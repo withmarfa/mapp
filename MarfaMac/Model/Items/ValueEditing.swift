@@ -2,13 +2,17 @@ import Foundation
 import Marfa
 
 /// The values that open in a panel under them, in the inspector and on the page: what the field is, whatever it is
-/// called. A yes or no is a checkbox in both places, and a list of anything but people or words stays in the inspector's
-/// own list editor.
+/// called. A yes or no is two rows, a list of people or words adds and takes away, and any other list of entries is
+/// edited member by member in the same panel.
 nonisolated enum ValueEditKind: Hashable, Sendable {
     case status(ItemTypeInfo.Field)
     case choice(ItemTypeInfo.Field)
     case date(ItemTypeInfo.Field)
     case people(ItemTypeInfo.Field, ListShape)
+    /// A yes or no, chosen from two rows.
+    case yesNo(ItemTypeInfo.Field)
+    /// A list of entries with members, such as emails and phone numbers with their labels: one block for each entry.
+    case entries(ItemTypeInfo.Field, ListShape)
     /// A text of any format, which may run to many lines.
     case text(ItemTypeInfo.Field)
     case number(ItemTypeInfo.Field)
@@ -25,6 +29,8 @@ nonisolated enum ValueEditKind: Hashable, Sendable {
     /// The item's Location: a point on a map and, where the type has one, a name for the place. It is made of fields, so
     /// it has none of its own, and it is set by clicking a map, not by choosing from a list.
     case location(ItemLocation)
+    /// An event's start, end, All Day and zone, which the type declares as fields and the panel writes together.
+    case eventTime(EventTime)
 
     /// How the field is edited in a panel, or nil where it is not.
     init?(field: ItemTypeInfo.Field) {
@@ -33,6 +39,8 @@ nonisolated enum ValueEditKind: Hashable, Sendable {
         case .choice where field.isPicked: self = .choice(field)
         case .date: self = .date(field)
         case .list(let shape) where shape.holdsPeople: self = .people(field, shape)
+        case .list(let shape): self = .entries(field, shape)
+        case .boolean: self = .yesNo(field)
         case .text: self = .text(field)
         case .number: self = .number(field)
         case .words: self = .words(field)
@@ -43,9 +51,9 @@ nonisolated enum ValueEditKind: Hashable, Sendable {
     var field: ItemTypeInfo.Field? {
         switch self {
         case .status(let field), .choice(let field), .date(let field), .people(let field, _), .text(let field), .number(let field),
-             .words(let field):
+             .words(let field), .yesNo(let field), .entries(let field, _):
             field
-        case .tags, .collections, .parent, .type, .location: nil
+        case .tags, .collections, .parent, .type, .location, .eventTime: nil
         }
     }
 
@@ -68,6 +76,7 @@ nonisolated enum ValueEditKind: Hashable, Sendable {
         case .parent: PagePlacement.parent
         case .type: PagePlacement.type
         case .location: ItemLocation.rowID
+        case .eventTime: EventTime.rowID
         default: field?.key ?? ""
         }
     }
@@ -89,8 +98,8 @@ nonisolated enum ValueEditKind: Hashable, Sendable {
     /// chip in the search field; a value that holds several shows one chip each, and the panel stays open.
     var closesOnChoice: Bool {
         switch self {
-        case .status, .choice, .parent, .type: true
-        case .date, .people, .tags, .collections, .text, .number, .words, .location: false
+        case .status, .choice, .parent, .type, .yesNo: true
+        case .date, .people, .tags, .collections, .text, .number, .words, .location, .eventTime, .entries: false
         }
     }
 }
@@ -168,6 +177,18 @@ nonisolated enum ValueEditOptions {
             rows.append(option(current, group: nil))
         }
         return rows
+    }
+
+    static let yesWord = "yes"
+    static let noWord = "no"
+
+    /// The two rows of a yes or no, the one it holds marked. A value that is not set reads as no.
+    static func yesNoRows(current: PropertyValue?) -> [ValueListRow] {
+        let isYes = InspectorFields.isYes(current)
+        return [
+            ValueListRow(id: optionID(yesWord), role: .option, title: String(localized: "Yes"), isCurrent: isYes),
+            ValueListRow(id: optionID(noWord), role: .option, title: String(localized: "No"), isCurrent: !isYes),
+        ]
     }
 
     /// A choice's options in the catalogue's order. The item's own
@@ -339,7 +360,13 @@ nonisolated enum PeopleSuggestions {
 
 /// The words a list of words can offer: those other items hold in the same field, most often held first.
 nonisolated enum WordSuggestions {
-    static func pool(from lists: [PropertyValue?]) -> [String] {
+    /// One word, as the first item that holds it spells it, with how many items hold it.
+    struct Entry: Hashable, Sendable {
+        let word: String
+        let count: Int
+    }
+
+    static func pool(from lists: [PropertyValue?]) -> [Entry] {
         var counts: [String: (word: String, count: Int)] = [:]
         for list in lists {
             for word in ListEntries.entries(of: list).compactMap(\.string) where !word.isEmpty {
@@ -348,7 +375,7 @@ nonisolated enum WordSuggestions {
         }
         return counts.values
             .sorted { $0.count != $1.count ? $0.count > $1.count : $0.word.localizedStandardCompare($1.word) == .orderedAscending }
-            .map(\.word)
+            .map { Entry(word: $0.word, count: $0.count) }
     }
 }
 

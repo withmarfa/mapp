@@ -24,13 +24,15 @@ struct ValueEditContent: View {
             await Task.yield()
             fieldFocused = true
         }
+        .onChange(of: model.listedCollections, initial: true) { _, ids in model.wantCounts(of: ids) }
+        .onDisappear { model.releaseCounts() }
     }
 
     // MARK: Search
 
     @ViewBuilder private var searchArea: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ChipFieldLayout(spacing: 4 * scale, lineHeight: ValueEditMetrics.rowHeight * scale, queryFloor: (model.query.isEmpty ? 16 : 48) * scale) {
+            ChipFieldLayout(spacing: 5 * scale, lineHeight: ValueEditMetrics.fieldLine * scale, queryFloor: (model.query.isEmpty ? 16 : 48) * scale) {
                 ForEach(model.chips) { chip in
                     ValueChipView(chip: chip, scale: scale) { model.remove(chip) }
                 }
@@ -42,8 +44,8 @@ struct ValueEditContent: View {
                     .accessibilityLabel(model.searchPrompt)
                     .accessibilityIdentifier("ValueEditSearch")
             }
-            .padding(.horizontal, 8 * scale)
-            .padding(.vertical, 2 * scale)
+            .padding(.horizontal, 7 * scale)
+            .padding(.vertical, 4 * scale)
             Divider().padding(.top, 2 * scale)
         }
         .padding(.bottom, 4 * scale)
@@ -200,27 +202,49 @@ struct ValueEditContent: View {
         .frame(height: ValueEditMetrics.rowHeight * scale)
     }
 
-    private func noticeArea(_ notice: String) -> some View {
+    /// A conflict is a question, so it has no red: what happened, what that means, and two small buttons with Keep My Edit
+    /// the main one. Anything else is one red line.
+    @ViewBuilder private func noticeArea(_ notice: String) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Divider().padding(.vertical, 4 * scale)
-            Text(verbatim: notice)
-                .font(.system(size: 11 * scale))
-                .foregroundStyle(.red)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 8 * scale)
-                .padding(.bottom, 2 * scale)
-                .accessibilityIdentifier("ValueEditNotice")
             if model.hasConflict {
-                HStack(spacing: 12 * scale) {
-                    Button("Keep My Edit") { model.keepEdit() }
-                        .accessibilityIdentifier("ValueEditKeepEdit")
-                    Button("Use Current Value") { model.useCurrentValue() }
-                        .accessibilityIdentifier("ValueEditUseCurrent")
-                }
-                .appButton(.secondary, size: .small)
-                .padding(.horizontal, 8 * scale)
-                .padding(.bottom, 2 * scale)
+                conflictFoot
+            } else {
+                Text(verbatim: notice)
+                    .font(.system(size: 11 * scale))
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 8 * scale)
+                    .padding(.bottom, 2 * scale)
+                    .accessibilityIdentifier("ValueEditNotice")
             }
+        }
+    }
+
+    private var conflictFoot: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 1 * scale) {
+                Text(verbatim: ValueEditModel.conflictQuestion)
+                    .foregroundStyle(.primary)
+                Text(verbatim: ValueEditModel.conflictConsequence)
+                    .foregroundStyle(.secondary)
+            }
+            .font(.system(size: 11 * scale))
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 8 * scale)
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("ValueEditNotice")
+            HStack(spacing: 6 * scale) {
+                Button("Keep My Edit") { model.keepEdit() }
+                    .appButton(.primary, size: .small)
+                    .accessibilityIdentifier("ValueEditKeepEdit")
+                Button("Use Current Value") { model.useCurrentValue() }
+                    .appButton(.secondary, size: .small)
+                    .accessibilityIdentifier("ValueEditUseCurrent")
+            }
+            .padding(.horizontal, 8 * scale)
+            .padding(.top, 6 * scale)
+            .padding(.bottom, 4 * scale)
         }
     }
 }
@@ -235,18 +259,19 @@ private struct ValueEditRow: View {
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
-        HStack(spacing: 7 * scale) {
+        HStack(spacing: 8 * scale) {
             ValueMarkView(mark: row.mark, scale: scale)
             Text(verbatim: row.title).lineLimit(1).truncationMode(.tail)
             Spacer(minLength: 8 * scale)
-            if let detail = row.detail {
-                if row.role == .create {
-                    ShortcutKeys(detail).layoutPriority(1)
-                } else {
-                    Text(verbatim: detail)
-                        .layoutPriority(1)
-                        .foregroundStyle(.secondary)
-                }
+            if row.role == .create {
+                // The key cap shows only while Return takes this row.
+                if isActive { ShortcutKeys("↩").layoutPriority(1) }
+            } else if let detail = row.detail ?? model.countText(of: row) {
+                Text(verbatim: detail)
+                    .font(.system(size: 12 * scale))
+                    .monospacedDigit()
+                    .layoutPriority(1)
+                    .foregroundStyle(.secondary)
             }
         }
         .font(.system(size: ValueEditMetrics.textSize * scale))

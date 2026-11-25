@@ -75,13 +75,19 @@ final class ValueEditPanelSession: ValueEditSession {
         panel.makeKeyAndOrderFront(nil)
         // A date panel has nothing to type until the person chooses the Time field, but AppKit gives a new panel's first text
         // field the focus. The panel itself takes it instead, so Tab still reaches the field.
-        if case .date = model.kind { panel.makeFirstResponder(panel) }
+        switch model.kind {
+        case .date, .eventTime: panel.makeFirstResponder(panel)
+        default: break
+        }
     }
 
-    /// The Location panel is a map with its own fields, so it draws itself; every other value draws the rows.
+    /// The Location panel is a map with its own fields, an event's time and a list of entries have fields of their own, so
+    /// they draw themselves; every other value draws the rows.
     @MainActor
     private static func content(of model: ValueEditModel) -> AnyView {
         if let location = model.location { return AnyView(LocationPanelContent(model: location, panel: model).interfaceTextStyle()) }
+        if let eventTime = model.eventTime { return AnyView(EventTimePanelContent(model: eventTime, panel: model).interfaceTextStyle()) }
+        if case .entries = model.kind { return AnyView(EntriesPanelContent(model: model).interfaceTextStyle()) }
         return AnyView(ValueEditContent(model: model).interfaceTextStyle())
     }
 
@@ -160,6 +166,7 @@ final class ValueEditPanelSession: ValueEditSession {
     private var estimatedHeight: CGFloat {
         switch model.kind {
         case .date: 420
+        case .eventTime: 400
         case .location: LocationMetrics.estimatedHeight
         default: CGFloat(model.rows.count) * ValueEditMetrics.rowHeight + 2 * ValueEditMetrics.padding + (model.hasSearch ? 64 : 0)
         }
@@ -195,7 +202,7 @@ extension ValueEditModel {
         var widest: CGFloat = 0
         for row in rows where row.role == .option || row.role == .create {
             let mark = row.mark == .none ? 0 : 21 * scale
-            let detail = row.detail.map { (row.role == .create ? 16 : text($0)) + 8 * scale } ?? 0
+            let detail = row.role == .create ? 24 * scale : row.detail.map { text($0) + 8 * scale } ?? 0
             widest = max(widest, mark + text(row.title) + detail + 8 * scale)
         }
         // The search field holds the chips and the room to type after them: one line for what fits, more where it does not.

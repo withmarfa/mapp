@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// A month drawn across the panel's width in the panel's own look: rows of 28 points, the accent in a circle on the chosen day,
-/// today in the accent's color, days of the neighbouring months dimmed. The system's graphical picker keeps its own
+/// A month drawn across the panel's width in the panel's own look: days 26 points across, the chosen day in a dark gray
+/// circle, today's number in red, days of the neighbouring months dimmed. The system's graphical picker keeps its own
 /// size and a grey ground, so it cannot be fitted to the panel.
 struct ValueCalendar: View {
     let selected: Date?
@@ -95,19 +95,31 @@ private struct ValueCalendarDay: View {
     @State private var hovered = false
     @Environment(\.colorScheme) private var scheme
 
+    /// Red for today, the one color a day takes; the chosen day is gray, never the accent.
+    private static let todayRed = Color(red: 229 / 255, green: 72 / 255, blue: 77 / 255)
+
+    private var ink: Color { scheme == .dark ? .white : .black }
+
     var body: some View {
         Button(action: action) {
             Text(verbatim: String(calendar.component(.day, from: day)))
-                .font(.system(size: 13 * scale, weight: isToday ? .semibold : .regular))
+                .font(.system(size: 13 * scale, weight: isSelected || isToday ? .semibold : .regular))
                 .monospacedDigit()
-                .foregroundStyle(isToday ? AnyShapeStyle(Color.accentColor) : inMonth ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
-                .frame(width: 28 * scale, height: 28 * scale)
-                .background(isSelected ? SelectionLooks.chosen(for: scheme) : hovered ? SelectionLooks.hover(for: scheme) : .clear, in: .circle)
+                .foregroundStyle(foreground)
+                .frame(width: 26 * scale, height: 26 * scale)
+                .background(isSelected ? ink.opacity(0.72) : hovered ? SelectionLooks.hover(for: scheme) : .clear, in: .circle)
                 .contentShape(.circle)
                 .frame(maxWidth: .infinity)
         }
         .buttonStyle(.plain)
         .onHover { hovered = $0 }
         .accessibilityLabel(Text(day, format: .dateTime.weekday(.wide).day().month(.wide)))
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private var foreground: AnyShapeStyle {
+        if isSelected { return AnyShapeStyle(scheme == .dark ? Color.black : Color.white) }
+        if isToday { return AnyShapeStyle(Self.todayRed) }
+        return inMonth ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary)
     }
 }

@@ -90,10 +90,10 @@ struct ItemPropertyRow: View {
         if case .list(let shape) = definition.kind {
             // The list tells its own refusals, beside the entry they are about.
             VStack(alignment: .leading, spacing: 8) {
-                ListEntriesEditor(
+                EntriesEditor(
                     shape: shape, label: definition.label, key: definition.key, value: value, isEditable: isEditable,
                     editing: input.list, isWriting: isWriting, onChange: onChange)
-                if isEditable, editKind != nil {
+                if isEditable, case .people? = editKind {
                     Button { openEditor() } label: { Label("Add Person…", systemImage: "person.badge.plus") }
                         .appButton(.secondary, size: .small)
                         .accessibilityLabel("Add Person to \(definition.label)")
@@ -327,7 +327,15 @@ struct ItemPropertyRow: View {
 
     /// The panel the value opens in. A row for a value no item holds yet types a text or a number into the row, since a
     /// panel writes what was typed to its item.
-    private var panelKind: ValueEditKind? { editKind.flatMap { item == nil && $0.isTyped ? nil : $0 } }
+    private var panelKind: ValueEditKind? {
+        editKind.flatMap { kind in
+            switch kind {
+            // A form edits a yes or no with its checkbox and a list of entries in its own blocks.
+            case .yesNo, .entries: nil
+            default: item == nil && kind.isTyped ? nil : kind
+            }
+        }
+    }
 
     private func openEditor() {
         guard isEditable, let kind = panelKind, let library, let view = anchor.view else { return }

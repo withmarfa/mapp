@@ -85,7 +85,7 @@ final class ValueEditModel {
     @ObservationIgnored private(set) var rowsBuilt = 0
     @ObservationIgnored let pool: [PeopleSuggestions.Person]
     @ObservationIgnored private var typedAhead = (text: "", at: Date.distantPast)
-    @ObservationIgnored let wordPool: [String]
+    @ObservationIgnored let wordPool: [WordSuggestions.Entry]
     /// What is typed into a text or a number, with the value it began from, so a change made elsewhere meanwhile is
     /// never written over.
     @ObservationIgnored let draft = ItemPropertyDraft()
@@ -96,11 +96,21 @@ final class ValueEditModel {
     @ObservationIgnored private(set) var isFinished = false
     /// The Location panel's own state, for a request of that kind.
     @ObservationIgnored private(set) var location: LocationPanelModel?
+    /// An event's time panel's own state, for a request of that kind.
+    @ObservationIgnored private(set) var eventTime: EventTimePanelModel?
+    /// The work on a list of entries, for a request of that kind: which entry is which while the list changes, and the
+    /// text typed into each member and not yet written.
+    @ObservationIgnored let entries = ListEditing()
+    /// The collections whose member counts the panel has asked for, which it lets go of when it ends (`ItemCounts`).
+    @ObservationIgnored var countedCollections: Set<ItemID> = []
 
     init(_ request: ValueEditRequest) {
         self.request = request
         if case .location(let spec) = request.kind, let item = request.item {
             location = LocationPanelModel(spec: spec, item: item, library: request.library, undoManager: request.undoManager)
+        }
+        if case .eventTime(let spec) = request.kind, let item = request.item {
+            eventTime = EventTimePanelModel(spec: spec, item: item, library: request.library, undoManager: request.undoManager, calendar: request.calendar)
         }
         let items = request.library.activeItems
         switch request.kind {
@@ -123,6 +133,10 @@ final class ValueEditModel {
     }
 
     var kind: ValueEditKind { request.kind }
+
+    /// What a conflict says at the panel's foot, in two lines: what happened, and what it means for the edit.
+    static let conflictQuestion = String(localized: "This value changed while you were editing.")
+    static let conflictConsequence = String(localized: "Your edit hasn’t been saved.")
 
     /// The type whose words a status panel edits: the item's own, since a status panel is for one item.
     var typeToEditStatuses: TypeID? {
@@ -231,7 +245,7 @@ final class ValueEditModel {
     var hasSearch: Bool {
         switch kind {
         case .people, .tags, .collections, .words, .parent, .status, .choice, .type: true
-        case .date, .text, .number, .location: false
+        case .date, .text, .number, .location, .yesNo, .eventTime, .entries: false
         }
     }
 
@@ -297,8 +311,9 @@ final class ValueEditModel {
         case .tags: tagRows
         case .collections: collectionRows
         case .words: wordRows
-        case .parent: parentRows
-        case .text, .number, .location: []
+        case .parent: marked(parentRows: parentRows)
+        case .yesNo: ValueEditOptions.yesNoRows(current: value)
+        case .text, .number, .location, .eventTime, .entries: []
         }
     }
 
@@ -346,6 +361,7 @@ final class ValueEditModel {
     var activeRow: String? {
         let rows = navigable
         if let highlight, rows.contains(where: { $0.id == highlight }) { return highlight }
+        if case .yesNo = kind { return rows.first { $0.isCurrent }?.id }
         guard hasSearch, !query.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
         switch kind {
         case .tags, .words: return rows.first { $0.role == .create }?.id ?? rows.first?.id
@@ -375,7 +391,10 @@ final class ValueEditModel {
     /// The most a list is tall: ten rows, past which it scrolls. A status list, which is grouped under headings, is as tall
     /// as its groups.
     func listLimit(scale: CGFloat) -> CGFloat {
-        if case .status = kind { return .infinity }
+        switch kind {
+        case .status, .entries: return .infinity
+        default: break
+        }
         return CGFloat(ValueEditMetrics.visibleRows) * ValueEditMetrics.rowHeight * scale
     }
 
@@ -443,7 +462,10 @@ final class ValueEditModel {
         case .words: activateWord(id)
         case .parent: activateParent(id)
         case .type: activateType(id)
-        case .text, .number, .location: break
+        case .yesNo:
+            guard let word = ValueEditOptions.word(of: id), commit(.bool(word == ValueEditOptions.yesWord)) else { return }
+            close()
+        case .text, .number, .location, .eventTime, .entries: break
         }
     }
 
@@ -497,12 +519,13 @@ final class ValueEditModel {
             return [ValueChip(id: ValueEditOptions.optionID(word), title: ItemTypeInfo.Field.label(ofOption: word), mark: .dot(OptionTone.tone(of: word, in: field, isPriority: isPriority(field))), isRemovable: !field.required)]
         case .parent:
             guard let current = parentTarget else { return [] }
-            return [ValueChip(id: "parent:" + current.id, title: current.displayTitle)]
+            let mark = current.itemID.flatMap(library.item).map(mark(of:)) ?? .none
+            return [ValueChip(id: "parent:" + current.id, title: current.displayTitle, mark: mark)]
         case .type:
             let types = Set(request.targets.compactMap { library.item($0)?.type })
             guard types.count == 1, let type = types.first else { return [] }
             return [ValueChip(id: Self.typePrefix + type.rawValue, title: library.catalogue.label(for: type), mark: .type(icon: library.catalogue.icon(for: type)), isRemovable: false, givesType: true)]
-        case .date, .text, .number, .location:
+        case .date, .text, .number, .location, .yesNo, .eventTime, .entries:
             return []
         }
     }
@@ -571,7 +594,10 @@ final class ValueEditModel {
     /// themselves; ending the panel any other way (a click elsewhere, a resized window, another item) never loses it.
     func finish(cancelled: Bool) {
         isFinished = true
+        releaseCounts()
         location?.finish(cancelled: cancelled)
+        eventTime?.finish(cancelled: cancelled)
+        leaveEntries(cancelled: cancelled)
         guard !cancelled else {
             // The time field loses focus as the panel goes, which would otherwise write what was cancelled.
             unsaved = nil
@@ -595,6 +621,13 @@ final class ValueEditModel {
     }
 
     // MARK: Writing
+
+    /// Holds `new` as the value of a request with no item, which the library has no copy of.
+    func keep(_ new: PropertyValue?) {
+        guard request.item == nil else { return }
+        local = new
+        hasLocal = true
+    }
 
     @discardableResult
     func commit(_ new: PropertyValue?, failure: String = String(localized: "The value could not be saved.")) -> Bool {
