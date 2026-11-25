@@ -50,7 +50,7 @@ struct ItemPanel<Legacy: View>: View {
                 VStack(alignment: .leading, spacing: 0) {
                     switch shown {
                     case .outline: PanelOutlineView(model: outline, onHeading: onHeading, onPage: onPage)
-                    case .links: PanelLinksView(groups: links, onOpen: onOpen)
+                    case .links: PanelLinksView(item: item.id, groups: links, onOpen: onOpen)
                     case .info: PanelInfoView(model: info, onShowHistory: onShowHistory) { legacy }
                     }
                 }
