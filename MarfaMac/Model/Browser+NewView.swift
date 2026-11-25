@@ -37,19 +37,52 @@ nonisolated enum NewViewStart: String, CaseIterable, Hashable, Identifiable, Sen
         case .blank: "square.dashed"
         }
     }
+
+    /// The order a starting point sets: as the window holds it, and as the view is written.
+    var sort: (window: [ItemTableComparator], saved: [LibraryViewSort])? {
+        switch self {
+        case .recentlyAdded, .inbox:
+            ([ItemTableComparator(column: .created, order: .reverse)], [LibraryViewSort(field: "created_at", ascending: false)])
+        default: nil
+        }
+    }
 }
 
 /// Making a view from a starting point: which ones fit the place, what each does to the window, which the person already
 /// has, the name the panel suggests, and Create View's checks. The window shows the view as it will list, and the
 /// panel's snapshot puts the place back on Cancel.
 extension Browser {
-    /// The search's tokens that Marfa can save as a view's filter, which This Search starts from. The panel names the
-    /// others (`ViewDraft.Unkept.searchToken`).
-    func searchTokenFilters(in library: any ItemLibrary) -> [FilterClause] {
-        let targets = tokenTargets(in: library)
-        return searchTokens.filter { token in
-            targets[token.field].flatMap { ViewDraft.piece(of: token, target: $0, calendar: .current) } != nil
+    /// The search's tokens This Search starts from: the window's search, or the one set aside while another starting
+    /// point shows its own list.
+    private var newViewSearchTokens: [FilterClause] { viewPanel?.setAsideSearch?.tokens ?? searchTokens }
+
+    /// What This Search saves of the search's tokens: the filters Marfa can say, and the From a From token names, which
+    /// becomes the view's tier as Marfa holds it. The panel names the other tokens (`ViewDraft.Unkept.searchToken`).
+    func searchStart(in library: any ItemLibrary) -> (filters: [FilterClause], scope: ListScope?, inFrom: [FilterClause]) {
+        let tokens = newViewSearchTokens
+        let targets = tokenTargets(in: library, of: tokens)
+        let place = (viewPanel?.snapshot?.place ?? shown).place
+        var result: (filters: [FilterClause], scope: ListScope?, inFrom: [FilterClause]) = ([], nil, [])
+        for token in tokens {
+            if token.field == FilterTarget.tier.id {
+                guard token.op == .is, token.values.count == 1, let tier = token.values.first.flatMap(Tier.init(word:)) else { continue }
+                if place.takesScope, result.scope == nil {
+                    result.scope = ListScope(tier: tier)
+                    result.inFrom.append(token)
+                } else if place == .library && tier == .library || place == .feed && tier == .feed {
+                    // The place lists that tier already.
+                    result.inFrom.append(token)
+                }
+            } else if targets[token.field].flatMap({ ViewDraft.piece(of: token, target: $0, calendar: .current) }) != nil {
+                result.filters.append(token)
+            }
         }
+        return result
+    }
+
+    /// The search's tokens that Marfa can save as a view's filter.
+    func searchTokenFilters(in library: any ItemLibrary) -> [FilterClause] {
+        searchStart(in: library).filters
     }
 
     /// The starting points for the place the new view began on, three to a tile row: This Search first while searching,
@@ -59,7 +92,8 @@ extension Browser {
         guard let snapshot = viewPanel?.snapshot, snapshot.place.view == .own else { return [] }
         let place = snapshot.place.place
         var starts: [NewViewStart] = []
-        if !searchTokenFilters(in: library).isEmpty { starts.append(.search) }
+        let search = searchStart(in: library)
+        if !search.filters.isEmpty || !search.inFrom.isEmpty { starts.append(.search) }
         starts += [.recentlyAdded, .favorites]
         if availableViewModes(in: library).contains(.calendar) { starts.append(.calendar) }
         if statusColumn(in: library) != nil { starts.append(.byStatus) }
@@ -109,11 +143,21 @@ extension Browser {
         var options = ItemTableOptions()
         var layout = snapshot.viewMode
         panel.quickActions = nil
+        panel.choosesNoSource = false
+        panel.tokensInFrom = []
+        // Any other starting point shows its own list, so the search is set aside until the panel closes.
+        if start == .search { restoreSetAsideSearch(of: panel) } else { setSearchAside(in: panel) }
         switch start {
         case .search:
-            options.filter.clauses = searchTokenFilters(in: library)
+            let search = searchStart(in: library)
+            // The place's From, Archived Items and Include Kinds stay, and a From token sets the From.
+            options.scope = search.scope ?? snapshot.options?.scope
+            options.archived = snapshot.options?.archived
+            options.includesKinds = snapshot.options?.includesKinds
+            options.filter.clauses = search.filters
+            panel.tokensInFrom = search.inFrom
         case .recentlyAdded:
-            options.sort = [ItemTableComparator(column: .created, order: .reverse)]
+            options.sort = start.sort?.window
             layout = .list
         case .favorites:
             options.filter.clauses = [FilterClause(field: ItemTableColumn.tags.id, op: .includes, values: [ItemTag.favorite])]
@@ -131,7 +175,7 @@ extension Browser {
         case .inTheFeed:
             options.scope = .feed
         case .inbox:
-            options.sort = [ItemTableComparator(column: .created, order: .reverse)]
+            options.sort = start.sort?.window
             layout = .list
             panel.quickActions = true
         case .blank:
@@ -141,6 +185,107 @@ extension Browser {
         if layout != viewMode { set(layout: layout) }
         panel.start = start
         panel.suggest(suggestedViewName(in: library))
+        panel.startingValues = newViewValues()
+    }
+
+    private func setSearchAside(in panel: ViewPanel) {
+        guard panel.setAsideSearch == nil, narrowsBySearch else { return }
+        panel.setAsideSearch = ViewPanel.SetAsideSearch(text: searchText, tokens: searchTokens, relevanceChoice: relevanceChoice)
+        searchText = ""
+        searchTokens = []
+    }
+
+    func restoreSetAsideSearch(of panel: ViewPanel) {
+        guard let aside = panel.setAsideSearch else { return }
+        panel.setAsideSearch = nil
+        searchText = aside.text
+        searchTokens = aside.tokens
+        relevanceChoice = aside.relevanceChoice
+    }
+
+    // MARK: What the person has made of it
+
+    /// The new view's values as the window shows them now.
+    func newViewValues() -> ViewPanel.Values? {
+        guard let panel = viewPanel, panel.isNew, let place = panel.snapshot?.place else { return nil }
+        var options = (tableOptions[place] ?? ItemTableOptions()).settled
+        options.collapsed = nil
+        return ViewPanel.Values(
+            options: options, layout: viewMode, timelineDate: timelineFields[place], quickActions: panel.quickActions,
+            addsToSidebar: panel.addsToSidebar, choosesNoSource: panel.choosesNoSource)
+    }
+
+    /// Whether the new view holds the person's work: a name they typed, a value they changed since the starting point,
+    /// or a Create View that could not make it yet.
+    func isNewViewTouched(_ panel: ViewPanel) -> Bool {
+        guard panel.isNew, viewPanel === panel else { return false }
+        return panel.problem != nil || panel.hasTypedName || newViewValues() != panel.startingValues
+    }
+
+    /// Whether a click outside the panel must not end it: while the new view holds the person's work, whatever
+    /// Create View's state.
+    var keepsNewViewOpen: Bool {
+        guard let panel = viewPanel else { return false }
+        return isNewViewTouched(panel)
+    }
+
+    /// What the new view gives back as it ends any way but Cancel: the whole of it in words while it holds the
+    /// person's work, and nothing otherwise.
+    func newViewHandOff(in library: any ItemLibrary) -> String? {
+        guard let panel = viewPanel, isNewViewTouched(panel) else { return nil }
+        return newViewDescription(in: library)
+    }
+
+    /// The new view as its panel's sentence reads, under its name: its types, From, filters, layout, sort and group.
+    func newViewDescription(in library: any ItemLibrary) -> String {
+        let panel = viewPanel
+        let typed = panel?.trimmedName ?? ""
+        let name = typed.isEmpty ? suggestedViewName(in: library) : typed
+        let content = tableContent(in: library)
+        let options = tableOptions[shown] ?? ItemTableOptions()
+        let catalogue = library.catalogue
+        let place = shown.place
+        let isTypes = { (clause: FilterClause) in clause.field == ViewDraft.typeFieldID && clause.op == .is }
+        let types = (options.filter.clauses.first(where: isTypes)?.values ?? []).filter { !$0.isEmpty }
+            .map { catalogue.itemTypes[TypeID($0)]?.plural ?? $0 }
+        var words: [String] = []
+        if !types.isEmpty {
+            words.append(types.formatted(.list(type: .and, width: .standard)))
+        } else if case .type = place {
+            words.append(library.name(of: place))
+        } else {
+            words.append(String(localized: "All items"))
+        }
+        switch place {
+        case .library: words.append(String(localized: "from the Library"))
+        case .feed: words.append(String(localized: "from the Feed"))
+        case .collection, .source: words.append(String(localized: "in \(library.name(of: place))"))
+        default: break
+        }
+        if place.takesScope { words += [String(localized: "from"), listing.scope.title] }
+        let conditions = options.filter.clauses.filter { $0.isComplete && !isTypes($0) }
+        if conditions.isEmpty {
+            words += [String(localized: "with"), String(localized: "no filter")]
+        } else {
+            let said = conditions.map { clause -> String in
+                guard let target = content.filterOffer.targets[clause.field] else { return clause.values.joined(separator: ", ") }
+                let parts = FilterWording.parts(of: clause, target: target, calendar: .current, titles: { library.title(ofValue: $0) })
+                return [parts.field, parts.relation, parts.values].filter { !$0.isEmpty }.joined(separator: " ")
+            }
+            let joined = options.filter.matchesAny
+                ? said.formatted(.list(type: .or, width: .standard)) : said.formatted(.list(type: .and, width: .standard))
+            words += [String(localized: "where"), joined]
+        }
+        words += [String(localized: "as a"), viewMode.title]
+        if viewMode != .timeline, viewMode != .calendar, !keepsPlaceOrder {
+            let sort = SavedViews.arrangement(self, content: content, order: storedOrder).sort
+            if let first = sort.first { words += [String(localized: "sorted by"), first.column.label] }
+            let grouping = shownGrouping(in: library)
+            if grouping != .none, let found = groupOffer(in: library).entry(for: grouping) {
+                words += [String(localized: "grouped by"), found.entry.label]
+            }
+        }
+        return name + "\n" + words.joined(separator: " ")
     }
 
     /// The Feed's sources an inbox can list, by name with their counts.
@@ -153,16 +298,25 @@ extension Browser {
         tableOptions[shown]?.filter.clauses.first { $0.field == FilterTarget.source.id && $0.op == .is }?.values ?? []
     }
 
-    /// Ticks or unticks one source of an inbox. Every source ticked is no filter at all.
+    /// Whether an inbox's menu ticks `code`: every source while none is named, and none once the person unticked the last.
+    func ticksSource(_ code: String) -> Bool {
+        if viewPanel?.choosesNoSource == true { return false }
+        let chosen = chosenSources
+        return chosen.isEmpty || chosen.contains(code)
+    }
+
+    /// Ticks or unticks one source of an inbox. Every source ticked is no filter at all, and none ticked is a view
+    /// Create View won't make until one is ticked again.
     func setSource(_ code: String, chosen: Bool, in library: any ItemLibrary) {
         let all = inboxSources(in: library).map(\.code)
-        var chosenNow = Set(chosenSources.isEmpty ? all : chosenSources)
+        var chosenNow = Set(all.filter(ticksSource))
         if chosen { chosenNow.insert(code) } else { chosenNow.remove(code) }
         var options = tableOptions[shown] ?? ItemTableOptions()
         options.filter.clauses.removeAll { $0.field == FilterTarget.source.id && $0.op == .is }
         if !chosenNow.isEmpty, chosenNow != Set(all) {
             options.filter.clauses.append(FilterClause(field: FilterTarget.source.id, op: .is, values: all.filter(chosenNow.contains)))
         }
+        viewPanel?.choosesNoSource = chosenNow.isEmpty
         tableOptions[shown] = options
     }
 

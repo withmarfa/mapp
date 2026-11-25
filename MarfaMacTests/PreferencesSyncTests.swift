@@ -194,6 +194,40 @@ import Testing
         _ = sync
     }
 
+    // MARK: The row of views on two Macs
+
+    private let viewOrder = PreferenceUnit.row(.places, setting: "viewOrder", key: "library")
+    private let viewHidden = PreferenceUnit.row(.places, setting: "viewHidden", key: "library")
+
+    @Test func aHideHereAndAReorderOnAnotherMacBothStand() async throws {
+        let copy = FakePreferencesCopy()
+        let item = await copy.add([viewOrder: #"["own","favorites"]"#])
+        let sync = await sync(copy)
+        ViewOrders.update(in: defaults) { $0.setHidden(.favorites, true, in: .library) }
+        await copy.change(item, [viewOrder: #"["favorites","own"]"#])
+        await sync.flush()
+        #expect(try await eventuallyAsking { await copy.unitsHeld(item)[self.viewHidden] != nil })
+        let stored = ViewOrders.stored(in: defaults)
+        #expect(stored.order(in: .library) == [.favorites, .own])
+        #expect(stored.hidden(in: .library) == [.favorites])
+        #expect(await copy.unitsHeld(item)[viewOrder] == #"["favorites","own"]"#)
+    }
+
+    @Test func aReorderHereLeavesAHideOnAnotherMacStanding() async throws {
+        let copy = FakePreferencesCopy()
+        let item = await copy.add([viewOrder: #"["own","favorites"]"#])
+        let sync = await sync(copy)
+        ViewOrders.update(in: defaults) { $0.set([.favorites, .own], in: .library) }
+        await copy.change(item, [viewHidden: #"["favorites"]"#])
+        await sync.flush()
+        #expect(try await eventuallyAsking { await copy.unitsHeld(item)[self.viewOrder] == #"["favorites","own"]"# })
+        await sync.flush()
+        let stored = ViewOrders.stored(in: defaults)
+        #expect(stored.hidden(in: .library) == [.favorites])
+        #expect(stored.order(in: .library) == [.favorites, .own])
+        #expect(await copy.unitsHeld(item)[viewHidden] == #"["favorites"]"#)
+    }
+
     @Test func aMarfaValueThatCannotBeReadIsSetAsideOnceAndLeftInTheMarfa() async throws {
         let copy = FakePreferencesCopy()
         let sync = await sync(copy)

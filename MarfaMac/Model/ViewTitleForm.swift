@@ -26,6 +26,8 @@ final class ViewTitleForm {
     private let library: any ItemLibrary
     private var isFinished = false
     private var departure: Departure?
+    /// What is given back in place of the title alone, such as the whole of a new view in words.
+    private var handOffText: String?
 
     init(title: String = "", library: any ItemLibrary) {
         self.title = title
@@ -61,9 +63,10 @@ final class ViewTitleForm {
 
     /// Gives a title the server has not taken to the clipboard through the library's notices, as the panel that
     /// asked for it ends without the person's Cancel. A title on its way to the server is given back only if it is refused.
-    func handOff(because departure: Departure) {
+    func handOff(because departure: Departure, text: String? = nil) {
         guard !isFinished, self.departure == nil else { return }
         self.departure = departure
+        handOffText = text
         guard !isSaving else { return }
         giveBack()
     }
@@ -71,7 +74,7 @@ final class ViewTitleForm {
     private func giveBack() {
         guard let departure, !isFinished else { return }
         isFinished = true
-        let title = trimmedTitle
+        let title = handOffText ?? trimmedTitle
         guard !title.isEmpty else { return }
         let reason = switch departure {
         case .closed: String(localized: "The window closed before the view was saved.")

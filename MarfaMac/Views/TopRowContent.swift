@@ -81,7 +81,7 @@ struct TopRowContent {
         let all = choices(in: ofLibrary ? .library : place, browser: browser, library: library)
         let chosenWord = shown.view.word
         let making = browser.viewPanel?.isNew == true
-        var views = all.filter { !$0.isHidden || (!making && !ofLibrary && $0.id == chosenWord) }
+        var views = all.filter { !$0.isHidden || (!making && (!ofLibrary || place == .library) && $0.id == chosenWord) }
         if let panel = browser.viewPanel, panel.isNew {
             let title = panel.trimmedName.isEmpty ? String(localized: "New View") : panel.trimmedName
             views.append(Choice(id: Choice.newID, title: title, target: shown, isNew: true))

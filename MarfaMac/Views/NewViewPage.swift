@@ -11,6 +11,8 @@ struct NewViewPage: View {
     @Bindable var panel: ViewPanel
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 3)
+    /// The view a tile would open, while the person is asked whether to discard the new view for it.
+    @State private var discardingFor: PlaceView?
 
     var body: some View {
         let starts = browser.newViewStarts(in: library)
@@ -68,7 +70,7 @@ struct NewViewPage: View {
                     .accessibilityIdentifier("ViewPanelCancel")
                 Button("Create View") { create() }
                     .buttonStyle(.borderedProminent)
-                    .disabled(panel.form?.isBusy == true || clash != nil || !library.reachesServer)
+                    .disabled(panel.form?.isBusy == true || clash != nil || !library.reachesServer || panel.choosesNoSource)
                     .accessibilityIdentifier("ViewPanelCreate")
             }
         }
@@ -76,6 +78,19 @@ struct NewViewPage: View {
         .padding(.top, 4)
         .padding(.bottom, 10)
         .onChange(of: suggestion) { panel.suggest(suggestion) }
+        .alert(
+            "Discard the New View?", isPresented: Binding { discardingFor != nil } set: { if !$0 { discardingFor = nil } },
+            presenting: discardingFor
+        ) { theirs in
+            Button("Cancel", role: .cancel) { discardingFor = nil }
+                .keyboardShortcut(.defaultAction)
+            Button("Discard", role: .destructive) {
+                discardingFor = nil
+                browser.openExistingView(theirs, in: library, order: order)
+            }
+        } message: { theirs in
+            Text("“\(title(of: theirs))” opens in its place, and what you chose for the new view is lost.")
+        }
     }
 
     /// The name another view already has, which Create View will not take.
@@ -86,6 +101,7 @@ struct NewViewPage: View {
 
     private var shownProblem: String? {
         if let clash { return String(localized: "A view named “\(clash)” already exists. Choose another name.") }
+        if panel.choosesNoSource { return String(localized: "Choose at least one source for the inbox.") }
         switch panel.problem {
         case .offline?:
             return library.reachesServer
@@ -100,7 +116,7 @@ struct NewViewPage: View {
         let theirs = browser.existingView(for: start, in: library)
         let chosen = panel.start == start
         return Button {
-            if let theirs { browser.openExistingView(theirs, in: library, order: order) } else { browser.chooseStart(start, in: library) }
+            discardingFor = browser.pickStart(start, in: library, order: order)
         } label: {
             VStack(spacing: 4) {
                 Image(systemName: theirs == nil ? start.symbol : "checkmark.circle.fill")
@@ -228,10 +244,12 @@ private struct NewViewSentence: View {
             let sources = browser.inboxSources(in: library)
             let chosen = browser.chosenSources
             let names = sources.filter { chosen.contains($0.code) }.map(\.name)
+            let title = panel.choosesNoSource ? String(localized: "no source")
+                : names.isEmpty ? String(localized: "any source") : names.formatted(.list(type: .or, width: .standard))
             words(String(localized: "whose source is"))
-            value(names.isEmpty ? String(localized: "any source") : names.formatted(.list(type: .or, width: .standard)), id: "Sources") {
+            value(title, id: "Sources") {
                 ForEach(sources, id: \.code) { source in
-                    Toggle(isOn: Binding { chosen.isEmpty || chosen.contains(source.code) } set: {
+                    Toggle(isOn: Binding { browser.ticksSource(source.code) } set: {
                         browser.setSource(source.code, chosen: $0, in: library)
                     }) {
                         Text("\(source.name)  \(source.count.formatted())")

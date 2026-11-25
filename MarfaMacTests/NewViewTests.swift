@@ -155,7 +155,7 @@ struct NewViewTests {
         #expect(made == nil)
         let panel = try #require(browser.viewPanel)
         #expect(panel.problem == .offline)
-        #expect(panel.holdsUnmadeView)
+        #expect(browser.keepsNewViewOpen)
         #expect(panel.shownName == "Mine")
         #expect(browser.tableOptions[browser.shown]?.sort?.first?.column.id == ItemTableColumn.created.id)
         #expect(library.views.isEmpty)
@@ -328,14 +328,196 @@ struct NewViewTests {
         #expect(browser.viewChoices(in: place, library: library) == [.saved(views[2].id), .own, .saved(views[0].id), .saved(added.id)])
     }
 
-    @Test func anEarlierCopyLeavesAHiddenViewAloneAndKeepsItThroughItsOwnOrder() {
-        var orders = ViewOrders()
-        orders.set([.own, .saved(ItemID("a"))], in: .library)
-        orders.setHidden(.saved(ItemID("a")), true, in: .library)
-        // What an earlier copy reads: the hidden word is one it does not know.
-        #expect(orders.order(in: .library) == [.own, .saved(ItemID("a"))])
-        #expect(orders.places[Place.library.word]?.contains { ViewChoice(knownWord: $0) == nil } == true)
-        orders.set([.saved(ItemID("a")), .own], in: .library)
-        #expect(orders.hidden(in: .library) == [.saved(ItemID("a"))])
+    @Test func hiddenViewsAreASettingOfTheirOwnThatAReorderLeavesAlone() {
+        let defaults = ThrowawayDefaults.make("MarfaMac.NewViewTests.hidden")
+        ViewOrders.update(in: defaults) { $0.setHidden(.saved(ItemID("a")), true, in: .library) }
+        #expect(defaults.data(forKey: ViewOrders.key) == nil)
+        ViewOrders.update(in: defaults) { $0.set([.saved(ItemID("a")), .own], in: .library) }
+        let stored = ViewOrders.stored(in: defaults)
+        #expect(stored.hidden(in: .library) == [.saved(ItemID("a"))])
+        #expect(stored.order(in: .library) == [.saved(ItemID("a")), .own])
+    }
+
+    @Test func aReorderKeepsAViewThisMacHasNotReadAtItsPlace() {
+        let views = ["A", "B"].map {
+            LibraryView(id: ItemID("v-\($0)"), title: $0, version: 1, query: LibraryViewQuery(types: [Self.task]), sort: [], group: nil)
+        }
+        let place = Place.type(Self.task)
+        let (browser, library) = Self.window(views: views)
+        let unread = ViewChoice.saved(ItemID("v-elsewhere"))
+        ViewOrders.update(in: browser.defaults) { $0.set([.own, unread, .saved(views[0].id), .saved(views[1].id)], in: place) }
+        browser.moveView(.saved(views[1].id), onto: .own, in: place, library: library)
+        #expect(ViewOrders.stored(in: browser.defaults).order(in: place) == [.saved(views[1].id), unread, .own, .saved(views[0].id)])
+    }
+
+    // MARK: Round 1
+
+    @Test func aTileForAViewThePersonHasAsksOnlyOnceTheDraftIsTheirs() throws {
+        let theirs = LibraryView(
+            id: ItemID("v-board"), title: "Board", version: 1, query: LibraryViewQuery(types: [Self.task]),
+            sort: [], group: LibraryViewGroup(field: ViewDraft.statusGroupField))
+        let status = ItemTypeInfo.Field(key: "status", label: "Status", kind: .status([
+            StatusWord(value: "todo", group: .notStarted), StatusWord(value: "done", group: .completed),
+        ]), declaredBy: Self.task)
+        let (browser, library) = Self.window(views: [theirs])
+        library.catalogue = MarfaMac.Catalogue(itemTypes: [
+            ItemTypeInfo(id: Self.task, label: "Task", fields: [status], titleField: "title", bodyField: "body", parent: nil),
+        ])
+        browser.openNewViewPanel(in: library)
+        browser.viewPanel?.shownName = "Mine"
+        #expect(browser.keepsNewViewOpen)
+        #expect(browser.pickStart(.byStatus, in: library, order: Self.order)?.view == .saved(theirs.id))
+        #expect(browser.viewPanel?.shownName == "Mine")
+        // A value changed is the person's too.
+        browser.viewPanel?.shownName = ""
+        browser.chooseStart(.recentlyAdded, in: library)
+        #expect(!browser.keepsNewViewOpen)
+        browser.setSort([ItemTableComparator(column: .title, order: .forward)])
+        #expect(browser.pickStart(.byStatus, in: library, order: Self.order) != nil)
+        #expect(browser.viewPanel != nil)
+        // Untouched, the tile opens theirs at once.
+        browser.chooseStart(.recentlyAdded, in: library)
+        #expect(browser.pickStart(.byStatus, in: library, order: Self.order) == nil)
+        #expect(browser.viewPanel == nil)
+        #expect(browser.shown.savedView == theirs.id)
+    }
+
+    @Test func aTouchedDraftEndedByAPlaceChangeIsGivenBackInWords() throws {
+        let (browser, library) = Self.window()
+        browser.openNewViewPanel(in: library)
+        browser.chooseStart(.recentlyAdded, in: library)
+        browser.viewPanel?.shownName = "Newest Tasks"
+        browser.show(.feed, in: library, order: Self.order)
+        let notice = try #require(library.notices.waiting.first { $0.isNotKept })
+        let text = try #require(notice.text)
+        #expect(text.hasPrefix("Newest Tasks\n"))
+        #expect(text.contains("sorted by"))
+        #expect(text.contains(ItemViewMode.list.title))
+    }
+
+    @Test func anUntouchedDraftEndsWithNothingGivenBack() {
+        let (browser, library) = Self.window()
+        browser.openNewViewPanel(in: library)
+        browser.chooseStart(.recentlyAdded, in: library)
+        #expect(!browser.keepsNewViewOpen)
+        browser.show(.feed, in: library, order: Self.order)
+        #expect(!library.notices.waiting.contains { $0.isNotKept })
+    }
+
+    @Test func aRefusedDraftIsStillGivenBackWhenTheWindowCloses() async throws {
+        let (browser, library) = Self.window()
+        library.viewFailure = ViewWriteFailure(kind: .refused, message: "filter")
+        browser.openNewViewPanel(in: library)
+        browser.chooseStart(.favorites, in: library)
+        #expect(await browser.finishViewPanel(in: library, order: Self.order) == nil)
+        #expect(browser.keepsNewViewOpen)
+        browser.viewPanel?.handOff(because: .closed)
+        let text = try #require(library.notices.waiting.first { $0.isNotKept }?.text)
+        #expect(text.hasPrefix("Favorites\n"))
+    }
+
+    @Test func thisSearchSavesAFromTokenAsTheViewsTier() async throws {
+        let (browser, library) = Self.window()
+        let feed = FilterClause(field: FilterTarget.tier.id, op: .is, values: [Tier.feed.word])
+        browser.addSearchToken(feed)
+        browser.openNewViewPanel(in: library)
+        #expect(browser.viewPanel?.start == .search)
+        #expect(browser.listing.scope == .feed)
+        let draft = try #require(ViewDraft.draft(SavedViews.window(browser, in: library, order: Self.order), catalogue: library.catalogue, views: []))
+        #expect(draft.unkept.isEmpty)
+        let made = try #require(await browser.finishViewPanel(in: library, order: Self.order))
+        #expect(made.query.tier == .feed)
+        #expect(made.query.filter == nil)
+        #expect(Self.overTheWire(made)?.query.tier == .feed)
+    }
+
+    @Test func aFromTokenTheViewCannotSayIsNamed() throws {
+        let (browser, library) = Self.window(.library)
+        let feed = FilterClause(field: FilterTarget.tier.id, op: .is, values: [Tier.feed.word])
+        let tag = FilterClause(field: FilterTarget.tags.id, op: .includes, values: ["zine"])
+        browser.addSearchToken(feed)
+        browser.addSearchToken(tag)
+        browser.openNewViewPanel(in: library)
+        #expect(browser.tableOptions[browser.shown]?.filter.clauses == [tag])
+        let draft = try #require(ViewDraft.draft(SavedViews.window(browser, in: library, order: Self.order), catalogue: library.catalogue, views: []))
+        let named = draft.unkept.compactMap { if case .searchToken(let words) = $0 { words } else { nil } }
+        #expect(named.count == 1)
+        #expect(named.first?.contains(Tier.feed.title) == true)
+    }
+
+    @Test func anotherStartingPointShowsItsOwnListAndTheSearchComesBack() async throws {
+        let (browser, library) = Self.window()
+        let tag = FilterClause(field: FilterTarget.tags.id, op: .includes, values: ["zine"])
+        browser.addSearchToken(tag)
+        browser.searchText = "zine"
+        browser.openNewViewPanel(in: library)
+        browser.chooseStart(.recentlyAdded, in: library)
+        #expect(browser.searchTokens.isEmpty)
+        #expect(!browser.isSearching)
+        #expect(browser.newViewStarts(in: library).first == .search)
+        browser.chooseStart(.search, in: library)
+        #expect(browser.searchTokens == [tag])
+        browser.chooseStart(.recentlyAdded, in: library)
+        browser.escapeViewPanel(in: library)
+        #expect(browser.searchTokens == [tag])
+        #expect(browser.searchText == "zine")
+        // Made, it is written with the starting point's own order.
+        browser.openNewViewPanel(in: library)
+        browser.chooseStart(.recentlyAdded, in: library)
+        let made = try #require(await browser.finishViewPanel(in: library, order: Self.order))
+        #expect(made.sort == [LibraryViewSort(field: "created_at", ascending: false)])
+    }
+
+    @Test func untickingTheLastInboxSourceLeavesNoneAndMakesNothing() async {
+        let (browser, library) = Self.window(.feed)
+        library.sources.counts = ["mail": 2]
+        browser.openNewViewPanel(in: library)
+        browser.chooseStart(.inbox, in: library)
+        #expect(browser.ticksSource("mail"))
+        browser.setSource("mail", chosen: false, in: library)
+        #expect(!browser.ticksSource("mail"))
+        #expect(browser.viewPanel?.choosesNoSource == true)
+        #expect(await browser.finishViewPanel(in: library, order: Self.order) == nil)
+        #expect(library.views.isEmpty)
+        browser.setSource("mail", chosen: true, in: library)
+        #expect(browser.ticksSource("mail"))
+        #expect(browser.viewPanel?.choosesNoSource == false)
+    }
+
+    @Test func aPillRenameOfAViewDeletedElsewhereGivesTheNameBack() async {
+        let id = ItemID("v-open")
+        let (browser, library) = Self.window(views: [])
+        #expect(await browser.renameView(id, to: "Newest", from: "Open", in: library) == false)
+        let notice = library.notices.waiting.first { $0.isNotKept && $0.text == "Newest" }
+        #expect(notice?.message.contains(Browser.deletedElsewhere) == true)
+    }
+
+    @Test func aPillRenameTheServerFindsGoneGivesTheNameBack() async {
+        let id = ItemID("v-open")
+        let view = LibraryView(id: id, title: "Open", version: 1, query: LibraryViewQuery(types: [Self.task]), sort: [], group: nil)
+        let (browser, library) = Self.window(views: [view])
+        library.viewFailure = ViewWriteFailure(kind: .gone, message: "Gone")
+        #expect(await browser.renameView(id, to: "Newest", from: "Open", in: library) == false)
+        let notice = library.notices.waiting.first { $0.isNotKept && $0.text == "Newest" }
+        #expect(notice?.message.contains(Browser.deletedElsewhere) == true)
+    }
+
+    @Test func deleteAndDuplicateOfAViewGoneTellThePerson() async {
+        let (browser, library) = Self.window(views: [])
+        browser.askToDeleteView(ItemID("v-gone"), in: library)
+        #expect(browser.deletingView == nil)
+        #expect(await browser.duplicateView(ItemID("v-gone"), in: library, order: Self.order) == nil)
+        #expect(library.notices.waiting.filter { $0.message == Browser.deletedElsewhere }.count == 2)
+        #expect(library.views.isEmpty)
+    }
+
+    @Test func aHiddenLibraryViewShowsItsPillWhileChosen() {
+        let view = LibraryView(id: ItemID("v-a"), title: "A", version: 1, query: LibraryViewQuery(), sort: [], group: nil)
+        let (browser, library) = Self.window(.library, views: [view])
+        ViewOrders.update(in: browser.defaults) { $0.setHidden(.saved(view.id), true, in: .library) }
+        browser.showing = PlaceView(.library, .saved(view.id))
+        let row = TopRowContent.make(browser: browser, library: library)
+        #expect(row.views.contains { $0.id == ViewChoice.saved(view.id).word && $0.isHidden })
+        #expect(row.chosen == ViewChoice.saved(view.id).word)
     }
 }

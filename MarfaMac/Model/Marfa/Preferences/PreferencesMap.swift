@@ -93,6 +93,8 @@ enum PreferencesMap {
             .places, setting: "placeDensity", .data, wrapper: nil, local: [], .data(PlaceDensities.setAsideKey))),
         SyncedSetting(key: ViewOrders.key, place: .rows(
             .places, setting: "viewOrder", .data, wrapper: nil, local: [], .data(ViewOrders.setAsideKey))),
+        SyncedSetting(key: ViewOrders.hiddenKey, place: .rows(
+            .places, setting: "viewHidden", .data, wrapper: nil, local: [], .data(ViewOrders.hiddenSetAsideKey))),
         SyncedSetting(key: SidebarLayouts.defaultsKey, place: .sidebar(.data(SidebarLayouts.setAsideKey))),
     ]
 

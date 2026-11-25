@@ -6,6 +6,10 @@ import Observation
 @Observable
 final class Browser {
     var showing: PlaceView? = .library {
+        // A new view's words are worked out while the window still shows the place it began on.
+        willSet {
+            if !(newValue.map { $0.isSame(showing) } ?? (showing == nil)) { viewPanel?.settleHandOffText() }
+        }
         // A scroll position belongs to the place and layout it was made in.
         didSet {
             // A saved view that moves to another home is still what the window shows.
@@ -456,6 +460,7 @@ final class Browser {
         Browser.open.add(self)
         if let undoManager { self.undoManager = undoManager }
         guard libraryID != id else { return }
+        viewPanel?.settleHandOffText()
         self.library = library
         let isFirst = libraryID == nil
         libraryID = id

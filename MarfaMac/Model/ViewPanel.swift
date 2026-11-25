@@ -104,8 +104,50 @@ final class ViewPanel {
         suggestedName = name
     }
 
-    /// Whether the panel holds something a click outside it must not throw away: a view Create View could not make yet.
-    var holdsUnmadeView: Bool { isNew && problem != nil }
+    /// Whether the person unticked every source of an inbox, which Create View won't make.
+    var choosesNoSource = false
+
+    /// What the new view's values were when the panel opened or the person last chose a starting point: a draft that
+    /// differs, or holds a typed name, is the person's work (`Browser.isNewViewTouched`).
+    struct Values: Equatable {
+        var options: ItemTableOptions
+        var layout: ItemViewMode
+        var timelineDate: String?
+        var quickActions: Bool?
+        var addsToSidebar: Bool
+        var choosesNoSource: Bool
+    }
+
+    var startingValues: Values?
+
+    /// Whether the person typed a name of their own rather than taking the one suggested.
+    var hasTypedName: Bool {
+        guard let form else { return false }
+        return !form.trimmedTitle.isEmpty && form.title != suggestedName
+    }
+
+    /// The search set aside while a starting point other than This Search shows its own list, put back when the panel
+    /// closes on the place it began on.
+    struct SetAsideSearch {
+        var text: String
+        var tokens: [FilterClause]
+        var relevanceChoice: Bool?
+    }
+
+    var setAsideSearch: SetAsideSearch?
+    /// The search's tokens This Search says with its From rather than its filter.
+    var tokensInFrom: [FilterClause] = []
+
+    /// The new view in words, or nil while the person has made nothing of it, given back when the panel ends any way
+    /// but Cancel (`Browser.newViewHandOff`).
+    @ObservationIgnored var handOffText: (() -> String?)?
+
+    /// Works the words out now, while the window still shows the place the new view began on.
+    func settleHandOffText() {
+        guard let handOffText else { return }
+        let text = handOffText()
+        self.handOffText = { text }
+    }
 
     init(editing view: LibraryView, notices: Notices) {
         purpose = .edit(view.id)
@@ -168,7 +210,14 @@ final class ViewPanel {
     func handOff(because departure: ViewTitleForm.Departure) {
         switch purpose {
         case .new:
-            form?.handOff(because: departure)
+            if let handOffText, let text = handOffText() {
+                form?.handOff(because: departure, text: text)
+            } else if handOffText != nil {
+                // Nothing of the person's is in it.
+                form?.discard()
+            } else {
+                form?.handOff(because: departure)
+            }
         case .edit:
             guard typedRename != nil else { return }
             if renaming != nil {

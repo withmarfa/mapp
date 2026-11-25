@@ -443,8 +443,16 @@ extension Browser {
             tellsRenamed: !panel.hasLeftWithRename)
         panel.finishRename(
             name: name, kept: outcome == .kept,
-            reason: outcome == .renamedElsewhere
-                ? String(localized: "This view was renamed in another app, so your name wasn’t written.") : nil)
+            reason: switch outcome {
+            case .renamedElsewhere: String(localized: "This view was renamed in another app, so your name wasn’t written.")
+            case .gone: Self.deletedElsewhere
+            case .kept, .notWritten: nil
+            })
+        // A panel still open on a view deleted meanwhile closes with the name given back.
+        if outcome == .gone, !panel.hasLeftWithRename, viewPanel === panel {
+            viewPanel = nil
+            panel.handOffBecauseGone()
+        }
         if outcome == .kept { registerNameUndo(of: id, restoring: view.title, from: name) }
         // The person, told, may commit the name again over the other app's, which is then their choice.
         if outcome == .renamedElsewhere, let now = library.views.first(where: { $0.id == id }) { panel.restartRename(from: now) }
@@ -456,7 +464,11 @@ extension Browser {
     @discardableResult
     func renameView(_ id: ItemID, to typed: String, from startingTitle: String, in library: any ItemLibrary) async -> Bool {
         let name = typed.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard library.views.contains(where: { $0.id == id }), !name.isEmpty, name != startingTitle else { return false }
+        guard !name.isEmpty, name != startingTitle else { return false }
+        guard library.views.contains(where: { $0.id == id }) else {
+            library.notices.notKept(String(localized: "View Not Renamed"), text: name, reason: Self.deletedElsewhere)
+            return false
+        }
         guard library.reachesServer else {
             library.notices.notKept(
                 String(localized: "View Not Renamed"), text: name,
@@ -471,6 +483,8 @@ extension Browser {
             library.notices.notKept(
                 String(localized: "View Not Renamed"), text: name,
                 reason: String(localized: "This view was renamed in another app, so your name wasn’t written."))
+        case .gone:
+            library.notices.notKept(String(localized: "View Not Renamed"), text: name, reason: Self.deletedElsewhere)
         case .notWritten:
             library.notices.notKept(String(localized: "View Not Renamed"), text: name, reason: String(localized: "The view keeps its name."))
         }
@@ -488,7 +502,12 @@ extension Browser {
 
     enum NameOutcome {
         case kept, renamedElsewhere, notWritten
+        /// The view was deleted, by another app, before the name reached it.
+        case gone
     }
+
+    /// What a person is told when the view a command or a rename meant is gone.
+    static var deletedElsewhere: String { String(localized: "This view was deleted in another app.") }
 
     /// Writes a title, where the view still has the one this change was made from, on `baseVersion` or the version
     /// last read.
@@ -510,7 +529,7 @@ extension Browser {
         _ name: String, of id: ItemID, expecting titles: Set<String>, baseVersion: Int64?, in library: any ItemLibrary,
         tellsOffline: Bool, tellsRenamed: Bool
     ) async -> NameOutcome {
-        guard let view = library.views.first(where: { $0.id == id }) else { return .notWritten }
+        guard let view = library.views.first(where: { $0.id == id }) else { return .gone }
         // A view the window has not opened is renamed on the version the library holds.
         let seed = viewSeeds[id]
         guard titles.contains(view.title) else {
@@ -536,6 +555,8 @@ extension Browser {
             // A name is the one setting this write sends, so the conflict is another app's rename.
             if tellsRenamed { tellRenamedElsewhere(in: library) }
             return .renamedElsewhere
+        case .failure(let failure) where failure.kind == .gone:
+            return .gone
         case .failure:
             return .notWritten
         }

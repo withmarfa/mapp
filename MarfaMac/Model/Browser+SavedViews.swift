@@ -522,6 +522,9 @@ extension Browser {
     /// Delete View…, from the View menu, the palette or a pill: asks first, since a view has no bin. The View panel closes
     /// so the question is not hidden behind it.
     func askToDeleteView(_ id: ItemID, in library: any ItemLibrary) {
+        guard library.views.contains(where: { $0.id == id }) else {
+            return library.notices.tell(String(localized: "Can’t Delete View"), Self.deletedElsewhere)
+        }
         closeViewPanel(in: library)
         deletingView = id
     }

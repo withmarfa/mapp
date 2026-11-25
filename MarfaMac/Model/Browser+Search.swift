@@ -36,12 +36,13 @@ extension Browser {
 
     /// The fields the tokens ask about, found from the catalogue alone: the table's columns come from the items, which
     /// the tokens decide, so the fields cannot wait for them.
-    func tokenTargets(in library: any ItemLibrary) -> [String: FilterTarget] {
-        guard hasSearchTokens else { return [:] }
+    func tokenTargets(in library: any ItemLibrary, of tokens: [FilterClause]? = nil) -> [String: FilterTarget] {
+        let tokens = tokens ?? searchTokens
+        guard !tokens.isEmpty else { return [:] }
         let known = Dictionary((FilterTarget.everyItem + [.tier]).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         let types = listedTypes(in: library)
         var targets: [String: FilterTarget] = [:]
-        for clause in searchTokens where targets[clause.field] == nil {
+        for clause in tokens where targets[clause.field] == nil {
             if let target = known[clause.field] {
                 targets[clause.field] = target
             } else if clause.field.hasPrefix(Self.fieldColumnPrefix),

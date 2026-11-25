@@ -311,6 +311,7 @@ private struct TopRowMenuLabel: View {
 /// renamed in place. VoiceOver reads a radio group of every view, whatever has folded.
 private struct TopRowPills: View {
     @CurrentLibrary private var library
+    @StoredOrder private var order
     let browser: Browser
     let place: Place
     let choices: [TopRowContent.Choice]
@@ -406,6 +407,8 @@ private struct TopRowPills: View {
             .onSubmit { commitRename(choice) }
             .onExitCommand { renaming = nil }
             .onChange(of: nameFocused) { if !nameFocused, renaming == choice.id { commitRename(choice) } }
+            // The pill can go while the name is typed, as when another app deletes the view: the name is handed on.
+            .onDisappear { if renaming == choice.id { commitRename(choice) } }
             .task { nameFocused = true }
             .accessibilityIdentifier("TopRowRename")
     }
@@ -439,9 +442,7 @@ private struct TopRowPills: View {
         Menu {
             ForEach(folded) { choice in Button(choice.title) { choose(choice) } }
             if !hiddenViews.isEmpty {
-                Section("Hidden") {
-                    ForEach(hiddenViews) { choice in Button(choice.title) { choose(choice) } }
-                }
+                hiddenSection
             }
             Divider()
             Button("New View…", action: newView)
@@ -451,15 +452,27 @@ private struct TopRowPills: View {
         .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
     }
 
+    /// The views hidden from the row, each opened or shown in the row again from its own menu.
+    private var hiddenSection: some View {
+        Section("Hidden") {
+            ForEach(hiddenViews) { choice in
+                Menu(choice.title) {
+                    Button("Open View") { choose(choice) }
+                    Button("Show in Row") {
+                        browser.setHidden(choice.target.view, false, in: place, library: library, order: order)
+                    }
+                }
+            }
+        }
+    }
+
     private var onePill: some View {
         Menu {
             ForEach(choices) { choice in
                 Toggle(choice.title, isOn: Binding { choice.id == current?.id } set: { _ in choose(choice) })
             }
             if !hiddenViews.isEmpty {
-                Section("Hidden") {
-                    ForEach(hiddenViews) { choice in Button(choice.title) { choose(choice) } }
-                }
+                hiddenSection
             }
             Divider()
             Button("New View…", action: newView)

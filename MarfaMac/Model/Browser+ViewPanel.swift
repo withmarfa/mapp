@@ -46,8 +46,10 @@ extension Browser {
             }
         }
         if viewPanel == nil { viewPanel = ViewPanel(newFrom: viewSnapshot(), library: library) }
+        viewPanel?.handOffText = { [weak self] in self?.newViewHandOff(in: library) }
         if newViewStarts(in: library).first == .search { chooseStart(.search, in: library) }
         viewPanel?.suggest(suggestedViewName(in: library))
+        viewPanel?.startingValues = newViewValues()
     }
 
     /// Create View on a new view makes it, with the name typed or the default one. On a view or a place it closes the
@@ -100,7 +102,10 @@ extension Browser {
     private func dropNewViewPanel(_ panel: ViewPanel) {
         viewPanel = nil
         dropUndoSteps(of: panel)
-        if let snapshot = panel.snapshot { restore(snapshot) }
+        guard let snapshot = panel.snapshot else { return }
+        restore(snapshot)
+        // A search set aside for a starting point's list comes back, unless the window has moved on.
+        if shown.isSame(snapshot.place) { restoreSetAsideSearch(of: panel) }
     }
 
     /// The place changed under the panel: a new view is cancelled, and a view's changes stay held where they were made.
@@ -170,7 +175,7 @@ extension Browser {
     /// refusal each leave the panel, the name and the window as they are, with the reason in the panel.
     @discardableResult
     func makeNewView(from panel: ViewPanel, in library: any ItemLibrary, order: ItemOrder) async -> LibraryView? {
-        guard let form = panel.form, !form.isBusy else { return nil }
+        guard let form = panel.form, !form.isBusy, !panel.choosesNoSource else { return nil }
         if form.trimmedTitle.isEmpty { form.title = suggestedViewName(in: library) }
         if viewNamed(form.trimmedTitle, in: library) != nil {
             panel.problem = .clash(form.trimmedTitle)
@@ -186,7 +191,9 @@ extension Browser {
         let held: Bool? = if let id = shown.savedView { macSettings(for: id).quickActions } else { placeQuickActions[shown] }
         settings.quickActions = panel.quickActions ?? held
         guard form.canSubmit else { return nil }
-        guard let draft = ViewDraft.draft(window, catalogue: library.catalogue, views: library.views) else { return nil }
+        guard var draft = ViewDraft.draft(window, catalogue: library.catalogue, views: library.views) else { return nil }
+        // A starting point's own order is written as it is, never left to the order a layout or a search gives.
+        if let start = panel.start, let own = start.sort, tableOptions[shown]?.sort == own.window { draft.sort = own.saved }
         panel.problem = nil
         guard case .done(let view) = await form.submit(draft) else {
             panel.problem = .refused
@@ -205,6 +212,18 @@ extension Browser {
         return view
     }
 
+    /// A starting point's tile: one the person already has opens theirs, at once while the new view holds nothing of
+    /// theirs. Otherwise the view it would open is returned, for the person to confirm discarding the new view first.
+    func pickStart(_ start: NewViewStart, in library: any ItemLibrary, order: ItemOrder) -> PlaceView? {
+        guard let theirs = existingView(for: start, in: library) else {
+            chooseStart(start, in: library)
+            return nil
+        }
+        if let panel = viewPanel, isNewViewTouched(panel) { return theirs }
+        openExistingView(theirs, in: library, order: order)
+        return nil
+    }
+
     /// A starting point the person already has opens theirs, and the new view is dropped as Cancel drops it.
     func openExistingView(_ place: PlaceView, in library: any ItemLibrary, order: ItemOrder) {
         escapeViewPanel(in: library)
@@ -218,7 +237,11 @@ extension Browser {
     /// shows the copy.
     @discardableResult
     func duplicateView(_ id: ItemID, in library: any ItemLibrary, order: ItemOrder) async -> LibraryView? {
-        guard library.reachesServer, let view = library.views.first(where: { $0.id == id }) else { return nil }
+        guard let view = library.views.first(where: { $0.id == id }) else {
+            library.notices.tell(String(localized: "Can’t Duplicate View"), Self.deletedElsewhere)
+            return nil
+        }
+        guard library.reachesServer else { return nil }
         let settings = LibraryViewSettings(title: String(localized: "\(view.title) Copy"), query: view.query, sort: view.sort, group: view.group)
         guard let copy = await library.createView(settings) else { return nil }
         if let kept = ViewLayouts.stored(in: defaults).settings(for: id) {

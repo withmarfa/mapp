@@ -82,8 +82,8 @@ struct ViewPanelPopover: View {
         .onExitCommand {
             if panel.page != .main { panel.page = .main } else { browser.escapeViewPanel(in: library) }
         }
-        // A view Create View could not make yet stays until the person makes it or cancels it.
-        .interactiveDismissDisabled(panel.holdsUnmadeView)
+        // A new view holding the person's work stays until they make it or cancel it.
+        .interactiveDismissDisabled(browser.keepsNewViewOpen)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("ViewPanel")
     }
