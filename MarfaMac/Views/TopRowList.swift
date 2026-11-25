@@ -3,8 +3,9 @@ import SwiftUI
 extension View {
     /// The top row of a list column or of a layout that spans the window: the place's title and views.
     /// `opensPlaces` is true while the sidebar is closed, when the title opens the sidebar's rows.
-    func topRowOverList(browser: Browser, scroll: TopRowScroll, opensPlaces: Bool, signal: AnyHashable) -> some View {
-        modifier(TopRowOverList(browser: browser, scroll: scroll, opensPlaces: opensPlaces, signal: signal))
+    /// `isSmall` is true while the window is at its smallest, where the views are one pill beside the title.
+    func topRowOverList(browser: Browser, scroll: TopRowScroll, opensPlaces: Bool, isSmall: Bool, signal: AnyHashable) -> some View {
+        modifier(TopRowOverList(browser: browser, scroll: scroll, opensPlaces: opensPlaces, isSmall: isSmall, signal: signal))
     }
 
     /// The top row of an item's page: the item's title on one line once the page's head has scrolled off.
@@ -15,9 +16,11 @@ extension View {
 
 private struct TopRowOverList: ViewModifier {
     @CurrentLibrary private var library
+    @Environment(\.interfaceTextSize) private var textSize
     let browser: Browser
     let scroll: TopRowScroll
     let opensPlaces: Bool
+    let isSmall: Bool
     let signal: AnyHashable
 
     /// The layouts that stand the views beside the title from the start: the calendar has a header of its own and the
@@ -26,14 +29,14 @@ private struct TopRowOverList: ViewModifier {
 
     func body(content: Content) -> some View {
         let row = TopRowContent.make(browser: browser, library: library)
-        // With the sidebar closed the place, its views and the buttons share one row.
-        let beside = isAlwaysBeside || browser.isSearchExpanded || browser.isSearching || opensPlaces
-        let restHeight = row.hasViews && !beside ? TopRowMetrics.restHeight : 0
+        // With the sidebar closed the place, its views and the buttons share one row, and so they do at the smallest window.
+        let beside = isAlwaysBeside || browser.isSearchExpanded || browser.isSearching || opensPlaces || isSmall
+        let restHeight = row.hasViews && !beside ? TopRowMetrics.restHeight(scale: InterfaceStyle.scale(for: textSize)) : 0
         content
-            .environment(\.topRowSpace, TopRowSpace(scroll: scroll, restHeight: restHeight))
             .modifier(
                 TopRowFrame(scroll: scroll, restHeight: restHeight, bands: true, signal: signal) { room, isAway in
-                    TopRowTitleLine(browser: browser, content: row, showsViews: row.hasViews && isAway, opensPlaces: opensPlaces)
+                    TopRowTitleLine(
+                        browser: browser, content: row, showsViews: row.hasViews && isAway, opensPlaces: opensPlaces, isSmall: isSmall)
                         .padding(.leading, room.titleLead)
                         .padding(.trailing, room.titleTrail)
                 } rest: {
@@ -51,7 +54,7 @@ private struct TopRowOverPage: ViewModifier {
 
     func body(content: Content) -> some View {
         content.modifier(
-            TopRowFrame(scroll: nil, restHeight: 0, bands: false, signal: signal) { room, _ in
+            TopRowFrame(scroll: nil, restHeight: 0, bands: false, signal: signal, dragClearance: TopRowMetrics.pageLift) { room, _ in
                 HStack(spacing: 0) {
                     if showsScrolledTitle || tools.isFocused, let head = tools.scrolledPageTitle {
                         ScrolledItemTitle(title: head.title, icon: head.icon, showsIcon: true, subtitle: head.subtitle)

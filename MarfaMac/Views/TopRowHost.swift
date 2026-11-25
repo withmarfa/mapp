@@ -9,6 +9,12 @@ final class TopRowScroll {
     var offset: CGFloat = 0
     /// The column headings' height, which a table's rows pass under before they reach the toolbar.
     var headingHeight: CGFloat = 0
+
+    /// Forgets what a layout that has gone left, so the next one starts at its top.
+    func reset() {
+        if offset != 0 { offset = 0 }
+        if headingHeight != 0 { headingHeight = 0 }
+    }
 }
 
 /// What a list needs to know of the top row above it: the room the row of views takes at rest, which the list leaves
@@ -16,6 +22,12 @@ final class TopRowScroll {
 struct TopRowSpace {
     var scroll: TopRowScroll?
     var restHeight: CGFloat = 0
+    /// The height of the title's line: the toolbar's, and never less, so the line stands in full screen with the toolbar
+    /// hidden too.
+    var lineHeight: CGFloat = TopRowMetrics.lineHeight
+    /// How much of the line the column's own top inset does not already cover, which is all of it while the toolbar is
+    /// hidden.
+    var uncovered: CGFloat = 0
 }
 
 extension EnvironmentValues {
@@ -34,7 +46,8 @@ struct TopRowRoom: Equatable {
 /// row of views at rest under the line. It is drawn over the column, so the toolbar holds only the buttons.
 struct TopRowFrame<Line: View, Rest: View>: ViewModifier {
     @AppStorage(InterfaceKey.showsPageToolbarBackground) private var showsBackground = true
-    @State private var toolbarHeight: CGFloat = 52
+    /// The toolbar's height as the column's top inset says, which is zero while full screen hides the toolbar.
+    @State private var insetTop: CGFloat = TopRowMetrics.lineHeight
     @State private var room = TopRowRoom()
     let scroll: TopRowScroll?
     /// The room the row of views takes at rest, or zero where there is none.
@@ -43,29 +56,37 @@ struct TopRowFrame<Line: View, Rest: View>: ViewModifier {
     let bands: Bool
     /// What changes the toolbar's items, so the room is measured again.
     let signal: AnyHashable
+    /// How much of the line's lower edge does not move the window, where a page's first line stands under it.
+    let dragClearance: CGFloat
     /// The line, told whether the rows have scrolled past the row of views at rest.
     let line: (_ room: TopRowRoom, _ isAway: Bool) -> Line
     let rest: Rest
 
     init(
-        scroll: TopRowScroll?, restHeight: CGFloat, bands: Bool, signal: AnyHashable,
+        scroll: TopRowScroll?, restHeight: CGFloat, bands: Bool, signal: AnyHashable, dragClearance: CGFloat = 0,
         @ViewBuilder line: @escaping (_ room: TopRowRoom, _ isAway: Bool) -> Line, @ViewBuilder rest: () -> Rest
     ) {
         self.scroll = scroll
         self.restHeight = restHeight
         self.bands = bands
         self.signal = signal
+        self.dragClearance = dragClearance
         self.line = line
         self.rest = rest()
     }
 
     func body(content: Content) -> some View {
+        let lineHeight = max(insetTop, TopRowMetrics.lineHeight)
         content
-            .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.top } action: { toolbarHeight = $0 }
+            .environment(
+                \.topRowSpace,
+                TopRowSpace(scroll: scroll, restHeight: restHeight, lineHeight: lineHeight, uncovered: lineHeight - insetTop)
+            )
+            .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.top } action: { insetTop = $0 }
             .background { ToolbarRoomProbe(room: $room, signal: signal) }
             .overlay(alignment: .top) {
                 TopRowStack(
-                    scroll: scroll, restHeight: restHeight, height: toolbarHeight, bands: bands && showsBackground, room: room,
+                    scroll: scroll, restHeight: restHeight, height: lineHeight, bands: bands && showsBackground, dragClearance: dragClearance, room: room,
                     line: line, rest: rest)
                 .ignoresSafeArea(.container, edges: .top)
             }
@@ -78,6 +99,7 @@ private struct TopRowStack<Line: View, Rest: View>: View {
     let restHeight: CGFloat
     let height: CGFloat
     let bands: Bool
+    let dragClearance: CGFloat
     let room: TopRowRoom
     let line: (TopRowRoom, Bool) -> Line
     let rest: Rest
@@ -93,7 +115,7 @@ private struct TopRowStack<Line: View, Rest: View>: View {
             VStack(spacing: 0) {
                 line(room, isAway)
                     .frame(height: height)
-                    .background { TopRowDragArea() }
+                    .background { TopRowDragArea().padding(.bottom, dragClearance) }
                 if restHeight > 0, !isAway {
                     rest
                         .frame(height: restHeight, alignment: .top)
@@ -136,11 +158,13 @@ private struct TopRowScrolls: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .contentMargins(.top, space.restHeight, for: .scrollContent)
+            .contentMargins(.top, space.restHeight + space.uncovered, for: .scrollContent)
             .onScrollGeometryChange(for: CGFloat.self) { max(0, ($0.contentOffset.y + $0.contentInsets.top).rounded()) } action: { _, new in
                 if space.scroll?.offset != new { space.scroll?.offset = new }
             }
             .scrollEdgeEffectHidden(true, for: .top)
+            // A layout that goes leaves its scroll behind, which the next one does not share.
+            .onDisappear { space.scroll?.reset() }
     }
 }
 
@@ -156,8 +180,9 @@ private struct TopRowTable: ViewModifier {
 
 /// Reaches the `NSScrollView` behind a table or a list. SwiftUI's `contentMargins` leaves their scroll views alone, so the
 /// room for the row of views is the scroll view's own top inset, to which AppKit adds the headings' height. The headings'
-/// container is then set at the toolbar's lower edge, or lower while the row of views still shows, and set again whenever
-/// the scroll view or AppKit moves it.
+/// container is then set at the title line's lower edge, or lower while the row of views still shows, and set again
+/// whenever the scroll view or AppKit moves it. The line's height is the top row's (`TopRowSpace`), not the scroll view's
+/// safe area, which is empty while full screen hides the toolbar and changes as it comes and goes.
 private struct TopRowTableProbe: NSViewRepresentable {
     let space: TopRowSpace
 
@@ -194,7 +219,7 @@ private struct TopRowTableProbe: NSViewRepresentable {
         func refresh() {
             guard window != nil, let table = nearestTable(), let scroll = table.enclosingScrollView else { return }
             if self.table !== table { follow(table, in: scroll) }
-            let room = scroll.safeAreaInsets.top + space.restHeight
+            let room = space.lineHeight + space.restHeight
             if scroll.automaticallyAdjustsContentInsets { scroll.automaticallyAdjustsContentInsets = false }
             if scroll.contentInsets.top != room {
                 let clip = scroll.contentView
@@ -228,7 +253,7 @@ private struct TopRowTableProbe: NSViewRepresentable {
         func stop() {
             observers.forEach { NotificationCenter.default.removeObserver($0) }
             observers = []
-            space.scroll?.offset = 0
+            space.scroll?.reset()
         }
 
         private func place() {
@@ -242,7 +267,7 @@ private struct TopRowTableProbe: NSViewRepresentable {
             }
             // A list has no column headings to pin.
             guard let container = table.headerView?.superview else { return }
-            let top = scroll.safeAreaInsets.top + max(0, space.restHeight - scrolled)
+            let top = space.lineHeight + max(0, space.restHeight - scrolled)
             if container.frame.origin.y != top {
                 isPlacing = true
                 container.frame.origin.y = top
@@ -256,21 +281,48 @@ private struct TopRowTableProbe: NSViewRepresentable {
 
 /// The row's empty space moves the window, and a double click zooms it, as the title bar's would.
 private struct TopRowDragArea: View {
+    @State private var window: NSWindow?
+
     var body: some View {
         Color.clear
             .contentShape(Rectangle())
             .gesture(WindowDragGesture())
-            .simultaneousGesture(TapGesture(count: 2).onEnded { Self.titleBarDoubleClick() })
+            .simultaneousGesture(TapGesture(count: 2).onEnded { Self.titleBarDoubleClick(window) })
+            // As a title bar does, the first click of a window not in front already drags or zooms it.
+            .allowsWindowActivationEvents()
+            .background { WindowReader(window: $window) }
             .accessibilityHidden(true)
     }
 
-    /// What System Settings says a title bar's double click does.
-    @MainActor private static func titleBarDoubleClick() {
-        guard let window = NSApp.keyWindow else { return }
+    /// What System Settings says a title bar's double click does, for the window this row is in.
+    @MainActor private static func titleBarDoubleClick(_ window: NSWindow?) {
+        guard let window else { return }
         switch UserDefaults.standard.string(forKey: "AppleActionOnDoubleClick") {
         case "Minimize": window.performMiniaturize(nil)
         case "None": break
         default: window.performZoom(nil)
+        }
+    }
+}
+
+/// Reads the window a view is in.
+private struct WindowReader: NSViewRepresentable {
+    @Binding var window: NSWindow?
+
+    func makeNSView(context: Context) -> Reader { Reader() }
+    func updateNSView(_ view: Reader, context: Context) {
+        view.report = { if window !== $0 { window = $0 } }
+        DispatchQueue.main.async { [weak view] in view?.report(view?.window) }
+    }
+
+    final class Reader: NSView {
+        var report: (NSWindow?) -> Void = { _ in }
+
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            DispatchQueue.main.async { [weak self] in self?.report(self?.window) }
         }
     }
 }
@@ -306,10 +358,7 @@ private struct WindowTitleHider: NSViewRepresentable {
         }
 
         func hide() {
-            guard let window else { return }
-            // The smallest the window goes, as a frame: the toolbar's height is in it.
-            if window.minSize.height < 520 { window.minSize = NSSize(width: 760, height: 520) }
-            guard window.titleVisibility != .hidden else { return }
+            guard let window, window.titleVisibility != .hidden else { return }
             window.titleVisibility = .hidden
         }
 
@@ -333,7 +382,9 @@ private struct ToolbarRoomProbe: NSViewRepresentable {
 
     final class Probe: NSView {
         var report: (TopRowRoom) -> Void = { _ in }
+        /// The window's own changes, and the frame changes of each toolbar item watched (`watched`).
         private var observers: [any NSObjectProtocol] = []
+        private var itemObservers: [any NSObjectProtocol] = []
         private var watched: [NSView] = []
 
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
@@ -342,6 +393,7 @@ private struct ToolbarRoomProbe: NSViewRepresentable {
             super.viewDidMoveToWindow()
             observers.forEach { NotificationCenter.default.removeObserver($0) }
             observers = []
+            unwatchItems()
             guard let window else { return }
             for name in [NSWindow.didResizeNotification, NSWindow.didEndLiveResizeNotification, NSWindow.didEnterFullScreenNotification, NSWindow.didExitFullScreenNotification] {
                 observers.append(NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
@@ -384,16 +436,23 @@ private struct ToolbarRoomProbe: NSViewRepresentable {
             }
             // Stay told of each item that moves, so the room follows an item that grows, as the search field does.
             if views.map(ObjectIdentifier.init) != watched.map(ObjectIdentifier.init) {
+                unwatchItems()
                 watched = views
                 for view in views {
                     view.postsFrameChangedNotifications = true
-                    observers.append(NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification, object: view, queue: .main) { [weak self] _ in
+                    itemObservers.append(NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification, object: view, queue: .main) { [weak self] _ in
                         MainActor.assumeIsolated { self?.measure() }
                     })
                 }
             }
             let (leading, trailing) = Self.room(of: rects, in: column)
             report(TopRowRoom(leading: leading, trailing: trailing))
+        }
+
+        private func unwatchItems() {
+            itemObservers.forEach { NotificationCenter.default.removeObserver($0) }
+            itemObservers = []
+            watched = []
         }
 
         private static func collectViewers(in view: NSView, into rects: inout [NSRect]) {
@@ -426,6 +485,9 @@ private struct ToolbarRoomProbe: NSViewRepresentable {
             return (max(0, leading), max(0, trailing))
         }
 
-        isolated deinit { observers.forEach { NotificationCenter.default.removeObserver($0) } }
+        isolated deinit {
+            observers.forEach { NotificationCenter.default.removeObserver($0) }
+            itemObservers.forEach { NotificationCenter.default.removeObserver($0) }
+        }
     }
 }

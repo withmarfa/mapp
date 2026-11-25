@@ -101,7 +101,7 @@ struct ItemWindow: View {
                     .itemCorner(item, editor: editor, details: details)
                     .escapesFromPage(details)
                     .navigationTitle(item.displayTitle)
-                    .toolbar(removing: .title)
+                    .hidesWindowTitle()
                     .focusedSceneValue(\.editor, editor)
                     .focusedSceneValue(\.focusedItems, FocusedItems(ids: [item.id], undoManager: undoManager))
                     .toolbar {

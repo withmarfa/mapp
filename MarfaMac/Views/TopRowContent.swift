@@ -53,10 +53,10 @@ struct TopRowContent {
         return String(localized: "\(searched.formatted()) of \(count.formatted())")
     }
 
-    /// What VoiceOver reads for the title, the count being part of it.
+    /// What VoiceOver reads for the title, the count being part of it: "Notes, 1 item".
     var titleLabel: String {
-        guard let searched else { return String(localized: "\(title), \(count.formatted()) items") }
-        return String(localized: "\(title), \(searched.formatted()) of \(count.formatted()) items")
+        guard let searched else { return String(AttributedString(localized: "\(title), ^[\(count) item](inflect: true)").characters) }
+        return String(AttributedString(localized: "\(title), \(searched.formatted()) of ^[\(count) item](inflect: true)").characters)
     }
 
     @MainActor

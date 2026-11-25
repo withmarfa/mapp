@@ -57,8 +57,8 @@ struct MarfaMacApp: App {
     var body: some Scene {
         WindowGroup(id: Self.mainWindowID) {
             RootView(settingsLauncher: settingsLauncher, libraries: libraries)
-                // The smallest the window goes is 760 by 520 (`hidesWindowTitle`): the panel, the sidebar, the control and the views have given way by then.
-                .frame(minWidth: 760)
+                // The one place the smallest window is set, 760 by 520: the panel, the sidebar, the control and the views have given way by then.
+                .frame(minWidth: 760, minHeight: 520)
                 .interfaceTextStyle()
                 // The page's web view is backed by this color, which, unlike the window's default background, is
                 // not tinted by the desktop. Making it the window's background gives the list, Settings and the
@@ -83,7 +83,9 @@ struct MarfaMacApp: App {
             ImportFromDevicesCommands()
             LooksCommands(libraries: libraries)
             FormatCommands(shortcuts: libraries.shortcuts)
-            // No Customize Toolbar: the buttons are fixed, and every one is a command of the menus and the palette.
+            // No Customize Toolbar, as the buttons are fixed and every one is a command of the menus and the palette. No Hide
+            // Toolbar either: the top row's line stands at the toolbar's height beside its buttons, which the window has no
+            // other place for.
             CommandGroup(replacing: .toolbar) {}
             SettingsCommands(launcher: settingsLauncher, shortcuts: libraries.shortcuts)
             AboutCommands(updater: delegate.updater)

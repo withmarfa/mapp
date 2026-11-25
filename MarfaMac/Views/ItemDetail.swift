@@ -71,16 +71,20 @@ struct ItemPage: View {
     /// background has no need.
     var backsToolbar = true
     @AppStorage(InterfaceKey.showsPageToolbarBackground) private var showsToolbarBackground = true
+    @Environment(\.topRowSpace) private var topRow
     @State private var bannerHeight: CGFloat = 0
 
     var body: some View {
         GeometryReader { proxy in
+            // The toolbar's height as the top row knows it, which holds while full screen hides the toolbar.
+            let toolbarHeight = max(proxy.safeAreaInsets.top, topRow.lineHeight)
             ZStack(alignment: .top) {
-                // The page runs under the toolbar and any banner, so it starts below them and scrolls beneath.
-                ItemEditor(controller: editor, topInset: proxy.safeAreaInsets.top + bannerHeight)
+                // The page runs under the toolbar and any banner, and scrolls beneath it. It starts a little above the
+                // toolbar's lower edge (`TopRowMetrics.pageLift`), where the boards put the kicker.
+                ItemEditor(controller: editor, topInset: toolbarHeight - TopRowMetrics.pageLift + bannerHeight)
                     .ignoresSafeArea(.container, edges: .top)
                     .modifier(ItemPageHeader(item: item, editor: editor, drafts: headerDrafts))
-                ToolbarBand(toolbarHeight: proxy.safeAreaInsets.top, isShown: backsToolbar && showsToolbarBackground && editor.isContentUnderToolbar)
+                ToolbarBand(toolbarHeight: toolbarHeight, isShown: backsToolbar && showsToolbarBackground && editor.isContentUnderToolbar)
                 VStack(spacing: 0) {
                     if item.state == .trashed {
                         DeletedItemBanner(id: item.id)
@@ -90,6 +94,8 @@ struct ItemPage: View {
                         UnreadableItemBanner(message: problem.message)
                     }
                 }
+                // Below the toolbar, which the safe area does not hold while full screen hides it.
+                .padding(.top, topRow.uncovered)
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { bannerHeight = $0 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

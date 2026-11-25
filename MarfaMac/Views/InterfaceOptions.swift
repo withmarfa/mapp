@@ -57,6 +57,12 @@ enum PaletteMaterial: String, CaseIterable, Identifiable {
     var id: Self { self }
 }
 
+/// The right sidebar's width in every window: 300, which the person can drag out to the widest.
+enum PanelWidth {
+    static let standard: CGFloat = 300
+    static let widest: CGFloat = 440
+}
+
 enum InterfaceStyle {
     static let defaultTextSize = 13
     static let textSizes = [11, 12, 13, 14, 15, 16, 18, 20, 24]

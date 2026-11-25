@@ -31,10 +31,11 @@ struct MainView: View {
     @State private var listScroll = TopRowScroll()
     /// The window's width, which folds the panel and then the sidebar as the window narrows (`foldForWidth`).
     @State private var windowWidth: CGFloat = 0
-    /// Whether the window folded the panel or the sidebar itself, and so opens it again when the room returns. A panel or
-    /// sidebar the person closed stays closed.
-    @State private var foldedPanel = false
-    @State private var foldedSidebar = false
+    /// Whether the window folded the panel or the sidebar itself, and so opens it again when the room returns, also after
+    /// a quit. Kept with the window, so a panel or sidebar folded by the width is never taken for one the person closed,
+    /// which stays closed.
+    @SceneStorage("panelFolded") private var foldedPanel = false
+    @SceneStorage("sidebarFolded") private var foldedSidebar = false
     private let restoresWindow: Bool
 
     init(browser: Browser = Browser(), details: DetailsPresentation = DetailsPresentation(), restoresWindow: Bool = true) {
@@ -123,7 +124,7 @@ struct MainView: View {
         } content: {
             ItemList(browser: browser, order: order, pane: $pane).equatable()
                 .filterChips(browser)
-                .topRowOverList(browser: browser, scroll: listScroll, opensPlaces: !isSidebarVisible, signal: topRowSignal)
+                .topRowOverList(browser: browser, scroll: listScroll, opensPlaces: !isSidebarVisible, isSmall: isSmallWindow, signal: topRowSignal)
                 // The split view reads the ideal only as it is built, so it comes from the tracker as it stands then.
                 .navigationSplitViewColumnWidth(
                     min: ColumnWidth.list.range.lowerBound, ideal: measuredWidths.width(of: .list),
@@ -242,7 +243,7 @@ struct MainView: View {
                             }
                             .filterChips(browser)
                             .viewCorner(browser)
-                            .topRowOverList(browser: browser, scroll: listScroll, opensPlaces: !isSidebarVisible, signal: topRowSignal)
+                            .topRowOverList(browser: browser, scroll: listScroll, opensPlaces: !isSidebarVisible, isSmall: isSmallWindow, signal: topRowSignal)
                         } else {
                             fullPage.topRowOverPage(tools: pageTools, signal: topRowSignal)
                         }
@@ -264,17 +265,21 @@ struct MainView: View {
         ItemInspectorColumn(browser: browser, details: details, editor: editor)
     }
 
-    /// Under this width the panel folds, and under the next the sidebar does.
+    /// Under this width the panel folds, and under the next the sidebar does; under the last the views are one pill beside
+    /// the title (the window's smallest is 760 wide).
     private static let panelFoldsBelow: CGFloat = 1000
     private static let sidebarFoldsBelow: CGFloat = 900
+    private static let viewsFoldBelow: CGFloat = 800
+
+    private var isSmallWindow: Bool { windowWidth > 0 && windowWidth < Self.viewsFoldBelow }
 
     /// Folds the panel and then the sidebar as the window narrows past their widths, and opens them again as it widens, but
     /// only what it folded itself. It acts when the width crosses a limit, so a person who opens one in a narrow window
-    /// keeps it open.
+    /// keeps it open. A width from nothing is a window just opened, which crosses every limit it is under or over.
     private func foldForWidth(from old: CGFloat, to new: CGFloat) {
         func crossed(_ limit: CGFloat) -> Bool? {
             if new < limit, old >= limit || old == 0 { return true }
-            if new >= limit, old < limit, old > 0 { return false }
+            if new >= limit, old < limit { return false }
             return nil
         }
         if let folds = crossed(Self.panelFoldsBelow) {
@@ -314,7 +319,12 @@ struct MainView: View {
         .modifier(CommandValuePanels(details: details))
         .modifier(FieldEditSheets(details: details))
         .sheet(item: Binding { details.typeValues } set: { details.typeValues = $0 }) { TypeValuesSheet(request: $0) }
-        .onChange(of: details.isPresentedByPerson) { if restoresWindow { storedDetailsPresented = details.isPresentedByPerson } }
+        .onChange(of: details.isPresentedByPerson) {
+            // What the window folded is not the person's choice: the panel the person opens is theirs again.
+            if details.isPresentedByPerson { foldedPanel = false }
+            if restoresWindow { storedDetailsPresented = details.isPresentedByPerson }
+        }
+        .onChange(of: isSidebarVisible) { if isSidebarVisible { foldedSidebar = false } }
         // Closing the sidebar by hand finishes Customize Layout, which has nowhere else to show.
         .onChange(of: details.isPresented) { if !details.isPresented { details.endLayout() } }
         // Leaving the page finishes it too, as there is nothing left to arrange.
@@ -380,6 +390,8 @@ struct MainView: View {
         }
         .onAppear {
             if restoresWindow { details.isPresented = storedDetailsPresented }
+            // The window's width may have arrived before what it restored, which it folds or opens again as it must.
+            if windowWidth > 0 { foldForWidth(from: 0, to: windowWidth) }
             let editor = editor
             if restoresWindow {
                 // The position is saved once the person stops scrolling, not for every line of it.
@@ -532,7 +544,7 @@ private struct ItemInspectorColumn: ViewModifier {
     let editor: EditorController
     /// Read once, as the window remakes this column when its layout changes and the column's own width goes with it.
     /// Kept out of the state as it changes, so a drag is not fed back into the column it is resizing.
-    @State private var width = UserDefaults.standard.object(forKey: InterfaceKey.inspectorWidth) as? Double ?? 300
+    @State private var width = UserDefaults.standard.object(forKey: InterfaceKey.inspectorWidth) as? Double ?? PanelWidth.standard
 
     /// Whether the person is dragging the sidebar's own edge, which is what chooses its width. Dragging another divider
     /// or the window's edge can squeeze the sidebar too, and that is not a choice to keep.
@@ -549,7 +561,7 @@ private struct ItemInspectorColumn: ViewModifier {
                     guard details.isPresented, Self.isDraggingEdge(ofSidebarWidth: newWidth) else { return }
                     UserDefaults.standard.set(Double(newWidth), forKey: InterfaceKey.inspectorWidth)
                 }
-                .inspectorColumnWidth(min: 300, ideal: width, max: 440)
+                .inspectorColumnWidth(min: PanelWidth.standard, ideal: width, max: PanelWidth.widest)
                 .toolbar { InspectorToolbar(details: details, editor: editor, browser: browser) }
         }
     }

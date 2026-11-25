@@ -37,7 +37,7 @@ struct SidebarIndex: View {
         }
         .inspector(isPresented: Binding { details.isPresented } set: { details.isPresented = $0 }) {
             IndexInspector(choice: choice, place: place, rows: rows) { browser.show(PlaceView($0.place), in: library, order: order) }
-                .inspectorColumnWidth(min: 260, ideal: 310, max: 440)
+                .inspectorColumnWidth(min: PanelWidth.standard, ideal: PanelWidth.standard, max: PanelWidth.widest)
                 .toolbar { InspectorToolbar(details: details, editor: nil, browser: browser) }
         }
         .task(id: Following(place: place, library: ObjectIdentifier(library))) {

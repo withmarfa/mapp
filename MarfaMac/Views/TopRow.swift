@@ -16,6 +16,8 @@ struct TopRowTitleLine: View {
     let showsViews: Bool
     /// Whether the title opens the sidebar's rows, as it does with the sidebar closed.
     let opensPlaces: Bool
+    /// Whether the window is at its smallest, where the views are the one pill beside the title.
+    let isSmall: Bool
 
     var body: some View {
         let pieces = TopRowPieces(browser: browser, content: content, library: library, order: order)
@@ -38,8 +40,9 @@ struct TopRowTitleLine: View {
             let steps = TopRowFold.steps(
                 viewCount: content.views.count, hasPlaces: !content.places.isEmpty, offersScope: content.showsScope,
                 scopeIsDefault: content.isDefaultScope, restsBelow: false)
-            // The field takes the room while searching, and the views are the one pill whatever there is.
-            return browser.isSearchExpanded ? Array(steps.suffix(1)) : steps
+            // The field takes the room while searching, and the smallest window has none to spare: the views are the one
+            // pill whatever there is.
+            return browser.isSearchExpanded || isSmall ? Array(steps.suffix(1)) : steps
         }
         var folds = [TopRowFold(scope: content.showsScope, places: .none, shown: nil)]
         if content.showsScope, content.isDefaultScope { folds.append(TopRowFold(scope: false, places: .none, shown: nil)) }
@@ -104,11 +107,11 @@ struct TopRowPieces {
 
     // MARK: Views
 
-    /// The views as one fold of the row shows them. The tab group holds the views and nothing else, so the places
+    /// The views as one fold of the row shows them. The radio group holds the views and nothing else, so the places
     /// at the row's end are outside it.
     func views(_ fold: TopRowFold) -> some View {
         HStack(spacing: 0) {
-            TopRowTabs(
+            TopRowPills(
                 choices: content.views, chosen: content.chosenChoice?.id ?? "", isChanged: content.isChanged, fold: fold,
                 choose: choose, newView: newView)
             Spacer(minLength: 16)
@@ -137,8 +140,7 @@ struct TopRowPieces {
             TopRowMenuLabel(title: Text("Browse"), padding: 8)
         }
         .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
-        // One control, whose value names what it holds, as the fold menus all are.
-        .accessibilityElement(children: .ignore)
+        // The menu's own button, whose value names what it holds.
         .accessibilityLabel("Browse")
         .accessibilityValue(content.places.map(\.title).joined(separator: ", "))
         .accessibilityIdentifier("TopRowBrowse")
@@ -198,16 +200,18 @@ private struct TopRowTitle: View {
     var body: some View {
         Group {
             if let menu {
+                // The menu's own button, labeled with the title and its count.
                 Menu { PlacesMenuView(menu: menu, browser: browser, order: order) } label: { cluster }
                     .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+                    .accessibilityLabel(label)
                     .accessibilityHint("Opens the sidebar's places")
             } else {
                 cluster
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(label)
             }
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(label)
-        .accessibilityAddTraits(menu == nil ? .isHeader : [.isHeader, .isButton])
+        .accessibilityAddTraits(.isHeader)
         .accessibilityIdentifier("TopRowTitle")
     }
 }
@@ -273,9 +277,9 @@ private struct TopRowMenuLabel: View {
     }
 }
 
-/// The views of a place as a tab group: each a pill, the chosen one selected, and what does not fit in a menu that ends
-/// with New View….
-private struct TopRowTabs: View {
+/// The views of a place as a radio group: each a pill, the chosen one selected, and what does not fit in a menu that ends
+/// with New View…. VoiceOver reads a radio group of every view, whatever has folded.
+private struct TopRowPills: View {
     let choices: [TopRowContent.Choice]
     let chosen: String
     let isChanged: Bool
@@ -305,9 +309,22 @@ private struct TopRowTabs: View {
             }
         }
         .fixedSize()
-        .accessibilityElement(children: .contain)
-        .accessibilityAddTraits(.isTabBar)
-        .accessibilityLabel("Views")
+        .accessibilityRepresentation {
+            Group {
+                Picker("Views", selection: Binding { current?.id ?? "" } set: { id in
+                    if let choice = choices.first(where: { $0.id == id }) { choose(choice) }
+                }) {
+                    ForEach(choices) { choice in
+                        Group {
+                            if isChanged, choice.id == current?.id { Text("\(choice.title), changed") } else { Text(choice.title) }
+                        }
+                        .tag(choice.id)
+                    }
+                }
+                .pickerStyle(.radioGroup)
+                Button("New View", action: newView)
+            }
+        }
         .accessibilityIdentifier("TopRowViews")
     }
 
@@ -320,8 +337,6 @@ private struct TopRowTabs: View {
             }
         }
         .buttonStyle(TopRowPillStyle(isChosen: isChosen))
-        .accessibilityAddTraits(isChosen ? .isSelected : [])
-        .accessibilityValue(isChosen && isChanged ? Text("Changed") : Text(""))
     }
 
     private var plus: some View {
@@ -329,7 +344,6 @@ private struct TopRowTabs: View {
             .labelStyle(.iconOnly)
             .buttonStyle(TopRowPillStyle(isChosen: false))
             .help("New View")
-            .accessibilityIdentifier("TopRowNewView")
     }
 
     private func more(_ hidden: [TopRowContent.Choice]) -> some View {
@@ -341,10 +355,6 @@ private struct TopRowTabs: View {
             TopRowMenuLabel(title: Text("\(hidden.count) More"))
         }
         .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(hidden.count) more views")
-        .accessibilityValue(hidden.map(\.title).joined(separator: ", "))
-        .accessibilityIdentifier("TopRowMore")
     }
 
     private var onePill: some View {
@@ -358,10 +368,6 @@ private struct TopRowTabs: View {
             TopRowMenuLabel(title: Text(current?.title ?? ""), isChosen: true)
         }
         .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("View, \(current?.title ?? "")")
-        .accessibilityValue(choices.map(\.title).joined(separator: ", "))
-        .accessibilityIdentifier("TopRowOnePill")
     }
 }
 
@@ -371,8 +377,16 @@ enum TopRowMetrics {
     /// The pills start a little before the title so their words line up under it.
     static let pillsLead: CGFloat = 29
     static let pillHeight: CGFloat = 28
-    /// The row of views under the title: the pills and the air below them.
-    static let restHeight: CGFloat = 40
+    /// The title's line at the least: the toolbar's usual height, which stands in full screen while the toolbar is hidden.
+    static let lineHeight: CGFloat = 52
+    /// How far a page's content starts above the toolbar's lower edge, under the toolbar: the kicker is 44 from the
+    /// window's top in a toolbar 52 tall, and the page's own top margin is the rest.
+    static let pageLift: CGFloat = 12
+    /// The air below the pills in the row of views.
+    static let restMargin: CGFloat = 12
+
+    /// The row of views under the title: the pills at their size for the text size, and the air below them.
+    static func restHeight(scale: CGFloat) -> CGFloat { pillHeight * max(1, scale) + restMargin }
     /// What the row keeps clear of the toolbar's buttons and of the traffic lights.
     static let clearance: CGFloat = 12
 }
