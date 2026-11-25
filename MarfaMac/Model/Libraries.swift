@@ -151,7 +151,7 @@ import MarfaTesting
         }
     }
 
-    /// Has this app's settings follow the library's copy, where it has one of a Marfa server.
+    /// Follows the current library's refused creates and, for a server copy, its synced settings.
     private func follow(_ library: MarfaLibrary?) {
         refusalsHeard?.cancel()
         refusalsHeard = library.map(newItemDrafts.follow)

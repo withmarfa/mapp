@@ -450,9 +450,8 @@ final class QuickAdd {
         if let entry { drafts.sendingFile(entry) }
     }
 
-    /// The library added the file on its way as `item`, or nothing where nil. Answers whether the window still
-    /// holds the draft. Where it let it go meanwhile, the draft as sent waits for Marfa's answer, or comes back at
-    /// once, and the person is told where.
+    /// Returns whether the window still holds the draft. If the window closed, keep the draft until Marfa answers
+    /// the queued create. If queuing failed, return the draft and tell the person where to find it.
     fileprivate func fileSent(_ item: ItemID?, telling notices: Notices) -> Bool {
         let files = Array(sending?.files.prefix(1) ?? [])
         sending = nil

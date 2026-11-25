@@ -56,7 +56,7 @@ Every editor asks `Item.allows(_:)` for the `ItemChange` it writes (`ValueEditKi
 | `make(_:_:in:)`, `take(_:in:)` | Start or claim a draft, never shared |
 | `update(_:_:)`, `escape(_:)` | Keep what was typed; drop an empty draft |
 | `sending(_:as:)`, `settle(in:)` | Write the item's ID first; hide the draft until Marfa answers (`ItemLibrary.refusedCreates`) |
-| `release(_:sending:rest:)`, `giveBack(_:)` | A file's window closed: hidden until it is added; a failure is given back and told |
+| `release(_:sending:rest:)`, `giveBack(_:)` | Hide the file draft after window close. If queuing fails, return it and tell the person. |
 | `release(_:)`, `drop(_:)` | The holder went, or the person cleared it |
 
 ### Dropping
