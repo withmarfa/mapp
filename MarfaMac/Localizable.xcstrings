@@ -955,6 +955,9 @@
         }
       }
     },
+    "%lld items are files, and Marfa sets this property of a file itself." : {
+
+    },
     "%lld items are files, which can’t be moved between lanes." : {
       "extractionState" : "manual",
       "localizations" : {
