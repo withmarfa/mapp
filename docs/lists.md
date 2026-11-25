@@ -40,7 +40,7 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 ## Layouts
 
 - **The Archive, reached from the Library page's tabs and Go, opens as a table of Name, Type, Source and Edited.** Its title is the Library's, with its count ("10 of 213" when narrowed); empty, it says "Nothing is archived."
-- **Unarchive and Delete stand on an Archive row under the pointer** (`RowQuickActions`)
+- **Unarchive and Delete stand on an Archive row under the pointer** (`RowQuickActions`).
 - **A layout draws the list it is given** (`ItemViewMode`) and never changes which items show.
 - **One row menu, one density and one drag serve every layout.**
 - **An item's date is its own type's** (`ItemPlacement`), so a place of several types puts each where it belongs. A person can point the view at one field.
