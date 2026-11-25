@@ -173,8 +173,8 @@ extension Browser {
         }
     }
 
-    /// Puts the order, grouping, filters and timeline date back, or only `parts` of them, and leaves the rest of the
-    /// place's options.
+    /// Puts the order, grouping, filters, timeline date and listing back, or only `parts` of them, and leaves the rest
+    /// of the place's options.
     func put(_ choices: ViewChoices, in place: PlaceView, only parts: Set<ViewChoices.Part> = Set(ViewChoices.Part.allCases)) {
         var current = self.choices(in: place)
         current.take(parts, from: choices)
@@ -185,6 +185,9 @@ extension Browser {
         options.hiddenGroups = current.options.hiddenGroups
         options.sort = current.options.sort
         options.filter = current.options.filter
+        options.scope = current.options.scope
+        options.archived = current.options.archived
+        options.includesKinds = current.options.includesKinds
         tableOptions[place] = options
         timelineFields[place] = current.timelineDate
     }

@@ -125,12 +125,19 @@ extension Browser {
         return differs(id, from: seed)
     }
 
-    /// The query the window reads the view's items with while its filters differ from the view's own, and nil while
-    /// they do not: the view's list is then the library's own reading of the saved view. A window that opened the
-    /// view keeps the query of that version, whatever the view has since become elsewhere, as it keeps its filters.
+    /// The query the window reads the view's items with while its filters, From or Archived Items differ from the
+    /// view's own, and nil while they do not: the view's list is then the library's own reading of the saved view. A
+    /// window that opened the view keeps the query of that version, whatever the view has since become elsewhere, as it
+    /// keeps its filters, and reads the tiers and states the window chose.
     var viewPreview: (view: ItemID, query: LibraryViewQuery)? {
-        guard let id = shown.savedView, let seed = viewSeeds[id], let query = seed.preview,
-              !(tableOptions[shown] ?? ItemTableOptions()).filter.isSame(as: seed.options.filter) else { return nil }
+        guard let id = shown.savedView, let seed = viewSeeds[id], var query = seed.preview else { return nil }
+        let options = tableOptions[shown] ?? ItemTableOptions()
+        let listing = listing(in: shown)
+        let viewScope = seed.options.scope ?? .all, viewArchived = seed.options.archived ?? .hidden
+        guard !options.filter.isSame(as: seed.options.filter) || listing.scope != viewScope || listing.archived != viewArchived
+        else { return nil }
+        query.tier = listing.scope.tier
+        query.states = listing.archived.states
         return (id, query)
     }
 

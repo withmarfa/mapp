@@ -57,6 +57,22 @@ struct BrowserViewPreviewTests {
         #expect(browser.viewPreview == nil)
     }
 
+    @Test func archivedItemsPreviewsAndUndoes() {
+        let library = Self.library()
+        let browser = Self.window(library)
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        browser.undoManager = undo
+        _ = browser.choicesChanged()
+        undo.beginUndoGrouping()
+        browser.setArchived(.shown)
+        undo.endUndoGrouping()
+        #expect(browser.viewPreview?.query.states == nil)
+        undo.undo()
+        #expect(browser.listing(in: browser.shown).archived == .hidden)
+        #expect(browser.viewPreview == nil)
+    }
+
     @Test func aChangedPreviewListChangesWhatTheWindowDraws() {
         let library = Self.library()
         let browser = Self.window(library)

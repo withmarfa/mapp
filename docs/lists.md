@@ -25,6 +25,7 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **A saved view is an item in Marfa.** Marfa holds its title, query, sort and group. The app holds the rest (`ViewMacSettings` in `ViewLayouts`): layout, properties, cards, density, week or month and column widths.
 - **A change to a saved view is written as it is made** (`Browser+ViewWrites`), naming only the settings that changed, so it never writes over another app's.
 - **A write that Marfa has not taken stays in the window.** Until it is taken, Save View sends it again and Revert View drops it (`hasViewChanges`).
+- **The window lists what it shows while a change waits.** While its filters, From or Archived Items differ from the view's own, it reads the view's query with the window's choices (`viewPreview`).
 - **Undo takes back only the settings of its own step**, so another app's change stays.
 - **An entry for a thing that is gone is forgotten only when the copy is whole and current**, because a copy that is filling also lacks things.
 - **Save as View saves what Marfa can hold and names the rest first** (`ViewDraft.Unkept`). A type's place saves the type, which Marfa takes with its kinds, and an exact-type condition only with Include Kinds off; a Type filter takes its place. The window's From and Archived Items become the view's tier and states, and a view's become the window's (`ViewDraft`).
