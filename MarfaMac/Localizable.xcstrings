@@ -2802,6 +2802,9 @@
     "Behind highlighted text." : {
 
     },
+    "Beside the List" : {
+
+    },
     "Best Match" : {
 
     },
@@ -5744,6 +5747,9 @@
     "Jobs" : {
 
     },
+    "Keep" : {
+
+    },
     "Keep All Downloads" : {
 
     },
@@ -7322,6 +7328,9 @@
         }
       }
     },
+    "Open Beside the List" : {
+
+    },
     "Open Connection…" : {
 
     },
@@ -7361,7 +7370,13 @@
     "Open as Modal" : {
 
     },
-    "Open in Browser" : {
+    "Open as Page" : {
+
+    },
+    "Open in %@" : {
+
+    },
+    "Open in Default App" : {
 
     },
     "Open in New Window" : {

@@ -26,8 +26,7 @@ struct ItemPageHeader: ViewModifier {
                 }
                 ValueEditPresenter.shared.itemChanged(to: id)
                 editor.onHeaderEvent = handler
-                let library = library, drafts = drafts
-                editor.showHeader { Cost.measure(.pageHeader) { Self.header(of: id, in: library, drafts: drafts) } }
+                editor.showHeader(Self.heldHeader(of: editor, in: library, drafts: drafts))
             }
             .onChange(of: interfaceTextSize) { editor.refreshHeader() }
             .onChange(of: titleLines) { editor.refreshHeader() }
@@ -43,6 +42,15 @@ struct ItemPageHeader: ViewModifier {
             .onChange(of: Tuning.shared.chipLooks) { editor.refreshHeader() }
             #endif
             .onDisappear { drafts.saveTitle(of: item.id, in: library, undoManager: undoManager) }
+    }
+
+    /// The header of the item the editor holds, which changes only once the text before it is handed over, so the head
+    /// never names one item over another's text.
+    static func heldHeader(of editor: EditorController, in library: any ItemLibrary, drafts: DetailsPresentation) -> () -> PageHeader? {
+        { [weak editor] in
+            guard let id = editor?.heldItemID else { return nil }
+            return Cost.measure(.pageHeader) { header(of: id, in: library, drafts: drafts) }
+        }
     }
 
     /// What the page's head shows for the item, read from the library and the window's drafts as they are now.

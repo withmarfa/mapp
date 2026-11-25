@@ -158,9 +158,9 @@ extension EditorTests {
         #expect(shown.id == reader.id && beeps == 1, "a link to no item leaves the window as it is")
         window.makeFirstResponder(nil)
         await editor.openItemLink(ItemLink(linkText: "[[Plan]]")!, from: reader.id)
-        #expect(shown.id == plan.id, "the window now shows the linked item, which it will find again at the next launch")
-        // The window's page loads the item it now shows, and the keyboard goes there with it.
-        editor.load(try #require(library.item(plan.id)))
+        // Once the reader's text is handed over and the page holds the linked item, which the keyboard goes to.
+        #expect(await eventually { shown.id == plan.id }, "the window now shows the linked item, which it will find again at the next launch")
+        #expect(editor.pageItemID == plan.id)
         func typing() async throws -> Bool {
             try await editor.webView.evaluateJavaScript("document.activeElement?.matches('.ProseMirror') === true") as? Bool ?? false
         }

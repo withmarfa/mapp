@@ -30,19 +30,12 @@ nonisolated enum PageHeaderKind: String, Sendable {
 }
 
 extension ItemLibrary {
-    /// The web address "Open Original" opens: the `url` of an item whose page is for reading, if it is one.
+    /// The web address the corner's Open takes a page for reading to: the `url` of an item whose page is for reading.
     func originalAddress(of item: Item) -> URL? {
         guard PageHeaderKind.of(item.type, in: catalogue) == .reading else { return nil }
         return BrowserTarget.webAddress(item.value(of: "url")?.string?.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
-    /// What "Open in Browser" opens for `item`, if it is a Web Page. `fetchedFile` is the page's file once the window
-    /// has it.
-    func browserTarget(of item: Item, fetchedFile: URL?) -> BrowserTarget? {
-        guard PageHeaderKind.of(item.type, in: catalogue) == .webpage else { return nil }
-        return BrowserTarget.of(item, fetchedFile: fetchedFile)
-    }
-
-    /// Whether the item is a Web Page, which has the "Open in Browser" action.
+    /// Whether the item is a Web Page, which opens in the browser as a saved page.
     func isWebPage(_ item: Item) -> Bool { PageHeaderKind.of(item.type, in: catalogue) == .webpage }
 }

@@ -209,6 +209,7 @@ struct MainView: View {
                     sidebarColumn
                 } detail: {
                     ItemsIndex(browser: browser, pane: $pane)
+                        .besidePage(browser, editor: editor, details: details)
                         .toastOverlay()
                         .modifier(itemInspector)
                         .toolbar { windowToolbar() }
@@ -248,6 +249,7 @@ struct MainView: View {
                             fullPage.topRowOverPage(tools: pageTools, signal: topRowSignal)
                         }
                     }
+                    .besidePage(browser, editor: editor, details: details)
                     .toastOverlay()
                     .modifier(itemInspector)
                     .toolbar { windowToolbar() }
@@ -515,7 +517,10 @@ struct MainView: View {
             Task { pane = request }
         case .page, .title:
             // The modal's own page takes the request, and no full page is opened behind it.
-            if browser.showsCollection, !browser.isModalPresented { browser.isCollectionItemPresented = true }
+            // With Beside the List the page is the column beside the layout, so no full page is opened behind it.
+            if browser.showsCollection, !browser.isModalPresented, ItemOpening.stored() != .besideList {
+                browser.isCollectionItemPresented = true
+            }
             return
         case nil: return
         }

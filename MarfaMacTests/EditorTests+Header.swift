@@ -9,6 +9,39 @@ import WebKit
 extension EditorTests {
     // MARK: The item header
 
+    /// A new selection in the main window leaves the head on the item whose text the page still holds until that text
+    /// is handed over, so typing in the wait never shows under the head of an item it does not reach.
+    @Test @MainActor func theHeadStaysOnTheItemThePageHoldsUntilItsTextIsHandedOver() async throws {
+        let library = FakeItemLibrary()
+        let first = library.add("First\n")
+        let second = library.add("Second\n")
+        let page = try await Page(library: library)
+        page.editor.onChange = { [library] id, text, read in library.updateBody(of: id, to: text, readAt: read) }
+        page.editor.showHeader(ItemPageHeader.heldHeader(of: page.editor, in: library, drafts: DetailsPresentation()))
+        try await page.show(first.id)
+        try await page.wait { page.editor.header?.item == first.id.rawValue }
+        let leaving = page.editor.generation
+        try await page.run("""
+            window.held = true
+            const flush = window.editor.flush.bind(window.editor)
+            window.editor.flush = generation => {
+                if (window.held) return { commandError: 'composition', message: 'Text composition is in progress' }
+                return generation === \(leaving) ? 'First, typed\\n' : flush(generation)
+            }
+            """)
+
+        // As the main window's page does when the selection moves.
+        page.editor.select(try #require(library.item(second.id)))
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(page.editor.header?.item == first.id.rawValue, "the head waits for the text on the page")
+        #expect(page.editor.pageItemID == first.id)
+
+        try await page.run("window.held = false")
+        try await page.wait { page.editor.pageItemID == second.id && page.editor.header?.item == second.id.rawValue }
+        #expect(library.body(of: first.id)?.text == "First, typed\n")
+        #expect(library.body(of: second.id)?.text == "Second\n")
+    }
+
     static func header(_ title: String, id: ItemID = ItemID("note")) -> PageHeader {
         PageHeader(item: id.rawValue, title: title, draft: nil, titleRejected: false,
                    titleRefusal: "The title could not be saved.", editable: true,

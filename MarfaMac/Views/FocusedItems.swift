@@ -47,6 +47,9 @@ final class DetailsPresentation {
     /// The size and page of the image or PDF the window's page has ready, which the corner and the menus act on. It names
     /// its item, so another item's page never takes it, and the page withdraws it when it goes.
     private(set) var offeredFile: (item: ItemID, viewing: FileViewing)?
+    /// Where the file of the item on the page is, once the window has fetched it, which the corner's Open hands to the
+    /// app that opens it.
+    private(set) var resolvedFile: (item: ItemID, url: URL)?
     /// The items the window's Change Type panel is asked for.
     var typeChange: TypeChangeRequest?
     /// The items and type the window asks the values for that the type needs.
@@ -139,6 +142,17 @@ final class DetailsPresentation {
         }
     }
 
+    /// `item`'s file is at `url`, or is not yet anywhere, as while it is fetched.
+    func fileResolved(_ url: URL?, for item: ItemID) {
+        resolvedFile = url.map { (item, $0) }
+    }
+
+    /// The file of `item`'s page, once the window has it.
+    func fileURL(of item: ItemID?) -> URL? {
+        guard let item, resolvedFile?.item == item else { return nil }
+        return resolvedFile?.url
+    }
+
     /// Gives the window the controls of `item`'s file, which its page has ready.
     func offerFileView(_ viewing: FileViewing, for item: ItemID) {
         offeredFile = (item, viewing)
@@ -184,6 +198,7 @@ final class DetailsPresentation {
         if focusedItem != item { focusedItem = nil }
         if formatsItem != item { formatsItem = nil }
         if offeredFile?.item != item { offeredFile = nil }
+        if resolvedFile?.item != item { resolvedFile = nil }
     }
 
     /// `item`'s page has gone, as when the item was deleted or the window turned to something else. Another item's
@@ -192,6 +207,7 @@ final class DetailsPresentation {
         if focusedItem == item { focusedItem = nil }
         if formatsItem == item { formatsItem = nil }
         if offeredFile?.item == item { offeredFile = nil }
+        if resolvedFile?.item == item { resolvedFile = nil }
     }
 
     /// Escape on the page: an open size field closes first, then the formats bar, then Focus on a second press. False

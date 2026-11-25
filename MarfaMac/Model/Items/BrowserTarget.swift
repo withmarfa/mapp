@@ -1,7 +1,7 @@
 import Foundation
 import UniformTypeIdentifiers
 
-/// What "Open in Browser" opens for a Web Page: the address the page came from where the item names one, since the
+/// What the corner's Open takes a Web Page to: the address the page came from where the item names one, since the
 /// live page is what a person means, and otherwise the saved HTML file.
 nonisolated enum BrowserTarget: Equatable, Sendable {
     case address(URL)

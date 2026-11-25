@@ -2,8 +2,8 @@ import SwiftUI
 
 /// An item opened as a modal: a large, solid page over the window, which dims what is behind it. It hosts the same
 /// item page the window shows, with the window's one editor, so no second editor writes the item while it is open
-/// (the page beside the list steps aside, `MainView`). The right sidebar opens inside it, and the page has no corner.
-/// Escape, the close button and a click on the dim area put it away, and `MainView` saves what was typed as it goes.
+/// (the page beside the list steps aside, `MainView`). It has no corner and no panel. Escape, the close button and a click
+/// on the dim area put it away, and `MainView` saves what was typed as it goes.
 /// The window's own toolbar is dimmed and inactive while it is open (`MainView`).
 struct ItemModal: View {
     @CurrentLibrary private var library
@@ -20,21 +20,24 @@ struct ItemModal: View {
     private static let pageTop: CGFloat = 64
     /// The height of a button's capsule: the window toolbar's, not smaller.
     private static let buttonHeight: CGFloat = 35
-    private static let sidebarWidth: CGFloat = 300
     private static let corner: CGFloat = 22
-    /// The page's width, which the right sidebar adds to rather than takes from, as far as the window leaves room.
-    private static let pageWidth: CGFloat = 1000
-    private static let sideMargin: CGFloat = 110
-    private static let verticalMargin: CGFloat = 60
+    /// The card's margins to the window, from the board: 210 at the sides and 56 above and below in a window 1440 points
+    /// wide, which makes the card 1020 by 788 in 1440 by 900. The side margin shrinks with a window narrower than that, so
+    /// the card keeps its share of it, and stays 210 in a wider one.
+    private static let sideMargin: CGFloat = 210
+    private static let sideMarginShare: CGFloat = 210 / 1440
+    private static let verticalMargin: CGFloat = 56
 
-    private func cardWidth(in window: CGFloat) -> CGFloat {
-        let wanted = Self.pageWidth + (details.isPresented ? Self.sidebarWidth : 0)
-        // Where the window is too narrow for the page, the card keeps a margin of its own.
-        return max(0, min(wanted, window - 2 * Self.sideMargin))
+    /// The card's size in a window of `window`'s size.
+    static func cardSize(in window: CGSize) -> CGSize {
+        CGSize(
+            width: max(0, window.width - 2 * min(sideMargin, window.width * sideMarginShare)),
+            height: max(0, window.height - 2 * verticalMargin))
     }
 
     var body: some View {
         GeometryReader { proxy in
+            let size = Self.cardSize(in: proxy.size)
             ZStack {
                 // Not a button: a click on the dim area is not a control to tab to, and Escape does the same.
                 Color.black.opacity(0.28)
@@ -43,10 +46,11 @@ struct ItemModal: View {
                     .onTapGesture { browser.closeModal() }
                     .accessibilityHidden(true)
                 card
-                    .frame(width: cardWidth(in: proxy.size.width))
-                    .padding(.vertical, Self.verticalMargin)
+                    .frame(width: size.width, height: size.height)
             }
         }
+        // The margins are to the window's edges, under the title bar as the board draws them.
+        .ignoresSafeArea()
         .accessibilityElement(children: .contain)
         .accessibilityLabel(Text("Item"))
         .accessibilityAddTraits(.isModal)
@@ -55,7 +59,8 @@ struct ItemModal: View {
         .focusable()
         .focusEffectDisabled()
         .focused($hasKeyboard)
-        .onAppear { hasKeyboard = true }
+        // The modal has no panel to arrange a layout in, so one under way ends as it opens.
+        .onAppear { hasKeyboard = true; details.endLayout() }
         .onExitCommand { escape() }
         // An item that is gone from the library has nothing left to show.
         .onChange(of: browser.modalItem.map { library.item($0) == nil } ?? true) { _, isGone in
@@ -64,16 +69,9 @@ struct ItemModal: View {
     }
 
     private var card: some View {
-        HStack(spacing: 0) {
-            ItemDetail(browser: browser, editor: editor, details: details, backsToolbar: false, showsCorner: false)
-                .safeAreaPadding(.top, Self.pageTop)
-                .overlay(alignment: .top) { toolbar }
-            if details.isPresented {
-                Divider()
-                ItemInspectorHost(browser: browser, details: details, editor: editor)
-                    .frame(width: Self.sidebarWidth)
-            }
-        }
+        ItemDetail(browser: browser, editor: editor, details: details, backsToolbar: false, showsCorner: false)
+            .safeAreaPadding(.top, Self.pageTop)
+            .overlay(alignment: .top) { toolbar }
         .ignoresSafeArea()
         .background(Color(nsColor: .windowBackgroundColor))
         .clipShape(.rect(cornerRadius: Self.corner))
@@ -87,8 +85,8 @@ struct ItemModal: View {
 
     // MARK: The toolbar
 
-    /// Close, then up and down, at the page's leading edge; full page and new window, Share and More, and the right
-    /// sidebar at its trailing edge. Each set is a capsule of glass.
+    /// Close, then up and down, at the page's leading edge; Keep first on an item in the Feed, then Favorite, Share and
+    /// More, then Open as Page at its trailing edge. Each set is a capsule of glass.
     private var toolbar: some View {
         let id = browser.modalItem
         let neighbors = browser.modalNeighbors(in: library, order: order)
@@ -112,32 +110,32 @@ struct ItemModal: View {
                         .accessibilityIdentifier("ModalNext")
                 }
                 Spacer(minLength: 0)
+                if let id, PageKeepButton.applies(to: id, in: library) {
+                    // Keep moves on to the item after it, which the list behind may no longer hold once it is kept, and
+                    // only while the modal still shows the item kept.
+                    let following = neighbors.next
+                    tools.withUndo { undoManager in
+                        PageKeepButton(id: id, undoManager: undoManager) {
+                            if let following, browser.modalItem == id { browser.moveModal(to: following) }
+                        }
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 14)
+                        .frame(height: Self.buttonHeight)
+                        .glassEffect(.regular, in: .capsule)
+                    }
+                }
+                capsule {
+                    tools.withUndo { FavoriteButton(ids: tools.ids, undoManager: $0) }
+                    tools.shareLink
+                    tools.moreMenu
+                }
                 capsule {
                     Button(ItemOpening.fullPage.commandTitle, systemImage: ItemOpening.fullPage.symbol) {
                         if let id { browser.open([id], as: .fullPage) }
                     }
-                    .help(Text(ItemOpening.fullPage.commandTitle))
+                    .help("Open as Page")
                     .accessibilityIdentifier("ModalFullPage")
-                }
-                capsule {
-                    Button(ItemOpening.newWindow.commandTitle, systemImage: ItemOpening.newWindow.symbol) { openInNewWindow() }
-                        .help(Text(ItemOpening.newWindow.commandTitle))
-                        .accessibilityIdentifier("ModalNewWindow")
-                }
-                capsule {
-                    tools.shareLink
-                    tools.moreMenu
-                }
-                // Done stands in for Details while Customize Layout has the right sidebar, as in the window.
-                if details.isCustomizingLayout {
-                    LayoutDoneButton(details: details, editor: editor)
-                } else {
-                    capsule(isOn: details.isPresented) {
-                        Button("Details", systemImage: "sidebar.right") { details.isPresented.toggle() }
-                            .symbolVariant(details.isPresented ? .fill : .none)
-                            .help(details.isPresented ? "Hide Details" : "Show Details")
-                            .accessibilityIdentifier("DetailsToggle")
-                    }
                 }
             }
             .padding(.horizontal, 12)
@@ -145,10 +143,10 @@ struct ItemModal: View {
         }
     }
 
-    /// A capsule of glass holding buttons, filled gray while the one it holds is on, as every on button is. Each button is a
+    /// A capsule of glass holding buttons. Each button is a
     /// square of the toolbar's button height, so one alone is a circle and a pair is a capsule with no gap between them,
     /// as the window toolbar draws them.
-    private func capsule<Content: View>(isOn: Bool = false, @ViewBuilder _ content: () -> Content) -> some View {
+    private func capsule<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
         HStack(spacing: 0) {
             content()
                 .frame(width: Self.buttonHeight, height: Self.buttonHeight)
@@ -159,15 +157,6 @@ struct ItemModal: View {
         .menuIndicator(.hidden)
         .labelStyle(.iconOnly)
         .foregroundStyle(.primary)
-        .glassEffect(isOn ? .regular.tint(.secondary) : .regular, in: .capsule)
-    }
-
-    /// Closes the modal and opens the item in a window of its own, once what was typed is saved.
-    private func openInNewWindow() {
-        guard let id = browser.modalItem else { return }
-        browser.closeModal()
-        editor.flush { kept in
-            if kept { browser.open([id], as: .newWindow) }
-        }
+        .glassEffect(.regular, in: .capsule)
     }
 }

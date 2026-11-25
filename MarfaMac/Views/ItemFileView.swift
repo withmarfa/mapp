@@ -104,12 +104,17 @@ struct FileItemPage: View {
     var backsToolbar = true
 
     var body: some View {
+        // The corner's Open takes the file from the window's presentation, so every window tells it.
+        let resolved: (URL?) -> Void = { [id = item.id, drafts] url in
+            drafts.fileResolved(url, for: id)
+            onResolved(url)
+        }
         if case .webPage(let document, let runsScripts) = library.pageLayout(of: item) {
             WebPageItemPage(
-                item: item, document: document, runsScripts: runsScripts, drafts: drafts, open: open, onResolved: onResolved,
+                item: item, document: document, runsScripts: runsScripts, drafts: drafts, open: open, onResolved: resolved,
                 backsToolbar: backsToolbar)
         } else {
-            ItemFileView(id: item.id, details: drafts, onResolved: onResolved)
+            ItemFileView(id: item.id, details: drafts, onResolved: resolved)
         }
     }
 }

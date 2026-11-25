@@ -84,23 +84,22 @@ struct ItemCommandContext {
     /// Whether the page is in a modal, which has no corner, so no Focus and no formats.
     var hidesCorner: Bool { browser?.isModalPresented == true }
 
-    var originalAddress: URL? { item.flatMap { library?.originalAddress(of: $0) } }
-
-    var browserTarget: BrowserTarget? { item.flatMap { item in library?.browserTarget(of: item, fetchedFile: fileURL) } }
+    /// Where Open in Default App takes the page: the browser, the app that opens the file, or Maps.
+    var openTarget: PageOpenTarget? { item.flatMap { item in library.flatMap { PageOpenTarget.of(item, in: $0, file: fileURL) } } }
 }
 
 /// The commands on one item or selection that the toolbar's More menu and the menu bar both offer. Each is defined
 /// once here: its title, symbol, shortcut, when it applies and what it does. A menu shows every one of them and
 /// dims the ones that do not apply, so the two menus never differ in what they offer or when.
 enum ItemCommand: CaseIterable {
-    case open, openAsModal, openAsFullPage, quickLook, openInNewWindow, openOriginal, openInBrowser, copyLink, addAttachment, toggleSource, toggleReader, toggleFormats, toggleFocus, print, exportPDF
+    case open, openBesideList, openAsModal, openAsFullPage, quickLook, openInNewWindow, openOutside, copyLink, addAttachment, toggleSource, toggleReader, toggleFormats, toggleFocus, print, exportPDF
 
     /// The menu bar group also determines where ⌘K lists the command.
     var paletteGroup: PaletteSections.CommandGroup {
         switch self {
         case .copyLink, .addAttachment: .edit
         case .toggleSource, .toggleReader, .toggleFormats, .toggleFocus: .view
-        case .open, .openAsModal, .openAsFullPage, .quickLook, .openInNewWindow, .openOriginal, .openInBrowser, .print, .exportPDF: .file
+        case .open, .openBesideList, .openAsModal, .openAsFullPage, .quickLook, .openInNewWindow, .openOutside, .print, .exportPDF: .file
         }
     }
 
@@ -109,12 +108,13 @@ enum ItemCommand: CaseIterable {
     func title(in context: ItemCommandContext, sourceMode: Bool? = nil) -> LocalizedStringResource {
         switch self {
         case .open: "Open"
+        case .openBesideList: ItemOpening.besideList.commandTitle
         case .openAsModal: ItemOpening.modal.commandTitle
         case .openAsFullPage: ItemOpening.fullPage.commandTitle
         case .quickLook: "Quick Look"
         case .openInNewWindow: "Open in New Window"
-        case .openOriginal: "Open Original"
-        case .openInBrowser: "Open in Browser"
+        case .openOutside:
+            if let name = context.openTarget.flatMap({ PageOpener.appName(for: $0) }) { LocalizedStringResource("Open in \(name)") } else { LocalizedStringResource("Open") }
         case .copyLink: "Copy Link"
         case .addAttachment: "Add Attachment…"
         case .toggleSource: (sourceMode ?? context.showsSource) ? "Show Formatted Text" : "Show Markdown Source"
@@ -129,11 +129,12 @@ enum ItemCommand: CaseIterable {
     var systemImage: String {
         switch self {
         case .open: "arrow.up.right"
+        case .openBesideList: ItemOpening.besideList.symbol
         case .openAsModal: ItemOpening.modal.symbol
         case .openAsFullPage: ItemOpening.fullPage.symbol
         case .quickLook: "eye"
         case .openInNewWindow: "macwindow"
-        case .openOriginal, .openInBrowser: "safari"
+        case .openOutside: "arrow.up.forward.app"
         case .copyLink: "link"
         case .addAttachment: "paperclip"
         case .toggleSource: "doc.plaintext"
@@ -150,12 +151,12 @@ enum ItemCommand: CaseIterable {
     var shortcutCommand: ShortcutCommand {
         switch self {
         case .open: .open
+        case .openBesideList: .openBesideList
         case .openAsModal: .openAsModal
         case .openAsFullPage: .openAsFullPage
         case .quickLook: .quickLook
         case .openInNewWindow: .openInNewWindow
-        case .openOriginal: .openOriginal
-        case .openInBrowser: .openInBrowser
+        case .openOutside: .openOutside
         case .copyLink: .copyLink
         case .addAttachment: .addAttachment
         case .toggleSource: .toggleSource
@@ -171,11 +172,11 @@ enum ItemCommand: CaseIterable {
         guard context.library != nil else { return false }
         return switch self {
         case .open: context.hasBrowser && ItemOpening.stored().canOpen(context.ids.count)
+        case .openBesideList: context.hasBrowser && ItemOpening.besideList.canOpen(context.ids.count)
         case .openAsModal: context.hasBrowser && ItemOpening.modal.canOpen(context.ids.count)
         case .openAsFullPage: context.hasBrowser && ItemOpening.fullPage.canOpen(context.ids.count)
         case .quickLook, .openInNewWindow: context.hasBrowser && !context.ids.isEmpty
-        case .openOriginal: context.originalAddress != nil
-        case .openInBrowser: context.browserTarget != nil
+        case .openOutside: context.openTarget != nil
         case .copyLink: context.item != nil
         case .addAttachment: context.editableItem != nil
         case .toggleSource, .print, .exportPDF: context.visibleItem != nil
@@ -190,13 +191,13 @@ enum ItemCommand: CaseIterable {
         guard isEnabled(in: context), let library = context.library else { return }
         switch self {
         case .open: context.browser?.open(context.ids)
+        case .openBesideList: context.browser?.open(context.ids, as: .besideList)
         case .openAsModal: context.browser?.open(context.ids, as: .modal)
         case .openAsFullPage: context.browser?.open(context.ids, as: .fullPage)
         case .quickLook: if let browser = context.browser { Task { await browser.quickLookSelection(in: library) } }
         case .openInNewWindow: ItemWindows.open(library.idsForWindows(context.ids), opening: openWindow)
-        case .openOriginal: context.originalAddress.map { _ = NSWorkspace.shared.open($0) }
-        case .openInBrowser:
-            if let item = context.item, let target = context.browserTarget { BrowserOpening.open(target, for: item) }
+        case .openOutside:
+            if let item = context.item, let target = context.openTarget { PageOpener.open(target, for: item) }
         case .copyLink: if let id = context.item?.id { Task { await library.copyLink(of: id) } }
         case .addAttachment: editor?.isChoosingImages = true
         case .toggleSource: editor.map { $0.setSourceMode(!$0.caret.sourceMode) }
