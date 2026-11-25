@@ -54,6 +54,18 @@ extension ItemMove {
         }
     }
 
+    /// The moves a menu lists out of those `selectionCommands` offered, in the menu's order: Keep, Move to Feed, then
+    /// Archive, or Unarchive where nothing in the selection can be archived. A selection in both tiers lists both tier moves.
+    static func inMenu(_ offered: Set<ItemMove>) -> [ItemMove] {
+        var moves: [ItemMove] = [.keep, .moveToFeed].filter(offered.contains)
+        if offered.contains(.archive) {
+            moves.append(.archive)
+        } else if offered.contains(.unarchive) {
+            moves.append(.unarchive)
+        }
+        return moves
+    }
+
     /// The command's name, which its undo step carries.
     var name: String {
         switch self {
@@ -126,8 +138,8 @@ extension ItemLibrary {
     }
 
     /// The items among `ids` that Archive moves, every active item beneath them through `parent-of` at any depth,
-    /// and why the others do not move. An item already archived needs nothing, and one beneath that is archived or in
-    /// Recently Deleted is left as it is. `beneath` holds none of `archiving`.
+    /// and why the others do not move. An item already archived needs nothing and adds nothing beneath it, and one
+    /// beneath that is archived or in Recently Deleted is left as it is. `beneath` holds none of `archiving`.
     func archivePlan(_ ids: Set<ItemID>) -> (archiving: Set<ItemID>, beneath: Set<ItemID>, skips: BatchSkips) {
         var archiving = Set<ItemID>()
         var skips = BatchSkips()
@@ -141,8 +153,10 @@ extension ItemLibrary {
                 skips.skip(reason)
                 continue
             }
-            roots.append(id)
-            if item.state == .active { archiving.insert(id) }
+            if item.state == .active {
+                archiving.insert(id)
+                roots.append(id)
+            }
         }
         var beneath = Set<ItemID>()
         var seen = Set(roots)
@@ -187,19 +201,6 @@ extension ItemLibrary {
             if offered.count == ItemMove.allCases.count { break }
         }
         return offered
-    }
-
-    /// The moves a menu lists for `ids`, in the menu's order: Keep, Move to Feed, then Archive, or Unarchive where
-    /// nothing in the selection can be archived. A selection in both tiers lists both tier moves.
-    func menuMoves(_ ids: Set<ItemID>) -> [ItemMove] {
-        let offered = selectionCommands(ids)
-        var moves: [ItemMove] = [.keep, .moveToFeed].filter(offered.contains)
-        if offered.contains(.archive) {
-            moves.append(.archive)
-        } else if offered.contains(.unarchive) {
-            moves.append(.unarchive)
-        }
-        return moves
     }
 
     /// Nil for now: the question waits for the type's feed window in the catalogue (withmarfa/marfa#3560,

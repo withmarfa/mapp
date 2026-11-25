@@ -6,8 +6,11 @@ nonisolated enum MoveWords {
     /// The title asking whether to archive what is under the items too. `title` names one item; `beneath` counts the
     /// items under all of them.
     static func archiveTitle(selected: Int, title: String?, beneath: Int) -> String {
-        if selected == 1, let title = title?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty {
-            return AttributedString(localized: "Archive “\(title)” and the ^[\(beneath) item](inflect: true) under it?").text
+        if selected == 1 {
+            if let title = title?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty {
+                return AttributedString(localized: "Archive “\(title)” and the ^[\(beneath) item](inflect: true) under it?").text
+            }
+            return AttributedString(localized: "Archive this item and the ^[\(beneath) item](inflect: true) under it?").text
         }
         return AttributedString(localized: "Archive ^[\(selected) item](inflect: true) and the ^[\(beneath) item](inflect: true) under them?").text
     }

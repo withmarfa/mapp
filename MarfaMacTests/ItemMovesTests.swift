@@ -10,12 +10,12 @@ import Testing
 
     static let binned = ItemID("binned")
 
-    private func loaded() async throws -> (MarfaLibrary, FakeItemSource) {
+    private func loaded(adding extra: [Item] = []) async throws -> (MarfaLibrary, FakeItemSource) {
         let items = F.items.map { item in
             var item = item
             if item.id == F.t1 { item.state = .archived }
             return item
-        } + [F.item(Self.binned, F.note, "Binned child", age: 10, state: .trashed, edges: [F.child("c9", Self.binned, of: F.t1)])]
+        } + [F.item(Self.binned, F.note, "Binned child", age: 10, state: .trashed, edges: [F.child("c9", Self.binned, of: F.t1)])] + extra
         let source = FakeItemSource()
         for (id, text) in F.texts { source.setBody(text, of: id) }
         let library = MarfaLibrary(source: source, notices: Notices())
@@ -43,6 +43,14 @@ import Testing
             source.send(.answered(write.id, .accepted))
         }
         source.clearWrites()
+    }
+
+    @Test func archiveCountsOnlyWhatIsBeneathTheItemsItWillArchive() async throws {
+        let under = ItemID("under")
+        let (library, _) = try await loaded(adding: [F.item(under, F.note, "Under the archived", age: 10, edges: [F.child("c8", under, of: F.t1)])])
+        let plan = library.archivePlan([F.t1, F.n1])
+        #expect(plan.archiving == [F.n1])
+        #expect(plan.beneath.isEmpty, "an item that is archived already adds nothing beneath it")
     }
 
     @Test func archiveTakesWhatIsActiveBeneathAndItsUndoMovesBackOnlyWhatItChanged() async throws {
@@ -188,10 +196,11 @@ import Testing
 
     @Test func aMenuListsTheTierMovesThenArchiveAndUnarchiveOnlyWhereNothingCanBeArchived() async throws {
         let (library, _) = try await loaded()
-        #expect(library.menuMoves([F.n1, F.n2]) == [.keep, .moveToFeed, .archive])
-        #expect(library.menuMoves([F.n2, F.t1]) == [.keep, .moveToFeed, .archive], "a mixed selection archives")
-        #expect(library.menuMoves([F.t1]).last == .unarchive && !library.menuMoves([F.t1]).contains(.archive))
-        #expect(library.menuMoves([F.n3]).isEmpty, "an item in the bin offers none")
+        #expect(ItemMove.inMenu(library.selectionCommands([F.n1, F.n2])) == [.keep, .moveToFeed, .archive])
+        #expect(ItemMove.inMenu(library.selectionCommands([F.n2, F.t1])) == [.keep, .moveToFeed, .archive], "a mixed selection archives")
+        let onlyArchived = ItemMove.inMenu(library.selectionCommands([F.t1]))
+        #expect(onlyArchived.last == .unarchive && !onlyArchived.contains(.archive))
+        #expect(ItemMove.inMenu(library.selectionCommands([F.n3])).isEmpty, "an item in the bin offers none")
     }
 
     /// What a window's manager does between events: this one opens no group of its own, so a move's group is its step.

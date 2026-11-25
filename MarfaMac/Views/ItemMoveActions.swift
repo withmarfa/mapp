@@ -75,7 +75,7 @@ struct ItemMoveActions: View {
         let offered = library.selectionCommands(ids)
         // Archive is the one command for a mixed selection; Unarchive only where nothing in it can be archived.
         let toggle: ItemMove = offered.contains(.unarchive) && !offered.contains(.archive) ? .unarchive : .archive
-        let moves: [ItemMove] = keepsPlace ? [.keep, .moveToFeed, toggle] : library.menuMoves(ids)
+        let moves: [ItemMove] = keepsPlace ? [.keep, .moveToFeed, toggle] : ItemMove.inMenu(offered)
         ForEach(moves, id: \.self) { move in
             Button(move.name, systemImage: move.symbol) {
                 library.perform(move, on: ids, undoManager: undoManager, details: details)

@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// The actions for a set of items, shared by the list's context menu and the menu bar: whether it is a favorite, then
-/// the moves and what removes it. The More menu places them apart, with other commands between.
+/// the moves and what removes it. The More menu places them apart, with other commands between. A row's menu draws
+/// ⌃⌘K and ⌃⌘A beside the moves and ⌘⌫ beside Delete.
 struct ItemActions: View {
     @CurrentLibrary private var library
     /// The window's, for the Add to Collection panel; the menu bar passes the front window's in.
@@ -52,6 +53,8 @@ struct ItemOrganizeActions: View {
     var inMenuBar = false
     /// Keeps the items in the menu, dimmed, when nothing is selected, as the menu bar and the More menu do.
     var keepsPlace = false
+    /// Draws ⌘⌫ beside Delete, as a row's menu does. The key itself is the list's.
+    var showsDeleteKey = false
     var shortcuts: ShortcutBindings?
 
     var body: some View {
@@ -102,6 +105,8 @@ struct ItemRemoveActions: View {
     let undoManager: UndoManager?
     var inMenuBar = false
     var keepsPlace = false
+    /// Draws ⌘⌫ beside Delete, as a row's menu does. The key itself is the list's.
+    var showsDeleteKey = false
     var shortcuts: ShortcutBindings?
 
     var body: some View {
@@ -118,6 +123,7 @@ struct ItemRemoveActions: View {
                 library.deleteAfterSaving(ids, undoManager: undoManager, asking: details)
             }
             .shortcut(.delete, shortcuts)
+            .keyboardShortcut(showsDeleteKey ? KeyboardShortcut(.delete, modifiers: .command) : nil)
             .disabled(context.items.isEmpty)
         }
     }

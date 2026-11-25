@@ -5,6 +5,7 @@ import SwiftUI
 /// as the board's Move To.
 struct ItemRowMenu<LayoutActions: View>: View {
     @CurrentLibrary private var library
+    @Environment(Libraries.self) private var libraries
     @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
     @AppStorage(ListKey.openItemsIn) private var opening = ItemOpening.standard
     let browser: Browser
@@ -45,10 +46,10 @@ struct ItemRowMenu<LayoutActions: View>: View {
         case .layoutActions: layoutActions
         case .changeType: TypeChangeButton(ids: ids, details: details, undoManager: undoManager)
         case .versionHistory: VersionHistoryButton(ids: ids, details: details)
-        case .moves: ItemMoveActions(ids: ids, undoManager: undoManager)
+        case .moves: ItemMoveActions(ids: ids, undoManager: undoManager, shortcuts: libraries.shortcuts)
         case .recover:
             Button("Recover", systemImage: "arrow.uturn.backward") { library.recover(ids, undoManager: undoManager) }
-        case .delete: ItemRemoveActions(ids: ids, undoManager: undoManager)
+        case .delete: ItemRemoveActions(ids: ids, undoManager: undoManager, showsDeleteKey: true)
         case .divider: Divider()
         }
     }

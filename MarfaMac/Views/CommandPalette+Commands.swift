@@ -172,7 +172,7 @@ extension CommandPalette {
                     details.typeChange = TypeChangeRequest(ids: ids, undoManager: undoManager)
                 }
             }
-            for move in library.menuMoves(ids) {
+            for move in ItemMove.inMenu(library.selectionCommands(ids)) {
                 add(move.name, move.symbol, keys(move.shortcutCommand), in: .file) {
                     library.perform(move, on: ids, undoManager: undoManager, details: details)
                 }

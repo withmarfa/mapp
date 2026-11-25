@@ -134,8 +134,8 @@ nonisolated extension Shortcut {
 }
 
 extension View {
-    /// Binds the key the person chose for `command`, in the menu bar: with no `bindings` (the toolbar's copy of a command, a
-    /// row's menu), none, so a key is never registered twice.
+    /// Binds the key the person chose for `command`, in the menu bar: with no `bindings` (the toolbar's copy of a command), none,
+    /// so a key is never registered twice. A row's menu passes them only to draw the key beside the command.
     func shortcut(_ command: ShortcutCommand, _ bindings: ShortcutBindings?) -> some View {
         keyboardShortcut(bindings?.shortcut(for: command)?.keyboardShortcut)
     }
