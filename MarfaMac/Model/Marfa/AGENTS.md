@@ -31,8 +31,8 @@
 
 - **The core judges new links and moves** (`Edges.check`), including endpoint types, nesting, the bin, cycles, duplicates and cardinality. Either end can request the change.
 - **`changeLinks` takes what the person changed** (`adding`, `removing`), never the screen's list. Changes run in call order, each after the source has taken (`SourceChange.taken`) or answered the one before.
-- **Only `validation` and `notFound` refuse a check,** in the core's words, but for a `details.constraint` of `cardinality` or `duplicate`. A copy not yet whole is `.incomplete`, and any other error `.unknown`; neither is the core's refusal, and a picker row asks again.
-- **Check a new child's parent and every new link before writing any** (`newChildVerdict(under:)`). A picker row asks as the change would be made.
+- **Only `validation` and `notFound` refuse a check,** in the core's words, but for a `details.constraint` of `cardinality` or `duplicate`. A copy not yet whole is `.incomplete`, and any other error `.unknown`; neither is the core's refusal.
+- **Check a new child's parent and every new link before writing any** (`newChildVerdict(under:)`).
 - **An end that holds one link has it replaced by moving the other end,** in one `edges.update`. Never remove and add, which can leave the end with none or two.
 - **Never take a link that a third item holds.** Tell the person which item holds it. A many-valued swap sends its new links first. A refusal leaves the old links in place.
 - **The package writes what a text links or embeds as edges on save.** Change such a link in the text, never as a relationship, and answer a link only from the core (`ItemSource.linkAnswers`).

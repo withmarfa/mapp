@@ -70,7 +70,7 @@ extension ValueEditModel {
         var rows = matching.prefix(Self.linkLimit).map { candidate in
             ValueListRow(
                 id: Self.linkPrefix + candidate.id.rawValue, role: .option, title: candidate.displayTitle,
-                detail: candidate.state == .archived ? String(localized: "Archived") : nil, mark: mark(of: candidate))
+                detail: detail(of: candidate), mark: mark(of: candidate))
         }
         if matching.count > Self.linkLimit { rows.append(.header(String(localized: "Type to narrow the list"), id: "header:more")) }
         if holdsOne, typed.isEmpty, let current = heldLinks.first, let item = current.item {
@@ -78,6 +78,17 @@ extension ValueEditModel {
             rows.append(ValueListRow(id: Self.openID, role: .option, title: String(localized: "Open “\(item.displayTitle)”"), mark: .symbol("arrow.up.right")))
         }
         return rows
+    }
+
+    /// What a row says beside its title: that the item is archived, and the item it would be taken from, where choosing
+    /// it moves its one link (a child under another parent).
+    private func detail(of candidate: Item) -> String? {
+        let archived = candidate.state == .archived ? String(localized: "Archived") : nil
+        guard let item = request.item, case .relation(let field) = kind,
+            let holder = library.linkTakenFrom(candidate.id, field: field, for: item).flatMap(library.item)
+        else { return archived }
+        let holds = String(localized: "In \(holder.displayTitle)")
+        return archived.map { String(localized: "\($0), \(holds)") } ?? holds
     }
 
     /// The item a row or a chip stands for.
@@ -108,7 +119,10 @@ extension ValueEditModel {
             if holdsOne { close() }
             return
         }
-        change(item, field: field.field, adding: [target], removing: holdsOne ? held : [], label: library.item(target)?.displayTitle ?? "")
+        let taken = library.linkTakenFrom(target, field: field.field, for: item).flatMap(library.item)?.displayTitle
+        change(
+            item, field: field.field, adding: [target], removing: holdsOne ? held : [],
+            label: library.item(target)?.displayTitle ?? "", movedFrom: taken)
     }
 
     /// Takes one chip's link away.
@@ -119,15 +133,16 @@ extension ValueEditModel {
             return
         }
         guard let field = linkField, let item = request.item else { return }
-        change(item, field: field.field, adding: [], removing: [target], label: chip.title)
+        change(item, field: field.field, adding: [], removing: [target], label: chip.title, movedFrom: nil)
     }
 
     /// Makes the change in one undo step. The library judges it and may have to ask the server, so the panel waits without
     /// holding anything up and says why when the change is refused, keeping what was typed. A change answered after the panel
     /// has closed is told as a notice instead.
-    private func change(_ item: ItemID, field: String, adding: [ItemID], removing: [ItemID], label: String) {
+    private func change(_ item: ItemID, field: String, adding: [ItemID], removing: [ItemID], label: String, movedFrom: String?) {
         isSaving = true
         notice = nil
+        moved = nil
         let (library, undoManager, closes) = (library, request.undoManager, holdsOne)
         Task { [weak self] in
             let verdict = await library.changeLinks(item, field: field, adding: adding, removing: removing, undoManager: undoManager)
@@ -138,6 +153,7 @@ extension ValueEditModel {
             }
             isSaving = false
             if verdict == .taken {
+                moved = movedFrom.map { String(localized: "“\(label)” moved from “\($0)”.") }
                 if closes {
                     close()
                 } else {

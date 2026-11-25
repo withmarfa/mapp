@@ -23,7 +23,6 @@ nonisolated struct ItemRelationship: Identifiable, Sendable {
     let label: String
     let targets: [ItemRelationshipTarget]
     let isEditable: Bool
-    let allowsMultiple: Bool
     var id: String { field }
 }
 

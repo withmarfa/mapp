@@ -7,7 +7,7 @@ import Foundation
 /// The rows are every property the type offers, in the person's order for the type (`PagePlacement.ordered`), each
 /// once. Those shown before Show More are the first `shownLimit` of the rows that have a value or that the person set
 /// to Always Show, or, for a type with no text, of every row the person has not hidden. The rest are `folded`, and a
-/// hidden row is also `muted`. An event's time is its first row, When, whatever the person chose.
+/// hidden row is also `muted`. An event's time is its first row, When, hidden like any other row if the person chose so.
 ///
 /// The values no field describes (`PropertyRow.section`) come last, always folded and read only, under a heading of their
 /// own, and have no place in the person's order.
@@ -126,7 +126,7 @@ nonisolated struct PageHead: Equatable, Sendable {
             case .whenSet: !hasText || !row.isEmpty
             }
         }
-        let shown = Set(([when].compactMap { $0 } + leading).prefix(Self.shownLimit).map(\.id))
+        let shown = Set(([when].compactMap { $0 }.filter { placement.shows($0.id) != .hidden } + leading).prefix(Self.shownLimit).map(\.id))
         let rows = ([when].compactMap { $0 } + listed).map { row in
             var row = row
             row.folded = !shown.contains(row.id)

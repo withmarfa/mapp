@@ -288,9 +288,9 @@ final class FakeItemLibrary: ItemLibrary {
         await checkingParent?()
         return childRefusals[parent].map { .refused($0) } ?? .taken
     }
-    func relationshipVerdict(for id: ItemID, field: String, to other: ItemID) async -> EdgeVerdict {
-        refusals[id]?[other].map { .refused($0) } ?? .taken
-    }
+    /// What `linkTakenFrom` answers for each (item chosen, field) a test sets.
+    var takenFrom: [ItemID: ItemID] = [:]
+    func linkTakenFrom(_ other: ItemID, field: String, for id: ItemID) -> ItemID? { takenFrom[other] }
     func bodyMentions(for id: ItemID) -> [ItemRelationshipTarget] { [] }
     /// The items each type may be made under, by type.
     var parentCandidates: [String: [ItemID]] = [:]

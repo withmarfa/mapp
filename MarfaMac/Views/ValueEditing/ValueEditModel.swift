@@ -45,6 +45,8 @@ final class ValueEditModel {
         }
     }
     var notice: String?
+    /// What a link just made took from another item, told under the list as a plain line, not a refusal.
+    var moved: String?
     /// What the person typed that is not saved yet: a time, or a tag, word or person typed in full that the list
     /// refused. It is cleared only when that input is written, when the person cancels with Escape or empties the
     /// search field, or when it is handed back, so ending the panel any other way never loses it, and a search that

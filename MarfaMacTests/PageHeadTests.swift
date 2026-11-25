@@ -121,7 +121,7 @@ struct PageHeadTests {
         let head = Self.head(Self.item(), links: [
             Self.link(MarfaMapping.collectionEdge, "In Collection"), Self.link("about", "About", ["a1"]),
             Self.link("references", "References", ["r1"], editability: .readOnly(reason)),
-            Self.link("inverse:parent-of", "Children", ["c1"]),
+            Self.link("inverse:parent-of", "Children", ["c1"]), Self.link("inverse:about", "Subject of", ["s1"]),
         ])
         #expect(head.rows.first { $0.id == MarfaMapping.collectionEdge }?.value == .empty(symbol: "link"), "an item in no collection has the row")
         #expect(head.rows.first { $0.id == MarfaMapping.collectionEdge }?.editable == true)
@@ -129,7 +129,7 @@ struct PageHeadTests {
         let references = head.rows.first { $0.id == "references" }
         #expect(references?.editable == false)
         #expect(references?.lock == reason)
-        #expect(Self.shown(head) == ["about", "references"], "a link shows when it has one, and the links that point here wait under Show More")
+        #expect(Self.shown(head) == ["about", "references", "inverse:about"], "a link shows when it has one, in either direction")
         #expect(head.rows.first { $0.id == "inverse:parent-of" }?.folded == true)
     }
 
@@ -151,6 +151,16 @@ struct PageHeadTests {
         placements.setRowOrder(["priority"], of: TypeID("aic.ticket"))
         let head = Self.head(Self.item(["priority": .string("high")]), placements: placements, when: when)
         #expect(Self.shown(head) == [PagePlacement.when, "priority"])
+    }
+
+    @Test func aStoredChoiceToHideWhenHidesItsRow() {
+        let when = PropertyRow(id: PagePlacement.when, label: "When", value: .when("Thu 29 Oct", note: "In 4 days"))
+        var placements = PagePlacements()
+        placements.setShows(.hidden, row: "when", of: TypeID("aic.ticket"))
+        let head = Self.head(Self.item(["priority": .string("high")]), placements: placements, when: when)
+        #expect(Self.shown(head) == ["priority"])
+        let row = head.rows.first { $0.id == PagePlacement.when }
+        #expect(row?.folded == true && row?.muted == true)
     }
 
     @Test func anEventsNoteIsAllDayForOneWholeDayElseHowFarOffItIs() throws {

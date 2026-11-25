@@ -22,7 +22,7 @@ struct ValueEditContent: View {
             if model.hasSearch { searchArea }
             listArea
             if let type = model.typeToEditStatuses { editStatuses(type) }
-            if let notice = model.notice { noticeArea(notice) }
+            if let notice = model.notice { noticeArea(notice) } else if let moved = model.moved { movedLine(moved) }
         }
         .padding(ValueEditMetrics.padding * scale)
         .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -259,6 +259,19 @@ struct ValueEditContent: View {
         }
     }
 
+    private func movedLine(_ text: String) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Divider().padding(.vertical, 4 * scale)
+            Text(verbatim: text)
+                .font(.system(size: 11 * scale))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 8 * scale)
+                .padding(.bottom, 2 * scale)
+                .accessibilityIdentifier("ValueEditMoved")
+        }
+    }
+
     private var conflictFoot: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 1 * scale) {
@@ -304,7 +317,7 @@ private struct ValueEditRow: View {
             if row.role == .create {
                 // The key cap shows only while Return takes this row.
                 if isActive { ShortcutKeys("↩").layoutPriority(1) }
-            } else if let detail = row.detail ?? model.countText(of: row) {
+            } else if case let detail = [row.detail, model.countText(of: row)].compactMap(\.self).joined(separator: ", "), !detail.isEmpty {
                 Text(verbatim: detail)
                     .font(.system(size: 12 * scale))
                     .monospacedDigit()

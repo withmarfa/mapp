@@ -59,25 +59,14 @@ extension MarfaLibrary {
         atTo ? admits(type, constraint(of: info, atTo: true)) : catalogue.admits(type, from: info)
     }
 
-    /// What the core says of linking `id` through `field` to `other`, as the change would be made: a field that holds one
-    /// link has it replaced by moving an end, which the core judges as a move, and any other link as a new one. Judged
-    /// on what the copy holds, with no server and nothing queued, so a picker can ask of each row.
-    func relationshipVerdict(for id: ItemID, field: String, to other: ItemID) async -> EdgeVerdict {
-        guard let end = fieldEnd(field) else { return .unknown }
-        let current = linked(to: id, end)
-        guard !current.contains(other) else { return .taken }
-        // A picker of a field that holds one link replaces it with the item chosen.
-        let replaced = end.info.cardinality(atTo: end.atTo) == .one ? current : []
-        switch plan(id, field: field, adding: [other], removing: replaced) {
-        case .unavailable: return await source.edgeVerdict(draft(id, other, end))
-        case .refused(let reason): return .refused(reason)
-        case .change(_, let made):
-            for link in made {
-                let verdict = await verdict(of: link)
-                if verdict != .taken { return verdict }
-            }
-            return .taken
-        }
+    /// The item that holds the one link `other` would give up if `id` took it through `field`: the parent of an item
+    /// chosen as a child of `id`, which the change moves to `id`. Nil where nothing is taken from another item, or
+    /// where the field is not an inverse one (a link a third item holds there is refused, not moved).
+    func linkTakenFrom(_ other: ItemID, field: String, for id: ItemID) -> ItemID? {
+        guard let end = fieldEnd(field), end.isInverse, end.info.cardinality(atTo: !end.atTo) == .one else { return nil }
+        let farEnd = FieldEnd(info: end.info, atTo: !end.atTo, isInverse: false)
+        guard let theirs = held(by: other, farEnd).first(where: { (farEnd.atTo ? $0.from : $0.to) != id }) else { return nil }
+        return farEnd.atTo ? theirs.from : theirs.to
     }
 
     private func verdict(of link: MadeLink) async -> EdgeVerdict {
@@ -154,7 +143,7 @@ extension MarfaLibrary {
         var results = fields.map { name, end in
             ItemRelationship(
                 field: name, label: label(end), targets: Self.ordered(others(of: id, end).map(target)),
-                isEditable: item.allows(.links), allowsMultiple: end.info.cardinality == .many)
+                isEditable: item.allows(.links))
         }
         let pointing = index.links(touching: id).filter { $0.holder != id }
         for type in Set(pointing.map(\.type)) {
@@ -169,14 +158,13 @@ extension MarfaLibrary {
                     field: held.field, label: held.label,
                     targets: Self.ordered(
                         held.targets + targets.filter { incoming in !held.targets.contains { $0.id == incoming.id } }),
-                    isEditable: held.isEditable, allowsMultiple: held.allowsMultiple)
+                    isEditable: held.isEditable)
                 continue
             }
             // The text that links an item is the linking item's to change, not a relationship of this one.
             results.append(ItemRelationship(
                 field: RelationField.inversePrefix + type, label: label(end), targets: targets,
-                isEditable: item.allows(.links) && type != MarfaMapping.bodyLinkEdge,
-                allowsMultiple: end.info.reverseCardinality == .many))
+                isEditable: item.allows(.links) && type != MarfaMapping.bodyLinkEdge))
         }
         return results.sorted { lhs, rhs in
             lhs.field.hasPrefix(RelationField.inversePrefix) != rhs.field.hasPrefix(RelationField.inversePrefix)
@@ -240,7 +228,7 @@ extension MarfaLibrary {
     private var linkable: Set<ItemID> { index.ids(in: .active).union(index.ids(in: .archived)) }
 
     /// Active and archived items of a type the field's far end allows. Which of them the core would refuse, such as one
-    /// that would close a cycle, is asked of each (`relationshipVerdict`).
+    /// that would close a cycle, is told by the core when the link is changed.
     func relationshipCandidates(for id: ItemID, field: String) -> [Item] {
         guard let item = item(id), let end = fieldEnd(field) else { return [] }
         guard admits(item.type, end.info, atTo: end.atTo) else { return [] }

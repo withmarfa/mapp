@@ -192,6 +192,23 @@ struct ValueEditingTests {
         #expect(library.relationshipWrites.map(\.adding) == [[other.id]] && library.relationshipWrites.map(\.removing) == [[]])
     }
 
+    @Test func aChildUnderAnotherParentSaysSoInTheListAndAfterTheMove() async {
+        let children = RelationField(
+            field: "inverse:parent-of", label: "Children", cardinality: .many, allowedTypes: [], targets: [], editability: .editable)
+        let (model, library, _, other) = linkPanel(children)
+        let parent = Self.item(["title": .string("Alpha")], id: "10000000-0000-0000-0000-000000000003")
+        library.items.append(parent)
+        library.takenFrom[other.id] = parent.id
+        library.acceptsRelationships = true
+        let row = ValueEditModel.linkPrefix + other.id.rawValue
+        #expect(model.rows.first { $0.id == row }?.detail == "In \(parent.displayTitle)")
+        #expect(model.moved == nil)
+        model.activate(row)
+        while model.isSaving { await Task.yield() }
+        #expect(model.moved?.contains(parent.displayTitle) == true, "the panel's line says which parent the item left")
+        #expect(library.relationshipWrites.count == 1, "the move is one call, so one undo step")
+    }
+
     @Test func aPanelForAFieldTheItemCannotChangeTakesNoLink() async {
         let locked = RelationField(
             field: "references", label: "References", cardinality: .many, allowedTypes: [], targets: [], editability: .readOnly("In the text."))

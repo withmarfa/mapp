@@ -133,9 +133,9 @@ protocol ItemLibrary: AnyObject, Observable {
     func childIDs(of id: ItemID) -> [ItemID]
     /// The active and archived items `field` may link `id` to; an item in the bin is never one.
     func relationshipCandidates(for id: ItemID, field: String) -> [Item]
-    /// What the core says of linking `id` through `field` to `other`, judged on what is held, with nothing queued and
-    /// no server: taken, refused in its words, or unknown where it could not be asked.
-    func relationshipVerdict(for id: ItemID, field: String, to other: ItemID) async -> EdgeVerdict
+    /// The item whose one link `other` gives up when `id` takes it through the inverse `field`, as a parent is given up
+    /// by a child chosen under another: where the change moves a link rather than adds one. Nil otherwise.
+    func linkTakenFrom(_ other: ItemID, field: String, for id: ItemID) -> ItemID?
     /// What the core says of filing a new item under `parent`, asked before the item exists: a parent in the bin or of a
     /// type that cannot be one is refused, as is nesting under a flat type. The new item has no id the copy holds, so
     /// the core does not judge its type here; `creationParentCandidates` keeps to the types the parent end admits.
