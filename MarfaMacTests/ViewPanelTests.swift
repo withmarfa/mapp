@@ -600,4 +600,89 @@ struct ViewPanelTests {
         #expect(library.views.count == 2)
         #expect(library.views.contains { $0.title == "New View" })
     }
+
+    // MARK: Revert, offline changes and what a new view keeps
+
+    private static let byTitle = [ItemTableComparator(column: .title, order: .forward)]
+
+    /// Revert View puts back the sort this Mac changed and leaves the grouping another app cleared, whether that change
+    /// came merged into this Mac's write or arrived after it.
+    @Test(arguments: [true, false]) func revertPutsBackOnlyWhatThisMacChanged(mergedIntoTheWrite: Bool) async {
+        let (browser, library, _) = Self.opened()
+        if mergedIntoTheWrite { library.changedElsewhere = { $0.group = nil } }
+        await Self.change(browser) { browser.tableOptions[browser.shown, default: .init()].sort = Self.byTitle }
+        if !mergedIntoTheWrite, var changed = Self.held(library) {
+            changed.version += 1
+            changed.group = nil
+            library.views = [changed]
+            browser.followView(in: library)
+        }
+        #expect(Self.held(library)?.group == nil)
+        browser.revertView(in: library)
+        #expect(await eventually(within: .seconds(20)) { Self.held(library)?.sort == Self.view().sort })
+        #expect(Self.held(library)?.group == nil)
+    }
+
+    @Test func aNameTypedThenClickedAwayFromOfflineGoesToTheClipboard() async {
+        let (browser, library, _) = Self.opened(reachesServer: false)
+        browser.openViewPanel(in: library)
+        browser.viewPanel?.name = "Typed"
+        browser.dismissViewPanel(in: library)
+        #expect(browser.viewPanel == nil)
+        #expect(await eventually(within: .seconds(20)) { library.notices.waiting.contains { $0.isNotKept && $0.text == "Typed" } })
+    }
+
+    /// A change made offline outlives the view, the window and a relaunch, and another window sends it once the server is back.
+    @Test func anOfflineChangeIsWrittenOnceTheServerIsBackAfterTheWindowClosed() async {
+        let (browser, library, _) = Self.opened(reachesServer: false)
+        let defaults = browser.defaults
+        await Self.change(browser) { browser.setFilter(Self.status, values: ["todo"]) }
+        browser.showing = .library
+        #expect(PendingViewChanges.holds(Self.id, in: defaults))
+        // A window opened after a relaunch, on another place, reads the same defaults.
+        library.reachesServer = true
+        let later = Browser()
+        later.defaults = defaults
+        later.adopt(library)
+        later.showing = .library
+        later.reachabilityChanged(in: library)
+        #expect(await eventually(within: .seconds(20)) { Self.held(library)?.query.filter?.contains("todo") == true })
+        #expect(!PendingViewChanges.holds(Self.id, in: defaults))
+    }
+
+    @Test func anOfflineChangeMarfaRefusesLaterGoesToTheClipboard() async {
+        let (browser, library, _) = Self.opened(reachesServer: false)
+        await Self.change(browser) { browser.setFilter(Self.status, values: ["todo"]) }
+        browser.showing = .library
+        library.reachesServer = true
+        library.viewFailure = ViewWriteFailure(kind: .refused, message: "No")
+        browser.reachabilityChanged(in: library)
+        #expect(await eventually(within: .seconds(20)) { library.notices.waiting.contains { $0.isNotKept && $0.title == "View Not Saved" } })
+        #expect(!PendingViewChanges.holds(Self.id, in: browser.defaults))
+        #expect(Self.held(library)?.version == 1)
+    }
+
+    /// A grouping chosen in a list writes only the group, so a sort the Mac cannot show stays.
+    @Test func aGroupingKeepsASortTheMacCannotShow() async {
+        var custom = Self.view()
+        custom.sort = [LibraryViewSort(field: "source", ascending: true)]
+        custom.group = nil
+        let (browser, library, _) = Self.opened(view: custom)
+        browser.viewMode = .list
+        await Self.change(browser) { browser.chooseGrouping(.column(Self.status, by: .value)) }
+        #expect(Self.held(library)?.group?.field == "properties.status")
+        #expect(Self.held(library)?.sort == custom.sort)
+    }
+
+    @Test func createViewKeepsOpenItemsAndQuickActions() async throws {
+        let (browser, library, _) = Self.opened()
+        browser.setOpening(.modal)
+        browser.setShowsQuickActions(false)
+        browser.openNewViewPanel(in: library)
+        await browser.finishViewPanel(in: library, order: Self.order)
+        let made = try #require(library.views.first { $0.id != Self.id })
+        let settings = ViewLayouts.stored(in: browser.defaults).settings(for: made.id)
+        #expect(settings?.opening == .modal)
+        #expect(settings?.quickActions == false)
+    }
 }

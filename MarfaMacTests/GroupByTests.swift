@@ -110,6 +110,28 @@ struct GroupByTests {
         #expect(ItemTableLayout.groups(of: rows, by: column, mode: .presence).map(\.id) == ["false"])
     }
 
+    /// In a saved view the groups are Marfa's: a row whose type lacks the field is Not Set, and a status word its type
+    /// does not declare is No Status (`device/view-group-presence`, `device/view-group-status`). A place keeps Not Applicable.
+    @Test func aSavedViewGroupsEveryRowAsMarfaDoes() throws {
+        let items = [
+            Self.item("open-day", Self.event, ["place": .string("Studio")]), Self.item("plan", Self.task),
+            Self.item("odd", Self.task, ["status": .string("someday")]), Self.item("done", Self.task, ["status": .string("done")]),
+        ]
+        let rows = Self.rows(items)
+        let columns = Self.columns(rows)
+        let place = try #require(columns.first { $0.id == "field.place" })
+        #expect(ItemTableLayout.groups(of: rows, by: place, mode: .presence).map(\.id).contains(GroupKey.notApplicable))
+        let marfa = ItemTableLayout.groups(of: rows, by: place, mode: .presence, declared: true, asMarfa: true)
+        #expect(marfa.map(\.id) == ["false", "true"])
+        #expect(Set(marfa[0].rows.map(\.item.id.rawValue)) == ["plan", "odd", "done"])
+        let status = try #require(columns.first { $0.id == "field.status" && $0.groups(by: .statusGroups) })
+        let tasks = Self.rows(Array(items.dropFirst()))
+        let none = ItemTableLayout.groups(of: tasks, by: status, mode: .statusGroups, catalogue: Self.catalogue, declared: true, asMarfa: true)
+        #expect(Set(try #require(none.first { $0.id == "" }).rows.map(\.item.id.rawValue)) == ["plan", "odd"])
+        let lanes = ItemBoardLayout.lanes(items: Array(items.dropFirst()), key: "status", catalogue: Self.catalogue, statusGroups: true, asMarfa: true)
+        #expect(Set(try #require(lanes.first { $0.groupKey == "" }).items.map(\.id.rawValue)) == ["plan", "odd"])
+    }
+
     // MARK: In a window
 
     private static func library(_ items: [MarfaMac.Item]) -> FakeItemLibrary {

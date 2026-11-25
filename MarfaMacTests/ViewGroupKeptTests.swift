@@ -128,6 +128,18 @@ struct ViewGroupKeptTests {
         #expect(monthly.unkept.isEmpty)
     }
 
+    /// Day to Set or Not Set on the same field keeps no date key, and back keeps no `true` or `false`.
+    @Test func aChangeOfWayKeepsOnlyTheKeysTheNewGroupingCanName() {
+        let byDay = LibraryViewGroup(field: "properties.due_at", bucket: .day, order: Self.otherApps.order, hidden: Self.otherApps.hidden)
+        let presence = ViewDraft.kept(LibraryViewGroup(field: "properties.due_at", byPresence: true), from: byDay)
+        #expect(presence?.order == [])
+        #expect(presence?.hidden == [])
+        let setOrNot = LibraryViewGroup(field: "properties.due_at", order: [.bool(true)], hidden: [.bool(false)], byPresence: true)
+        let weekly = ViewDraft.kept(LibraryViewGroup(field: "properties.due_at", bucket: .week), from: setOrNot)
+        #expect(weekly?.order == [])
+        #expect(weekly?.hidden == [])
+    }
+
     @Test func anotherFieldDropsTheOldGroupsAndWritesTheAppsOrder() {
         let view = Self.view(LibraryViewGroup(field: "properties.priority", order: [.string("high")], hidden: [.string("low")]))
         let byStatus = Self.change(view, window: Self.window(grouping: Self.statusColumn)) { $0.grouping = .column("field.status") }
