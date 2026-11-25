@@ -197,7 +197,8 @@ import Testing
     // MARK: The row of views on two Macs
 
     private let viewOrder = PreferenceUnit.row(.places, setting: "viewOrder", key: "library")
-    private let viewHidden = PreferenceUnit.row(.places, setting: "viewHidden", key: "library")
+    private let viewHidden = PreferenceUnit.row(.places, setting: "viewHidden", key: #"["library","favorites"]"#)
+    private let ownHidden = PreferenceUnit.row(.places, setting: "viewHidden", key: #"["library","own"]"#)
 
     @Test func aHideHereAndAReorderOnAnotherMacBothStand() async throws {
         let copy = FakePreferencesCopy()
@@ -218,14 +219,53 @@ import Testing
         let item = await copy.add([viewOrder: #"["own","favorites"]"#])
         let sync = await sync(copy)
         ViewOrders.update(in: defaults) { $0.set([.favorites, .own], in: .library) }
-        await copy.change(item, [viewHidden: #"["favorites"]"#])
+        await copy.change(item, [viewHidden: "true"])
         await sync.flush()
         #expect(try await eventuallyAsking { await copy.unitsHeld(item)[self.viewOrder] == #"["favorites","own"]"# })
         await sync.flush()
         let stored = ViewOrders.stored(in: defaults)
         #expect(stored.hidden(in: .library) == [.favorites])
         #expect(stored.order(in: .library) == [.favorites, .own])
-        #expect(await copy.unitsHeld(item)[viewHidden] == #"["favorites"]"#)
+        #expect(await copy.unitsHeld(item)[viewHidden] == "true")
+    }
+
+    /// An earlier copy of the app kept another Mac's hidden views in the sync's record without storing them, so the
+    /// upgraded app holds none: they are taken from the Marfa, never deleted there.
+    @Test func hiddenViewsAnEarlierCopyNeverStoredAreTakenNotDeleted() async throws {
+        let copy = FakePreferencesCopy()
+        let item = await copy.add([viewHidden: "true", viewOrder: #"["own","favorites"]"#])
+        defaults.set(Data(#"{"library":["own","favorites"]}"#.utf8), forKey: ViewOrders.key)
+        var record = PreferencesSync.Record()
+        record.marfas["instance-1"] = .init(item: item, base: [viewHidden: "true", viewOrder: #"["own","favorites"]"#])
+        record.last = "instance-1"
+        record.save(defaults)
+        let sync = await sync(copy)
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[viewHidden] == "true")
+        #expect(ViewOrders.stored(in: defaults).hidden(in: .library) == [.favorites])
+        // Shown again here, the view's row says so, and the next step leaves it.
+        ViewOrders.update(in: defaults) { $0.setHidden(.favorites, false, in: .library) }
+        #expect(try await eventuallyAsking { await copy.unitsHeld(item)[self.viewHidden] == "false" })
+        await sync.flush()
+        #expect(ViewOrders.stored(in: defaults).hidden(in: .library).isEmpty)
+    }
+
+    @Test func twoMacsHidingDifferentViewsBothStand() async throws {
+        let copy = FakePreferencesCopy()
+        let item = await copy.add([viewOrder: #"["own","favorites"]"#])
+        let sync = await sync(copy)
+        ViewOrders.update(in: defaults) { $0.setHidden(.own, true, in: .library) }
+        await copy.change(item, [viewHidden: "true"])
+        await sync.flush()
+        #expect(try await eventuallyAsking { await copy.unitsHeld(item)[self.ownHidden] == "true" })
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[viewHidden] == "true")
+        #expect(ViewOrders.stored(in: defaults).hidden(in: .library) == [.own, .favorites])
+        // Showing one changes only its row.
+        ViewOrders.update(in: defaults) { $0.setHidden(.own, false, in: .library) }
+        #expect(try await eventuallyAsking { await copy.unitsHeld(item)[self.ownHidden] == "false" })
+        #expect(await copy.unitsHeld(item)[viewHidden] == "true")
+        #expect(ViewOrders.stored(in: defaults).hidden(in: .library) == [.favorites])
     }
 
     @Test func aMarfaValueThatCannotBeReadIsSetAsideOnceAndLeftInTheMarfa() async throws {
