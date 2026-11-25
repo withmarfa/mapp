@@ -1,4 +1,5 @@
 import { openLink, postToHost } from './bridge'
+import { cardTargetAt, watchCards } from './card'
 import {
   ItemEditor,
   guardedCommand,
@@ -130,6 +131,7 @@ const editor = await ItemEditor.mount(
   labels.words,
 )
 const header = new ItemHeader(headerRoot, footerRoot, labels.header)
+watchCards(() => header.item)
 const notice = new PageNoticeLine(
   noticeRoot,
   reasonRoot,
@@ -181,6 +183,18 @@ window.addEventListener(
   'contextmenu',
   (event) => {
     postToHost({ type: 'embedMenu', embed: null, opens: false })
+    const card = cardTargetAt(event.target)
+    const shown = header.item
+    if (shown) {
+      const rect = card?.element.getBoundingClientRect()
+      postToHost({
+        type: 'cardMenu',
+        item: shown,
+        card: card ? card.target : null,
+        rect: rect ? [rect.left, rect.top, rect.width, rect.height] : [0, 0, 0, 0],
+        viewportHeight: window.innerHeight,
+      })
+    }
     if (header.openRowMenuAt(event.target)) {
       event.preventDefault()
       event.stopPropagation()

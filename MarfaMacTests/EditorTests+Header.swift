@@ -49,7 +49,7 @@ extension EditorTests {
                    status: .init(label: "In Progress", enabled: true), parent: .init(label: "Field Research", enabled: true),
                    pins: [],
                    rows: [PropertyRow(id: "status", label: "Status", value: .status), PropertyRow(id: "child-of", label: "Parent", value: .parent)],
-                   showMore: "Show 0 More", linked: [], showsText: true, showMoreLinked: "Show 0 More", interfaceTextSize: 13, titleLines: 2,
+                   showMore: "Show 0 More", foot: PageFoot(sections: []), showsText: true, interfaceTextSize: 13, titleLines: 2,
                    chips: .init(looks: .defaults))
     }
 

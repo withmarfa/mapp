@@ -141,10 +141,23 @@ final class EditorWebView: WKWebView {
     private final class MenuEmbed: NSObject {
         let item: ItemID
         let reference: EmbedReference
+        /// The file item the embed is bound to, where it is.
+        let file: ItemID?
 
-        init(item: ItemID, reference: EmbedReference) {
+        init(item: ItemID, reference: EmbedReference, file: ItemID?) {
             self.item = item
             self.reference = reference
+            self.file = file
+        }
+    }
+
+    private final class MenuCard: NSObject {
+        let target: LinkCardTarget
+        let rect: CGRect
+
+        init(target: LinkCardTarget, rect: CGRect) {
+            self.target = target
+            self.rect = rect
         }
     }
 
@@ -161,6 +174,22 @@ final class EditorWebView: WKWebView {
     @objc private func openEmbed(_ sender: NSMenuItem) {
         guard let embed = sender.representedObject as? MenuEmbed else { return }
         controller?.openEmbed(embed.reference, in: embed.item)
+    }
+
+    /// Open Item, on a picture or file the item embeds: its own item, as Settings > General > Open Items says.
+    @objc private func openEmbedItem(_ sender: NSMenuItem) {
+        guard let file = (sender.representedObject as? MenuEmbed)?.file else { return }
+        controller?.follow(file)
+    }
+
+    @objc private func copyEmbedLink(_ sender: NSMenuItem) {
+        guard let file = (sender.representedObject as? MenuEmbed)?.file, let library = controller?.library else { return }
+        Task { await library.copyLink(of: file) }
+    }
+
+    @objc private func showCard(_ sender: NSMenuItem) {
+        guard let card = sender.representedObject as? MenuCard else { return }
+        controller?.showCard(card.target, rect: card.rect)
     }
 
     @objc private func revealEmbed(_ sender: NSMenuItem) {
@@ -244,15 +273,29 @@ final class EditorWebView: WKWebView {
         super.willOpenMenu(menu, with: event)
         declinesInsertion = false
         if let embed = controller?.takeMenuEmbed() {
-            let open = NSMenuItem(title: String(localized: "Open"), action: #selector(openEmbed(_:)), keyEquivalent: "")
-            let reveal = NSMenuItem(title: String(localized: "Show in Finder"), action: #selector(revealEmbed(_:)), keyEquivalent: "")
-            for item in [open, reveal] {
+            let file = controller?.library?.embeddedFileItem(embed.reference, in: embed.item)
+            let represented = MenuEmbed(item: embed.item, reference: embed.reference, file: file)
+            func entry(_ title: String, _ action: Selector) -> NSMenuItem {
+                let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
                 item.target = self
-                item.representedObject = MenuEmbed(item: embed.item, reference: embed.reference)
+                item.representedObject = represented
+                return item
             }
-            let items = embed.opens ? [open, reveal] : [reveal]
+            var items: [NSMenuItem] = []
+            if file != nil {
+                items += [entry(String(localized: "Open Item"), #selector(openEmbedItem(_:))), entry(String(localized: "Copy Link"), #selector(copyEmbedLink(_:))), .separator()]
+            }
+            if embed.opens { items.append(entry(String(localized: "Open"), #selector(openEmbed(_:)))) }
+            items.append(entry(String(localized: "Show in Finder"), #selector(revealEmbed(_:))))
             for (index, item) in items.enumerated() { menu.insertItem(item, at: index) }
             menu.insertItem(.separator(), at: items.count)
+        }
+        if let card = controller?.takeMenuCard() {
+            let show = NSMenuItem(title: String(localized: "Show Card"), action: #selector(showCard(_:)), keyEquivalent: "")
+            show.target = self
+            show.representedObject = MenuCard(target: card.target, rect: card.rect)
+            menu.insertItem(show, at: 0)
+            menu.insertItem(.separator(), at: 1)
         }
         if let row = controller?.takeMenuRow() {
             declinesInsertion = true

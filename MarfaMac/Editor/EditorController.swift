@@ -82,6 +82,10 @@ final class EditorController: NSObject {
     /// The row of the property block, or Linked From, the context menu is opening over, which it offers to hide
     /// from the page.
     @ObservationIgnored var menuRow: (item: ItemID, row: String)?
+    /// The linked item the context menu is opening over, which it offers to show as a card.
+    @ObservationIgnored var menuCard: (target: LinkCardTarget, rect: CGRect)?
+    /// How many rows each list at the foot of the item on the page has been asked to show (`footMore`).
+    @ObservationIgnored var footAsked: (item: ItemID, limits: PageFoot.Limits)?
     /// Escape in the page, which hands the keyboard back to the list.
     @ObservationIgnored var onEscape: () -> Void = {}
     /// A window that shows an item beside the list reveals it as choosing it in the list does.

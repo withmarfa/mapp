@@ -122,6 +122,14 @@ extension EditorController {
             Task { await openItemLink(link, from: item) }
         case .linkMenu(let item, let generation, let target, let point, let viewportHeight):
             showLinkMenu(for: target, in: item, generation: generation, at: point, viewportHeight: viewportHeight)
+        case .cardHover(let item, let target, let rect, let viewportHeight):
+            hoverCard(on: target, in: item, rect: containerRect(rect, viewportHeight: viewportHeight))
+        case .cardEnd:
+            endHoverCard()
+        case .cardMenu(let item, let target, let rect, let viewportHeight):
+            menuCard = item == pageItemID ? target.map { ($0, containerRect(rect, viewportHeight: viewportHeight)) } : nil
+        case .footMore(let item, let key):
+            showMoreFoot(of: item, key: key)
         case .embedMenu(let embed):
             menuEmbed = embed
         case .rowMenu(let row):
