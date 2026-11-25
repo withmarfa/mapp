@@ -57,8 +57,11 @@ extension Browser {
     func keepPlaceChoices(of place: PlaceView) {
         let options = tableOptions[place]
         let timeline = timelineFields[place]
+        let catalogue = library?.catalogue
         updatePlaceDefault(place) {
+            let stored = $0
             $0.keep(options)
+            if let catalogue { $0.keepUnapplied(from: stored, in: place, catalogue: catalogue) }
             $0.timelineField = timeline
         }
     }

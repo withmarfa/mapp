@@ -261,6 +261,29 @@ struct PlaceDefaultsTests {
         #expect(options?.grouping == .automatic)
     }
 
+    @Test func aSortAndGroupingTheWindowCouldNotApplyOutliveAnotherChange() {
+        let defaults = ViewPanelTests.defaults()
+        var stored = PlaceDefault()
+        stored.sort = [.init(column: "field.gone", reversed: false), .init(column: "title", reversed: true)]
+        stored.grouping = .column("field.gone")
+        stored.groupOrder = ["a"]
+        Self.store(stored, for: Self.tasks, in: defaults)
+        let browser = Self.window(defaults, library: Self.library())
+        browser.setFilter(Self.status, values: ["todo"], negated: true)
+        browser.choicesChanged()
+        var kept = PlaceDefaults.stored(in: defaults).default(for: Self.tasks)
+        #expect(kept?.sort == stored.sort)
+        #expect(kept?.grouping == stored.grouping)
+        #expect(kept?.groupOrder == ["a"])
+        #expect(kept?.filter.map(\.field) == [Self.status])
+
+        // A sort the person sets replaces it.
+        browser.tableOptions[Self.tasks, default: .init()].sort = [ItemTableComparator(column: .edited, order: .forward)]
+        browser.choicesChanged()
+        kept = PlaceDefaults.stored(in: defaults).default(for: Self.tasks)
+        #expect(kept?.sort == [.init(column: "edited", reversed: false)])
+    }
+
     @Test func aTypeThatNoLongerExistsIsIgnored() {
         let defaults = ViewPanelTests.defaults()
         var stored = PlaceDefault()

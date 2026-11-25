@@ -75,4 +75,26 @@ import Testing
         #expect(browser.tableContent(in: library) !== pending)
     }
 
+    @Test func aLargeTableLeftWhileItsEditSettlesShowsTheEditOnReturn() async throws {
+        let (library, source) = try await BigLibrary.loaded(scale: 4)
+        let browser = browser(showing: .library)
+        browser.adopt(library)
+        #expect(library.items(in: .library).count > Browser.arrangesAlongsideAbove)
+        let first = browser.tableContent(in: library)
+        var edited = try #require(first.rows.first?.item)
+        edited.title = "Renamed"
+        edited.version = ItemVersion(2)
+        source.send(.upserted([edited]))
+        try #require(await eventually { library.item(edited.id)?.title == "Renamed" })
+        // The edit starts an arrangement, and the window leaves for a place with no table before it lands.
+        #expect(browser.tableContent(in: library) === first)
+        browser.showing = .types
+        await browser.arranging?.task.value
+
+        browser.showing = .library
+        try #require(await eventually(within: .seconds(30)) {
+            browser.tableContent(in: library).allRows.contains { $0.item.title == "Renamed" }
+        })
+    }
+
 }

@@ -161,6 +161,8 @@ final class Browser {
     @ObservationIgnored var heldTables: PlaceMemory<(key: TableKey, content: ItemTableContent)> = [:]
     /// The arrangement under way, and what it is for.
     @ObservationIgnored var arranging: (key: TableKey, task: Task<Void, Never>)?
+    /// The last sort an arrangement started off the main actor, which the next waits for.
+    @ObservationIgnored var sorting: Task<[ItemTableRow], Never>?
     /// Counts the arrangements that landed, which a view reads through `tableContent(in:)` to draw the new one.
     var tableArrangements = 0
     /// The rows of Types, Collections or Sources, held while what they read stands (`Browser+PlaceIndex`).
@@ -439,6 +441,7 @@ final class Browser {
         heldTables = [:]
         arranging?.task.cancel()
         arranging = nil
+        sorting = nil
         indexRowsMemo = nil
         sectionsMemo = nil
         viewModesMemo = nil

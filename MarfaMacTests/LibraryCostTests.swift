@@ -37,6 +37,7 @@ struct LibraryCostTests {
         // One edit: how long the main actor holds the window to ask for the next table, then how long until it lands
         // (its sort runs off the main actor, after a run of edits is let settle).
         let before = browser.tableArrangements
+        Cost.resetTallies()
         var edited = try #require(library.items(in: .library).first)
         edited.title = "Edited"
         edited.modified = .now
@@ -48,5 +49,15 @@ struct LibraryCostTests {
         line("afterEditMainActor", milliseconds(since: start))
         try #require(await eventually(within: .seconds(60)) { _ = browser.tableContent(in: library); return browser.tableArrangements > before })
         line("afterEditLanded", milliseconds(since: start))
+        // The arrangement's own time on the main actor: its rows made and filtered, before the sort leaves it.
+        line("afterEditArrangeMainActor", Cost.tallies[.tableArrange]?.milliseconds ?? 0)
+
+        // Types and Sources, made again as at each change while one shows.
+        for place in [PlaceView.types, .sources] {
+            browser.showing = place
+            start = ContinuousClock.now
+            _ = browser.indexRows(in: library).count
+            line("\(place.place.word)Rows", milliseconds(since: start))
+        }
     }
 }

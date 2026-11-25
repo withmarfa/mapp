@@ -13,6 +13,8 @@ nonisolated enum Cost: String, CaseIterable, Sendable {
     /// One `ItemTableContent` made, whatever it was asked for afterwards.
     case tableContent
     case tableRows
+    /// The main actor's part of arranging a large table (`Browser.arrange`): its rows made and filtered.
+    case tableArrange
     case tableGroups
     /// One run of the gallery's own body, timed over its listing of every item the place holds.
     case galleryBody
