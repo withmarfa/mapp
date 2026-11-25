@@ -24,7 +24,7 @@ struct CommandValuePanels: ViewModifier {
             .onChange(of: details.collectionPick?.id) {
                 guard let request = details.collectionPick else { return }
                 details.collectionPick = nil
-                present(.collections, for: request.ids, undoManager: request.undoManager)
+                present(.relation(MarfaMapping.collectionEdge), for: request.ids, undoManager: request.undoManager)
             }
     }
 

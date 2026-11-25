@@ -14,7 +14,6 @@ struct ItemInspectorHost: View {
     /// The page beside the panel, which lists the headings of the item on it and goes to one, for the Outline.
     /// Nil where no page is beside the panel, and the Outline then has no headings.
     var editor: EditorController?
-    @State private var editing: ItemRelationship?
     @AppStorage(PagePlacements.key) private var placements = PagePlacements()
 
     init(browser: Browser, details: DetailsPresentation, editor: EditorController? = nil) {
@@ -50,7 +49,6 @@ struct ItemInspectorHost: View {
                         onProperty: { key, value in library.setItemProperty(id, key: key, value: value, undoManager: undoManager) },
                         isWritingProperties: { library.isWritingProperties(of: id) },
                         onOpen: open,
-                        onEdit: { editing = $0 },
                         onRemove: { relationship, target in
                             await library.changeLinks(id, field: relationship.field, adding: [], removing: [target], undoManager: undoManager) == .taken
                         },
@@ -72,13 +70,6 @@ struct ItemInspectorHost: View {
             } else {
                 // A place with no items says so in the main area, and so does the list layout's page column.
                 Color.clear
-            }
-        }
-        .sheet(item: $editing) { relationship in
-            if let id = selectedID {
-                ItemRelationshipPicker(owner: id, relationship: relationship, candidates: library.relationshipCandidates(for: id, field: relationship.field)) {
-                    await library.changeLinks(id, field: relationship.field, adding: $0, removing: $1, undoManager: undoManager) == .taken
-                }
             }
         }
         .accessibilityElement(children: .contain)
@@ -119,7 +110,6 @@ struct ItemInspector: View {
     /// entries, which waits for it.
     var isWritingProperties: () -> Bool = { false }
     let onOpen: (ItemID) -> Void
-    let onEdit: (ItemRelationship) -> Void
     let onRemove: (ItemRelationship, ItemID) async -> Bool
     /// The tags the person manages, which exclude the favorite tag, and what removes one. Tags are added in the Tags box,
     /// whose editor reaches the library itself.
@@ -210,22 +200,13 @@ struct ItemInspector: View {
 
     private var relationshipSection: some View {
         PanelSection(title: "Relationships", count: relationshipCount,
-                     placeholder: relationshipCount == 0 ? "No Relationships" : nil, boxed: false, add: { hovering in
-            if !addable.isEmpty {
-                InspectorPlusMenu(accessibilityLabel: "Add Relationship", identifier: "RelationshipAddMenu", isRowHovered: hovering) {
-                    ForEach(addable) { option in
-                        Button(option.label) { onEdit(option) }
-                            .accessibilityIdentifier("RelationshipAdd.\(option.field)")
-                    }
-                }
-            }
-        }) {
+                     placeholder: relationshipCount == 0 ? "No Relationships" : nil, boxed: false) {
             VStack(alignment: .leading, spacing: InspectorMetrics.groupGap) {
                 ForEach(shownRelationships) { relationship in
                     let group = LinkGroup(item: item.id, field: relationship.field)
                     ItemRelationshipGroup(
                         relationship: relationship, typeIcon: typeIcon, isExpanded: presentation.expandedLinks.contains(group),
-                        onShowAll: { presentation.expandLinks(group) }, onOpen: onOpen, onEdit: { onEdit(relationship) },
+                        onShowAll: { presentation.expandLinks(group) }, onOpen: onOpen,
                         onRemove: { await onRemove(relationship, $0) }, shownOnPage: placement.showsOnPage(relationship.field),
                         onShowOnPage: showOnPage(relationship.field))
                 }
@@ -296,7 +277,7 @@ struct ItemInspector: View {
 
     private var hasProperties: Bool { !entries.isEmpty || !emptyFields.isEmpty || offersLocation }
 
-    private var hasRelationships: Bool { !shownRelationships.isEmpty || !addable.isEmpty }
+    private var hasRelationships: Bool { !shownRelationships.isEmpty }
 
     /// An item that can take a tag shows the section for adding one; one that can't shows it only if it has tags.
     private var hasTags: Bool { item.allows(.tags) || !tags.isEmpty }
@@ -317,10 +298,6 @@ struct ItemInspector: View {
 
     private var shownRelationships: [ItemRelationship] {
         InspectorFields.relationships(relationships)
-    }
-
-    private var addable: [ItemRelationship] {
-        relationships.filter { $0.isEditable && ($0.targets.isEmpty || $0.allowsMultiple) }
     }
 }
 
@@ -359,5 +336,13 @@ private struct PanelSection<Content: View, Add: View>: View {
                 content
             }
         }
+    }
+}
+
+extension PanelSection where Add == EmptyView {
+    /// A section with no plus.
+    fileprivate init(title: LocalizedStringKey, count: Int? = nil, placeholder: LocalizedStringKey? = nil, boxed: Bool = true,
+                     @ViewBuilder content: () -> Content) {
+        self.init(title: title, count: count, placeholder: placeholder, boxed: boxed, add: { _ in EmptyView() }, content: content)
     }
 }

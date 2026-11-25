@@ -44,29 +44,25 @@ struct MarfaEdgeCheckTests {
         try await Self.file("c", under: "b", in: scene)
         let queued = try await scene.fake.copy.queue.all().count
         // `a` filed under its own grandchild, from either end.
-        let fromChild = await scene.library.relationshipVerdict(for: scene.id("a"), field: "child-of", to: scene.id("c")).refusal
-        let fromParent = await scene.library.relationshipVerdict(for: scene.id("c"), field: "inverse:parent-of", to: scene.id("a")).refusal
+        let fromChild = await scene.library.changeLinks(scene.id("a"), field: "child-of", adding: [scene.id("c")], removing: [], undoManager: nil).refusal
+        let fromParent = await scene.library.changeLinks(scene.id("c"), field: "inverse:parent-of", adding: [scene.id("a")], removing: [], undoManager: nil).refusal
         #expect(fromChild?.localizedStandardContains("cycle") == true, "\(String(describing: fromChild))")
         #expect(fromParent == fromChild)
-        // An unrelated item, and the parent already above, are taken.
-        let sibling = await scene.library.relationshipVerdict(for: scene.id("c"), field: "child-of", to: scene.id("a"))
-        #expect(sibling == .taken)
         #expect(try await scene.fake.copy.queue.all().count == queued, "asking queued a write")
         await scene.source.close()
     }
 
     @Test func anItemCantBeLinkedToItself() async throws {
         let scene = try await Self.scene([("a", "core.note")])
-        let refusal = await scene.library.relationshipVerdict(for: scene.id("a"), field: "child-of", to: scene.id("a")).refusal
+        let refusal = await scene.library.changeLinks(scene.id("a"), field: "child-of", adding: [scene.id("a")], removing: [], undoManager: nil).refusal
         #expect(refusal?.isEmpty == false)
         await scene.source.close()
     }
 
     @Test func aCollectionCantBeInAnotherBecauseTheTypeIsFlat() async throws {
         let scene = try await Self.scene([("holiday", "core.collection"), ("archive", "core.collection"), ("note", "core.note")])
-        let nested = await scene.library.relationshipVerdict(for: scene.id("archive"), field: "in-collection", to: scene.id("holiday")).refusal
+        let nested = await scene.library.changeLinks(scene.id("archive"), field: "in-collection", adding: [scene.id("holiday")], removing: [], undoManager: nil).refusal
         #expect(nested?.isEmpty == false)
-        #expect(await scene.library.relationshipVerdict(for: scene.id("note"), field: "in-collection", to: scene.id("holiday")) == .taken)
         // The catalogue says so too, so a collection is not offered the field.
         #expect(scene.library.catalogue.edgeTypes[MarfaMapping.collectionEdge]?.flat == true)
         #expect(!scene.library.canJoinCollection(try #require(scene.library.item(scene.id("archive")))))
@@ -121,8 +117,6 @@ struct MarfaEdgeCheckTests {
         let scene = try await Self.scene([("a", "core.note"), ("b", "core.note"), ("child", "core.note")])
         try await Self.file("child", under: "a", in: scene)
         let queued = try await scene.fake.copy.queue.all().count
-        // A picker replaces the one parent, so the row is asked as a move, which the core takes.
-        #expect(await scene.library.relationshipVerdict(for: scene.id("child"), field: "child-of", to: scene.id("b")) == .taken)
         // A second parent beside the first is the core's to refuse, in words naming the item that holds one already.
         #expect(await scene.library.changeLinks(scene.id("child"), field: "child-of", adding: [scene.id("b")], removing: [], undoManager: nil) != .taken)
         #expect(scene.library.notices.waiting.contains { $0.title == String(localized: "Can’t Change This Relationship") })
@@ -195,11 +189,24 @@ struct MarfaEdgeCheckTests {
         await scene.source.close()
     }
 
+    @Test func aChildChosenUnderAnotherParentNamesTheParentItLeaves() async throws {
+        let scene = try await Self.scene([("a", "core.note"), ("b", "core.note"), ("child", "core.note")])
+        // Nothing is taken from anyone while the child has no parent, or has this one.
+        #expect(scene.library.linkTakenFrom(scene.id("child"), field: "inverse:parent-of", for: scene.id("b")) == nil)
+        try await Self.file("child", under: "a", in: scene)
+        #expect(scene.library.linkTakenFrom(scene.id("child"), field: "inverse:parent-of", for: scene.id("b")) == scene.id("a"))
+        #expect(scene.library.linkTakenFrom(scene.id("child"), field: "inverse:parent-of", for: scene.id("a")) == nil)
+        // The child's own end is a replacement it makes, and a field that holds many takes nothing.
+        #expect(scene.library.linkTakenFrom(scene.id("b"), field: "child-of", for: scene.id("child")) == nil)
+        #expect(scene.library.linkTakenFrom(scene.id("child"), field: "about", for: scene.id("b")) == nil)
+        await scene.source.close()
+    }
+
     @Test func anItemInTheBinIsRefused() async throws {
         let scene = try await Self.scene([("a", "core.note"), ("b", "core.note")])
         _ = try await scene.fake.copy.items.delete(scene.id("b").rawValue)
         try #require(await eventually { scene.library.item(scene.id("b"))?.state == .trashed })
-        let refusal = await scene.library.relationshipVerdict(for: scene.id("a"), field: "child-of", to: scene.id("b")).refusal
+        let refusal = await scene.library.changeLinks(scene.id("a"), field: "child-of", adding: [scene.id("b")], removing: [], undoManager: nil).refusal
         #expect(refusal?.isEmpty == false)
         await scene.source.close()
     }
@@ -208,7 +215,7 @@ struct MarfaEdgeCheckTests {
         let scene = try await Self.scene([("a", "core.note"), ("b", "core.note")])
         await scene.source.close()
         // The copy is closed, so the core cannot be asked: neither a refusal to show nor a go-ahead.
-        let verdict = await scene.library.relationshipVerdict(for: scene.id("a"), field: "child-of", to: scene.id("b"))
+        let verdict = await scene.library.changeLinks(scene.id("a"), field: "child-of", adding: [scene.id("b")], removing: [], undoManager: nil)
         #expect(verdict == .unknown, "\(verdict)")
     }
 

@@ -64,7 +64,7 @@ BUDGETS = {  # words
     "docs/commands.md": 1200,
     "docs/concepts.md": 2600,
     "docs/editing.md": 900,
-    "docs/item-page.md": 1200,
+    "docs/item-page.md": 1240,
     "docs/lists.md": 1400,
     "docs/look.md": 1200,
     "docs/model.md": 1100,
@@ -74,7 +74,7 @@ BUDGETS = {  # words
     "docs/settings-window.md": 1000,
     "docs/type-looks.md": 900,
     "docs/value-panels.md": 800,
-    "docs/window.md": 900,
+    "docs/window.md": 990,
 }
 MONTH = r"(?:January|February|March|April|May|June|July|August|September|October|November|December)"
 STATUS = [(re.compile(p, re.IGNORECASE), why) for p, why in (

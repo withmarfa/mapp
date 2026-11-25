@@ -552,9 +552,6 @@
         }
       }
     },
-    "%@, Archived" : {
-
-    },
     "%@, ^[%lld item](inflect: true)" : {
       "localizations" : {
         "en" : {
@@ -1750,7 +1747,16 @@
     "A" : {
 
     },
+    "A Collection" : {
+
+    },
     "A Folder" : {
+
+    },
+    "A Source" : {
+
+    },
+    "A Type" : {
 
     },
     "A View" : {
@@ -2104,6 +2110,12 @@
 
     },
     "Add Row Below" : {
+
+    },
+    "Add Section" : {
+
+    },
+    "Add Shortcut" : {
 
     },
     "Add Sort" : {
@@ -2785,6 +2797,9 @@
 
     },
     "Behind highlighted text." : {
+
+    },
+    "Beside the List" : {
 
     },
     "Best Match" : {
@@ -4894,6 +4909,9 @@
     "Go" : {
 
     },
+    "Go To" : {
+
+    },
     "Go back to settings saved before a change." : {
 
     },
@@ -5038,7 +5056,13 @@
     "Hide Sidebar" : {
 
     },
+    "Hide Views from Sidebar" : {
+
+    },
     "Hide from Page" : {
+
+    },
+    "Hide from Sidebar" : {
 
     },
     "Hide on %@ Pages" : {
@@ -5172,6 +5196,9 @@
 
     },
     "In" : {
+
+    },
+    "In %@" : {
 
     },
     "In %@." : {
@@ -5687,6 +5714,9 @@
     "Jobs" : {
 
     },
+    "Keep" : {
+
+    },
     "Keep All Downloads" : {
 
     },
@@ -5969,6 +5999,9 @@
     "Link" : {
 
     },
+    "Link Not Saved" : {
+
+    },
     "Link Type Not Made" : {
 
     },
@@ -6171,9 +6204,6 @@
 
     },
     "Manage Backups" : {
-
-    },
-    "Manage Connections…" : {
 
     },
     "Manage Connectors" : {
@@ -6542,6 +6572,9 @@
 
     },
     "New Tab" : {
+
+    },
+    "New Tab…" : {
 
     },
     "New Type" : {
@@ -7241,6 +7274,9 @@
         }
       }
     },
+    "Open Beside the List" : {
+
+    },
     "Open Connection…" : {
 
     },
@@ -7280,7 +7316,13 @@
     "Open as Modal" : {
 
     },
-    "Open in Browser" : {
+    "Open as Page" : {
+
+    },
+    "Open in %@" : {
+
+    },
+    "Open in Default App" : {
 
     },
     "Open in New Window" : {
@@ -7432,9 +7474,6 @@
     },
     "Parent" : {
       "extractionState" : "manual"
-    },
-    "Parent Not Saved" : {
-
     },
     "Part of a type Marfa or a plugin provides" : {
 
@@ -7924,6 +7963,9 @@
     "Remove Old Activity" : {
 
     },
+    "Remove Shortcut" : {
+
+    },
     "Remove Sort" : {
 
     },
@@ -8057,6 +8099,12 @@
     "Rename Source" : {
       "extractionState" : "manual"
     },
+    "Rename Source…" : {
+
+    },
+    "Rename Tab" : {
+
+    },
     "Rename View" : {
       "extractionState" : "manual",
       "generatesSymbol" : false
@@ -8087,9 +8135,6 @@
 
     },
     "Replaced an item’s tags" : {
-
-    },
-    "Replace…" : {
 
     },
     "Replacing" : {
@@ -8323,6 +8368,9 @@
       "extractionState" : "manual"
     },
     "Saved" : {
+
+    },
+    "Saved Views" : {
 
     },
     "Saved as “%@”." : {
@@ -8689,6 +8737,9 @@
     },
     "Show Month" : {
       "extractionState" : "manual"
+    },
+    "Show More" : {
+
     },
     "Show Original" : {
 
@@ -9888,6 +9939,9 @@
     "The library sets this tag itself." : {
 
     },
+    "The link could not be saved." : {
+
+    },
     "The link types couldn’t be read again to choose an unused ID, so nothing was sent. %@" : {
 
     },
@@ -9986,9 +10040,6 @@
     },
     "The panel closed before the view was saved." : {
       "extractionState" : "manual"
-    },
-    "The parent could not be saved." : {
-
     },
     "The picture couldn’t be loaded." : {
 
@@ -10670,6 +10721,9 @@
     },
     "This needs the server. Try again when you’re back online." : {
       "extractionState" : "manual"
+    },
+    "This place can’t be saved as a view" : {
+
     },
     "This plugin needs Marfa %@ or later. This server runs %@." : {
       "localizations" : {
@@ -12189,6 +12243,16 @@
     },
     "“%@” may remove items sooner than the server’s current setting." : {
       "extractionState" : "manual"
+    },
+    "“%@” moved from “%@”." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "“%1$@” moved from “%2$@”."
+          }
+        }
+      }
     },
     "“%@” was added but runs nothing yet." : {
 

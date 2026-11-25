@@ -103,7 +103,7 @@ extension EditorController {
             // The page has already refused what Inkkit's `canOpenLink` does not allow.
             openAddress(href)
         case .openItem(let id):
-            onOpenItem(id)
+            follow(id)
         case .copy(let text):
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(text, forType: .string)

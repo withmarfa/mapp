@@ -5,20 +5,24 @@ extension Browser {
     /// for the library's answer, so it names only what the copy queued, and shows nothing where nothing moved. The
     /// toast's Undo is the step the move registered (`StepUndo`), so it is the undo manager's own Undo: where the move's
     /// writes are not yet answered, the library puts it back on the stack and says so. It is offered only where no undo
-    /// group was open before the move, as Delete's is.
+    /// group was open before the move, as Delete's is. `moved` hears the same answer.
     static func move(
         _ move: ItemMove, _ ids: Set<ItemID>, beneath: Bool = false, in library: any ItemLibrary, undoManager: UndoManager?,
-        toasts: ToastPresenter?
+        toasts: ToastPresenter?, moved: ((CommandOutcome) -> Void)? = nil
     ) {
         let startsGroup = undoManager?.groupingLevel == 0
         let opensGroup = startsGroup && undoManager?.groupsByEvent == false
         let report = MoveReport(move, library: library, toasts: toasts)
+        let answer = { (outcome: CommandOutcome) in
+            report.answer(outcome)
+            moved?(outcome)
+        }
         if opensGroup { undoManager?.beginUndoGrouping() }
         switch move {
-        case .keep: library.setTier(ids, to: .library, undoManager: undoManager, moved: report.answer)
-        case .moveToFeed: library.setTier(ids, to: .feed, undoManager: undoManager, moved: report.answer)
-        case .archive: library.archive(ids, beneath: beneath, undoManager: undoManager, moved: report.answer)
-        case .unarchive: library.unarchive(ids, undoManager: undoManager, moved: report.answer)
+        case .keep: library.setTier(ids, to: .library, undoManager: undoManager, moved: answer)
+        case .moveToFeed: library.setTier(ids, to: .feed, undoManager: undoManager, moved: answer)
+        case .archive: library.archive(ids, beneath: beneath, undoManager: undoManager, moved: answer)
+        case .unarchive: library.unarchive(ids, undoManager: undoManager, moved: answer)
         }
         if opensGroup { undoManager?.endUndoGrouping() }
         report.begin(step: startsGroup ? undoManager.flatMap { $0.canUndo ? StepUndo(undoManager: $0) : nil } : nil)

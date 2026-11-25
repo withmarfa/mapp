@@ -15,12 +15,12 @@ nonisolated extension ShortcutCommand {
     static let newWindow = ShortcutCommand("newWindow", in: .file, String(localized: "New Window"), "n", [.command, .option])
     static let refresh = ShortcutCommand("refresh", in: .file, String(localized: "Refresh"), "r")
     static let open = ShortcutCommand("open", in: .file, String(localized: "Open"))
+    static let openBesideList = ShortcutCommand("openBesideList", in: .file, String(localized: "Open Beside the List"))
     static let openAsModal = ShortcutCommand("openAsModal", in: .file, String(localized: "Open as Modal"))
     static let openAsFullPage = ShortcutCommand("openAsFullPage", in: .file, String(localized: "Open as Full Page"))
     static let openInNewWindow = ShortcutCommand("openInNewWindow", in: .file, String(localized: "Open in New Window"), "o")
     static let quickLook = ShortcutCommand("quickLook", in: .file, String(localized: "Quick Look"))
-    static let openOriginal = ShortcutCommand("openOriginal", in: .file, String(localized: "Open Original"))
-    static let openInBrowser = ShortcutCommand("openInBrowser", in: .file, String(localized: "Open in Browser"))
+    static let openOutside = ShortcutCommand("openOutside", in: .file, String(localized: "Open in Default App"))
     static let favorite = ShortcutCommand("favorite", in: .file, String(localized: "Add to Favorites"))
     static let addTag = ShortcutCommand("addTag", in: .file, String(localized: "Add Tag…"))
     static let changeType = ShortcutCommand("changeType", in: .file, String(localized: "Change Type…"))
@@ -93,7 +93,7 @@ nonisolated extension ShortcutCommand {
     /// Every command, in the order of the menus.
     static var all: [ShortcutCommand] {
         let commands: [ShortcutCommand] = [
-            settings, newItem, newWindow, refresh, open, openAsModal, openAsFullPage, openInNewWindow, quickLook, openOriginal, openInBrowser,
+            settings, newItem, newWindow, refresh, open, openBesideList, openAsModal, openAsFullPage, openInNewWindow, quickLook, openOutside,
             favorite, addTag, changeType, customizeLayout, versionHistory, keepInLibrary, moveToFeed, archive, delete, exportPDF, print,
             copyLink, addAttachment, searchItems, commandPalette, paletteActions, searchList, find, findNext, findPrevious, useSelectionForFind,
             toggleSource, toggleReader, toggleFormats, focus, viewAsList, viewAsGallery, viewAsTable, viewAsBoard, viewAsTimeline, viewAsCalendar,

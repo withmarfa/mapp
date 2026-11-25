@@ -12,6 +12,8 @@ paths:
   - MarfaMac/Views/ItemPanel/*.swift
   - MarfaMac/Views/Item*Inspector*.swift
   - MarfaMac/Views/ItemCorner.swift
+  - MarfaMac/Views/PageOpener.swift
+  - MarfaMac/Model/Items/PageOpenTarget.swift
   - MarfaMac/Views/WebPageItemPage.swift
   - MarfaMac/Views/VersionHistory*.swift
   - editor/src/header.ts
@@ -25,8 +27,8 @@ An item's page is its head (a kicker, the title and rows) and its text. One page
 
 - **One head, built once.** `PageHead` decides the kicker, pins and rows; `editor/src/header.ts` draws them on a page with text, `PageHeadView` on a saved web page, which has no menu or drag. A rule added in one drawing must be added in the other.
 - **The kicker** is the type's mark and name, then Read Only, Feed or Archived where true. Its name opens Change Type where the item can change type.
-- **Rows show what has a value, six at most, then Show N More,** which lists every property in the type's order, Empty where unset and hidden ones grey. It is offered on every page; on read-only and deleted ones nothing opens.
-- **A type that keeps no text shows its first six rows.**
+- **Rows show what has a value, six at most, then Show N More,** which lists every property in the type's order, Empty where unset, hidden ones grey. It is offered on every page; on read-only and deleted ones nothing opens.
+- **A type that keeps no text shows its first six rows,** empty or not.
 - **A row is dragged by its name.** A drag or Move Up or Down moves only that row in the type's one order.
 - **An event's time is one row, When,** always first, with how far off it is or All Day in grey.
 - **Long text stops after two lines;** an email, a phone and a number to call open.
@@ -78,15 +80,17 @@ The page and the panel draw what `Item.allows(_:)` answers, and never judge an i
 | The page | Its corner |
 | --- | --- |
 | Text that can be written | Formats, text size, Focus |
-| Text that cannot | Text size, Focus |
+| Text that cannot, or a type with none | Text size, Focus |
 | A web page with a Reader view | Reader or Original, text size, Focus |
 | A web page without one | Focus |
 | An image | Size, Focus |
-| A PDF | Page, size, Focus |
+| A PDF | Page (two or more), size, Focus |
 | Any other file, or one still arriving | Focus |
 | An item in the modal | None |
+| The column beside a layout | Open as Page |
 
 - **Every control in the corner is also a command in the View menu**, and the corner's own menus bind no keys, because a key registered twice works for neither.
+- **Open leads wherever the page has somewhere outside the app** (`PageOpenTarget`): the browser, a file's app or Maps, named in its help.
 - **A person can turn off formats, text size and Focus** (`PageCornerChoice`). One turned off is in the page's More menu.
 - **Zoom keys size the file or the text, never both** (`FileViewCommands`, `TextZoomCommands`).
 - **A size belongs to one file.** Another item's page opens fitted.
@@ -96,9 +100,9 @@ The page and the panel draw what `Item.allows(_:)` answers, and never judge an i
 ## Text and links
 
 - **A plain click on a link places the caret**, because the page is for writing. Command-click, or Open Link at the caret, opens it.
-- **A link to an item opens as Settings says** (`ItemOpening`), and one followed in the modal stays there. A link in the property block or in Linked From shows the item in the list.
-- **Opening is refused for an address that may not be opened**, such as a script, and the rest of the link's menu stays.
+- **A link to an item opens as Settings says** (`ItemOpening`), and one followed in the modal stays there. So does a link in a row, the foot or a panel (`EditorController.follow`).
 - **Every look of a link reads the same under the pointer** (`LinkLook`), and a link to nothing keeps its dashes in all of them.
+- **Opening is refused for an address that may not be opened**, such as a script, and the rest of the link's menu stays.
 - **Removing a link keeps its words.**
 
 ## Files and saved web pages

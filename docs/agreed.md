@@ -108,11 +108,7 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | Stored `rows` | A page placement is stored with `rows` beside `shows`, because a copy from before `shows` sets the whole map aside without `rows`. Removed after the first v0.1 release: write `shows` only and keep reading an old `rows` once. | `PagePlacements.swift` | – |
 | Scrolled | The title sits in the toolbar on one line. | `ItemDetail.swift`, `WindowToolbar.swift` | `Rethink-Page-Scrolled`, `Rethink-White-Page` |
 | Foot | Sub-Items with nesting on any item that has them; a Timeline of mentions on a person and a place; more after 30. | `LinkedFromPlace`, `editor/src/header.ts` | `Rethink-Sub-Items`, `Rethink-Person`, `Rethink-Place` |
-| Corner | Formats, text size and Focus on a written page; size and Focus otherwise; Open on a file. | `PageCorner` | `Rethink-Formats`, `Rethink-Focus` |
 | Blocks | A callout as a tinted block without a rail. A code block's actions in its corner; the place of its language is open. | `editor/src/style.css` | `Rethink-Blocks`, `Rethink-Blocks-Code` |
-| Beside the list | Open Items gains Beside the List: the page in a column, one editor to a window. | `ItemOpening`, `EditorSlot` | `Rethink-Notes`, `Rethink-Library-New` |
-| Modal | Close, Up and Down lead; Favorite, Share and More trail, with Keep first on a Feed item; Open as Page in the corner. | `ItemModal.swift` | `Rethink-Modal`, `Rethink-Inbox-Modal` |
-| Own window | An item's window has the same page, panel and controls. | `ItemWindow.swift` | `Rethink-Item-Window` |
 
 ## The panel beside it
 
@@ -124,7 +120,7 @@ Read only the row you are building. A row says what was agreed; the boards it na
 
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
-| Edges as rows | Each edge field a type may hold gets a row and a value panel: filled ones in place, the rest under Show More, and inverses where Marfa allows. The panel obeys Marfa's answer. One commit is one undo. Only a reference in the text is not editable. An item in no collection has an empty In Collection row. | `ValueEditKind`, `ItemRelationshipPicker`, `PropertyRow` | `Rethink-Properties-Rule`, `Rethink-Edit-Values` |
+| Links in the panel | A plus on the heading of a group of links whose field takes a change, which opens the field's panel, and Remove in a link's menu. The panel's Relationships section, which the Inspector lists today, goes with the Inspector. | `ItemRelationships.swift`, the panel's Links | `Rethink-Properties-Rule` |
 | Undo of a link in one call | Undo checks a link's id, type and ends, then deletes it by id in a second package call, so a move synced between the two is lost, as with state moves. **Waits for Marfa:** one package call that checks and deletes. | `MarfaEngine+Writing.swift` | – |
 | Conflict | A calm line with Keep My Edit and Use Current Value. | `ValueEditModel` | `Rethink-Edit-Conflict` |
 | Status where it is seen | A click on a status in a row or a lane opens its panel; the row stays until it is left. | `StatusSymbol`, `ItemRow.swift` | `Rethink-Status-In-List` |

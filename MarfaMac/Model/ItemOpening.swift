@@ -4,6 +4,8 @@ import Foundation
 /// Open Items says. One value in the defaults (`ListKey.openItemsIn`),
 /// which syncs through the Marfa (`PreferencesMap`).
 nonisolated enum ItemOpening: String, CaseIterable, Identifiable, Hashable, Sendable {
+    /// The page in a column beside the list, or beside a table, board or gallery. Choosing another row replaces it.
+    case besideList
     /// A large page over the window, which dims what is behind it.
     case modal
     /// The item's page in place of the layout, with a Back button.
@@ -11,13 +13,14 @@ nonisolated enum ItemOpening: String, CaseIterable, Identifiable, Hashable, Send
     /// A window of its own.
     case newWindow
 
-    static let standard = ItemOpening.modal
+    static let standard = ItemOpening.besideList
 
     var id: Self { self }
 
     /// The value Settings names.
     var title: String {
         switch self {
+        case .besideList: String(localized: "Beside the List")
         case .modal: String(localized: "Over the List")
         case .fullPage: String(localized: "Full Page")
         case .newWindow: String(localized: "New Window")
@@ -27,6 +30,7 @@ nonisolated enum ItemOpening: String, CaseIterable, Identifiable, Hashable, Send
     /// The command that opens an item this way, as a menu or the palette names it.
     var commandTitle: LocalizedStringResource {
         switch self {
+        case .besideList: "Open Beside the List"
         case .modal: "Open as Modal"
         case .fullPage: "Open as Full Page"
         case .newWindow: "Open in New Window"
@@ -35,13 +39,14 @@ nonisolated enum ItemOpening: String, CaseIterable, Identifiable, Hashable, Send
 
     var symbol: String {
         switch self {
+        case .besideList: "sidebar.right"
         case .modal: "rectangle.center.inset.filled"
         case .fullPage: "arrow.up.left.and.arrow.down.right"
         case .newWindow: "macwindow"
         }
     }
 
-    /// The two ways Open does not do, in the order Settings lists them.
+    /// The ways Open does not do, in the order Settings lists them.
     var others: [ItemOpening] { Self.allCases.filter { $0 != self } }
 
     /// Whether `count` items can be opened this way: a modal and a full page show one item, and windows take as

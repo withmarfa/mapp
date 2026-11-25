@@ -23,7 +23,6 @@ nonisolated struct ItemRelationship: Identifiable, Sendable {
     let label: String
     let targets: [ItemRelationshipTarget]
     let isEditable: Bool
-    let allowsMultiple: Bool
     var id: String { field }
 }
 
@@ -34,6 +33,9 @@ nonisolated struct RelationField: Identifiable, Sendable {
         /// Why the row takes no change, in the person's words.
         case readOnly(String)
     }
+
+    /// The start of the name of the end that points at the item: `inverse:` and the edge type.
+    static let inversePrefix = "inverse:"
 
     /// What `ItemLibrary.changeLinks` takes: an edge type, its reverse name, or `inverse:` and the edge type.
     let field: String

@@ -735,6 +735,27 @@ button.item-kicker-type:focus-visible {
   text-overflow: ellipsis;
 }
 
+.item-more-items {
+  flex: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--label-secondary);
+  font: inherit;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.item-more-items:hover {
+  color: var(--label-primary);
+}
+
+.item-more-items:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 0;
+}
+
 .item-pin-more {
   flex: none;
   color: var(--label-secondary);
@@ -766,10 +787,20 @@ button.item-kicker-type:focus-visible {
 
 .item-rows[hidden],
 .item-props[hidden],
+.item-prop-sections[hidden],
 .item-more[hidden],
 .item-linked[hidden],
 .item-linked-list[hidden] {
   display: none;
+}
+
+/* The rows under a heading of their own, which cannot be dragged: a quiet heading above them. */
+.item-prop-heading {
+  margin-top: calc(var(--interface-text-size) * 8 / 13);
+  padding-block: calc(var(--interface-text-size) * 4 / 13);
+  color: var(--label-tertiary);
+  font-size: calc(var(--interface-text-size) * 11 / 13);
+  font-weight: 600;
 }
 
 /* A flex row, not a grid: WebKit keeps a grid row's height from the layout it was first drawn in. A row drawn while
@@ -781,8 +812,8 @@ button.item-kicker-type:focus-visible {
   flex-wrap: wrap;
   column-gap: 0;
   align-items: flex-start;
-  min-height: calc(var(--interface-text-size) * 30 / 13);
-  padding-block: calc(var(--interface-text-size) * 5 / 13);
+  min-height: calc(var(--interface-text-size) * 28 / 13);
+  padding-block: calc(var(--interface-text-size) * 4 / 13);
   box-sizing: border-box;
 }
 
@@ -865,6 +896,15 @@ button.item-kicker-type:focus-visible {
 .item-prop:not(:only-child) > .item-prop-label:hover .item-glyph,
 .item-prop.dragged .item-glyph {
   visibility: hidden;
+}
+
+/* A row under a heading is not dragged, so it shows no grip. */
+.item-prop-section .item-prop:not(:only-child) > .item-prop-label:hover .item-prop-grip {
+  visibility: hidden;
+}
+
+.item-prop-section .item-prop:not(:only-child) > .item-prop-label:hover .item-glyph {
+  visibility: visible;
 }
 
 .item-prop.dragged {

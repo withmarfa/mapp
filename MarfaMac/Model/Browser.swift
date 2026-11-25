@@ -65,6 +65,22 @@ final class Browser {
     /// (`selection`'s observer ends the modal otherwise), so the page, the toolbar and the commands read the selection
     /// as they do anywhere else. Set only through `open(_:as:)`, `moveModal` and `closeModal` (`Browser+Opening`).
     var modalItem: ItemID?
+    /// The column beside a layout that has the page, by the identity it gave itself, or nil. The window's one editor is
+    /// then on that page. A column that is shown puts itself here and one that goes, with the layout it stood beside,
+    /// takes itself away, so a window on an index or on Version History never reads as one with a page. Only the
+    /// column that is named here can clear it, since a layout's column may be replaced by the next one's before it goes.
+    private(set) var besideColumnHost: UUID?
+    /// Whether the page is in the column beside a layout that spans the window (`showsBesidePage`).
+    var showsBesideColumn: Bool { besideColumnHost != nil }
+
+    /// Says whether the column `host` shows the page now. Only a column that shows it, or the one that did, changes the answer.
+    func columnBeside(_ host: UUID, isShown: Bool) {
+        if isShown {
+            if besideColumnHost != host { besideColumnHost = host }
+        } else if besideColumnHost == host {
+            besideColumnHost = nil
+        }
+    }
     /// Opens items in windows of their own, which only a view can do. The window wires it where it makes its editor.
     @ObservationIgnored var windowOpener: ((Set<ItemID>) -> Void)?
 
@@ -254,7 +270,7 @@ final class Browser {
     /// Whether an item's page is what the window shows, as against a collection, an index or Settings. The editor
     /// stays mounted behind the others, so every command that acts on the page asks this first. An item open in the
     /// modal is shown over an index as over any layout.
-    var showsPage: Bool { isModalPresented || (!showsCollection && !showsPlaceIndex) }
+    var showsPage: Bool { isModalPresented || showsBesideColumn || (!showsCollection && !showsPlaceIndex) }
 
     /// Shows Settings, at `page` when one is given and where it was left otherwise.
     func showSettings(_ page: SettingsPage? = nil, subpage: SettingsSubpage? = nil) {
@@ -304,7 +320,7 @@ final class Browser {
         let staysInModal = isModalPresented
         select(item, in: library, order: order)
         if staysInModal { open([item.id], as: .modal) }
-        else if followsCollection { open([item.id], as: .fullPage) }
+        else if followsCollection { open([item.id], as: wayToFollowInCollection()) }
         else { focusRequest = .list }
     }
 

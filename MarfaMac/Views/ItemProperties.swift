@@ -491,6 +491,23 @@ nonisolated enum ItemValueText {
         }
     }
 
+    /// A value no field describes, with a date in it read as the fields' dates are.
+    static func text(of value: PropertyValue, format: DateFormat) -> String {
+        if let string = value.string, let date = ItemDate.parse(string) { return date.text(format: format) }
+        return string(value)
+    }
+
+    /// The row's value for the same: a date as a date, anything else as text.
+    static func value(of value: PropertyValue, format: DateFormat) -> PropertyRow.Value {
+        if let string = value.string, let date = ItemDate.parse(string) { return .date(date.text(format: format)) }
+        return .text(string(value))
+    }
+
+    /// The catalogue's label for a key, else the key written for reading.
+    static func name(of key: String, label: String?) -> String {
+        label ?? key.split { $0 == "_" || $0 == "-" || $0 == "." }.joined(separator: " ")
+    }
+
     /// A value as the text field that edits it holds it: a number in the person's locale, as `PropertyNumber` reads it.
     static func editing(_ value: PropertyValue) -> String {
         if case .number(let number) = value { return PropertyNumber.editing(number) }

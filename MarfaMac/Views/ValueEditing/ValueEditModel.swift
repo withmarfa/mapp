@@ -45,6 +45,8 @@ final class ValueEditModel {
         }
     }
     var notice: String?
+    /// What a link just made took from another item, told under the list as a plain line, not a refusal.
+    var moved: String?
     /// What the person typed that is not saved yet: a time, or a tag, word or person typed in full that the list
     /// refused. It is cleared only when that input is written, when the person cancels with Escape or empties the
     /// search field, or when it is handed back, so ending the panel any other way never loses it, and a search that
@@ -97,8 +99,12 @@ final class ValueEditModel {
     @ObservationIgnored let draft = ItemPropertyDraft()
     /// Whether the value changed under what was typed, which the person then settles.
     var hasConflict = false
-    /// A change to the parent that has not been answered yet.
+    /// A change to links that has not been answered yet.
     var isSaving = false
+    /// Whether the person asked for the links past `PageHead.linkLimit`, which the field shows as "N More".
+    var showsAllLinks = false
+    /// The field as the library read it at one revision, so a keystroke reads it from here (`linkReading`).
+    @ObservationIgnored var linkReadingCache: LinkReading?
     @ObservationIgnored private(set) var isFinished = false
     /// The Location panel's own state, for a request of that kind.
     @ObservationIgnored private(set) var location: LocationPanelModel?
@@ -227,7 +233,7 @@ final class ValueEditModel {
     /// panel, which an item that cannot be edited still opens to show its point.
     var isEditable: Bool {
         if kind == .type { return library.offersTypeChange(for: request.targets) }
-        if kind == .collections { return !library.collectionMembers(request.targets).isEmpty }
+        if case .relation = kind { return takesLinks }
         if kind == .tags, !request.items.isEmpty { return request.items.contains { library.item($0)?.allows(.tags) == true } }
         guard let id = request.item else { return true }
         guard let item = library.item(id) else { return false }
@@ -251,7 +257,7 @@ final class ValueEditModel {
 
     var hasSearch: Bool {
         switch kind {
-        case .people, .tags, .collections, .words, .parent, .status, .choice, .type: true
+        case .people, .tags, .relation, .words, .status, .choice, .type: true
         case .date, .text, .number, .location, .yesNo, .eventTime, .entries: false
         }
     }
@@ -259,7 +265,8 @@ final class ValueEditModel {
     /// Whether the panel adds to what the value holds, which then shows one chip for each thing held.
     var holdsMany: Bool {
         switch kind {
-        case .people, .tags, .collections, .words: true
+        case .people, .tags, .words: true
+        case .relation: !holdsOne
         default: false
         }
     }
@@ -268,9 +275,8 @@ final class ValueEditModel {
     var searchPrompt: LocalizedStringKey {
         switch kind {
         case .tags: "Add or Find a Tag"
-        case .collections: "Find a Collection"
         case .words: "Add or Find a Word"
-        case .parent: "Find an Item"
+        case .relation: linksOnlyCollections ? "Find a Collection" : "Find an Item"
         case .type: "Find a Type"
         case .status, .choice: "Find an Option"
         default: "Find or Add a Person"
@@ -286,7 +292,8 @@ final class ValueEditModel {
         let value: PropertyValue?
         let revision: Int
         let day: Date?
-        /// What else the rows read that the library's revision does not say: the parent, or the collections held.
+        /// What else the rows read that the library's revision does not say: the links held, and whether each can be asked
+        /// for its count.
         let held: [String]
     }
 
@@ -294,8 +301,7 @@ final class ValueEditModel {
         let key = RowsKey(
             query: query, value: value, revision: library.contentRevision,
             day: isDate ? request.calendar.startOfDay(for: library.now()) : nil,
-            held: kind == .parent ? parentTarget.map { [$0.id, $0.displayTitle] } ?? []
-                : kind == .collections ? heldCollections.map(\.id.rawValue) : [])
+            held: heldLinks.map { $0.id.rawValue + $0.title })
         if let rowsCache, rowsCache.key == key { return rowsCache.rows }
         rowsBuilt += 1
         let built = buildRows()
@@ -316,9 +322,8 @@ final class ValueEditModel {
         case .date: quickRows
         case .people(_, let shape): peopleRows(shape)
         case .tags: tagRows
-        case .collections: collectionRows
+        case .relation: linkRows
         case .words: wordRows
-        case .parent: marked(parentRows: parentRows)
         case .yesNo: ValueEditOptions.yesNoRows(current: value)
         case .text, .number, .location, .eventTime, .entries: []
         }
@@ -363,9 +368,13 @@ final class ValueEditModel {
 
     static let typePrefix = "type:"
 
-    /// The items the parent could be, read once for the panel.
-    @ObservationIgnored private(set) lazy var parentCandidates: [Item] =
-        request.item.map { library.relationshipCandidates(for: $0, field: PagePlacement.parent) } ?? []
+    /// The items a link could reach, read once for the panel: through the field's far end for one item, and every
+    /// collection an item may join for several.
+    @ObservationIgnored private(set) lazy var linkCandidates: [Item] = {
+        guard case .relation(let field) = kind else { return [] }
+        if isBatch { return library.joinableCollections }
+        return request.item.map { library.relationshipCandidates(for: $0, field: field) } ?? []
+    }()
 
     // MARK: Keyboard
 
@@ -376,6 +385,11 @@ final class ValueEditModel {
         let rows = navigable
         if let highlight, rows.contains(where: { $0.id == highlight }) { return highlight }
         if case .yesNo = kind { return rows.first { $0.isCurrent }?.id }
+        // A link's panel opens with the link the field holds lit, and once something is typed Return takes another.
+        if case .relation = kind {
+            if query.trimmingCharacters(in: .whitespaces).isEmpty { return rows.first { $0.isCurrent }?.id }
+            return rows.first { $0.id != Self.openID && !$0.isCurrent }?.id
+        }
         guard hasSearch, !query.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
         switch kind {
         case .tags, .words: return rows.first { $0.role == .create }?.id ?? rows.first?.id
@@ -473,9 +487,8 @@ final class ValueEditModel {
             if notice == nil { close() }
         case .people(_, let shape): activatePerson(id, shape)
         case .tags: activateTag(id)
-        case .collections: activateCollection(id)
+        case .relation: activateLink(id)
         case .words: activateWord(id)
-        case .parent: activateParent(id)
         case .type: activateType(id)
         case .yesNo:
             guard let word = ValueEditOptions.word(of: id), commit(.bool(word == ValueEditOptions.yesWord)) else { return }
@@ -515,10 +528,8 @@ final class ValueEditModel {
         switch kind {
         case .tags:
             return heldTokens.map { ValueChip(id: "tag:" + $0, title: $0, mark: .tag) }
-        case .collections:
-            return heldCollections.map {
-                ValueChip(id: Self.collectionPrefix + $0.id.rawValue, title: $0.displayTitle, mark: .type(icon: library.catalogue.icon(for: $0.type)))
-            }
+        case .relation:
+            return linkChips
         case .words:
             return heldTokens.map { ValueChip(id: "word:" + $0, title: $0, mark: .tag) }
         case .people(_, let shape):
@@ -532,10 +543,6 @@ final class ValueEditModel {
         case .choice(let field):
             guard let word = value?.string, !word.isEmpty else { return [] }
             return [ValueChip(id: ValueEditOptions.optionID(word), title: ItemTypeInfo.Field.label(ofOption: word), mark: .dot(OptionTone.tone(of: word, in: field, isPriority: isPriority(field))), isRemovable: !field.required)]
-        case .parent:
-            guard let current = parentTarget else { return [] }
-            let mark = current.itemID.flatMap(library.item).map(mark(of:)) ?? .none
-            return [ValueChip(id: "parent:" + current.id, title: current.displayTitle, mark: mark)]
         case .type:
             let types = Set(request.targets.compactMap { library.item($0)?.type })
             guard types.count == 1, let type = types.first else { return [] }
@@ -548,17 +555,16 @@ final class ValueEditModel {
     /// Takes one chip's value away: a tag, word or person from the list it is in, or the one value of a status, a choice
     /// or a parent.
     func remove(_ chip: ValueChip) {
+        if chip.revealsMore {
+            showsAllLinks = true
+            return
+        }
         guard isEditable, chip.isRemovable else { return }
         switch kind {
         case .tags, .words: removeToken(chip.title)
         case .people: activate(chip.id)
-        case .collections:
-            guard chip.id.hasPrefix(Self.collectionPrefix) else { return }
-            library.removeFromCollection(request.targets, ItemID(String(chip.id.dropFirst(Self.collectionPrefix.count))), undoManager: request.undoManager)
+        case .relation: removeLink(chip)
         case .status, .choice: commit(nil)
-        case .parent:
-            guard !isSaving, let item = request.item else { return }
-            changeParent(of: item, adding: nil, removing: parentTarget?.itemID)
         default: break
         }
     }

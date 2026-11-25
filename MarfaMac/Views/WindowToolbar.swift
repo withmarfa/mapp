@@ -377,8 +377,7 @@ private struct MoreMenu: View {
         let context = context
         guard let details, let item = context.item, context.showsPage, !context.hidesCorner, let library = context.library else { return [] }
         return PageCorner.inMore(
-            layout: library.pageLayout(of: item), hasReader: details.pageLook?.item == item.id,
-            canWrite: item.allows(.text) && editor != nil, file: details.fileViewing(of: item.id)?.kind,
+            PageCornerKind(for: item, in: library, details: details, hasEditor: editor != nil),
             shows: PageCornerChoice(formats: showsFormats, textSize: showsTextSize, focus: showsFocus))
     }
 
@@ -387,12 +386,12 @@ private struct MoreMenu: View {
         Menu("More", systemImage: "ellipsis") {
             Group {
                 command(.open)
+                command(.openBesideList)
                 command(.openAsModal)
                 command(.openAsFullPage)
                 command(.openInNewWindow)
                 command(.quickLook)
-                command(.openOriginal)
-                command(.openInBrowser)
+                command(.openOutside)
                 ItemShareLink(item: item, fileURL: fileURL, library: library, showsIcon: false)
                 command(.copyLink)
                 Divider()
@@ -413,7 +412,7 @@ private struct MoreMenu: View {
                         Menu("Text Size", systemImage: "textformat.size") { TextSizeOptions() }
                             .disabled(!PageCorner.sizesText(layout: pageLayout, look: details?.pageLook?.mode))
                     case .focus: command(.toggleFocus)
-                    case .look, .pages, .zoom: EmptyView()
+                    case .open, .look, .pages, .zoom: EmptyView()
                     }
                 }
                 Divider()

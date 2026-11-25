@@ -135,7 +135,7 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
 }
 
 extension PropertyRow: Encodable {
-    private enum Key: String, CodingKey { case id, label, symbol, kind, text, note, texts, items, options, people, more, help, editable, long, folded, muted }
+    private enum Key: String, CodingKey { case id, label, symbol, kind, text, note, texts, items, options, people, more, itemsAfter, moreItems, help, editable, long, folded, muted, section }
     /// What the page draws of an item a row links to: a type chip in the item's own tone, or a person's initials and
     /// name. The tone is one of `TypeTone`'s names; the page never picks a color.
     private struct Link: Encodable {
@@ -177,6 +177,10 @@ extension PropertyRow: Encodable {
         case .items(let targets):
             try container.encode("items", forKey: .kind)
             try container.encode(targets.map(Link.init), forKey: .items)
+            if targets.count > PageHead.linkLimit {
+                try container.encode(PageHead.linkLimit, forKey: .itemsAfter)
+                try container.encode(PageHead.moreLinksText(targets.count - PageHead.linkLimit), forKey: .moreItems)
+            }
         case .people(let names):
             try container.encode("people", forKey: .kind)
             try container.encode(names.map { Listed(title: $0, initials: PersonInitials.of($0)) }, forKey: .people)
@@ -200,11 +204,13 @@ extension PropertyRow: Encodable {
         case .text(let text): try Self.encode("text", text, into: &container)
         }
         if more > 0 { try container.encode(PageHead.moreText(more), forKey: .more) }
-        if let help { try container.encode(help, forKey: .help) }
+        // A link that takes no change says why where the whole value would be the help.
+        if let help = lock ?? help { try container.encode(help, forKey: .help) }
         if editable { try container.encode(true, forKey: .editable) }
         if long { try container.encode(true, forKey: .long) }
         if folded { try container.encode(true, forKey: .folded) }
         if muted { try container.encode(true, forKey: .muted) }
+        if let section { try container.encode(section, forKey: .section) }
     }
 
     private static func encode(_ kind: String, _ text: String, into container: inout KeyedEncodingContainer<Key>) throws {

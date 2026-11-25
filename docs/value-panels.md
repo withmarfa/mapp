@@ -1,5 +1,5 @@
 ---
-summary: How a value is edited in its panel: the rows, counts, conflicts, an event's time, lists with labels and the location map.
+summary: How a value is edited in its panel: the rows, counts, conflicts, an event's time, lists with labels, links and the location map.
 paths:
   - MarfaMac/Views/ValueEditing/*.swift
   - MarfaMac/Model/Items/EventTime.swift
@@ -12,25 +12,31 @@ paths:
 
 ## Panels
 
-- **A value is edited in a panel under itself** (`ValueEditPresenter`, `ValueEditModel`), the same one from a row, a cell, the right sidebar and a chip. Rows are 28 points, 1 point apart, with 7 point corners, in a panel with 14 point corners.
-- **A panel is as wide as its board** (`ValueEditMetrics`): status 250, date 212, choice 170, type 230 and event time 262, and a section header is 27 points.
+- **A value is edited in a panel under itself** (`ValueEditPresenter`, `ValueEditModel`), the same one from a row, a cell, the right sidebar and a chip.
+- **A panel is as wide as its board** (`ValueEditMetrics`).
 - **A single choice closes the panel when picked; several keep it open.** Only a date's panel has a row for Not Set. A yes or no is two rows, Yes and No.
 - **A chosen or pointed-at row is gray, never the accent.** In a calendar the chosen day is a dark gray circle and today's number is red (`ValueCalendar`).
 - **A value that holds several shows what is chosen as chips in the find field,** each with a remove mark. The field is a bare caret, not a box; the keyboard ring stays on every other control.
-- **A date panel starts with the day typed** ("25 Nov 2026", with " at 09:00" where the value holds a time). Return sets it; text that is no date stays in the field with the reason, and goes back to the person as the panel ends.
-- **Tags, words and collections show a count beside each row,** how many items hold it. A collection's member count is asked of Marfa (`ItemCounts`) when the rows appear, never while they draw.
-- **The last row makes what was typed:** Add “letterpress” for a word, Create Tag “pap” for a tag. Its Return key cap shows only while Return takes that row.
+- **A date panel starts with the day typed.** Return sets it; text that is no date stays in the field with the reason, and goes back to the person as the panel ends.
+- **Tags, words and collections show a count beside each row.** A collection's is asked of Marfa (`ItemCounts`) when the rows appear, never while they draw.
+- **The last row makes what was typed:** Add “letterpress” for a word, Create Tag “pap” for a tag.
 - **A status panel lists the type's words under their four groups.** Edit Statuses… opens the type in Settings.
-- **A people panel offers the people the lists already name and the people the library holds as items,** each added with their first address.
+- **A people panel offers the people the lists name and the library holds as items.**
 - **An event's time is one panel** (`EventTime`, `EventTimePanelModel`): a calendar, the start and the end each with a day and a time, All Day, and the zone. A change writes only the fields the action changes, so a stored value the person did not touch stays byte for byte.
 - **A day chosen or typed keeps the whole clock time,** seconds and fractions included. Moving the start keeps the length, and an end before the start is refused.
 - **A time the zone does not have on that day is refused,** never moved to one it has. What was typed stays in the field with the reason, and is given back where the panel ends or the start or end changed meanwhile.
-- **A list of entries is edited in one panel** (`EntriesEditor`): a block for each entry, its members in rows named by the core's labels. The first is the main one. Add, Return and leaving write the new entry whole, or hand back all of it; a refused Add keeps it to try again.
-- **A conflict is a question, not an error,** so it has no red: "This value changed while you were editing." and "Your edit hasn’t been saved.", with Keep My Edit, the main button, and Use Current Value. Any other refusal is one red line at the foot, and what was typed stays.
-- **A web address is a link, and a click opens it.** Its row's menu has Open, Copy, Edit, then Clear.
-- **Unsaved text is kept when a panel loses its place**, and the person is told where it is.
+- **A list of entries is edited in one panel** (`EntriesEditor`): a block for each entry, its members in rows named by the core's labels, the first entry the main one. Add, Return and leaving write the new entry whole, or hand back all of it; a refused Add keeps it to try again.
+- **A conflict is a question, not an error,** so it has no red: Keep My Edit is the main button, beside Use Current Value. Any other refusal is one red line at the foot, and what was typed stays.
 - **A panel writes the one property it shows**, on the version it read, so it never writes over another app's change to another property.
 - **Change Type, Add Tag and Add to Collection are panels too** (`CommandValuePanels`), never sheets. What a command cannot change is left alone and counted (`BatchSkips`).
+
+## Links
+
+- **Every link the type may hold is a row** (`RelationField`), Empty under Show N More until set; an In Collection row wears the collection's mark. One Marfa will not change (a text's `references`, a folder) is read only, its help tag saying why.
+- **A parent's sub-items and Referenced By wait under Show N More,** since the foot lists them. Values no field describes are the last rows, read only, under Other.
+- **A link's panel** (`ValueEditKind.relation`) serves every edge field, inverses too: ten rows narrowed by typing, each a mark and a name, Archived or "In <name>" beside it, or the one line No Results. The name takes the width before the detail is cut.
+- **A field of one link holds it as a chip and as the first row, lit, with Open under it.** A field of several shows chips, eight lines at most. Chips and a page's link rows show the first 30, then "N More" shows the rest.
+- **Marfa's answer is obeyed** (`ItemLibrary.changeLinks`): a refusal, or a copy not yet whole, is one red line and the panel stays, with what was typed. One commit is one undo step.
 
 ## Location
 

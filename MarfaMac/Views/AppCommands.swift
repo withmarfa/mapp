@@ -64,12 +64,12 @@ struct AppCommands: Commands {
                 let shown = ids.compactMap { library?.headerItem($0) }.filter { !$0.isFile }
                 let one = ids.count == 1 ? shown.first : nil
                 command(.open)
+                command(.openBesideList)
                 command(.openAsModal)
                 command(.openAsFullPage)
                 command(.openInNewWindow)
                 command(.quickLook)
-                command(.openOriginal)
-                command(.openInBrowser)
+                command(.openOutside)
                 Divider()
                 ItemShareLink(
                     item: one, fileURL: ids.count == 1 ? ids.first.flatMap { browser?.fileURL(of: $0) } : nil, library: library)
