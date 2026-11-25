@@ -53,8 +53,6 @@ struct ItemOrganizeActions: View {
     var inMenuBar = false
     /// Keeps the items in the menu, dimmed, when nothing is selected, as the menu bar and the More menu do.
     var keepsPlace = false
-    /// Draws ⌘⌫ beside Delete, as a row's menu does. The key itself is the list's.
-    var showsDeleteKey = false
     var shortcuts: ShortcutBindings?
 
     var body: some View {
