@@ -31,7 +31,7 @@ Every editor asks `Item.allows(_:)` for the `ItemChange` it writes (`ValueEditKi
 
 - **`Browser.openNewItem` opens each New command.** In a window, New Opens (`NewOpens`) chooses the line or the text form. The any-app shortcut requests the line. A kind that the line cannot make opens in the text form (`QuickAdd.lineOffers`).
 - **The kind to start with:** a type's own place starts with that type; anywhere else, New Items Are, then the last kind used, then a note (`QuickAdd.startingType`).
-- **One create holds the properties, tags and tier** (`Browser.saveQuickAdd`). The parent is a second write, and a refused parent is told. The In row sets the tier, starting from the place.
+- **One create holds the properties, tags and tier** (`Browser.saveQuickAdd`). The parent is a second write; a refusal then or later names both (`MarfaEngine.place`). The In row sets the tier, starting from the place.
 - **A type gives a new item only its first status that has not started** (`QuickAdd.prefill`).
 - **A required field the form cannot set is named at once** (`QuickAdd.unsettableRequired`). The line hands a draft missing a required value to the text form.
 - **The title may be left out** where the kind does not require it and the draft holds something else.
@@ -49,13 +49,14 @@ Every editor asks `Item.allows(_:)` for the `ItemChange` it writes (`ValueEditKi
 
 ### Typed text is never lost
 
-`NewItemDrafts` keeps each new item not added through a closed window, a quit and a refusal, by slot (`Slot.line`, `Slot.inPlace(_:)`) and instance (`serverKey`).
+`NewItemDrafts` keeps each new item not added through a closed window, a quit and a refusal, by slot (`Slot.line`, `Slot.inPlace(_:)`) and instance (`serverKey`). A refusal is kept with its draft at once (`follow`).
 
 | Call | Does |
 | --- | --- |
 | `make(_:_:in:)`, `take(_:in:)` | Start or claim a draft, never shared |
 | `update(_:_:)`, `escape(_:)` | Keep what was typed; drop an empty draft |
 | `sending(_:as:)`, `settle(in:)` | Write the item's ID first; hide the draft until Marfa answers (`ItemLibrary.refusedCreates`) |
+| `release(_:sending:rest:)`, `giveBack(_:)` | A file's window closed: hidden until it is added; a failure is given back and told |
 | `release(_:)`, `drop(_:)` | The holder went, or the person cleared it |
 
 ### Dropping
@@ -67,19 +68,19 @@ Every editor asks `Item.allows(_:)` for the `ItemChange` it writes (`ValueEditKi
 ## Changing type
 
 - **The title and text move to the new type's own keys in one edit** (`TypeChange`), because Marfa reads them from those keys. Marfa keeps every other value, as an unlisted property where the new type has no such field.
-- **The current type is a locked chip in the panel's field,** and the types follow in rows: the sidebar's first five in its order, then the rest by name under a line.
+- **The current type is a locked chip in the panel's field,** then rows: the sidebar's first five, then the rest by name under a line.
 - **A required field the items lack is asked for first** (`TypeValuesSheet`), once for the selection. It is the one sheet in editing: Change Type, "Task needs these values:", a field for each, then Cancel and Change Type. The title it needs starts as the item's name, for one item.
-- **Some changes are never offered:** a file's type, a type with no text for an item that has some, and a type whose field cannot hold the value under its key.
+- **Never offered:** a file's type, a type with no text for an item with text, or one whose field cannot hold the value under its key.
 
 ## A field's menu
 
 A right click on a property's name opens a menu with two parts (`FieldMenu`).
 
 - **The app's part is pin, move and hide.** It writes nothing to the item or the type, so a read-only item offers it too.
-- **Marfa's part is renaming a field or a choice, adding and removing choices, and removing the field** (`TypeDefinitionEdit`). It needs the server and is never queued, because a type's definition has no version to queue against.
-- **The type is read again just before it is sent**, and the change is refused if the field is no longer as it was shown. That narrows the race and does not close it.
+- **Marfa's part is renaming a field or a choice, adding and removing choices, and removing the field** (`TypeDefinitionEdit`). It needs the server and is never queued: a type's definition has no version.
+- **The type is read again just before it is sent**, and the change is refused if the field changed. It narrows the race without closing it.
 - **Only a field that the type itself declares, and no type above it does, can change** (`FieldLock`). A type Marfa ships, or one under `common`, changes nothing. A plugin's own root reads as editable until the server refuses.
-- **A choice word is never renamed**, only added, moved or removed, because items hold the word itself.
-- **A field's key never changes**, because items hold values under it. A rename changes its label.
+- **A choice word is never renamed**, only added, moved or removed: items hold the word.
+- **A field's key never changes**: items hold values under it. A rename changes its label.
 - **A removed choice stays on the items that have it**, and the last choice cannot be removed.
-- **Removing a field asks first and keeps the values** on the items, as unlisted properties. The title, text and source-link fields can be renamed and not removed.
+- **Removing a field asks first and keeps the values** on the items, as unlisted properties. The title, text and source-link fields cannot be removed.

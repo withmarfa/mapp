@@ -490,10 +490,33 @@
     "%@ uses it." : {
 
     },
+    "%@ was added, but Marfa refused to put it under %@: %@ The link is also listed in Settings." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ was added, but Marfa refused to put it under %2$@: %3$@ The link is also listed in Settings."
+          }
+        }
+      }
+    },
+    "%@ was added, but it couldn’t be put under %@: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ was added, but it couldn’t be put under %2$@: %3$@"
+          }
+        }
+      }
+    },
     "%@ was changed elsewhere. The app read the new value; yours wasn’t saved." : {
 
     },
     "%@ was changed somewhere else. Nothing was sent. Check what you chose, then save again." : {
+
+    },
+    "%@ wasn’t added, so what you typed for it is kept. It comes back the next time you make a new item." : {
 
     },
     "%@ wasn’t added." : {
@@ -4803,6 +4826,9 @@
       "extractionState" : "manual"
     },
     "File Kind and Size" : {
+
+    },
+    "File Not Added" : {
 
     },
     "File Not Attached" : {
@@ -10164,9 +10190,6 @@
     "The item was changed somewhere else while you were editing it. The server kept that version, and yours is the copy." : {
       "extractionState" : "manual"
     },
-    "The item was made, but it couldn’t be put under its parent: %@" : {
-      "extractionState" : "manual"
-    },
     "The item wasn’t added, so its files weren’t attached." : {
       "extractionState" : "manual"
     },
@@ -10273,6 +10296,9 @@
       "extractionState" : "manual"
     },
     "The new host and token are never shown again." : {
+
+    },
+    "The new item" : {
 
     },
     "The new item changed while its parent was being checked, so nothing was added. Add it again." : {
@@ -12439,6 +12465,9 @@
 
     },
     "its edge type" : {
+
+    },
+    "its parent" : {
 
     },
     "list and permanently delete deleted items" : {
