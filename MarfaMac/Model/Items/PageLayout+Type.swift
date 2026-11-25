@@ -2,9 +2,9 @@ import Foundation
 
 nonisolated extension PageLayout {
     /// The rows a type's page can place when no item of it is at hand to say which of its relationships are in use: the
-    /// fields the catalogue gives it, its tags and Linked From. Where an item exists, `rows(of:…)` is
-    /// the one that Customize Layout lists; this is the same without what only an item knows (its source, its parent link
-    /// and the fields its header draws itself).
+    /// fields the catalogue gives it, its tags and Linked From. Where an item exists, `rows(of:…)` is the one that
+    /// Customize Layout lists; this is the same without what only an item knows (its parent link and the fields its head
+    /// draws itself).
     static func rows(ofType type: TypeID, catalogue: Catalogue) -> [Row] {
         var rows: [Row] = []
         let info = catalogue.itemTypes[type]

@@ -125,8 +125,8 @@ nonisolated extension VersionContent {
     /// page does. Only what a version holds is shown: the fields it has. The item's tags, parent and location are not in a
     /// version, so those pins are left out rather than shown from the item as it is now.
     func pins(
-        saved: Date?, placement: PagePlacement, in catalogue: Catalogue, format: DateFormat, now: Date = .now,
-        calendar: Calendar = .current, locale: Locale = .current
+        placement: PagePlacement, in catalogue: Catalogue, format: DateFormat, now: Date = .now, calendar: Calendar = .current,
+        locale: Locale = .current
     ) -> [VersionFactRow] {
         let info = catalogue.itemTypes[type]
         var rows: [VersionFactRow] = []

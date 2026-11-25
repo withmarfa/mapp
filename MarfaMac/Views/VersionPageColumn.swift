@@ -56,8 +56,7 @@ struct VersionPageColumn: View {
 
     private func page(of entry: VersionEntry, older: VersionEntry?) -> some View {
         let pins = entry.content.pins(
-            saved: entry.written, placement: placements.placement(of: entry.content.type, in: library.catalogue),
-            in: library.catalogue, format: dateFormat)
+            placement: placements.placement(of: entry.content.type, in: library.catalogue), in: library.catalogue, format: dateFormat)
         return ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 if let title = entry.content.title, !title.isEmpty {
