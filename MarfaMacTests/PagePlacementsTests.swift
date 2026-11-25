@@ -237,7 +237,7 @@ struct PagePlacementsTests {
         let choice = try #require(again.choices["aic.ticket"])
         #expect(choice.others["labelOverrides"] == .object(["repo": .string("Repository")]))
         #expect(choice.others["future"] != nil)
-        #expect(choice.sidebar == ["history"])
+        #expect(choice.others["sidebar"] == .array([.string("history")]))
         #expect(choice.pins == ["repo"])
         // A choice that holds only what this version does not name is not dropped as empty.
         let alone = try #require(PagePlacements(rawValue: #"{"aic.ticket":{"labelOverrides":{"repo":"Repository"}}}"#))
