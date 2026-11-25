@@ -50,7 +50,7 @@ import Testing
             return [:]
         }
         let browser = Browser()
-        browser.sidebarItem = .allItems
+        browser.showing = .library
         browser.viewMode = .board
         browser.lookChoices[TypeID("test.card")] = TypeLookChoice(date: .off, secondary: [], facts: [.count(.children)])
 

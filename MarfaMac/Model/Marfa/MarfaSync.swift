@@ -8,7 +8,7 @@ import os
 /// failure and after a drain left writes undelivered; none of that is done here. Attachment downloads run
 /// separately so they cannot hold up a drain or flush.
 actor MarfaSync {
-    /// One slice of both tiers, so the Inbox (the feed) and the rest of the library read from one copy, offline too.
+    /// One slice of both tiers, so the Library and Feed can read from the same offline copy.
     private static let tier = SliceTier.all
     /// `*` leaves out every hidden type (`system.*` and `app.*`), so the saved views are named beside it. The engine
     /// keeps them out of the items it shows.

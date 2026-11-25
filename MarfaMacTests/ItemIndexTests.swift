@@ -19,9 +19,9 @@ import Testing
 
     @Test func theItemsPageKeepsItsOwnTabAndSort() throws {
         let defaults = ThrowawayDefaults.make("ItemIndexTests")
-        IndexPreferences.set(.fromApps, for: .items, in: defaults)
+        IndexPreferences.set(.feed, for: .items, in: defaults)
         IndexPreferences.set(IndexSort(column: .source, ascending: true), for: .items, in: defaults)
-        #expect(IndexPreferences.tab(for: .items, in: defaults) == .fromApps)
+        #expect(IndexPreferences.tab(for: .items, in: defaults) == .feed)
         #expect(IndexPreferences.sort(for: .items, in: defaults) == IndexSort(column: .source, ascending: true))
         #expect(IndexPreferences.tab(for: .collections, in: defaults) == .all)
         #expect(IndexPlace.items.columns == [.name, .types, .source, .latest])
@@ -34,7 +34,7 @@ import Testing
     private func browserOnItems(_ library: FakeItemLibrary) -> Browser {
         let browser = Browser()
         browser.defaults = ThrowawayDefaults.make("ItemIndexTests")
-        browser.sidebarItem = .allItems
+        browser.showing = .library
         return browser
     }
 
@@ -59,7 +59,7 @@ import Testing
         library.items[5].state = .trashed
         #expect(await eventually(within: .seconds(10)) { model.tabs?.all.count == items.count - 1 })
         #expect(model.tabs?.all.contains { $0.id == items[5].id } == false)
-        #expect(model.tabs?.yours.count == items.count - 1)
+        #expect(model.tabs?.library.count == items.count - 1)
     }
 
     @Test func leavingItemsKeepsTheRowsAndComingBackShowsThemLessWhatWentMeanwhile() async {

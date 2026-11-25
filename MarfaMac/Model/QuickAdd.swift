@@ -347,16 +347,15 @@ final class QuickAdd {
 
     /// The kind quick add opens in: the one asked for, else the one a type's own place holds, else the one Settings >
     /// General > New Items names (`chosen`), else the last used, then a note, then any. A kind not in `offered` (a type
-    /// since deleted, or one nobody can make) is passed over. A type's place is its list, the Collections index (a
-    /// collection) and Files.
+    /// since deleted, or one nobody can make) is passed over. A type's place is its list, and the Collections index's a
+    /// collection.
     static func startingType(
-        asked: String?, place: SidebarItem, chosen: String? = nil, remembered: String?, offered: [String], in catalogue: Catalogue
+        asked: String?, place: PlaceView, chosen: String? = nil, remembered: String?, offered: [String], in catalogue: Catalogue
     ) -> String? {
         func choice(_ id: String?) -> String? { id.flatMap { offered.contains($0) ? $0 : nil } }
-        let held: String? = switch place {
-        case .itemType(let id): id
+        let held: String? = switch place.place {
+        case .type(let type) where place.view == .own: type.rawValue
         case .collections: offered.first { catalogue.isCollection(TypeID($0)) }
-        case .files: TypeID.file.rawValue
         default: nil
         }
         return choice(asked) ?? choice(held) ?? choice(chosen) ?? choice(remembered) ?? choice("core.note") ?? offered.first
@@ -468,7 +467,7 @@ extension Browser {
         let types = QuickAdd.types(in: library).map(\.id.rawValue)
         if quickAdd.draft == nil {
             guard let kind = QuickAdd.startingType(
-                asked: typeID, place: item, chosen: NewItemType.stored(), remembered: remembered, offered: types,
+                asked: typeID, place: shown, chosen: NewItemType.stored(), remembered: remembered, offered: types,
                 in: library.catalogue)
             else { return }
             quickAdd.draft = QuickAdd.Draft(typeID: kind)
@@ -598,7 +597,7 @@ extension Browser {
             quickAdd.saving(draft)
             let title = NameText.trimmed(draft.title)
             id = await library.addFile(
-                file.url, title: title.isEmpty ? nil : title, parentID: draft.parentID, in: item)
+                file.url, title: title.isEmpty ? nil : title, parentID: draft.parentID, in: shown.place)
             quickAdd.saving(nil)
             guard let id else { return nil }
             // The person may have changed the draft while the file was sent; only the file sent is taken from it.
@@ -610,14 +609,14 @@ extension Browser {
             let properties = draft.properties.filter { $0.value != .null }
             id = library.createItem(
                 typeID: draft.typeID, title: draft.title, body: draft.body, properties: properties, parentID: draft.parentID,
-                in: item, undoManager: undoManager)
+                in: shown.place, undoManager: undoManager)
         }
         guard let id else { return nil }
         quickAdd.isPresented = false
         quickAdd.clearDraft()
         let keepsText = !isFile && QuickAdd.hasBody(draft.typeID, in: catalogue)
         var collection: ItemID?
-        if case .collection(let id) = item { collection = id }
+        if shown.view == .own, case .collection(let id) = shown.place { collection = id }
         newItem = NewItem(
             id: id, typeID: draft.typeID, library: library, caret: keepsText ? draft.pageCaret : nil, isFile: isFile,
             attachments: isFile ? [] : draft.files, embedsInText: keepsText, collection: collection,

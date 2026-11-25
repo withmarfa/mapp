@@ -137,6 +137,29 @@ import Testing
         #expect(try saved().map(\.1) == ["dark"])
     }
 
+    @Test func aMacWithNothingOfItsOwnCarriesWhatAnEarlierCopyOnAnotherMacSynced() async throws {
+        let task = #"{"itemType":{"_0":"core.task"}}"#
+        let copy = FakePreferencesCopy()
+        let item = await copy.add([
+            .member(.general, StartWith.earlierKey): try #require(PreferenceJSON.text(#"{"favorites":{}}"#)),
+            .row(.places, setting: "placeDefaults", key: task): #"{"layout":"board"}"#,
+            .row(.places, setting: "placeDensity", key: #"{"recents":{}}"#): #""compact""#,
+        ])
+        let sync = await sync(copy)
+        #expect(StartWith.stored(in: defaults) == .place(.favorites))
+        #expect(PlaceDefaults.stored(in: defaults).default(for: .type(TypeID("core.task")))?.layout == .board)
+        #expect(PlaceDensities.stored(in: defaults).density(for: .library) == .compact)
+        await sync.flush()
+        let held = await copy.unitsHeld(item)
+        #expect(held[.member(.general, StartWith.key)] == PreferenceJSON.text(StartWith.place(.favorites).rawValue))
+        let earlierRow = try #require(held[.row(.places, setting: "placeDefaults", key: task)], "the earlier row stays")
+        #expect(try JSONDecoder().decode(PlaceDefault.self, from: Data(earlierRow.utf8)).layout == .board)
+        // Copied once: what the person clears at the new key stays clear through the next sync.
+        PlaceDensities.update(in: defaults) { $0.set(nil, for: .library) }
+        await sync.flush()
+        #expect(PlaceDensities.stored(in: defaults).density(for: .library) == nil)
+    }
+
     // MARK: Following
 
     @Test func anotherMacsChangeReachesTheDefaultsAndIsNotSentBack() async throws {

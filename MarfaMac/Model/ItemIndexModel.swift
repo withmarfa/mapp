@@ -94,7 +94,7 @@ final class ItemIndexModel {
         armed += 1
         let (stamp, armed) = (stamp, armed)
         let (items, catalogue, directory) = withObservationTracking {
-            (library.items(in: .allItems), library.catalogue, library.sources)
+            (library.items(in: .library), library.catalogue, library.sources)
         } onChange: { [weak self] in
             // Called before the change lands, so the library is read again after it.
             Task { @MainActor [weak self] in self?.changed(generation: generation, armed: armed) }

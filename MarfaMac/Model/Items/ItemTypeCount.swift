@@ -7,9 +7,10 @@ nonisolated struct ItemTypeCount: Identifiable, Hashable, Sendable {
     let label: String
     /// The type's icon, an Iconify ID.
     let icon: String?
-    /// The items the type holds itself, never those of its subtypes, so the number is the length of the list the
-    /// row opens.
+    /// The type's active items, its kinds' included, so the number is the length of the list the row opens.
     let count: Int
+    /// The items the type holds itself, which the Types section adds up its branches by.
+    var own: Int
 }
 
 /// A row of the sidebar's Types section: a type, or a group of types whose identifiers share a stem that is no type
@@ -22,7 +23,7 @@ nonisolated struct TypeNode: Identifiable, Hashable, Sendable {
     let type: TypeID?
     let label: String
     let icon: String?
-    /// The type's own items, which its row opens; zero for a group.
+    /// The type's items, its kinds' included, which its row opens; zero for a group.
     let count: Int
     /// The items of the whole branch, the type's own included.
     let total: Int
@@ -57,7 +58,7 @@ nonisolated struct TypeNode: Identifiable, Hashable, Sendable {
             let shown = trimmed(label, under: parentLabel)
             let below = (children[id] ?? []).map { node($0, under: label) }
             let count = own?.count ?? 0
-            let total = count + below.reduce(0) { $0 + $1.total }
+            let total = (own?.own ?? 0) + below.reduce(0) { $0 + $1.total }
             let sorted = ordered(below)
             // A group of one adds a fold for nothing: its row takes its place, under its own full name.
             if !known, own == nil, sorted.count == 1, let only = sorted.first {
@@ -137,33 +138,38 @@ nonisolated extension Catalogue {
 }
 
 extension ItemLibrary {
-    /// How many items Recents lists. A fixed number, not a span of days, so it is useful however long ago the
-    /// library was last edited.
-    static var recentLimit: Int { 30 }
-
-    /// The active items among `items` edited most recently, newest first, as many as `recentLimit`.
-    static func recent(_ items: some Sequence<Item>) -> [Item] {
-        Array(items.filter { $0.state == .active }
-            .sorted { $0.modified != $1.modified ? $0.modified > $1.modified : $0.id.rawValue < $1.id.rawValue }
-            .prefix(recentLimit))
+    /// The saved views that belong to `place` (`Place.home(of:catalogue:)`), in `order` where it names them and by
+    /// title after.
+    func views(in place: Place, order: [ItemID] = []) -> [LibraryView] {
+        let catalogue = catalogue
+        let held = views.filter { Place.home(of: $0.query, catalogue: catalogue) == place }
+        let rank = Dictionary(order.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
+        return held.sorted { a, b in
+            switch (rank[a.id], rank[b.id]) {
+            case let (x?, y?): x < y
+            case (.some, nil): true
+            case (nil, .some): false
+            case (nil, nil): a.title.localizedStandardCompare(b.title) == .orderedAscending
+            }
+        }
     }
 
-    /// The catalogue's types that directly hold active items, most items first, then by label. The file types are
-    /// left out, since All Items and search reach them. A type with no items is left out, and the sidebar shows it
-    /// the first time the library holds one. The count is `count(in:)` of the type's own place, which lists the
-    /// type's items and no subtype's.
+    /// The catalogue's types that hold active items, most items first, then by label, files among them. A type with
+    /// no items is left out, and the sidebar shows it the first time the library holds one. The count is
+    /// `count(in:scope:)` of the type's place, its kinds included, which is the length of the list the row opens.
     var itemTypeCounts: [ItemTypeCount] {
         let started = ContinuousClock.now
         defer { Cost.record(.typeCounts, since: started) }
         let catalogue = catalogue
-        let held = catalogue.itemTypes.keys.compactMap { type -> (TypeID, Int)? in
-            guard !catalogue.isFileType(type) else { return nil }
-            let count = count(in: .itemType(type.rawValue))
-            return count > 0 ? (type, count) : nil
-        }
-        let labels = catalogue.displayLabels(for: held.map(\.0), as: .many)
+        let counts = Dictionary(uniqueKeysWithValues: catalogue.itemTypes.keys.map { ($0, count(in: .type($0), scope: .all)) })
+        let held = counts.filter { $0.value > 0 }
+        let labels = catalogue.displayLabels(for: held.keys, as: .many)
+        var kindCounts: [TypeID: Int] = [:]
+        for info in catalogue.itemTypes.values { if let parent = info.parent { kindCounts[parent, default: 0] += counts[info.id] ?? 0 } }
         return held.map { type, count in
-            ItemTypeCount(id: type, label: labels[type] ?? type.rawValue, icon: catalogue.icon(for: type), count: count)
+            let kinds = kindCounts[type] ?? 0
+            return ItemTypeCount(
+                id: type, label: labels[type] ?? type.rawValue, icon: catalogue.icon(for: type), count: count, own: max(count - kinds, 0))
         }
         .sorted {
             if $0.count != $1.count { return $0.count > $1.count }

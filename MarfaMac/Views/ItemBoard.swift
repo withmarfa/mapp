@@ -22,7 +22,7 @@ struct ItemBoard: View {
         let items = browser.filteredItems(in: library)
         // The lanes are the place's group (`Browser.boardGrouping`), so a saved view's group is its lanes.
         let lanes = browser.boardLanes(in: library)
-        let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
+        let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.shown)
         VStack(spacing: 0) {
             if let lanes {
                 let shown = browser.shownBoardLanes(lanes)
@@ -62,7 +62,7 @@ struct ItemBoard: View {
     }
 
     /// Set from the toolbar's View Options (`ItemBoardOptions`).
-    private var compact: Bool { browser.compactBoards[browser.item, default: false] }
+    private var compact: Bool { browser.compactBoards[browser.shown, default: false] }
 
     private static let laneGap: CGFloat = 12
     private static let edge: CGFloat = 20

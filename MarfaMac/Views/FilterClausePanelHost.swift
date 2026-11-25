@@ -9,7 +9,7 @@ struct FilterClausePanelHost: View {
 
     var body: some View {
         let content = browser.tableContent(in: library)
-        let state = (browser.tableOptions[browser.item] ?? ItemTableOptions()).filter
+        let state = (browser.tableOptions[browser.shown] ?? ItemTableOptions()).filter
         if state.clauses.indices.contains(index), let target = content.filterOffer.targets[state.clauses[index].field] {
             let clause = state.clauses[index]
             FilterClausePanel(

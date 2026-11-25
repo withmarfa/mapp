@@ -21,8 +21,8 @@ nonisolated enum SampleLibrary {
 
     /// With the sample flag, `-MarfaMacOpenPlace <type id>` opens that type's place (`items` opens Items) and
     /// `-MarfaMacLayout list|gallery|table|board|timeline|calendar` the layout, for a screenshot of one view.
-    static var launchPlace: SidebarItem? {
-        argument(after: "-MarfaMacOpenPlace").map { $0 == "items" ? .allItems : .itemType($0) }
+    static var launchPlace: PlaceView? {
+        argument(after: "-MarfaMacOpenPlace").map { $0 == "items" ? .library : .type(TypeID($0)) }
     }
 
     static var launchLayout: ItemViewMode? { argument(after: "-MarfaMacLayout").flatMap(ItemViewMode.init(rawValue:)) }

@@ -82,7 +82,7 @@ struct SidebarTypesSection: View, Equatable {
             showsIcon: SidebarTypeRow.showsIcon(row, subtypeIcons: showsSubtypeIcons), toggle: { toggle(row) })
         if node.opens, let type = node.type {
             content
-                .tag(SidebarItem.itemType(type.rawValue))
+                .tag(PlaceView.type(type))
                 .listRowInsets(.vertical, 0)
                 .contextMenu { typeMenu(node) }
                 .accessibilityIdentifier("SidebarType-\(node.id)")
@@ -148,7 +148,7 @@ struct SidebarFolding {
     /// Folding a row that holds the selected type selects the row, so something stays highlighted.
     func setCollapsed(_ id: String, _ collapsed: Bool) {
         if collapsed {
-            if let item = plan.selectionAfterFolding(id, selected: browser.sidebarItem) {
+            if let item = plan.selectionAfterFolding(id, selected: browser.showing) {
                 browser.show(item, in: library, order: order)
             }
         }
@@ -161,7 +161,7 @@ struct SidebarFolding {
     /// modifier belongs to someone else.
     func press(_ arrow: SidebarPlan.Arrow, _ press: KeyPress) -> KeyPress.Result {
         guard press.modifiers.isEmpty else { return .ignored }
-        switch plan.outcome(of: arrow, selected: browser.sidebarItem) {
+        switch plan.outcome(of: arrow, selected: browser.showing) {
         case .fold(let id, let collapsed): setCollapsed(id, collapsed)
         case .select(let item): browser.show(item, in: library, order: order)
         case nil: return .ignored

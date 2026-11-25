@@ -42,7 +42,7 @@ struct ItemInspectorHost: View {
                 ItemInspector(
                     item: item,
                     type: library.catalogue.itemTypes[item.type],
-                    place: item.tier == .feed ? String(localized: "Inbox") : String(localized: "Library"),
+                    place: item.tier == .feed ? String(localized: "Feed") : String(localized: "Library"),
                     source: item.source.map { library.sources.info($0) },
                     catalogue: library.catalogue,
                     hiddenKeys: library.hiddenPropertyKeys(of: item),
@@ -113,7 +113,7 @@ struct ItemInspectorHost: View {
             browser.showSettings(.recentlyDeleted)
             return
         }
-        browser.sidebarItem = .allItems
+        browser.showing = .library
         browser.selection = [id]
         browser.focusRequest = .list
     }
@@ -131,7 +131,7 @@ struct ItemInspector: View {
     let item: Item
     /// Nil for a type the catalogue does not hold, which is shown with no fields.
     let type: ItemTypeInfo?
-    /// The Inbox or the Library, by the item's tier.
+    /// The Feed or the Library, by the item's tier.
     var place: String? = nil
     /// The source that made the item, as the server names it; the code stands in until it has.
     var source: SourceInfo? = nil

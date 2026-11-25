@@ -43,13 +43,13 @@ struct ViewDraftTests {
     }
 
     private static func window(
-        _ place: SidebarItem, sort: [ItemTableComparator] = [], grouping: ItemTableColumn? = nil,
+        _ place: PlaceView, sort: [ItemTableComparator] = [], grouping: ItemTableColumn? = nil,
         filters: [String: Set<String>] = [:], negated: Set<String> = [], search: String? = nil, layout: ViewDraft.Layout = .table,
-        timelineDate: String? = nil, includesSubtypes: Bool = false
+        timelineDate: String? = nil, listing: PlaceListing = PlaceListing()
     ) -> ViewDraft.Window {
         ViewDraft.Window(
             place: place, columns: columns, sort: sort, grouping: grouping, filter: state(filters, negated: negated), targets: targets,
-            search: search, layout: layout, timelineDate: timelineDate, includesSubtypes: includesSubtypes)
+            search: search, layout: layout, timelineDate: timelineDate, listing: listing)
     }
 
     /// A filter added to `base` as a place's filter, through the same call a new view's draft makes.
@@ -68,35 +68,35 @@ struct ViewDraftTests {
 
     @Test func eachPlaceAViewCanStandForBecomesItsQuery() {
         let active: Set<ItemState> = [.active]
-        func query(_ place: SidebarItem) -> LibraryViewQuery? {
+        func query(_ place: PlaceView) -> LibraryViewQuery? {
             ViewDraft.query(for: place, catalogue: Self.catalogue, views: [])
         }
-        #expect(query(.allItems) == LibraryViewQuery(states: active))
-        #expect(query(.inbox) == LibraryViewQuery(tier: .feed, states: active))
+        #expect(query(.library) == LibraryViewQuery(tier: .library, states: active))
+        #expect(query(.feed) == LibraryViewQuery(tier: .feed, states: active))
+        #expect(query(.archive) == LibraryViewQuery(states: [.archived]))
         #expect(query(.favorites) == LibraryViewQuery(states: active, filter: #"tags contains "favorite""#))
-        #expect(query(.files) == LibraryViewQuery(types: [TypeID.file], states: active))
         #expect(query(.source("mail")) == LibraryViewQuery(states: active, filter: #"source eq "mail""#))
-        // A type's place holds its own items, and Marfa takes a type with its subtypes, so a type with any is narrowed.
-        #expect(query(.itemType("core.task")) == LibraryViewQuery(types: [Self.task], states: active))
-        #expect(query(.itemType("aic.ticket")) == LibraryViewQuery(types: [Self.ticket], states: active, filter: #"type eq "aic.ticket""#))
+        // Marfa takes a type with its kinds, as the window does unless it leaves them out.
+        #expect(query(.type(TypeID("core.task"))) == LibraryViewQuery(types: [Self.task], states: active))
+        #expect(query(.type(TypeID("aic.ticket"))) == LibraryViewQuery(types: [Self.ticket], states: active))
         // A collection's members are the items with an `in-collection` edge to it, written at the member.
         #expect(query(.collection(ItemID("c1"))) == LibraryViewQuery(states: active, filter: #"edge[in-collection] eq "c1""#))
     }
 
     @Test func placesNoViewCanStandForOfferNone() {
-        for place: SidebarItem in [.recents, .sources, .collections, .favoriteItem(ItemID("a"))] {
+        for place: PlaceView in [.types, .sources, .collections] {
             #expect(ViewDraft.query(for: place, catalogue: Self.catalogue, views: []) == nil)
             #expect(Self.draft(Self.window(place)) == nil)
         }
         // A view the library no longer holds cannot be saved anew.
-        #expect(Self.draft(Self.window(.view(ItemID("gone")))) == nil)
+        #expect(Self.draft(Self.window(.saved(ItemID("gone")))) == nil)
     }
 
     @Test func aViewSavedAgainKeepsItsOwnQuery() throws {
         let base = LibraryView(
             id: ItemID("v"), title: "Open", version: 3,
             query: LibraryViewQuery(types: [Self.task], tier: .library, filter: #"properties.priority eq "high""#, beneath: ItemID("p")))
-        let draft = try #require(Self.draft(Self.window(.view(base.id)), views: [base]))
+        let draft = try #require(Self.draft(Self.window(.saved(base.id), listing: PlaceListing(scope: .library, archived: .shown)), views: [base]))
         #expect(draft.query == base.query)
     }
 
@@ -104,7 +104,7 @@ struct ViewDraftTests {
 
     @Test func sortAndGroupKeepTheColumnsThatStandForFields() throws {
         let window = Self.window(
-            .allItems,
+            .library,
             sort: [
                 ItemTableComparator(column: Self.statusColumn, order: .forward),
                 ItemTableComparator(column: Self.dueColumn, order: .forward),
@@ -163,7 +163,7 @@ struct ViewDraftTests {
         // The table's own order and grouping, which the other layouts do not show, and a filter, which they all do.
         let sort = [ItemTableComparator(column: Self.statusColumn, order: .forward)]
         func draft(_ layout: ViewDraft.Layout) throws -> ViewDraft.Draft {
-            try #require(Self.draft(Self.window(.allItems, sort: sort, grouping: Self.statusColumn, filters: ["field.status": ["todo"]], layout: layout)))
+            try #require(Self.draft(Self.window(.library, sort: sort, grouping: Self.statusColumn, filters: ["field.status": ["todo"]], layout: layout)))
         }
         let byTitle = try draft(.list(ItemOrder(sort: .title, groupsByDate: true)))
         #expect(byTitle.sort == [LibraryViewSort(field: "title", ascending: true)])
@@ -186,7 +186,7 @@ struct ViewDraftTests {
         let board = try draft(.board)
         #expect(board.group == LibraryViewGroup(field: "properties.status", order: ViewDraft.declaredOrder(of: Self.statusColumn)))
         #expect(board.sort == [LibraryViewSort(field: "properties.status", ascending: true)])
-        let odd = try #require(Self.draft(Self.window(.allItems, grouping: Self.dueColumn, layout: .board)))
+        let odd = try #require(Self.draft(Self.window(.library, grouping: Self.dueColumn, layout: .board)))
         #expect(odd.unkept == [.group(column: "Due")])
 
         let timeline = try draft(.timeline(key: "due_at", label: "Due"))
@@ -277,7 +277,7 @@ struct ViewDraftTests {
         #expect(Self.shownFilters(seed).isEmpty)
         var options = seed
         options.filter = Self.state(["field.status": ["todo"]])
-        let update = ViewDraft.change(Self.window(.view(view.id), filters: Self.shownFilters(options)), options: options, seed: seed, seedTimelineDate: nil, seededTypes: nil, view: view, catalogue: Self.catalogue)
+        let update = ViewDraft.change(Self.window(.saved(view.id), filters: Self.shownFilters(options)), options: options, seed: seed, seedTimelineDate: nil, seededTypes: nil, view: view, catalogue: Self.catalogue)
         #expect(update.change.query == nil, "a filter that could not be read is not replaced")
         guard case .refused(let message)? = update.unkept.first else { Issue.record("not refused: \(update.unkept)"); return }
         #expect(!message.isEmpty)
@@ -309,7 +309,7 @@ struct ViewDraftTests {
         let seed = ViewDraft.options(for: view, catalogue: Self.catalogue)
         var ungrouped = seed
         ungrouped.grouping = .none
-        var window = Self.window(.view(view.id), layout: .list(ItemOrder(sort: .dateEdited, groupsByDate: true)))
+        var window = Self.window(.saved(view.id), layout: .list(ItemOrder(sort: .dateEdited, groupsByDate: true)))
         window.dated = ViewDraft.Dated(sort: [ItemTableComparator(column: .edited, order: .reverse)], hasSections: true)
         let result = ViewDraft.change(
             window, options: ungrouped, seed: seed, seedTimelineDate: nil, seededTypes: nil, view: view, catalogue: Self.catalogue)
@@ -325,19 +325,19 @@ struct ViewDraftTests {
 
         var grouped = seed
         grouped.grouping = .none
-        let ungroup = ViewDraft.change(Self.window(.view(view.id), sort: seed.sort ?? []), options: grouped, seed: seed, seedTimelineDate: nil, seededTypes: nil, view: view, catalogue: Self.catalogue)
+        let ungroup = ViewDraft.change(Self.window(.saved(view.id), sort: seed.sort ?? []), options: grouped, seed: seed, seedTimelineDate: nil, seededTypes: nil, view: view, catalogue: Self.catalogue)
         #expect(ungroup.change == LibraryViewChange(group: .clear))
 
         var filtered = seed
         filtered.filter = Self.state(["field.status": ["todo"]])
         let filter = ViewDraft.change(
-            Self.window(.view(view.id), filters: Self.shownFilters(filtered)), options: filtered, seed: seed, seedTimelineDate: nil, seededTypes: nil, view: view, catalogue: Self.catalogue)
+            Self.window(.saved(view.id), filters: Self.shownFilters(filtered)), options: filtered, seed: seed, seedTimelineDate: nil, seededTypes: nil, view: view, catalogue: Self.catalogue)
         #expect(filter.change == LibraryViewChange(
             query: LibraryViewQuery(types: [Self.task], filter: #"version gt 1 AND properties.status eq "todo""#)))
 
         var resorted = seed
         resorted.sort = [ItemTableComparator(column: .title)]
-        let sort = ViewDraft.change(Self.window(.view(view.id), sort: [ItemTableComparator(column: .title)]), options: resorted, seed: seed, seedTimelineDate: nil, seededTypes: nil, view: view, catalogue: Self.catalogue)
+        let sort = ViewDraft.change(Self.window(.saved(view.id), sort: [ItemTableComparator(column: .title)]), options: resorted, seed: seed, seedTimelineDate: nil, seededTypes: nil, view: view, catalogue: Self.catalogue)
         #expect(sort.change == LibraryViewChange(sort: [LibraryViewSort(field: "title", ascending: true)]))
     }
 
@@ -400,69 +400,80 @@ struct ViewDraftTests {
 
     // MARK: Types
 
-    @Test func aTypesPlaceWithIncludeSubtypesOnSavesTheTypeWithItsSubtypes() throws {
-        // Marfa lists a type with its subtypes, so the types alone hold what the window shows.
-        let on = try #require(Self.draft(Self.window(.itemType("aic.ticket"), includesSubtypes: true)))
+    @Test func aTypesViewHoldsItsKindsUnlessTheWindowLeavesThemOut() throws {
+        // Marfa lists a type with its kinds, so the types alone hold what the window shows.
+        let on = try #require(Self.draft(Self.window(.type(TypeID("aic.ticket")))))
         #expect(on.query.types == [Self.ticket])
         #expect(on.query.filter == nil)
         #expect(on.unkept.isEmpty)
-        // Filtered to one subtype, the window shows that subtype's items, which the types say.
-        let sub = try #require(Self.draft(Self.window(.itemType("aic.ticket"), filters: ["type": ["aic.ticket.task"]], includesSubtypes: true)))
-        #expect(sub.query.types == [Self.ticketTask])
-        #expect(sub.query.filter == nil)
-        // Filtered to the parent alone, the window shows the parent's own items, so it stays exact.
-        let parent = try #require(Self.draft(Self.window(.itemType("aic.ticket"), filters: ["type": ["aic.ticket"]], includesSubtypes: true)))
+        // Filtered to one kind, the window shows that kind's items, which the types say.
+        let kind = try #require(Self.draft(Self.window(.type(TypeID("aic.ticket")), filters: ["type": ["aic.ticket.task"]])))
+        #expect(kind.query.types == [Self.ticketTask])
+        #expect(kind.query.filter == nil)
+        // Filtered to the type alone, the window shows the type's own items, so it stays exact.
+        let parent = try #require(Self.draft(Self.window(.type(TypeID("aic.ticket")), filters: ["type": ["aic.ticket"]])))
         #expect(parent.query.filter == #"type eq "aic.ticket""#)
-        // Off, the type's own items alone, as before.
-        let off = try #require(Self.draft(Self.window(.itemType("aic.ticket"), includesSubtypes: false)))
+        // With its kinds left out, the type's own items alone.
+        let off = try #require(Self.draft(Self.window(.type(TypeID("aic.ticket")), listing: PlaceListing(includesKinds: false))))
         #expect(off.query.types == [Self.ticket])
         #expect(off.query.filter == #"type eq "aic.ticket""#)
     }
 
+    @Test func aViewKeepsTheWindowsFromAndArchivedItems() throws {
+        let base = LibraryView(id: ItemID("v"), title: "Open", version: 1, query: LibraryViewQuery(types: [Self.task]))
+        let listing = PlaceListing(scope: .feed, archived: .only)
+        let draft = try #require(Self.draft(Self.window(.saved(base.id), listing: listing), views: [base]))
+        #expect(draft.query.tier == .feed)
+        #expect(draft.query.states == [.archived])
+        #expect(ArchivedItems(states: nil) == .shown)
+        #expect(ListScope(tier: draft.query.tier) == .feed)
+    }
+
     @Test func aTypeFilterGoesIntoTheQueryTypes() throws {
-        let window = Self.window(.allItems, filters: ["type": ["core.task"]])
+        let window = Self.window(.library, filters: ["type": ["core.task"]])
         let draft = try #require(Self.draft(window))
         #expect(draft.query.types == [Self.task])
         #expect(draft.query.filter == nil)
         #expect(draft.unkept.isEmpty)
         // Several types are all of them.
-        let several = try #require(Self.draft(Self.window(.allItems, filters: ["type": ["core.task", "core.note"]])))
+        let several = try #require(Self.draft(Self.window(.library, filters: ["type": ["core.task", "core.note"]])))
         #expect(several.query.types == [TypeID("core.note"), Self.task])
     }
 
     @Test func aTypeWithSubtypesIsSavedAsAnExactTypeFilterBecauseMarfaListsItsSubtypesToo() throws {
         // Saving from the window with the Type filter on a type that has subtypes (#389).
-        let draft = try #require(Self.draft(Self.window(.allItems, filters: ["type": ["aic.ticket"]])))
+        let draft = try #require(Self.draft(Self.window(.library, filters: ["type": ["aic.ticket"]])))
         #expect(draft.query.types.isEmpty)
         #expect(draft.query.filter == #"type eq "aic.ticket""#)
         #expect(draft.unkept.isEmpty)
         // A type the place does not list replaces the place's, so the saved view is not empty.
-        let beside = try #require(Self.draft(Self.window(.itemType("core.task"), filters: ["type": ["core.note"]])))
+        let beside = try #require(Self.draft(Self.window(.type(TypeID("core.task")), filters: ["type": ["core.note"]])))
         #expect(beside.query.types == [TypeID("core.note")])
         #expect(beside.query.filter == nil)
         #expect(beside.unkept.isEmpty)
         // With the list grouped by a column too, both are kept.
-        let grouped = try #require(Self.draft(Self.window(.allItems, grouping: Self.statusColumn, filters: ["type": ["aic.ticket"]])))
+        let grouped = try #require(Self.draft(Self.window(.library, grouping: Self.statusColumn, filters: ["type": ["aic.ticket"]])))
         #expect(grouped.group == LibraryViewGroup(field: "properties.status", order: ViewDraft.declaredOrder(of: Self.statusColumn)))
         #expect(grouped.query.filter == #"type eq "aic.ticket""#)
         // Is Not is a condition.
-        let not = try #require(Self.draft(Self.window(.allItems, filters: ["type": ["core.task"]], negated: ["type"])))
+        let not = try #require(Self.draft(Self.window(.library, filters: ["type": ["core.task"]], negated: ["type"])))
         #expect(not.query.filter == #"type neq "core.task""#)
     }
 
     @Test func aSubtypeChosenInATypesPlaceReplacesThePlacesOwnTypeTerms() throws {
-        // A place of a type with subtypes saves its own items; the window filtered to a subtype shows that subtype's.
-        let place = try #require(ViewDraft.query(for: .itemType("aic.ticket"), catalogue: Self.catalogue, views: []))
+        // A type's place with its kinds left out saves its own items; the window filtered to a kind shows that kind's.
+        let own = PlaceListing(includesKinds: false)
+        let place = try #require(ViewDraft.query(for: .type(TypeID("aic.ticket")), listing: own, catalogue: Self.catalogue, views: []))
         #expect(place.filter == #"type eq "aic.ticket""#)
-        let sub = try #require(Self.draft(Self.window(.itemType("aic.ticket"), filters: ["type": ["aic.ticket.task"]])))
+        let sub = try #require(Self.draft(Self.window(.type(TypeID("aic.ticket")), filters: ["type": ["aic.ticket.task"]])))
         #expect(sub.query.types == [Self.ticketTask])
         #expect(sub.query.filter == nil)
         #expect(sub.unkept.isEmpty)
         // The parent alone is the place's own items already.
-        let parent = try #require(Self.draft(Self.window(.itemType("aic.ticket"), filters: ["type": ["aic.ticket"]])))
+        let parent = try #require(Self.draft(Self.window(.type(TypeID("aic.ticket")), filters: ["type": ["aic.ticket"]], listing: own)))
         #expect(parent.query == place)
         // Another type with its own subtypes is exact, and the place's terms are replaced.
-        let other = try #require(Self.draft(Self.window(.itemType("core.task"), filters: ["type": ["aic.ticket"]])))
+        let other = try #require(Self.draft(Self.window(.type(TypeID("core.task")), filters: ["type": ["aic.ticket"]])))
         #expect(other.query.types == [Self.ticket])
         #expect(other.query.filter == #"type eq "aic.ticket""#)
         // The place's other conditions stay.
@@ -485,7 +496,7 @@ struct ViewDraftTests {
         var options = seed
         options.filter = Self.state(["type": ["aic.ticket"]])
         let change = ViewDraft.change(
-            Self.window(.view(view.id), filters: ["type": ["aic.ticket"]]), options: options, seed: seed, seedTimelineDate: nil,
+            Self.window(.saved(view.id), filters: ["type": ["aic.ticket"]]), options: options, seed: seed, seedTimelineDate: nil,
             seededTypes: nil, view: view, catalogue: Self.catalogue)
         #expect(change.change.query?.types == [Self.ticket])
         #expect(change.change.query?.filter == #"type eq "aic.ticket""#)
@@ -504,7 +515,7 @@ struct ViewDraftTests {
         var options = seed
         options.filter = Self.state(["type": chosen])
         let change = ViewDraft.change(
-            window(.view(view.id), filters: ["type": chosen]), options: options, seed: seed, seedTimelineDate: nil,
+            window(.saved(view.id), filters: ["type": chosen]), options: options, seed: seed, seedTimelineDate: nil,
             seededTypes: ViewDraft.seededTypes(of: view.query, catalogue: catalogue), view: view, catalogue: catalogue)
         guard let query = change.change.query else { return (view, nil) }
         return (view, LibraryView(id: view.id, title: view.title, version: 3, query: query))
@@ -545,11 +556,11 @@ struct ViewDraftTests {
     }
 
     @Test func aTypeFilterOfTwoTypesInItemsIsTheirTypes() throws {
-        let plain = try #require(Self.draft(Self.window(.allItems, filters: ["type": ["core.task", "core.note"]])))
+        let plain = try #require(Self.draft(Self.window(.library, filters: ["type": ["core.task", "core.note"]])))
         #expect(plain.query.types == [TypeID("core.note"), Self.task])
         #expect(plain.query.filter == nil)
         // With a type that has subtypes, the types are exact conditions joined by or.
-        let exact = try #require(Self.draft(Self.window(.allItems, filters: ["type": ["core.task", "aic.ticket"]])))
+        let exact = try #require(Self.draft(Self.window(.library, filters: ["type": ["core.task", "aic.ticket"]])))
         #expect(exact.query.types.isEmpty)
         #expect(exact.query.filter == #"type eq "aic.ticket" OR type eq "core.task""#)
         #expect(exact.unkept.isEmpty)
@@ -571,7 +582,7 @@ struct ViewDraftTests {
             var options = seed
             options.filter = Self.state(filters)
             return ViewDraft.change(
-                Self.window(.view(view.id), filters: filters), options: options, seed: seed, seedTimelineDate: nil,
+                Self.window(.saved(view.id), filters: filters), options: options, seed: seed, seedTimelineDate: nil,
                 seededTypes: ViewDraft.seededTypes(of: view.query, catalogue: Self.catalogue), view: view, catalogue: Self.catalogue)
         }
         #expect(update(Self.shownFilters(seed)).change.query == nil)
@@ -588,7 +599,7 @@ struct ViewDraftTests {
         let seed = ViewDraft.options(for: view, catalogue: Self.catalogue)
         #expect(ViewDraft.differs(seed, timelineDate: "starts_at", from: seed, seedTimelineDate: "due_at"))
         #expect(!ViewDraft.differs(seed, timelineDate: "due_at", from: seed, seedTimelineDate: "due_at"))
-        let timeline = Self.window(.view(view.id), layout: .timeline(key: "starts_at", label: "Starts"), timelineDate: "starts_at")
+        let timeline = Self.window(.saved(view.id), layout: .timeline(key: "starts_at", label: "Starts"), timelineDate: "starts_at")
         let update = ViewDraft.change(timeline, options: seed, seed: seed, seedTimelineDate: "due_at", seededTypes: nil, view: view, catalogue: Self.catalogue)
         #expect(update.change == LibraryViewChange(group: .set(LibraryViewGroup(field: "properties.starts_at", bucket: .day))))
     }
@@ -598,7 +609,7 @@ struct ViewDraftTests {
         let view = LibraryView(id: ItemID("v"), title: "V", version: 2, group: LibraryViewGroup(field: "properties.status"))
         let seed = ViewDraft.options(for: view, catalogue: Self.catalogue)
         let timeline = Self.window(
-            .view(view.id), grouping: Self.statusColumn, layout: .timeline(key: "starts_at", label: "Starts"), timelineDate: "starts_at")
+            .saved(view.id), grouping: Self.statusColumn, layout: .timeline(key: "starts_at", label: "Starts"), timelineDate: "starts_at")
         let update = ViewDraft.change(timeline, options: seed, seed: seed, seedTimelineDate: nil, seededTypes: nil, view: view, catalogue: Self.catalogue)
         #expect(update.change.group == .set(LibraryViewGroup(field: "properties.starts_at", bucket: .day)))
         #expect(update.unkept == [.group(column: "Status")])
@@ -630,7 +641,7 @@ struct ViewDraftTests {
         var options = seed
         options.filter = Self.state(["field.status": ["todo"]])
         let update = ViewDraft.change(
-            Self.window(.view(view.id), filters: Self.shownFilters(options)), options: options, seed: seed, seedTimelineDate: nil, seededTypes: nil, view: view,
+            Self.window(.saved(view.id), filters: Self.shownFilters(options)), options: options, seed: seed, seedTimelineDate: nil, seededTypes: nil, view: view,
             catalogue: later)
         #expect((update.change.query?.types ?? view.query.types) == view.query.types)
     }
@@ -644,7 +655,7 @@ struct ViewDraftTests {
         func update(_ filters: [String: Set<String>]) -> (change: LibraryViewChange, unkept: [ViewDraft.Unkept]) {
             var options = seed
             options.filter = Self.state(filters)
-            return ViewDraft.change(Self.window(.view(view.id), filters: filters), options: options, seed: seed, seedTimelineDate: nil, seededTypes: nil, view: view, catalogue: Self.catalogue)
+            return ViewDraft.change(Self.window(.saved(view.id), filters: filters), options: options, seed: seed, seedTimelineDate: nil, seededTypes: nil, view: view, catalogue: Self.catalogue)
         }
 
         // Removing the filter in the window removes it from the view; what the window cannot show stays.
@@ -670,7 +681,7 @@ struct ViewDraftTests {
         let seed = ViewDraft.options(for: view, catalogue: Self.catalogue)
         var options = seed
         options.filter = Self.state([:])
-        let window = ViewDraft.Window(place: .view(view.id), columns: Self.columns, sort: [], grouping: nil, filter: FilterState(), targets: Self.targets)
+        let window = ViewDraft.Window(place: .saved(view.id), columns: Self.columns, sort: [], grouping: nil, filter: FilterState(), targets: Self.targets)
         let update = ViewDraft.change(window, options: options, seed: seed, seedTimelineDate: nil, seededTypes: nil, view: view, catalogue: Self.catalogue)
         #expect(update.change.query?.filter == #"properties.owner eq "ann""#)
     }

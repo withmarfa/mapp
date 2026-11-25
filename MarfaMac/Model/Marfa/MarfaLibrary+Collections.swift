@@ -5,7 +5,7 @@ import Foundation
 extension MarfaLibrary {
     var collections: [Item] {
         let ids = catalogue.collectionTypes.reduce(into: Set<ItemID>()) { found, type in
-            found.formUnion(index.activeByType[type] ?? [])
+            found.formUnion(index.active(ofType: type))
         }
         return Self.byTitle(heldItems(ids))
     }

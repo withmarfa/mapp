@@ -70,8 +70,8 @@ import Testing
         })
         #expect(library.search("other", in: .everywhere).items.isEmpty)
         // The same query in another scope.
-        #expect(await eventually { !library.search("body", in: .place(.inbox)).isPending })
-        #expect(library.search("body", in: .place(.inbox)).items.isEmpty)
+        #expect(await eventually { !library.search("body", in: .query(LibraryViewQuery(tier: .feed))).isPending })
+        #expect(library.search("body", in: .query(LibraryViewQuery(tier: .feed))).items.isEmpty)
         #expect(library.notices.waiting.last?.title == String(localized: "Can’t Search"))
         // Its own earlier answer stands.
         #expect(library.search("body", in: .everywhere).items.map(\.id) == [F.n1])

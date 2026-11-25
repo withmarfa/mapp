@@ -5,7 +5,6 @@ paths:
   - MarfaMac/Model/Items/Item.swift
   - MarfaMac/Model/Items/ItemAllows.swift
   - MarfaMac/Model/Items/ItemMoves.swift
-  - MarfaMac/Model/SidebarItem.swift
   - MarfaMac/Model/Marfa/MarfaMapping*.swift
 ---
 
@@ -29,6 +28,7 @@ Read this before you name, store or show a thing. `docs/concepts.md` says what e
 - **Everything drawn**: marks' colors, chips, symbols, spacing, layouts, and which properties a page or row shows. All of it syncs as this app's settings and touches no item. `docs/settings-sync.md` says where each setting is kept.
 - **Its own choices are defaults until a person changes one**, and only the change is stored, so a better default reaches everyone else.
 - **An option's color comes from its words, and a mark's from its icon** (`OptionTone`, `TypeTone`), because Marfa holds neither and two Macs must agree without a setting.
+- **Trap:** "the app keeps it" does not mean "this Mac keeps it": most of what a person sets follows them (`PreferencesMap.staysOnMac`).
 
 ## Where the app looks at what a type descends from
 
@@ -72,7 +72,10 @@ Use these words in names, strings and comments. A word with "Marfa" is the serve
 | Source | Marfa | What wrote an item. Its name and mark are Marfa's |
 | Saved view | Both | A `system.view` item: title, query, sort and group. The app adds the rest (`ViewMacSettings`) |
 | Item link | Marfa | An item's `marfa://` or `https` address (`ItemAppLink`) |
-| Place | App | What a sidebar row opens (`SidebarItem`) |
+| Place | App | Where a window can be (`Place`) |
+| Library, Feed | Marfa | The two tiers, as places. Never Inbox, Yours, From Apps or Recents |
+| From | App | Which tiers a place lists (`ListScope`) |
+| Kind | Marfa | A type below another |
 | Layout | App | How a list is drawn (`ItemViewMode`) |
 | Look | App | How one type is drawn in every list (`TypeLook`) |
 | Preset | App | The look a type starts from (`LookPreset`) |
@@ -89,8 +92,3 @@ Use these words in names, strings and comments. A word with "Marfa" is the serve
 | Toast | App | The short message with Undo (`ToastView`) |
 | Keycap | App | A key drawn by the app (`KeyCap`) |
 | Settings window | App | The window that holds the app's settings and the Marfa's (`SettingsWindowView`) |
-
-## Storage
-
-- **On this Mac** means a value that never leaves it. `PreferencesMap.staysOnMac` is the whole list, and a test fails if a key is in neither list.
-- **Trap:** "the app keeps it" does not mean "this Mac keeps it". Widths of columns, the last place open and per-Marfa export plans stay; nearly everything else a person sets follows them.

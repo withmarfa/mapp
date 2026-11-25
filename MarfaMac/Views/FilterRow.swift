@@ -19,7 +19,7 @@ struct FilterRow: View {
     var body: some View {
         if browser.showsFilterRow {
             let content = browser.tableContent(in: library)
-            let state = (browser.tableOptions[browser.item] ?? ItemTableOptions()).filter
+            let state = (browser.tableOptions[browser.shown] ?? ItemTableOptions()).filter
             let offer = content.filterOffer
             let held = holdingNote(of: state, offer: offer)
             FilterChipsBar(
@@ -40,7 +40,7 @@ struct FilterRow: View {
                 // The row is laid out first, so the + has a view to open under.
                 DispatchQueue.main.async { openFields() }
             }
-            .onChange(of: browser.item) { FilterPanelPresenter.shared.dismiss(restoringFocus: false) }
+            .onChange(of: browser.shown.memoryKey) { FilterPanelPresenter.shared.dismiss(restoringFocus: false) }
         }
     }
 
@@ -70,7 +70,7 @@ struct FilterRow: View {
 
     /// What a saved view's query holds that this row cannot change. It is kept whenever the view is written.
     private func lockedChips() -> [FilterChipItem] {
-        guard case .view(let id) = browser.item, let view = library.views.first(where: { $0.id == id }) else { return [] }
+        guard let id = browser.shown.savedView, let view = library.views.first(where: { $0.id == id }) else { return [] }
         return ViewDraft.unshownConditions(of: view.query, catalogue: library.catalogue).enumerated().map { index, text in
             FilterChipItem(
                 id: "locked.\(index)", field: text, relation: "", values: "", needsValue: false, isLocked: true,
@@ -89,7 +89,7 @@ struct FilterRow: View {
 
     /// What the filters cannot be saved as, said before the person tries: a place that could be a view only.
     private func holdingNote(of state: FilterState, offer: FilterOffer) -> String? {
-        guard ViewDraft.query(for: browser.item, catalogue: library.catalogue, views: library.views) != nil else { return nil }
+        guard ViewDraft.query(for: browser.shown, catalogue: library.catalogue, views: library.views) != nil else { return nil }
         let held = ViewDraft.holdability(of: state, targets: offer.targets, catalogue: library.catalogue)
         for unkept in held.unkept {
             switch unkept {
@@ -121,13 +121,13 @@ struct FilterRow: View {
     private func openValues(of id: String) {
         guard let index = clauseIndex(of: id) else { return }
         // Closing the panel open drops a filter left without a value, which moves the ones after it.
-        let state = (browser.tableOptions[browser.item] ?? ItemTableOptions()).filter
+        let state = (browser.tableOptions[browser.shown] ?? ItemTableOptions()).filter
         guard state.clauses.indices.contains(index) else { return }
         let clause = state.clauses[index]
         if FilterPanelPresenter.shared.isOpen, !FilterPanelPresenter.shared.isOpen(for: id) {
             FilterPanelPresenter.shared.dismiss(restoringFocus: false)
         }
-        let now = (browser.tableOptions[browser.item] ?? ItemTableOptions()).filter.clauses
+        let now = (browser.tableOptions[browser.shown] ?? ItemTableOptions()).filter.clauses
         let at = now.indices.contains(index) && now[index] == clause ? index : (now.firstIndex(of: clause) ?? index)
         let key = Self.chipPrefix + "\(at)"
         openIndex = at
@@ -148,7 +148,7 @@ struct FilterRow: View {
     private func openFields() {
         let content = browser.tableContent(in: library)
         let offer = content.filterOffer
-        let state = (browser.tableOptions[browser.item] ?? ItemTableOptions()).filter
+        let state = (browser.tableOptions[browser.shown] ?? ItemTableOptions()).filter
         func option(_ target: FilterTarget) -> FilterFieldOption {
             FilterFieldOption(id: target.id, title: target.label, symbol: Self.symbol(of: target))
         }

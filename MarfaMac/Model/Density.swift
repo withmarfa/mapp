@@ -34,11 +34,11 @@ nonisolated struct PlaceDensities: Equatable, Sendable {
         self.places = places
     }
 
-    func density(for place: SidebarItem) -> Density? {
+    func density(for place: PlaceView) -> Density? {
         places[place.storageKey]
     }
 
-    mutating func set(_ density: Density?, for place: SidebarItem) {
+    mutating func set(_ density: Density?, for place: PlaceView) {
         places[place.storageKey] = density
     }
 

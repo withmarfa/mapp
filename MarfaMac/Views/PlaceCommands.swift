@@ -33,7 +33,7 @@ struct PlaceCommands: Commands {
     private func group(_ entries: [GoMenu.Entry], menu: GoMenu, in library: any ItemLibrary) -> some View {
         ForEach(entries) { entry in
             // A toggle, for the check mark the menu puts beside the place the window shows.
-            Toggle(isOn: Binding { browser?.item == entry.item } set: { _ in go(entry, menu: menu, in: library) }) {
+            Toggle(isOn: Binding { entry.item.isSame(browser?.shown) } set: { _ in go(entry, menu: menu, in: library) }) {
                 label(entry)
             }
             .disabled(browser == nil || !library.isLoaded)

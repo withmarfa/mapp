@@ -373,8 +373,7 @@ struct SidebarPlacesSection: View, Equatable {
     }
 }
 
-/// One place of a section: its mark, its name and the count the row says, if any. Recents has no count since it always
-/// holds the same number, and the indexes list what the copy holds on their own.
+/// One sidebar row with its mark, name, and optional count.
 struct SidebarPlaceRow: View, Equatable {
     let data: SidebarPlaceRowData
     let groups: [SidebarGroupChoice]

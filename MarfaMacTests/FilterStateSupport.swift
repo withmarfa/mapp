@@ -17,13 +17,13 @@ extension Browser {
     /// Gives a field the one filter of "is" or "is not" these values, or none where there are none, as a chip of the first
     /// kind the row had.
     func setFilter(_ field: String, values: Set<String>, negated: Bool? = nil) {
-        var options = tableOptions[item] ?? ItemTableOptions()
+        var options = tableOptions[shown] ?? ItemTableOptions()
         let held = options.filter.clauses.first { $0.field == field }
         options.filter.clauses.removeAll { $0.field == field }
         if !values.isEmpty {
             let isNot = negated ?? (held?.op == .isNot)
             options.filter.clauses.append(FilterClause(field: field, op: isNot ? .isNot : .is, values: Array(values)))
         }
-        tableOptions[item] = options
+        tableOptions[shown] = options
     }
 }

@@ -16,7 +16,7 @@ struct ItemViewModeTests {
 
     @Test func aWindowKeptOnTheOldLayoutNameOpensInTheListAtItsPlace() throws {
         let (library, _, _, favorite) = BrowserTests().makeFakeLibrary()
-        let kept = Browser.Snapshot(place: .allItems, selection: [favorite.id], viewMode: .table)
+        let kept = Browser.Snapshot(place: .library, selection: [favorite.id], viewMode: .table)
         let json = try #require(String(data: JSONEncoder().encode(kept), encoding: .utf8))
         let oldName = json.replacingOccurrences(of: #""viewMode":"table""#, with: #""viewMode":"agenda""#)
         try #require(oldName != json)
@@ -24,7 +24,7 @@ struct ItemViewModeTests {
         let browser = Browser()
         browser.restore(from: saved, in: library, order: ItemOrder())
         #expect(browser.viewMode == .list)
-        #expect(browser.item == .allItems)
+        #expect(browser.shown == .library)
         #expect(browser.selection == [favorite.id])
     }
 }

@@ -127,16 +127,6 @@ import Testing
         here.set(Data("not json".utf8), forKey: PlaceDefaults.key)
         #expect(try setting(PlaceDefaults.key).read(here, library: "a") == .unreadable)
     }
-
-    @Test func includedSubtypesAreARowEach() throws {
-        let here = defaults()
-        IncludedSubtypes.update(in: here) { $0.set("core.task", included: true); $0.set("aic.ticket", included: true) }
-        let setting = try setting(IncludedSubtypes.key)
-        let read = units(setting.read(here, library: "a"))
-        #expect(Set(read.keys) == [.row(.types, setting: "includedSubtypes", key: "core.task"), .row(.types, setting: "includedSubtypes", key: "aic.ticket")])
-        setting.write([.row(.types, setting: "includedSubtypes", key: "core.task"): "true"], to: here, library: "a")
-        #expect(IncludedSubtypes.stored(in: here).types == ["core.task"])
-    }
 }
 
 @Suite struct PreferencesMergeTests {

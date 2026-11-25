@@ -43,13 +43,12 @@ struct MarfaViewsTests {
         let library = MarfaLibrary(source: source, notices: Notices())
         try #require(await eventually { library.isLoaded })
         #expect(library.views == [Self.planning])
-        #expect(Set(library.items(in: .allItems).map(\.id)) == [ItemID("n1"), ItemID("n2")])
-        #expect(library.count(in: .allItems) == 2)
-        #expect(library.items(in: .recents).count == 2)
+        #expect(Set(library.items(in: .library).map(\.id)) == [ItemID("n1"), ItemID("n2")])
+        #expect(library.count(in: Place.library) == 2)
         #expect(library.item(ItemID("view-planning")) == nil)
         #expect(!library.itemTypeCounts.contains { $0.id.rawValue.hasPrefix("system.") })
         // A view lists only items, even where its read names a view's own row.
-        #expect(await eventually { library.items(in: .view(Self.planning.id)).map(\.id) == [ItemID("n1")] })
+        #expect(await eventually { library.items(inView: (Self.planning.id)).map(\.id) == [ItemID("n1")] })
         await source.close()
     }
 
@@ -60,14 +59,14 @@ struct MarfaViewsTests {
         let library = MarfaLibrary(source: source, notices: Notices())
         try #require(await eventually { library.views == [Self.planning] })
         let browser = Browser()
-        browser.show(.view(Self.planning.id), in: library, order: ItemOrder())
+        browser.show(.saved(Self.planning.id), in: library, order: ItemOrder())
 
         views.completeness.withLock { $0 = .partial }
         views.list.withLock { $0 = [Self.reading] }
         await source.hear(Change(origin: .refreshed(.unfinished), itemId: nil, edgeId: nil))
         #expect(await eventually { library.views == [Self.planning, Self.reading] })
         browser.placeRemoved(in: library, order: ItemOrder())
-        #expect(browser.sidebarItem == .view(Self.planning.id))
+        #expect(browser.showing == .saved(Self.planning.id))
 
         // Once whole, the answer is what the copy holds.
         views.completeness.withLock { $0 = .complete }
@@ -90,20 +89,20 @@ struct MarfaViewsTests {
         let F = LibraryFixture.self
         let (library, source) = try await Self.loaded(views: [Self.planning, Self.reading])
         source.viewMembers.withLock { $0 = [Self.planning.id: [F.n1], Self.reading.id: [F.t1]] }
-        #expect(await eventually { library.items(in: .view(Self.planning.id)).map(\.id) == [F.n1] })
-        #expect(await eventually { library.items(in: .view(Self.reading.id)).map(\.id) == [F.t1] })
+        #expect(await eventually { library.items(inView: (Self.planning.id)).map(\.id) == [F.n1] })
+        #expect(await eventually { library.items(inView: (Self.reading.id)).map(\.id) == [F.t1] })
 
         // Neither can be read again, so each shows what it kept: nothing for the view that changed.
         source.viewFails.withLock { $0 = true }
         let reads = source.viewReads.withLock { $0 }
         source.send(.views([LibraryView(id: Self.planning.id, title: Self.planning.title, version: 2), Self.reading]))
         #expect(await eventually {
-            _ = library.items(in: .view(Self.planning.id))
-            _ = library.items(in: .view(Self.reading.id))
+            _ = library.items(inView: (Self.planning.id))
+            _ = library.items(inView: (Self.reading.id))
             return source.viewReads.withLock { $0 } >= reads + 2
         })
-        #expect(await eventually { library.items(in: .view(Self.planning.id)).isEmpty })
-        #expect(library.items(in: .view(Self.reading.id)).map(\.id) == [F.t1])
+        #expect(await eventually { library.items(inView: (Self.planning.id)).isEmpty })
+        #expect(library.items(inView: (Self.reading.id)).map(\.id) == [F.t1])
     }
 
     // MARK: A view's changed filters, read before they are saved
@@ -120,7 +119,7 @@ struct MarfaViewsTests {
         #expect(library.previewItems(ofView: Self.planning.id, query: Self.widened).map(\.id).count <= 1)
         #expect(await eventually { Set(library.previewItems(ofView: Self.planning.id, query: Self.widened).map(\.id)) == [F.n1, F.n2, F.t1] })
         // The view's own list is untouched.
-        #expect(await eventually { library.items(in: .view(Self.planning.id)).map(\.id) == [F.n1] })
+        #expect(await eventually { library.items(inView: (Self.planning.id)).map(\.id) == [F.n1] })
         #expect(source.previewQueries.withLock { $0 }.allSatisfy { $0 == Self.widened })
     }
 

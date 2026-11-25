@@ -35,7 +35,7 @@ Keep SwiftUI out. `ItemLibrary` is the app's whole view of the working copy; `Ma
 ## Places, views and search
 
 - **A file attached to another item is left out of places in one place** (`MarfaItemIndex.standalone`).
-- **A type counts only its own items, never its subtypes** (`MarfaItemIndex.activeByType`). Include Subtypes changes what the list shows (`Browser.placeItems`) and what a saved view is given (`ViewDraft.query`).
+- **A type counts its kinds, by tier, from the index** (`MarfaItemIndex.byType`). Include Kinds changes what the list shows (`Browser.listing(in:)`) and what a saved view is given (`ViewDraft.query`).
 - **`Browser.choicesChanged()` is the one funnel for a place's choices.** It registers one undo step and, in a saved view, writes Marfa's part at once, on the version last read, never queued. A failed write keeps the window's choice, a conflict shows the view, and both are told.
 - **A window whose filters differ from its view's lists a preview** (`ItemLibrary.previewItems(ofView:query:)`).
 - **Ask the browser for a place's content** (`Browser.tableContent(in:)`, `sections`, `paletteIndex`). Never build an `ItemTableContent` or read the library's items in a view, because that repeats the work at every draw.

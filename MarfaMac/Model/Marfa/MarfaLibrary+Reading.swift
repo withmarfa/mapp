@@ -82,19 +82,25 @@ extension MarfaLibrary {
         return ids.compactMap { records[$0]?.item }
     }
 
-    func items(in place: SidebarItem) -> [Item] {
-        if case .view(let id) = place { return items(inView: id) }
+    func items(in place: Place, scope: ListScope, archived: ArchivedItems, includingKinds: Bool) -> [Item] {
+        listing(ListingKey(place: place, scope: scope, archived: archived, includingKinds: includingKinds))
+    }
+
+    func favoriteItems(in scope: ListScope, archived: ArchivedItems) -> [Item] {
+        listing(ListingKey(place: .library, favorites: true, scope: scope, archived: archived, includingKinds: true))
+    }
+
+    private func listing(_ key: ListingKey) -> [Item] {
         let content = contentRevision
         let membership = membershipRevision
-        if let held = listed[place], held.content == content { return held.items }
-        // Which items are recent, and in what order, changes with any edit, not only with membership; so does a
-        // collection's order, which falls back on titles.
-        let isCollection: Bool = if case .collection = place { true } else { false }
-        var listing = listed[place].flatMap { $0.membership == membership && place != .recents && !isCollection ? $0 : nil }
-            ?? Listing(membership: membership, ids: listingOrder(of: place))
+        if let held = listed[key], held.content == content { return held.items }
+        // A collection's order falls back on titles, so it changes with any edit, not only with membership.
+        let isCollection: Bool = if case .collection = key.place { true } else { false }
+        var listing = listed[key].flatMap { $0.membership == membership && !isCollection ? $0 : nil }
+            ?? Listing(membership: membership, ids: listingOrder(of: key))
         listing.content = content
         listing.items = listing.ids.compactMap { records[$0]?.item }
-        listed[place] = listing
+        listed[key] = listing
         return listing.items
     }
 
@@ -115,22 +121,67 @@ extension MarfaLibrary {
         return index.ids(in: .trashed).count
     }
 
-    func count(in place: SidebarItem) -> Int {
-        if place == .recents { return min(index.ids(in: .active).count, Self.recentLimit) }
-        if case .view = place { return items(in: place).count }
-        let revision = membershipRevision
-        if let held = counted[place], held.revision == revision { return held.count }
-        let count = members(of: place).count
-        counted[place] = (revision, count)
-        return count
+    func count(in place: Place, scope: ListScope) -> Int {
+        switch place {
+        case .library: scopeCounts(in: place).library
+        case .feed: scopeCounts(in: place).feed
+        default: scopeCounts(in: place).count(in: scope)
+        }
     }
 
-    private func listingOrder(of place: SidebarItem) -> [ItemID] {
-        switch place {
-        case .recents: Self.recent(index.ids(in: .active).compactMap { records[$0]?.item }).map(\.id)
-        case .collection(let id): membersInOrder(of: id, among: members(of: place).compactMap { records[$0]?.item })
-        default: Self.ordered(members(of: place).compactMap { records[$0]?.item }).map(\.id)
+    /// What `place` lists in each tier: its active items, or the Archive's archived ones, as its listing has them.
+    func scopeCounts(in place: Place) -> ScopeCounts {
+        let revision = membershipRevision
+        if let held = counted[place], held.revision == revision { return held.counts }
+        let alone = standaloneCounts
+        let counts: ScopeCounts = switch place {
+        case .library, .feed: alone.active
+        case .archive: alone.archived
+        case .types, .collections, .sources: ScopeCounts(library: 0, feed: 0)
+        case .type(let type): kinds(of: type).reduce(ScopeCounts(library: 0, feed: 0)) { $0 + (alone.byType[$1] ?? .zero) }
+        case .source(let code): alone.bySource[code] ?? .zero
+        case .collection:
+            ScopeCounts(
+                library: members(of: ListingKey(place: place, scope: .library, archived: .hidden, includingKinds: true)).count,
+                feed: members(of: ListingKey(place: place, scope: .feed, archived: .hidden, includingKinds: true)).count)
         }
+        counted[place] = (revision, counts)
+        return counts
+    }
+
+    /// Counts by tier and state, with attached files removed once per membership revision.
+    private var standaloneCounts: StandaloneCounts {
+        let revision = membershipRevision
+        if let held = countedAlone, held.revision == revision { return held.counts }
+        func counts(_ split: MarfaItemIndex.Split, _ archived: ArchivedItems = .hidden) -> ScopeCounts {
+            ScopeCounts(library: split.count(in: .library, archived), feed: split.count(in: .feed, archived))
+        }
+        var alone = StandaloneCounts(
+            active: counts(index.listed), archived: counts(index.listed, .only),
+            byType: index.byType.mapValues { counts($0) }, bySource: index.bySource.mapValues { counts($0) })
+        for id in index.attachedToHeld() {
+            guard let item = records[id]?.item else { continue }
+            switch item.state {
+            case .archived: alone.archived.take(item.tier)
+            case .active:
+                alone.active.take(item.tier)
+                alone.byType[item.type]?.take(item.tier)
+                if let source = item.source { alone.bySource[source]?.take(item.tier) }
+            case .trashed: break
+            }
+        }
+        countedAlone = (revision, alone)
+        return alone
+    }
+
+    private func kinds(of type: TypeID, including: Bool = true) -> [TypeID] {
+        including ? [type] + catalogue.descendants(of: type) : [type]
+    }
+
+    private func listingOrder(of key: ListingKey) -> [ItemID] {
+        let found = members(of: key).compactMap { records[$0]?.item }
+        if case .collection(let id) = key.place, !key.favorites { return membersInOrder(of: id, among: found) }
+        return Self.ordered(found).map(\.id)
     }
 
     /// Newest first, as the source paints them; the views sort as the person chose.
@@ -138,50 +189,41 @@ extension MarfaLibrary {
         items.sorted { $0.created != $1.created ? $0.created > $1.created : $0.id.rawValue < $1.id.rawValue }
     }
 
-    /// The Inbox is the feed tier. All Items is every active item in either tier. Both, a source's place and a type's
-    /// place leave out a file attached to another item the library holds, which shows on that item's page instead; a
-    /// file with no parent, or whose parent is not held, still shows, whoever added it (Marfa holds no other mark of
-    /// one the person added), and Files and search list every file. Favorites stay unfiltered. A type's place holds that type's own items and no subtype's, so the sidebar's count is the list's length.
-    private func members(of place: SidebarItem) -> Set<ItemID> {
-        switch place {
-        case .inbox: return index.standalone(index.feed)
-        case .allItems: return index.standalone(index.ids(in: .active))
-        case .sources, .collections: return []
-        case .source(let name):
-            return index.standalone(Set(index.ids(in: .active).filter { records[$0]?.item.source == name }))
-        // Listed in its own order by `items(in:)` and counted by its limit, so never read here.
-        case .recents: return []
-        // Read from the copy by `items(inView:)`, so never read here.
-        case .view: return []
-        case .favorites: return index.favorites
-        case .favoriteItem(let id): return index.favorites.contains(id) ? [id] : []
-        case .itemType(let type): return index.standalone(index.activeByType[TypeID(type)] ?? [])
-        case .files: return active(withSubtypesOf: MarfaMapping.fileType)
-        // The active items filed in the collection through `in-collection`.
+    /// A file attached to an item the library holds appears on that item's page. A file whose parent is missing still
+    /// appears in places so it can be found. Search includes both.
+    private func members(of key: ListingKey) -> Set<ItemID> {
+        if key.favorites {
+            return index.standalone(index.favorites.filter { index.listed.contains($0, in: key.scope, key.archived) })
+        }
+        switch key.place {
+        case .library: return index.standalone(index.listed.ids(in: .library, key.archived))
+        case .feed: return index.standalone(index.listed.ids(in: .feed, key.archived))
+        case .archive: return index.standalone(index.listed.ids(in: .all, .only))
+        case .types, .sources, .collections: return []
+        case .source(let code): return index.standalone(index.bySource[code]?.ids(in: key.scope, key.archived) ?? [])
+        case .type(let type):
+            return index.standalone(kinds(of: type, including: key.includingKinds).reduce(into: Set<ItemID>()) { found, type in
+                found.formUnion(index.byType[type]?.ids(in: key.scope, key.archived) ?? [])
+            })
+        // The items filed in the collection through `in-collection`.
         case .collection(let id):
-            return Set(index.links(to: id, type: MarfaMapping.collectionEdge).map(\.from)).intersection(index.ids(in: .active))
+            return index.standalone(Set(index.links(to: id, type: MarfaMapping.collectionEdge).map(\.from)).filter {
+                index.listed.contains($0, in: key.scope, key.archived)
+            })
         }
     }
 
-    private func active(withSubtypesOf type: TypeID) -> Set<ItemID> {
-        catalogue.descendants(of: type).union([type]).reduce(into: Set<ItemID>()) { found, type in
-            found.formUnion(index.activeByType[type] ?? [])
-        }
-    }
-
-    func name(of place: SidebarItem) -> String {
+    func name(of place: Place) -> String {
         switch place {
-        case .inbox: String(localized: "Inbox")
-        case .recents: String(localized: "Recents")
-        case .allItems: String(localized: "Items")
+        case .library: String(localized: "Library")
+        case .feed: String(localized: "Feed")
+        case .types: String(localized: "Types")
         case .sources: String(localized: "Sources")
         case .collections: String(localized: "Collections")
+        case .archive: String(localized: "Archive")
         case .source(let code): sources.name(code)
-        case .favorites: String(localized: "Favorites")
-        case .favoriteItem(let id), .collection(let id): item(id)?.displayTitle ?? ""
-        case .itemType(let type): catalogue.plural(for: TypeID(type))
-        case .files: String(localized: "Files")
-        case .view(let id): views.first { $0.id == id }?.title ?? ""
+        case .collection(let id): item(id)?.displayTitle ?? ""
+        case .type(let type): catalogue.plural(for: type)
         }
     }
 
@@ -199,5 +241,28 @@ extension MarfaLibrary {
             return nil
         }
         return record.isHeld ? record.body : nil
+    }
+}
+
+/// Standalone items by tier: active ones for the library, each type and each source, and archived ones for the Archive.
+nonisolated struct StandaloneCounts {
+    var active: ScopeCounts
+    var archived: ScopeCounts
+    var byType: [TypeID: ScopeCounts]
+    var bySource: [String: ScopeCounts]
+}
+
+private nonisolated extension ScopeCounts {
+    static let zero = ScopeCounts(library: 0, feed: 0)
+
+    static func + (a: ScopeCounts, b: ScopeCounts) -> ScopeCounts {
+        ScopeCounts(library: a.library + b.library, feed: a.feed + b.feed)
+    }
+
+    mutating func take(_ tier: Tier) {
+        switch tier {
+        case .library: library -= 1
+        case .feed: feed -= 1
+        }
     }
 }

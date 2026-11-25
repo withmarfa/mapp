@@ -141,7 +141,7 @@ nonisolated enum SettingsPage: Hashable, Sendable {
         case .search:
             [
                 String(localized: "Left Out of Search"), String(localized: "Leave Out a Type or Source"), String(localized: "Archived Items"),
-                String(localized: "Inbox Items"), String(localized: "Order"), String(localized: "Best Match"), String(localized: "Most Recent"),
+                String(localized: "Feed Items"), String(localized: "Order"), String(localized: "Best Match"), String(localized: "Most Recent"),
                 String(localized: "Show Snippets"),
             ]
         case .onThisMac:

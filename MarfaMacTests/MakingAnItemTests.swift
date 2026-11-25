@@ -56,18 +56,17 @@ struct MakingAnItemTests {
 
     // MARK: The kind it opens in
 
-    private func opened(in place: SidebarItem, remembered: String? = nil, asked: String? = nil) -> String? {
+    private func opened(in place: PlaceView, remembered: String? = nil, asked: String? = nil) -> String? {
         let browser = Browser()
-        browser.sidebarItem = place
+        browser.showing = place
         browser.openQuickAdd(typeID: asked, remembered: remembered, in: library())
         return browser.quickAdd.draft?.typeID
     }
 
     @Test func aTypesPlaceHoldsItsTypeWhateverWasUsedLast() {
-        #expect(opened(in: .itemType("core.task"), remembered: "test.plain") == "core.task")
+        #expect(opened(in: .type(TypeID("core.task")), remembered: "test.plain") == "core.task")
         #expect(opened(in: .collections, remembered: "test.plain") == FakeItemLibrary.collectionType.rawValue)
-        #expect(opened(in: .files, remembered: "test.plain") == TypeID.file.rawValue)
-        #expect(opened(in: .itemType("core.task"), remembered: "test.plain", asked: "core.note") == "core.note", "a kind asked for wins")
+        #expect(opened(in: .type(TypeID("core.task")), remembered: "test.plain", asked: "core.note") == "core.note", "a kind asked for wins")
     }
 
     // MARK: What a kind gives it

@@ -74,14 +74,14 @@ import Testing
         var body: some View {
             IndexPage(
                 place: .collections, title: "Collections", browser: browser, pane: $pane, rows: rows,
-                tabs: [(.all, rows.count), (.yours, 3), (.fromApps, 1)], tab: .constant(.yours), choice: IndexChoice(), open: { _ in },
+                tabs: [(.all, rows.count), (.library, 3), (.feed, 1)], tab: .constant(.library), choice: IndexChoice(), open: { _ in },
                 newCollection: {}, emptyTab: EmptyState("Nothing Here"))
         }
     }
 
     private func indexPage(searching: Bool) -> some View {
         let browser = Browser()
-        browser.sidebarItem = .collections
+        browser.showing = .collections
         browser.isSearchExpanded = searching
         return IndexHost(browser: browser, rows: indexRows())
     }

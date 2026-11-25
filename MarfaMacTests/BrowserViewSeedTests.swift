@@ -23,7 +23,7 @@ struct BrowserViewSeedTests {
         browser.defaults = ViewPanelTests.defaults()
         ViewLayouts.update(in: browser.defaults) { $0.set(ViewMacSettings(layout: layout), for: view.id) }
         browser.adopt(library)
-        browser.sidebarItem = .view(view.id)
+        browser.showing = .saved(view.id)
         browser.viewMode = .table
         browser.followView(in: library)
         return (browser, library)
@@ -37,11 +37,23 @@ struct BrowserViewSeedTests {
         browser.viewSeeds[id] = seed
     }
 
+    @Test func aViewWhoseQueryMovesItTakesTheWindowToItsNewHome() {
+        let (browser, library) = Self.opened()
+        #expect(browser.shown == PlaceView(.type(TypeID("core.task")), .saved(Self.view().id)))
+        browser.tableOptions[browser.shown]?.grouping = .none
+        var moved = Self.view(version: 2)
+        moved.query.types = []
+        library.views = [moved]
+        browser.followView(in: library)
+        #expect(browser.shown == PlaceView(.library, .saved(moved.id)))
+        #expect(browser.tableOptions[browser.shown]?.grouping == ItemTableOptions.Grouping.none, "what the window keeps for the view goes with it")
+    }
+
     @Test func aChangedGroupingOffersASave() {
         let (browser, library) = Self.opened()
-        browser.tableOptions[browser.item]?.grouping = .none
+        browser.tableOptions[browser.shown]?.grouping = .none
         #expect(browser.hasViewChanges)
-        browser.tableOptions[browser.item]?.grouping = ViewDraft.options(for: Self.view(), catalogue: library.catalogue).grouping
+        browser.tableOptions[browser.shown]?.grouping = ViewDraft.options(for: Self.view(), catalogue: library.catalogue).grouping
         #expect(!browser.hasViewChanges)
     }
 
@@ -51,11 +63,11 @@ struct BrowserViewSeedTests {
             browser.viewMode = mode
             // The layout alone is a change too; the view is taken to have been saved in it, to see the filter's.
             Self.take(mode, in: browser)
-            browser.tableOptions[browser.item]?.filter = FilterState(is: ["field.status": ["todo"]])
+            browser.tableOptions[browser.shown]?.filter = FilterState(is: ["field.status": ["todo"]])
             #expect(browser.hasViewChanges, "\(mode) did not count a filter")
-            browser.tableOptions[browser.item]?.filter = FilterState(clauses: [FilterClause(field: "field.status", op: .isNot, values: ["todo"])])
+            browser.tableOptions[browser.shown]?.filter = FilterState(clauses: [FilterClause(field: "field.status", op: .isNot, values: ["todo"])])
             #expect(browser.hasViewChanges)
-            browser.tableOptions[browser.item]?.filter = FilterState()
+            browser.tableOptions[browser.shown]?.filter = FilterState()
             #expect(!browser.hasViewChanges, "\(mode) kept a change after the filter went")
         }
     }
@@ -63,24 +75,24 @@ struct BrowserViewSeedTests {
     @Test func isNotIsAChangeFromIs() {
         let (browser, library) = Self.opened(Self.view(filter: #"properties.status eq "todo""#))
         #expect(!browser.hasViewChanges)
-        browser.tableOptions[browser.item]?.filter = FilterState(clauses: [FilterClause(field: "field.status", op: .isNot, values: ["todo"])])
+        browser.tableOptions[browser.shown]?.filter = FilterState(clauses: [FilterClause(field: "field.status", op: .isNot, values: ["todo"])])
         #expect(browser.hasViewChanges)
         browser.revertView(in: library)
-        #expect(browser.tableOptions[browser.item]?.filter.clauses.first?.op == .is)
+        #expect(browser.tableOptions[browser.shown]?.filter.clauses.first?.op == .is)
         #expect(!browser.hasViewChanges)
     }
 
     @Test func aFilterThatSaysTooLittleIsNoChange() {
         let (browser, _) = Self.opened()
-        browser.tableOptions[browser.item]?.filter = FilterState(clauses: [FilterClause(field: "field.status", op: .is)])
+        browser.tableOptions[browser.shown]?.filter = FilterState(clauses: [FilterClause(field: "field.status", op: .is)])
         #expect(!browser.hasViewChanges)
     }
 
     @Test func aChangedTimelineDateIsAChange() {
         let (browser, _) = Self.opened(Self.view(group: "properties.due_at", bucket: .day), layout: .timeline)
-        #expect(browser.timelineFields[browser.item] == "due_at")
+        #expect(browser.timelineFields[browser.shown] == "due_at")
         #expect(!browser.hasViewChanges)
-        browser.timelineFields[browser.item] = "starts_at"
+        browser.timelineFields[browser.shown] = "starts_at"
         #expect(browser.hasViewChanges)
     }
 
@@ -115,24 +127,24 @@ struct BrowserViewSeedTests {
     @Test func revertingPutsTheWindowBackToTheViewInEveryLayout() {
         let (browser, library) = Self.opened()
         browser.viewMode = .board
-        browser.tableOptions[browser.item]?.grouping = .none
-        browser.tableOptions[browser.item]?.sort = [ItemTableComparator(column: .title)]
-        browser.tableOptions[browser.item]?.filter = FilterState(is: ["field.status": ["todo"]])
-        browser.timelineFields[browser.item] = "starts_at"
+        browser.tableOptions[browser.shown]?.grouping = .none
+        browser.tableOptions[browser.shown]?.sort = [ItemTableComparator(column: .title)]
+        browser.tableOptions[browser.shown]?.filter = FilterState(is: ["field.status": ["todo"]])
+        browser.timelineFields[browser.shown] = "starts_at"
         #expect(browser.hasViewChanges)
         browser.revertView(in: library)
         #expect(!browser.hasViewChanges)
-        #expect(browser.tableOptions[browser.item] == ViewDraft.options(for: Self.view(), catalogue: library.catalogue))
-        #expect(browser.timelineFields[browser.item] == nil)
+        #expect(browser.tableOptions[browser.shown] == ViewDraft.options(for: Self.view(), catalogue: library.catalogue))
+        #expect(browser.timelineFields[browser.shown] == nil)
     }
 
     @Test func revertingDoesNothingWhereThePlaceIsNotAView() {
         let browser = Browser()
         let library = FakeItemLibrary()
         browser.adopt(library)
-        browser.tableOptions[.allItems] = ItemTableOptions(filter: FilterState(is: ["field.status": ["todo"]]))
+        browser.tableOptions[.library] = ItemTableOptions(filter: FilterState(is: ["field.status": ["todo"]]))
         browser.revertView(in: library)
-        #expect(browser.tableOptions[.allItems]?.filter.valuesByField == ["field.status": ["todo"]])
+        #expect(browser.tableOptions[.library]?.filter.valuesByField == ["field.status": ["todo"]])
         #expect(!browser.hasViewChanges)
     }
 
@@ -140,13 +152,13 @@ struct BrowserViewSeedTests {
         let (browser, library) = Self.opened()
         library.views = [Self.view(version: 2, group: "type")]
         browser.followView(in: library)
-        #expect(browser.tableOptions[browser.item]?.grouping == ViewDraft.options(for: library.views[0], catalogue: library.catalogue).grouping)
+        #expect(browser.tableOptions[browser.shown]?.grouping == ViewDraft.options(for: library.views[0], catalogue: library.catalogue).grouping)
         #expect(browser.viewSeeds[library.views[0].id]?.version == 2)
 
-        browser.tableOptions[browser.item]?.grouping = .none
+        browser.tableOptions[browser.shown]?.grouping = .none
         library.views = [Self.view(version: 3)]
         browser.followView(in: library)
-        #expect(browser.tableOptions[browser.item]?.grouping == ItemTableOptions.Grouping.none)
+        #expect(browser.tableOptions[browser.shown]?.grouping == ItemTableOptions.Grouping.none)
         // The update stays based on the version the person's change was made on, so the server can refuse it.
         #expect(browser.viewSeeds[library.views[0].id]?.version == 2)
         #expect(browser.hasViewChanges)
@@ -154,18 +166,18 @@ struct BrowserViewSeedTests {
 
     @Test func aRefusedUpdatePutsTheWindowBackToTheView() {
         let (browser, library) = Self.opened()
-        browser.tableOptions[browser.item]?.grouping = .none
+        browser.tableOptions[browser.shown]?.grouping = .none
         library.views = [Self.view(version: 2)]
         browser.viewRefused(library.views[0].id, in: library)
-        #expect(browser.tableOptions[browser.item]?.grouping == ViewDraft.options(for: library.views[0], catalogue: library.catalogue).grouping)
+        #expect(browser.tableOptions[browser.shown]?.grouping == ViewDraft.options(for: library.views[0], catalogue: library.catalogue).grouping)
         #expect(browser.viewSeeds[library.views[0].id]?.version == 2)
         #expect(!browser.hasViewChanges)
     }
 
     @Test func anUpdateNamesOnlyWhatChangedAtTheVersionRead() throws {
         let (browser, library) = Self.opened()
-        browser.tableOptions[browser.item]?.grouping = .none
-        let window = ViewDraft.Window(place: browser.item, columns: [], sort: [], grouping: nil)
+        browser.tableOptions[browser.shown]?.grouping = .none
+        let window = ViewDraft.Window(place: browser.shown, columns: [], sort: [], grouping: nil)
         let update = try #require(browser.viewUpdate(window, in: library))
         #expect(update.baseVersion == 1)
         #expect(update.change.group == .clear)
@@ -192,7 +204,7 @@ struct BrowserViewSeedTests {
         for mode in ItemViewMode.allCases {
             let (browser, _) = Self.opened()
             browser.viewMode = mode
-            browser.tableOptions[browser.item]?.grouping = .none
+            browser.tableOptions[browser.shown]?.grouping = .none
             #expect(browser.hasViewChanges, "\(mode) did not count a grouping")
         }
     }

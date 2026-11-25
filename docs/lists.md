@@ -2,6 +2,7 @@
 summary: The rules of views, layouts, grouping, filters, properties, indexes and search, and what Marfa can save of them.
 paths:
   - MarfaMac/Model/Browser+*.swift
+  - MarfaMac/Model/EarlierPlaces.swift
   - MarfaMac/Model/View*.swift
   - MarfaMac/Model/ItemViewMode.swift
   - MarfaMac/Model/Items/Filter*.swift
@@ -25,10 +26,16 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **A saved view is an item in Marfa.** Marfa holds its title, query, sort and group. The app holds the rest (`ViewMacSettings` in `ViewLayouts`): layout, properties, cards, density, week or month and column widths.
 - **A change to a saved view is written as it is made** (`Browser+ViewWrites`), naming only the settings that changed, so it never writes over another app's.
 - **A write that Marfa has not taken stays in the window.** Until it is taken, Save View sends it again and Revert View drops it (`hasViewChanges`).
+- **The window lists what it shows while a change waits.** While its filters, From or Archived Items differ from the view's own, it reads the view's query with the window's choices (`viewPreview`).
 - **Undo takes back only the settings of its own step**, so another app's change stays.
 - **An entry for a thing that is gone is forgotten only when the copy is whole and current**, because a copy that is filling also lacks things.
-- **Save as View saves what Marfa can hold and names the rest first** (`ViewDraft.Unkept`). A type's place saves an exact-type condition; a Type filter takes its place.
+- **Save as View saves what Marfa can hold and names the rest first** (`ViewDraft.Unkept`). A type's place saves the type, which Marfa takes with its kinds, and an exact-type condition only with Include Kinds off; a Type filter takes its place. The window's From and Archived Items become the view's tier and states, and a view's become the window's (`ViewDraft`).
 - **Making, renaming and deleting a view needs the server.** A view has no bin, so deleting one asks.
+- **A saved view belongs to one place** (`Place.home(of:catalogue:)`). Use its sole type, else the sole collection or source its filter requires. Collection membership uses the item's outbound edge. For the feed tier alone, use the Feed. Otherwise use the Library.
+- **The Library and the Feed list their own tier.** A type, a collection and a source choose a From (`ListScope`), starting on `lists.defaultScope`.
+- **Favorites has an ordinary From,** starting on Library; a person may choose All Items. Its row counts what that From lists.
+- **A type counts and lists its kinds** unless Include Kinds is off. A saved view that names no state shows archived items (`ArchivedItems`).
+- **What earlier copies kept is read in to new keys** (`EarlierPlace.readIn`), at launch and after each settings sync, where the new keys leave it unset. Each earlier entry is read in once on each Mac, and stays for those copies. The Library takes All Items' settings, filled from Recents'. Include Subtypes is not read in.
 
 ## Layouts
 
@@ -42,7 +49,7 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 
 ## View Options
 
-- **The order is fixed:** filters, sort, group, properties, the layout's own options, subtypes, then the view's commands. The menu bar and palette have the same (`ViewOptionCommand`).
+- **The order is fixed:** filters, sort, group, properties, the layout's own options, Include Kinds, then the view's commands. The menu bar and palette have the same (`ViewOptionCommand`).
 - **An option that a place or layout lacks is absent.**
 
 ## Grouping
@@ -87,9 +94,10 @@ A filter is a `FilterClause`: a field, a `FilterOp` and values, shown as a chip.
 
 ## Indexes
 
-- **Items, Collections and Sources are lists of things, not of items of one view** (`IndexPage`). A long list of items is worked out off the main actor (`ItemIndexModel`).
+- **The Library's index, Collections and Sources are lists of things, not of items of one view** (`IndexPage`). The Library's tabs are All, Library and Feed. A long list of items is worked out off the main actor (`ItemIndexModel`).
 - **Trap:** an index page's body must not read the choice, or choosing a row draws every row.
-- **A row's count is of what the place lists.**
+- **A row's count is of what the place lists.** A file attached to an item the library holds shows on that item's page, so no list or count but search takes it, Archive, a collection and Favorites included. The Feed's row has no count. The counts are worked out once for each change of membership (`MarfaLibrary.scopeCounts`).
+- **The Library's Feed tab holds what a search finds there.** An Items page left on From Apps opens on All once.
 
 ## Search
 

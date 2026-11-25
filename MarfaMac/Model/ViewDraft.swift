@@ -7,7 +7,7 @@ import Marfa
 nonisolated enum ViewDraft {
     /// What a window shows of a place, as the table works it out.
     struct Window {
-        var place: SidebarItem
+        var place: PlaceView
         var columns: [ItemTableColumn]
         var sort: [ItemTableComparator]
         var grouping: ItemTableColumn?
@@ -32,8 +32,8 @@ nonisolated enum ViewDraft {
         /// Set where the window shows the list's own order, which a list or gallery that is neither sorted nor grouped by a
         /// column does: the order it shows, and whether it shows sections by date.
         var dated: Dated?
-        /// Whether the window lists a type's subtypes' items with its own (Include Subtypes, `Browser.stacksSubtypes`).
-        var includesSubtypes = false
+        /// The window's From, Archived Items and Include Kinds (`Browser.listing`).
+        var listing = PlaceListing()
     }
 
     /// The list's own order, which stands for a view with no sort or grouping of its own.
@@ -84,32 +84,36 @@ nonisolated enum ViewDraft {
         var unkept: [Unkept] = []
     }
 
-    /// The query a place stands for, or nil where a view cannot stand for it: Recents, which is a count of the
-    /// latest edits, an index, and a single favorite. A view lists active items, as the app's places
-    /// do. A collection's view lists its members, though by the view's own order, since a view cannot sort by an
-    /// edge's position.
+    /// The query what a window shows stands for, with the window's From, Archived Items and Include Kinds, or nil
+    /// where a view cannot stand for it: an index. The Library lists its tier and the Feed its own, whatever the
+    /// From. A type's view holds its kinds as Marfa takes a type, unless the window leaves them out, which an
+    /// exact-type condition says. A collection's view lists its members, though by the view's own order, since a
+    /// view cannot sort by an edge's position.
     static func query(
-        for place: SidebarItem, catalogue: Catalogue, views: [LibraryView], includingSubtypes: Bool = false
+        for shown: PlaceView, listing: PlaceListing = PlaceListing(), catalogue: Catalogue, views: [LibraryView]
     ) -> LibraryViewQuery? {
-        let active: Set<ItemState> = [.active]
-        switch place {
-        case .allItems: return LibraryViewQuery(states: active)
-        case .inbox: return LibraryViewQuery(tier: .feed, states: active)
+        let states = listing.archived.states
+        let tier = listing.scope.tier
+        switch shown.view {
+        case .saved(let id): return views.first { $0.id == id }?.query
         case .favorites:
-            return LibraryViewQuery(states: active, filter: text(of: FilterCondition(field: .tags, operator: .contains, value: .text(ItemTag.favorite))))
-        case .itemType(let raw):
-            let type = TypeID(raw)
-            // Marfa takes a type with its subtypes, so a type's view holds them as the window does with Include Subtypes
-            // on; otherwise a type's place holds the type's own items alone, which an exact-type condition says.
-            let own = includingSubtypes || catalogue.descendants(of: type).isEmpty ? nil : text(of: FilterCondition(field: .system(.type), operator: .eq, value: .text(raw)))
-            return LibraryViewQuery(types: [type], states: active, filter: own)
-        case .files: return LibraryViewQuery(types: [TypeID.file], states: active)
-        case .source(let name): return LibraryViewQuery(states: active, filter: text(of: FilterCondition(field: .system(.source), operator: .eq, value: .text(name))))
-        case .view(let id): return views.first { $0.id == id }?.query
+            return LibraryViewQuery(tier: tier, states: states, filter: text(of: FilterCondition(field: .tags, operator: .contains, value: .text(ItemTag.favorite))))
+        case .own: break
+        }
+        switch shown.place {
+        case .library: return LibraryViewQuery(tier: .library, states: states)
+        case .feed: return LibraryViewQuery(tier: .feed, states: states)
+        case .archive: return LibraryViewQuery(states: [.archived])
+        case .type(let type):
+            let own = listing.includesKinds || catalogue.descendants(of: type).isEmpty
+                ? nil : text(of: FilterCondition(field: .system(.type), operator: .eq, value: .text(type.rawValue)))
+            return LibraryViewQuery(types: [type], tier: tier, states: states, filter: own)
+        case .source(let name):
+            return LibraryViewQuery(tier: tier, states: states, filter: text(of: FilterCondition(field: .system(.source), operator: .eq, value: .text(name))))
         case .collection(let id):
             let member = FilterField.edge(type: MarfaMapping.collectionEdge, direction: .outbound)
-            return LibraryViewQuery(states: active, filter: text(of: FilterCondition(field: member, operator: .eq, value: .text(id.rawValue))))
-        case .recents, .sources, .collections, .favoriteItem: return nil
+            return LibraryViewQuery(tier: tier, states: states, filter: text(of: FilterCondition(field: member, operator: .eq, value: .text(id.rawValue))))
+        case .types, .sources, .collections: return nil
         }
     }
 
@@ -117,11 +121,16 @@ nonisolated enum ViewDraft {
     /// applies the filters; and each layout gives the order and grouping it shows, never the table's when the table
     /// is not showing.
     static func draft(_ window: Window, catalogue: Catalogue, views: [LibraryView]) -> Draft? {
-        guard let base = query(for: window.place, catalogue: catalogue, views: views, includingSubtypes: window.includesSubtypes) else { return nil }
+        guard var base = query(for: window.place, listing: window.listing, catalogue: catalogue, views: views) else { return nil }
+        if window.place.savedView != nil {
+            // A view's From and Archived Items are the window's, as its filters are.
+            if ListScope(tier: base.tier) != window.listing.scope { base.tier = window.listing.scope.tier }
+            if ArchivedItems(states: base.states) != window.listing.archived { base.states = window.listing.archived.states }
+        }
         var unkept: [Unkept] = []
         if let search = window.search { unkept.append(.search(search)) }
         let filtered: (query: LibraryViewQuery, unkept: [Unkept])
-        if case .view = window.place {
+        if window.place.savedView != nil {
             // A view's place shows the view's own filter as the window's filters, so they stand in for it.
             let replaced = replacing(
                 base, with: window.filter, targets: window.targets, seededTypes: window.seededTypes, catalogue: catalogue)
@@ -161,7 +170,7 @@ nonisolated enum ViewDraft {
             // are the board's grouping, kept as the table's is.
             return arrangement(of: Window(
                 place: window.place, columns: window.columns, sort: window.sort, grouping: window.grouping, groupMode: window.groupMode,
-                groupOrder: window.groupOrder, hiddenGroups: window.hiddenGroups, layout: .table))
+                groupOrder: window.groupOrder, hiddenGroups: window.hiddenGroups, layout: .table, listing: window.listing))
         case .calendar:
             return ([], nil, [])
         case .timeline(let key, let label):
@@ -347,6 +356,8 @@ nonisolated enum ViewDraft {
             options.grouping = .none
         }
         options.filter = filterState(of: view, catalogue: catalogue)
+        options.scope = ListScope(tier: view.query.tier)
+        options.archived = ArchivedItems(states: view.query.states)
         return options
     }
 
@@ -387,6 +398,7 @@ nonisolated enum ViewDraft {
         let seed = shown(seed, dated: dated)
         return !options.filter.isSame(as: seed.filter) || options.grouping != seed.grouping || reorders(options, from: seed)
             || sortKeys(options.sort) != sortKeys(seed.sort) || timelineDate != seedTimelineDate
+            || options.scope != seed.scope || options.archived != seed.archived
     }
 
     /// The options as a list that shows its starting order shows them: with no sort and no column to group by it is
@@ -481,6 +493,16 @@ nonisolated enum ViewDraft {
                 change.query = filter.query
             }
             unkept += filter.unkept
+        }
+        if let scope = options.scope, scope != seed.scope {
+            var query = change.query ?? view.query
+            query.tier = scope.tier
+            change.query = query
+        }
+        if let archived = options.archived, archived != seed.archived {
+            var query = change.query ?? view.query
+            query.states = archived.states
+            change.query = query
         }
         unkept += relativeFilters(of: window)
         return (change, unkept)

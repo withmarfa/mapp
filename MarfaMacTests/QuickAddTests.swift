@@ -87,12 +87,12 @@ struct QuickAddTests {
         let holiday = FakeItemLibrary.collection("Holiday")
         let library = FakeItemLibrary(items: [holiday], now: start)
         let browser = Browser()
-        browser.sidebarItem = .collection(holiday.id)
+        browser.showing = .collection(holiday.id)
         let id = try #require(await browser.quickAdded("Book venue", typeID: "core.task", in: library))
         let item = try #require(library.item(id))
         #expect(item.parentID == nil)
         #expect(item.collectionIDs == [holiday.id])
-        #expect(browser.sidebarItem == .collection(holiday.id))
+        #expect(browser.showing == .collection(holiday.id))
         #expect(browser.selection == [id])
         #expect(!browser.quickAdd.isPresented)
         #expect(library.notices.waiting.isEmpty)
@@ -103,7 +103,7 @@ struct QuickAddTests {
         let holiday = FakeItemLibrary.collection("Holiday")
         let library = FakeItemLibrary(items: [holiday], now: start)
         let browser = Browser()
-        browser.sidebarItem = .collection(holiday.id)
+        browser.showing = .collection(holiday.id)
         let id = try #require(await browser.quickAdded("Trips", typeID: FakeItemLibrary.collectionType.rawValue, in: library))
         #expect(library.item(id)?.collectionIDs.isEmpty == true)
         #expect(library.notices.waiting.isEmpty)
@@ -116,7 +116,7 @@ struct QuickAddTests {
         let library = FakeItemLibrary(items: [holiday], now: start)
         library.holdsCreations = true
         let browser = Browser()
-        browser.sidebarItem = .collection(holiday.id)
+        browser.showing = .collection(holiday.id)
         let id = try #require(await browser.quickAdded("Book venue", typeID: "core.task", in: library))
         let index = try #require(library.items.firstIndex { $0.id == holiday.id })
         library.items[index].state = .trashed
@@ -572,15 +572,15 @@ struct QuickAddTests {
 
     @Test func theKindIsTheOneChosenThenTheTypesPlaceThenTheLastUsedThenANote() {
         let library = FakeItemLibrary(now: start)
-        func kind(remembered: String? = nil, place: SidebarItem = .allItems, chosen: String? = nil) -> String? {
+        func kind(remembered: String? = nil, place: PlaceView = .library, chosen: String? = nil) -> String? {
             let browser = Browser()
-            browser.sidebarItem = place
+            browser.showing = place
             browser.openQuickAdd(typeID: chosen, remembered: remembered, in: library)
             return browser.quickAdd.draft?.typeID
         }
         #expect(kind() == "core.note")
-        #expect(kind(place: .itemType("core.task")) == "core.task")
-        #expect(kind(remembered: "test.project", place: .itemType("core.task")) == "core.task")
+        #expect(kind(place: .type(TypeID("core.task"))) == "core.task")
+        #expect(kind(remembered: "test.project", place: .type(TypeID("core.task"))) == "core.task")
         #expect(kind(remembered: "test.project") == "test.project")
         #expect(kind(remembered: "test.project", chosen: "core.task") == "core.task")
         #expect(kind(remembered: "no.such") == "core.note")

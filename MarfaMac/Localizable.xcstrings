@@ -2458,6 +2458,9 @@
     "Archive" : {
 
     },
+    "Archive Is Empty" : {
+
+    },
     "Archived Items" : {
 
     },
@@ -4494,6 +4497,12 @@
     "Feed" : {
 
     },
+    "Feed Is Empty" : {
+
+    },
+    "Feed Items" : {
+
+    },
     "Fetched a file from a web address" : {
 
     },
@@ -4554,6 +4563,9 @@
     "Files From the Web" : {
 
     },
+    "Files Is No Longer in the Sidebar" : {
+
+    },
     "Files Not Attached" : {
       "extractionState" : "manual"
     },
@@ -4569,10 +4581,10 @@
     "Files are waiting for a second copy" : {
 
     },
-    "Files may be missing from it." : {
+    "Files is no longer a place in the sidebar. Files are listed under their types." : {
 
     },
-    "Files you add show here." : {
+    "Files may be missing from it." : {
 
     },
     "Filled by a template. Not written back." : {
@@ -5124,22 +5136,13 @@
     "In the sidebar." : {
 
     },
-    "Inbox" : {
-
-    },
-    "Inbox Is Empty" : {
-
-    },
-    "Inbox Items" : {
-
-    },
     "Include" : {
 
     },
-    "Include Subtypes" : {
+    "Include Kinds" : {
 
     },
-    "Include the items of its subtypes in this list" : {
+    "Include the items of its kinds in this list" : {
 
     },
     "Include ⌘ or ⌃." : {
@@ -5448,10 +5451,10 @@
     "Items you add show here." : {
 
     },
-    "Items you delete wait here before they are permanently deleted." : {
+    "Items you archive show here." : {
 
     },
-    "Items you edit show here." : {
+    "Items you delete wait here before they are permanently deleted." : {
 
     },
     "Items you favorite show here." : {
@@ -6558,10 +6561,10 @@
     "No Collections" : {
       "extractionState" : "manual"
     },
-    "No Collections From Apps" : {
+    "No Collections in the Feed" : {
 
     },
-    "No Collections Of Yours" : {
+    "No Collections in the Library" : {
 
     },
     "No Connectors" : {
@@ -6582,9 +6585,6 @@
     "No Favorites" : {
 
     },
-    "No Files" : {
-      "extractionState" : "manual"
-    },
     "No Folders" : {
 
     },
@@ -6597,10 +6597,10 @@
     "No Items" : {
       "extractionState" : "manual"
     },
-    "No Items From Apps" : {
+    "No Items in the Feed" : {
 
     },
-    "No Items Of Yours" : {
+    "No Items in the Library" : {
 
     },
     "No Jobs Yet" : {
@@ -6649,9 +6649,6 @@
 
     },
     "No Properties" : {
-
-    },
-    "No Recent Items" : {
 
     },
     "No Relationships" : {
@@ -7734,9 +7731,6 @@
 
     },
     "Recently deleted items can’t be edited." : {
-
-    },
-    "Recents" : {
 
     },
     "Record Shortcut" : {
@@ -11321,9 +11315,6 @@
     "What happens in %@ is recorded here." : {
 
     },
-    "What isn’t filed yet." : {
-
-    },
     "What it may read and change. It can only be narrowed." : {
 
     },
@@ -11351,6 +11342,9 @@
     },
     "What you wrote is lost unless you copy it first." : {
       "extractionState" : "manual"
+    },
+    "What your apps send." : {
+
     },
     "What’s New in Marfa" : {
 

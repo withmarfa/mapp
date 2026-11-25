@@ -36,7 +36,7 @@ struct ViewPanelSort: View {
 
     private func set(_ sort: [ItemTableComparator]) {
         browser.orderSearch(byRelevance: false)
-        browser.tableOptions[browser.item, default: .init()].sort = sort
+        browser.tableOptions[browser.shown, default: .init()].sort = sort
     }
 }
 
@@ -104,7 +104,7 @@ private struct SortRow: View {
 
     private func write(_ next: [ItemTableComparator]) {
         browser.orderSearch(byRelevance: false)
-        browser.tableOptions[browser.item, default: .init()].sort = next
+        browser.tableOptions[browser.shown, default: .init()].sort = next
     }
 
     private static let prefix = "sort:"

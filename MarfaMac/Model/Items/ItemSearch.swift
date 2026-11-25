@@ -85,21 +85,14 @@ nonisolated struct SearchExcerpt: Hashable, Sendable {
 nonisolated enum SearchScope: Hashable, Sendable {
     /// Every item that is not in the bin.
     case everywhere
-    /// What the place lists, matched by the copy itself.
-    case place(SidebarItem)
-    /// What a type's place lists while it includes its subtypes: the type's items and theirs.
-    case typeWithSubtypes(TypeID)
+    /// What a saved view lists, as the server reads it.
+    case view(ItemID)
+    /// What a place lists with the window's choices, matched by the copy itself.
+    case query(LibraryViewQuery)
 
-    /// Whether searching `place` alone finds anything different from searching everywhere: the places that stand
-    /// for a query. Recents is a count of the latest edits, the indexes
-    /// list no items, and one favorite is a single item, so none of them can be searched alone; All Items is
-    /// everywhere.
-    static func narrows(_ place: SidebarItem) -> Bool {
-        switch place {
-        case .inbox, .favorites, .itemType, .collection, .source, .files, .view: true
-        case .allItems, .recents, .sources, .collections, .favoriteItem: false
-        }
-    }
+    /// Whether searching `place` alone finds anything different from searching everywhere: any place or view that
+    /// lists items. The indexes list none.
+    static func narrows(_ place: PlaceView) -> Bool { place.listsItems }
 }
 
 /// What a source is asked to search.

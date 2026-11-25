@@ -46,7 +46,7 @@ import Testing
         let looks = #"{"\#(library)":{"core.note":{"date":"created"}},"marfa:https://two":{"core.task":{"date":"created"}}}"#
         defaults.set(Data(looks.utf8), forKey: TypeLooks.defaultsKey)
         defaults.set(#"{"core.note":{"pins":["due_at"]}}"#, forKey: PagePlacements.key)
-        IncludedSubtypes.update(in: defaults) { $0.set("core.note", included: true) }
+        ViewOrders.update(in: defaults) { $0.set([.favorites, .own], in: .library) }
         ViewLayouts.update(in: defaults) { $0.set(ViewMacSettings(layout: .board, widths: Data("widths".utf8)), for: view) }
         PlaceDefaults.update(in: defaults) {
             var choice = PlaceDefault()
@@ -117,11 +117,11 @@ import Testing
 
     @Test func aValueTheSettingCannotStoreIsSkippedAndChangesNothing() async throws {
         defaults.set("dark", forKey: AppearanceKey.theme)
-        IncludedSubtypes.update(in: defaults) { $0.set("core.note", included: true) }
+        ViewOrders.update(in: defaults) { $0.set([.favorites, .own], in: .library); $0.set([.own], in: .feed) }
         let sync = sync()
         let before = held(sync)
         var units = before
-        units[.row(.types, setting: "includedSubtypes", key: "core.task")] = "{not json"
+        units[.row(.places, setting: "viewOrder", key: "library")] = "{not json"
         // The defaults cannot keep a null inside a value.
         units[.member(.appearance, AppearanceKey.theme)] = #"{"nested":[null]}"#
         let all = Set(SettingsFile.Section.allCases)

@@ -35,7 +35,7 @@ struct IndexRowsTests {
     @Test func sourcesAndTheirCountsComeFromOneGrouping() {
         let items = [item("a", source: "b"), item("b", source: "A"), item("c", source: "b"), item("d")]
         let library = FakeItemLibrary(items: items, now: base)
-        let groups = IndexRows.groupedBySource(library.items(in: .allItems))
+        let groups = IndexRows.groupedBySource(library.items(in: .library))
         #expect(library.sourceCounts.map(\.code) == groups.map(\.code))
         #expect(library.sourceCounts.map(\.count) == groups.map(\.items.count))
     }
@@ -56,10 +56,10 @@ struct IndexPreferencesTests {
     @Test func eachPageKeepsItsOwnTabAndSort() {
         let defaults = defaults()
         IndexPreferences.set(.keys, for: .sources, in: defaults)
-        IndexPreferences.set(.fromApps, for: .collections, in: defaults)
+        IndexPreferences.set(.feed, for: .collections, in: defaults)
         IndexPreferences.set(IndexSort(column: .latest, ascending: false), for: .sources, in: defaults)
         #expect(IndexPreferences.tab(for: .sources, in: defaults) == .keys)
-        #expect(IndexPreferences.tab(for: .collections, in: defaults) == .fromApps)
+        #expect(IndexPreferences.tab(for: .collections, in: defaults) == .feed)
         #expect(IndexPreferences.sort(for: .sources, in: defaults) == IndexSort(column: .latest, ascending: false))
         #expect(IndexPreferences.sort(for: .collections, in: defaults) == IndexPlace.collections.defaultSort)
     }

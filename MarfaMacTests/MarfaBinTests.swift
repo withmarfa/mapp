@@ -35,7 +35,7 @@ struct MarfaBinTests {
         let row = try #require(try await fake.copy.items.get([ids["second"]!.rawValue], includingBin: true).first)
         #expect(binned.first { $0.id == ids["second"]! }?.trashed == row.trashedDate)
         #expect(binned.allSatisfy { $0.trashed != nil })
-        #expect(library.items(in: .allItems).map(\.id) == [ids["kept"]!])
+        #expect(library.items(in: .library).map(\.id) == [ids["kept"]!])
         await source.close()
     }
 }

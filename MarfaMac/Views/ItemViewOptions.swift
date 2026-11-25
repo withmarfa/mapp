@@ -149,7 +149,7 @@ struct CurrentViewOptions: View {
             if let browser {
                 ItemCalendarOptions(browser: browser, shortcuts: shortcuts)
                 Divider()
-                IncludeSubtypesOption(browser: browser)
+                IncludeKindsOption(browser: browser)
             }
         // A collection keeps the order Marfa gives its members, so its Sort by is off (`keepsPlaceOrder`).
         case .list, .gallery, nil:
@@ -161,7 +161,7 @@ struct CurrentViewOptions: View {
             if let browser {
                 ItemTableViewOptions(browser: browser, table: false)
                 Divider()
-                IncludeSubtypesOption(browser: browser)
+                IncludeKindsOption(browser: browser)
             }
         }
     }
@@ -176,15 +176,15 @@ struct ItemBoardOptions: View {
         GroupByMenu(browser: browser)
         PropertiesMenu(browser: browser)
         Picker("Card Density", systemImage: "rectangle.compress.vertical", selection: Binding {
-            browser.compactBoards[browser.item, default: false]
-        } set: { browser.setCompactBoard($0, in: browser.item) }) {
+            browser.compactBoards[browser.shown, default: false]
+        } set: { browser.setCompactBoard($0, in: browser.shown) }) {
             Text("Comfortable").tag(false)
             Text("Compact").tag(true)
         }
         .pickerStyle(.menu)
         .accessibilityIdentifier("BoardCardDensity")
         Divider()
-        IncludeSubtypesOption(browser: browser)
+        IncludeKindsOption(browser: browser)
     }
 }
 
@@ -196,7 +196,7 @@ struct ItemTimelineOptions: View {
 
     var body: some View {
         let fields = browser.timelineFieldChoices(in: library)
-        let field = ItemTimelineLayout.selectedField(browser.timelineFields[browser.item], fields: fields)
+        let field = ItemTimelineLayout.selectedField(browser.timelineFields[browser.shown], fields: fields)
         Button("Today", systemImage: "calendar.circle") { browser.requestTimelineToday() }
             .shortcut(.today, shortcuts)
         Divider()

@@ -36,7 +36,7 @@ struct BrowserViewPreviewTests {
     private static func window(_ library: FakeItemLibrary, view: LibraryView = view()) -> Browser {
         let browser = Browser()
         browser.adopt(library)
-        browser.sidebarItem = .view(view.id)
+        browser.showing = .saved(view.id)
         browser.viewMode = .table
         browser.followView(in: library)
         return browser
@@ -49,7 +49,7 @@ struct BrowserViewPreviewTests {
     @Test func savingMakesTheChangedFiltersTheViewsOwn() {
         let library = Self.library()
         let browser = Self.window(library)
-        browser.tableOptions[browser.item]?.filter = FilterState(clauses: [FilterClause(field: Self.status, op: .is, values: ["todo"])])
+        browser.tableOptions[browser.shown]?.filter = FilterState(clauses: [FilterClause(field: Self.status, op: .is, values: ["todo"])])
         #expect(browser.viewPreview != nil)
         let saved = Self.view(version: 2, filter: #"properties.status eq "todo""#)
         browser.seed(saved, catalogue: library.catalogue)
@@ -57,10 +57,26 @@ struct BrowserViewPreviewTests {
         #expect(browser.viewPreview == nil)
     }
 
+    @Test func archivedItemsPreviewsAndUndoes() {
+        let library = Self.library()
+        let browser = Self.window(library)
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        browser.undoManager = undo
+        _ = browser.choicesChanged()
+        undo.beginUndoGrouping()
+        browser.setArchived(.shown)
+        undo.endUndoGrouping()
+        #expect(browser.viewPreview?.query.states == nil)
+        undo.undo()
+        #expect(browser.listing(in: browser.shown).archived == .hidden)
+        #expect(browser.viewPreview == nil)
+    }
+
     @Test func aChangedPreviewListChangesWhatTheWindowDraws() {
         let library = Self.library()
         let browser = Self.window(library)
-        browser.tableOptions[browser.item]?.filter = FilterState()
+        browser.tableOptions[browser.shown]?.filter = FilterState()
         let first = browser.tableContent(in: library)
         #expect(browser.tableContent(in: library) === first)
         // A preview that lands later, with no revision of the library's own to tell the table of it.
@@ -74,7 +90,7 @@ struct BrowserViewPreviewTests {
         let view = Self.view(filter: #"id eq "x" AND properties.status neq "done""#)
         let library = Self.library(view)
         let browser = Self.window(library, view: view)
-        browser.tableOptions[browser.item]?.filter = FilterState()
+        browser.tableOptions[browser.shown]?.filter = FilterState()
         _ = browser.tableContent(in: library)
         #expect(library.previewsAsked.last?.filter == #"id eq "x""#)
     }
@@ -83,8 +99,8 @@ struct BrowserViewPreviewTests {
         let view = Self.view(filter: #"properties.status eq "todo" OR properties.done eq true"#)
         let library = Self.library(view)
         let browser = Self.window(library, view: view)
-        #expect(browser.tableOptions[browser.item]?.filter.isEmpty == true)
-        browser.tableOptions[browser.item]?.filter = FilterState(is: [Self.status: ["todo"]])
+        #expect(browser.tableOptions[browser.shown]?.filter.isEmpty == true)
+        browser.tableOptions[browser.shown]?.filter = FilterState(is: [Self.status: ["todo"]])
         _ = browser.tableContent(in: library)
         #expect(library.previewsAsked.last?.filter == view.query.filter)
     }
@@ -92,7 +108,7 @@ struct BrowserViewPreviewTests {
     @Test func aWindowWithChangesKeepsItsPreviewWhenTheViewChangesElsewhere() {
         let library = Self.library()
         let browser = Self.window(library)
-        browser.tableOptions[browser.item]?.filter = FilterState()
+        browser.tableOptions[browser.shown]?.filter = FilterState()
         let before = browser.viewPreview
         let elsewhere = Self.view(version: 2, filter: #"properties.status eq "todo""#)
         library.views = [elsewhere]
@@ -105,7 +121,7 @@ struct BrowserViewPreviewTests {
         let library = Self.library()
         let changed = Self.window(library)
         let plain = Self.window(library)
-        changed.tableOptions[changed.item]?.filter = FilterState()
+        changed.tableOptions[changed.shown]?.filter = FilterState()
         #expect(titles(changed, library).count == 4)
         #expect(titles(plain, library) == ["t0", "t2", "t3"])
     }

@@ -33,12 +33,12 @@ struct LibraryChangeTests {
         let browser = Browser()
         browser.adopt(old)
         browser.selection = [old.items[0].id]
-        browser.sidebarItem = .favorites
+        browser.showing = .favorites
         browser.searchText = "hotel"
 
         browser.adopt(new)
         #expect(browser.selection.isEmpty, "the new library has none of the old selection's items")
-        #expect(browser.sidebarItem == .allItems)
+        #expect(browser.showing == .library)
         #expect(browser.searchText == "")
     }
 

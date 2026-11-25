@@ -6,17 +6,17 @@ import Foundation
 extension Browser {
     /// The list the window shows for the open place. Empty is "As in Layouts": the types' looks, untouched.
     var properties: ViewProperties {
-        if case .view(let id) = item { macSettings(for: id).properties } else { placeProperties[item] ?? ViewProperties() }
+        if let id = shown.savedView { macSettings(for: id).properties } else { placeProperties[shown] ?? ViewProperties() }
     }
 
     /// Changes the list. A saved view's is kept in the app's settings as it is made, and a place's in its default
     /// view. Undo takes either back.
     func changeProperties(_ change: (inout ViewProperties) -> Void) {
-        if case .view(let id) = item {
+        if let id = shown.savedView {
             changeViewSettings(id) { change(&$0.properties) }
             return
         }
-        let place = item
+        let place = shown
         let before = properties
         var next = before
         change(&next)
@@ -24,11 +24,11 @@ extension Browser {
         setPlaceProperties(next, before: before, in: place)
     }
 
-    private func setPlaceProperties(_ next: ViewProperties, before: ViewProperties, in place: SidebarItem) {
+    private func setPlaceProperties(_ next: ViewProperties, before: ViewProperties, in place: PlaceView) {
         placeProperties[place] = next.isChanged ? next : nil
         updatePlaceDefault(place) { $0.properties = next }
         registerUndo(String(localized: "Change Properties")) { browser in
-            guard browser.item == place else { return }
+            guard browser.shown.isSame(place) else { return }
             browser.setPlaceProperties(before, before: next, in: place)
         }
     }
@@ -74,7 +74,7 @@ extension Browser {
             }
         case .timeline:
             let fields = timelineFieldChoices(in: library)
-            if let key = ItemTimelineLayout.selectedField(timelineFields[item], fields: fields) { leaving.insert(Self.fieldColumnPrefix + key) }
+            if let key = ItemTimelineLayout.selectedField(timelineFields[shown], fields: fields) { leaving.insert(Self.fieldColumnPrefix + key) }
         default:
             break
         }

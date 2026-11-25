@@ -52,7 +52,7 @@ struct MarfaCreationTests {
         try #require(await eventually { library.isLoaded })
         let undo = UndoManager()
 
-        #expect(library.createItem(typeID: type.id.rawValue, title: "Untitled", body: "", parentID: nil, in: .allItems, undoManager: undo) == nil)
+        #expect(library.createItem(typeID: type.id.rawValue, title: "Untitled", body: "", parentID: nil, in: .library, undoManager: undo) == nil)
         #expect(source.writes.isEmpty)
         #expect(!undo.canUndo)
         #expect(library.notices.waiting.last?.title == String(localized: "Can’t Create Item"))
@@ -62,7 +62,7 @@ struct MarfaCreationTests {
         source.send(.catalogue(Self.catalogue()))
         try #require(await eventually { library.catalogue.itemTypes[Self.type] != nil })
         let id = try #require(library.createItem(
-            typeID: Self.type.rawValue, title: "Untitled", body: "", parentID: nil, in: .allItems, undoManager: undo))
+            typeID: Self.type.rawValue, title: "Untitled", body: "", parentID: nil, in: .library, undoManager: undo))
         #expect(source.writes == [.create(id: id, ItemDraft(type: Self.type, title: "Untitled", body: ""))])
     }
 

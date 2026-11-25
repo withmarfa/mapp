@@ -63,6 +63,13 @@ nonisolated struct ItemTableOptions: Hashable, Sendable {
     /// How many rows show at first and each time Load More is chosen. Kept with the place's other choices, not in
     /// a saved view, which has no field for it.
     var pageSize = TablePageSize.standard
+    /// The tiers the place lists (From), where the person or a saved view chose; nil is the place's own
+    /// (`Browser.listing`).
+    var scope: ListScope?
+    /// Whether archived items are listed, where the person or a saved view chose; nil hides them.
+    var archived: ArchivedItems?
+    /// Whether a type lists its kinds, where the person chose; nil lists them.
+    var includesKinds: Bool?
 
     /// The options as far as the rows and their groups depend on them: a page size never changes the rows, nor does a
     /// clause that says too little to filter by.

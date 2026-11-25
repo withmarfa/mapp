@@ -67,12 +67,13 @@ struct MarfaSearchSetsTests {
                 type: type.rawValue,
                 properties: [try #require(info.titleKey): .string("Zebra \(id)"), try #require(info.bodyKey): .string("zebra crossing")], id: ItemID.mint().rawValue))
         }
-        try #require(await eventually { library.items(in: .itemType(pair.id.rawValue)).count == 1 })
+        try #require(await eventually { library.items(in: .type(pair.id)).count == 1 })
         func found(_ scope: SearchScope) async -> [String] {
             _ = await eventually { !library.search("zebra", in: scope).isPending }
             return library.search("zebra", in: scope).items.map(\.title).sorted()
         }
-        #expect(await found(.place(.itemType(parent.rawValue))) == ["Zebra own"])
-        #expect(await found(.typeWithSubtypes(parent)) == ["Zebra own", "Zebra sub"])
+        let own = PlaceListing(includesKinds: false)
+        #expect(await found(.query(try #require(ViewDraft.query(for: .type(parent), listing: own, catalogue: catalogue, views: [])))) == ["Zebra own"])
+        #expect(await found(.query(try #require(ViewDraft.query(for: .type(parent), catalogue: catalogue, views: [])))) == ["Zebra own", "Zebra sub"])
     }
 }

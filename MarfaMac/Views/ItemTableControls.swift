@@ -51,7 +51,7 @@ private struct Controls {
 
     init(browser: Browser, content: ItemTableContent, choosesFromFields: Bool) {
         self.browser = browser
-        _options = Binding { browser.tableOptions[browser.item] ?? ItemTableOptions() } set: { browser.tableOptions[browser.item] = $0 }
+        _options = Binding { browser.tableOptions[browser.shown] ?? ItemTableOptions() } set: { browser.tableOptions[browser.shown] = $0 }
         columns = content.columns
         sort = SavedViews.arrangement(browser, content: content, order: browser.storedOrder).sort
         relevance = browser.isSearching ? Binding { browser.ordersByRelevance } set: { browser.orderSearch(byRelevance: $0) } : nil

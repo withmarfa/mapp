@@ -40,11 +40,30 @@ struct SidebarTabsTests {
 
         let plan = SidebarPlan(library(), layout: layout)
         #expect(plan.tabs.count == 1)
-        #expect(plan.shownBuiltInViews == [.inbox, .recents])
+        #expect(plan.shownBuiltInViews == [.feed])
         #expect(plan.shownSavedViews.map(\.title) == ["Reading", "Open work"], "the person's order of views holds")
         #expect(plan.groups(in: SidebarTab.homeID, customizing: false).map(\.group.kind) == [.shortcuts, .library, .views, .types])
         // Written back, it is the layout it was, with nothing added.
         #expect(try JSONDecoder().decode(SidebarLayout.self, from: JSONEncoder().encode(layout)) == layout)
+    }
+
+    @Test func aSectionOfAKindThisCopyDoesNotKnowIsSkippedAloneAndKept() throws {
+        let saved = Data(#"""
+        {"groups":[{"id":"library","kind":"library","tab":"home","isHidden":false,"shortcuts":[]},
+        {"id":"later","kind":"pinboard","tab":"home","extra":1},
+        {"id":"types","kind":"types","tab":"home","isHidden":false,"shortcuts":[]}],"order":["library"]}
+        """#.utf8)
+        var layout = try JSONDecoder().decode(SidebarLayout.self, from: saved)
+        #expect(layout.allGroups.map(\.id) == ["library", "types"])
+        #expect(layout.order == ["library"])
+        layout.setHidden(.library, true)
+        let back = try #require(try JSONSerialization.jsonObject(with: JSONEncoder().encode(layout)) as? [String: Any])
+        let groups = try #require(back["groups"] as? [[String: Any]])
+        #expect(groups.map { $0["id"] as? String } == ["library", "later", "types"])
+        #expect(groups[1]["kind"] as? String == "pinboard" && groups[1]["extra"] as? Int == 1)
+        // Only sections this copy cannot read show none, not the sections a new sidebar starts with.
+        let onlyLater = Data(#"{"groups":[{"id":"later","kind":"pinboard","tab":"home"}]}"#.utf8)
+        #expect(try JSONDecoder().decode(SidebarLayout.self, from: onlyLater).allGroups.isEmpty)
     }
 
     @Test func draggingARowAcrossTheBlocksOfADefaultSectionIsKept() {
@@ -335,13 +354,13 @@ struct SidebarTabsTests {
         let view = SidebarPlace.view(ItemID("v-Reading"))
         var layout = SidebarLayout()
         #expect(layout.color(of: view) == .gray)
-        for place in [SidebarPlace.inbox, .recents, .favorites, .all, .sources, .collections, .collection(ItemID("c-One")), .source("rss")] {
+        for place in [SidebarPlace.feed, .favorites, .library, .sources, .collections, .collection(ItemID("c-One")), .source("rss")] {
             #expect(layout.color(of: place) == .gray && place.defaultTone == .gray)
         }
         #expect(SidebarPlace.type("core.note").defaultTone == nil)
-        layout.setColor(.blue, of: .all)
-        #expect(layout.color(of: .all) == .blue)
-        layout.setColor(nil, of: .all)
+        layout.setColor(.blue, of: .library)
+        #expect(layout.color(of: .library) == .blue)
+        layout.setColor(nil, of: .library)
         layout.setColor(.purple, of: view)
         #expect(layout.color(of: view) == .purple)
         let stored = try JSONDecoder().decode(SidebarLayout.self, from: JSONEncoder().encode(layout))
@@ -362,7 +381,7 @@ struct SidebarTabsTests {
     @Test func aColorChosenBeforeGrayBecameTheDefaultStays() throws {
         let saved = Data(#"{"colors":{"inbox":"blue","favorites":"pink"}}"#.utf8)
         let layout = try JSONDecoder().decode(SidebarLayout.self, from: saved)
-        #expect(layout.color(of: .inbox) == .blue && layout.color(of: .favorites) == .pink && layout.color(of: .recents) == .gray)
+        #expect(layout.color(of: .feed) == .blue && layout.color(of: .favorites) == .pink && layout.color(of: .library) == .gray)
     }
 
     @Test func anUnknownStoredColorReadsAsTheViewsOwn() throws {

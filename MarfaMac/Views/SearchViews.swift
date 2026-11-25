@@ -25,13 +25,13 @@ struct SearchStatusBar: View {
 
     var body: some View {
         let results = browser.searchResults(in: library)
-        let offersScope = SearchScope.narrows(browser.item)
+        let offersScope = SearchScope.narrows(browser.shown)
         if offersScope || results?.isIncomplete == true || results?.cappedCount != nil {
             VStack(alignment: .leading, spacing: 6) {
                 if offersScope {
                     Picker("Search Scope", selection: $browser.searchesPlace) {
                         Text("Everywhere").tag(false)
-                        Text(verbatim: library.name(of: browser.item)).tag(true)
+                        Text(verbatim: library.name(of: browser.shown)).tag(true)
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()

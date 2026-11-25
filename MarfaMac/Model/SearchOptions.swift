@@ -1,10 +1,11 @@
 import Foundation
 
-/// How Search Items and the palette's item matches look: whether archived and Inbox items are searched, the order of the
+/// How Search Items and the palette's item matches look: whether archived and Feed items are searched, the order of the
 /// results and whether each shows the words that matched. One value each in the defaults, synced through the Marfa
 /// (`PreferencesMap`). What a server leaves out of search is `SearchLeaveOuts`.
 nonisolated enum SearchOptions {
     static let includesArchivedKey = "searchIncludesArchived"
+    /// Whether the feed tier is searched, under the word earlier copies stored.
     static let includesInboxKey = "searchIncludesInbox"
     static let orderKey = "searchOrder"
     static let showsSnippetsKey = "searchShowsSnippets"

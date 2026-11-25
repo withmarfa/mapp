@@ -80,6 +80,12 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
     var calendarScale: CalendarScale?
     /// What shows after the title in every layout; empty is the types' looks.
     var properties = ViewProperties()
+    /// The tiers a type, a collection or a source lists (From), and the Favorites view; nil is the place's own.
+    var scope: ListScope?
+    /// Whether archived items are listed; nil hides them.
+    var archived: ArchivedItems?
+    /// Whether a type lists its kinds; nil lists them.
+    var includesKinds: Bool?
 
     init() {}
 
@@ -101,9 +107,35 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
         cards = try container.decodeIfPresent(ViewCards.self, forKey: .cards) ?? ViewCards()
         calendarScale = try container.decodeIfPresent(CalendarScale.self, forKey: .calendarScale)
         properties = try container.decodeIfPresent(ViewProperties.self, forKey: .properties) ?? ViewProperties()
+        // A word this version does not know is the place's own choice.
+        scope = try container.decodeIfPresent(String.self, forKey: .scope).flatMap(ListScope.init(rawValue:))
+        archived = try container.decodeIfPresent(String.self, forKey: .archived).flatMap(ArchivedItems.init(rawValue:))
+        includesKinds = try container.decodeIfPresent(Bool.self, forKey: .includesKinds)
     }
 
     var isEmpty: Bool { self == PlaceDefault() }
+
+    /// This default with what it leaves unset taken from `other`. The grouping and its groups go together, as do the
+    /// filters and whether any one will do.
+    func filled(from other: PlaceDefault) -> PlaceDefault {
+        var filled = self
+        filled.layout = layout ?? other.layout
+        if sort.isEmpty { filled.sort = other.sort }
+        if grouping == nil, groupOrder.isEmpty, hiddenGroups.isEmpty {
+            (filled.grouping, filled.groupOrder, filled.hiddenGroups) = (other.grouping, other.groupOrder, other.hiddenGroups)
+        }
+        if !hidesEmptyGroups { filled.hidesEmptyGroups = other.hidesEmptyGroups }
+        if filter.isEmpty, !matchesAny { (filled.filter, filled.matchesAny) = (other.filter, other.matchesAny) }
+        filled.timelineField = timelineField ?? other.timelineField
+        if !compactBoard { filled.compactBoard = other.compactBoard }
+        if cards == ViewCards() { filled.cards = other.cards }
+        filled.calendarScale = calendarScale ?? other.calendarScale
+        if properties == ViewProperties() { filled.properties = other.properties }
+        filled.scope = scope ?? other.scope
+        filled.archived = archived ?? other.archived
+        filled.includesKinds = includesKinds ?? other.includesKinds
+        return filled
+    }
 
     /// Whether the person changed something the place would not show by itself: a layout that is the place's own does not
     /// count, since choosing it leaves the place as it was.
@@ -129,11 +161,14 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
         hiddenGroups = (options.hiddenGroups ?? []).sorted()
         filter = options.filter.complete.clauses
         matchesAny = options.filter.complete.matchesAny
+        scope = options.scope
+        archived = options.archived
+        includesKinds = options.includesKinds
     }
 
     /// The options a place opens with: those the window holds, with the filters, sort and grouping this keeps. A column
     /// of a field no type of the place declares any more is dropped, with its condition, and the rest stays.
-    func options(replacing held: ItemTableOptions?, in place: SidebarItem, catalogue: Catalogue) -> ItemTableOptions {
+    func options(replacing held: ItemTableOptions?, in place: PlaceView, catalogue: Catalogue) -> ItemTableOptions {
         var options = held ?? ItemTableOptions()
         let declared = Self.declaredFields(in: place, catalogue: catalogue)
         func isKept(_ column: String) -> Bool {
@@ -154,15 +189,18 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
         options.groupOrder = keepsGroups && !groupOrder.isEmpty ? groupOrder : nil
         options.hiddenGroups = keepsGroups && !hiddenGroups.isEmpty ? Set(hiddenGroups) : nil
         options.filter = FilterState(clauses: filter.filter { isKept($0.field) }, matchesAny: matchesAny).complete
+        options.scope = scope
+        options.archived = archived
+        options.includesKinds = includesKinds
         return options
     }
 
     /// The fields the types a place lists declare: its own type and the types below it for a type's place, and every type
     /// for any other, which lists items of many.
-    private static func declaredFields(in place: SidebarItem, catalogue: Catalogue) -> Set<String> {
+    private static func declaredFields(in place: PlaceView, catalogue: Catalogue) -> Set<String> {
         var types = Array(catalogue.itemTypes.values)
-        if case .itemType(let id) = place {
-            let wanted = catalogue.descendants(of: TypeID(id)).union([TypeID(id)])
+        if case .type(let id) = place.place {
+            let wanted = catalogue.descendants(of: id).union([id])
             types = types.filter { wanted.contains($0.id) }
         }
         return Set(types.flatMap { $0.fields.map(\.key) })
@@ -186,17 +224,17 @@ nonisolated struct PlaceDefaults: Equatable, Sendable {
         self.places = places
     }
 
-    func `default`(for place: SidebarItem) -> PlaceDefault? {
+    func `default`(for place: PlaceView) -> PlaceDefault? {
         places[place.storageKey]
     }
 
-    mutating func set(_ value: PlaceDefault?, for place: SidebarItem) {
+    mutating func set(_ value: PlaceDefault?, for place: PlaceView) {
         places[place.storageKey] = value.flatMap { $0.isEmpty ? nil : $0 }
     }
 
     /// The places that have an entry. A key that names no place this version knows is left out, so it is never judged.
-    var keptPlaces: [SidebarItem] {
-        places.keys.compactMap { try? JSONDecoder().decode(SidebarItem.self, from: Data($0.utf8)) }
+    var keptPlaces: [PlaceView] {
+        places.keys.compactMap(PlaceView.init(storageKey:))
     }
 
     // MARK: Keeping
@@ -230,6 +268,12 @@ nonisolated struct PlaceDefaults: Equatable, Sendable {
     /// The stored defaults; data that cannot be read is no defaults, never a failure.
     static func stored(in defaults: UserDefaults = .standard) -> PlaceDefaults {
         defaults.data(forKey: key).map { read($0).readable } ?? PlaceDefaults()
+    }
+
+    /// The From the Favorites view lists, as stored in `data`: the person's choice, else the Library, whatever Settings
+    /// says (`Browser.listing(in:)`).
+    static func favoritesScope(in data: Data?) -> ListScope {
+        data.flatMap { read($0).readable.default(for: .favorites)?.scope } ?? .library
     }
 
     /// Changes the stored defaults. What this write would replace and cannot read is kept aside first.

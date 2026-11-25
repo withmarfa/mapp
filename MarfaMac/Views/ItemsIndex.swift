@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// Items as an index: every item of the library under the tabs All, Yours (the library tier) and From Apps (the feed
+/// Items as an index: every item of the library under the tabs All, Library (the library tier) and Feed (the feed
 /// tier), as a table with no list column. The chosen row is the window's selection, which the right sidebar shows
 /// (`ItemInspectorHost`), and opening one follows Settings > General > Open Items (`Browser.open`).
 ///
@@ -53,8 +53,8 @@ struct ItemsIndex: View {
             }
             // An item that goes (deleted here or by another app, or gone on a sync) takes the right sidebar's content with it.
             .onChange(of: library.membershipRevision, initial: true) { browser.keepItemChoice(in: library) }
-            .onDisappear { if browser.item != .allItems { model.stop() } }
-            .navigationTitle(library.name(of: browser.item))
+            .onDisappear { if browser.shown != .library { model.stop() } }
+            .navigationTitle(library.name(of: browser.shown))
             .accessibilityIdentifier("ItemsIndex")
     }
 
@@ -65,7 +65,7 @@ struct ItemsIndex: View {
             let shown = tabs.rows(for: tab)
             IndexScaffold { browser.isIndexHeaderAway = $0 } top: {
                 IndexPageTop(
-                    title: library.name(of: browser.item), browser: browser,
+                    title: library.name(of: browser.shown), browser: browser,
                     tabs: Self.place.tabs.map { (tab: $0, count: tabs.count(for: $0)) },
                     tab: Binding { tab } set: { storedTab = $0 },
                     new: { browser.openQuickAddFromIndex(remembered: lastType, in: library) })
@@ -103,8 +103,8 @@ struct ItemsIndex: View {
             EmptyState("No Items", detail: "Items you make or apps send show here.")
         } else {
             switch tab {
-            case .yours: EmptyState("No Items Of Yours", detail: "Items you make show here.")
-            case .fromApps: EmptyState("No Items From Apps", detail: "Items that apps send show here.")
+            case .library: EmptyState("No Items in the Library", detail: "Items you make show here.")
+            case .feed: EmptyState("No Items in the Feed", detail: "Items that apps send show here.")
             case .all, .apps, .keys: EmptyState("No Items")
             }
         }

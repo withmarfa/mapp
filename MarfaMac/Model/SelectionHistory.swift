@@ -3,7 +3,7 @@ import Foundation
 /// The single items a window has shown, oldest first, and which of them it shows now.
 struct SelectionHistory {
     struct Entry: Equatable {
-        let place: SidebarItem
+        let place: PlaceView
         let id: ItemID
     }
 
@@ -15,7 +15,7 @@ struct SelectionHistory {
 
     /// Notes the selection after a change. Only one item shown is an entry; showing it again leaves the history as
     /// it is, and showing another drops whatever lay ahead.
-    mutating func record(_ selection: Set<ItemID>, in place: SidebarItem) {
+    mutating func record(_ selection: Set<ItemID>, in place: PlaceView) {
         guard selection.count == 1, let id = selection.first else { return }
         if entries.indices.contains(position), entries[position].id == id { return }
         entries.removeSubrange((position + 1)...)

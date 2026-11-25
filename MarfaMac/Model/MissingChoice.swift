@@ -16,15 +16,13 @@ nonisolated enum MissingChoice {
     }
 
     /// A stored place's name, for the pop-up that offers a few places and the library's types.
-    static func placeName(_ place: SidebarItem) -> String {
-        switch place {
-        case .itemType(let identifier): typeName(identifier)
+    static func placeName(_ place: PlaceView) -> String {
+        if place.savedView != nil { return String(localized: "View") }
+        return switch place.place {
+        case .type(let type): typeName(type.rawValue)
         case .collection, .collections: String(localized: "Collection")
-        case .view: String(localized: "View")
         case .source, .sources: String(localized: "Source")
-        case .favoriteItem: String(localized: "Favorite")
-        case .files: String(localized: "Files")
-        case .inbox, .recents, .allItems, .favorites: String(localized: "Place")
+        case .library, .feed, .types, .archive: String(localized: "Place")
         }
     }
 }

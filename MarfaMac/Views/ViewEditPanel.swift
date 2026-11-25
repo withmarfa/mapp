@@ -187,7 +187,7 @@ private struct ViewPanelGroup: View {
                     }
                     if shown != .none, browser.datedList == nil {
                         let hidden = browser.viewMode == .board && browser.boardLanes(in: library)?.isOwn == false
-                            ? Set<String>() : browser.tableOptions[browser.item]?.hiddenGroups ?? []
+                            ? Set<String>() : browser.tableOptions[browser.shown]?.hiddenGroups ?? []
                         ForEach(browser.groupRows(in: library).filter { $0.key != GroupKey.notApplicable }, id: \.key) { row in
                             GroupRow(browser: browser, key: row.key, title: row.title, isShown: !hidden.contains(row.key))
                         }
@@ -208,7 +208,7 @@ private struct ViewPanelGroup: View {
     }
 
     private var timelinePicker: some View {
-        let place = browser.item
+        let place = browser.shown
         let fields = browser.timelineFieldChoices(in: library)
         let selected = ItemTimelineLayout.selectedField(browser.timelineFields[place], fields: fields)
         return Picker("Group by", selection: Binding { selected ?? "" } set: { browser.timelineFields[place] = $0.isEmpty ? nil : $0 }) {

@@ -6,7 +6,7 @@ import Foundation
 extension Browser {
     /// Whether the open place is a saved view, whose sort and group the list and the gallery take.
     var isViewPlace: Bool {
-        if case .view = item { true } else { false }
+        shown.savedView != nil
     }
 
     static var initialDefaults: UserDefaults {
@@ -37,7 +37,10 @@ extension Browser {
     /// changes, unless the window holds choices Marfa has not taken (a write that failed): those stay, and the next
     /// write carries them. Every layout shows them, and the view opens in the layout this Mac keeps for it.
     func followView(in library: any ItemLibrary) {
-        guard case .view(let id) = item, let view = library.views.first(where: { $0.id == id }) else { return }
+        guard let id = shown.savedView, let view = library.views.first(where: { $0.id == id }) else { return }
+        // A change of the view's filters can move it to another home, and the window goes with it.
+        let home = PlaceView(Place.home(of: view.query, catalogue: library.catalogue), .saved(id))
+        if showing != home { showing = home }
         if pendingViewWrites.remove(id) != nil { scheduleWrite(of: id) }
         guard let seed = viewSeeds[id] else {
             apply(layout: ViewLayouts.stored(in: defaults).settings(for: id)?.layout, in: library)
@@ -53,7 +56,7 @@ extension Browser {
     func seed(
         _ view: LibraryView, catalogue: Catalogue, keepingWindow: Bool = false, sent: LibraryViewChange = LibraryViewChange()
     ) {
-        let place = SidebarItem.view(view.id)
+        let place = PlaceView.saved(view.id)
         var options = ViewDraft.options(for: view, catalogue: catalogue)
         let timelineDate = ViewDraft.timelineDate(of: view)
         let collapsed = tableOptions[place]?.collapsed
@@ -77,13 +80,13 @@ extension Browser {
     /// write was compared with, and that the write did not send. The server may have merged another app's change to one
     /// (`views/change-stale`); left out of the window, it would read as the person's own change, and the next write would
     /// send the window's older value back over it. A setting the person changed stays as they chose it, and is written.
-    private func follow(_ returned: ViewChoices, in place: SidebarItem, over earlier: ViewSeed, sent: LibraryViewChange) {
+    private func follow(_ returned: ViewChoices, in place: PlaceView, over earlier: ViewSeed, sent: LibraryViewChange) {
         let held = ViewChoices(options: earlier.options, timelineDate: earlier.timelineDate)
-        let dated = item == place ? datedList : nil
+        let dated = shown.isSame(place) ? datedList : nil
         var parts = Set(ViewChoices.Part.allCases).subtracting(choices(in: place).parts(differingFrom: held, dated: dated))
         if sent.sort != nil { parts.remove(.sort) }
         if sent.group != nil { parts.remove(.grouping) }
-        if sent.query != nil { parts.remove(.filters) }
+        if sent.query != nil { parts.subtract([.filters, .listing]) }
         // Filters the view says as before, though in other words than the window's, are not another app's change.
         if returned.options.filter.isSame(as: earlier.viewFilter) { parts.remove(.filters) }
         parts = parts.intersection(choices(in: place).parts(differingFrom: returned, dated: dated))
@@ -97,7 +100,7 @@ extension Browser {
     }
 
     private func differs(_ id: ItemID, from seed: ViewSeed) -> Bool {
-        let place = SidebarItem.view(id)
+        let place = PlaceView.saved(id)
         return ViewDraft.differs(
             tableOptions[place], timelineDate: timelineFields[place], from: seed.options, seedTimelineDate: seed.timelineDate,
             dated: datedList)
@@ -118,16 +121,23 @@ extension Browser {
     /// Whether the window's filters, order, grouping or timeline date differ from those Marfa holds for the view it
     /// shows, which is so only while a write has not been taken (the server could not be reached, or refused it).
     var hasViewChanges: Bool {
-        guard case .view(let id) = item, let seed = viewSeeds[id] else { return false }
+        guard let id = shown.savedView, let seed = viewSeeds[id] else { return false }
         return differs(id, from: seed)
     }
 
-    /// The query the window reads the view's items with while its filters differ from the view's own, and nil while
-    /// they do not: the view's list is then the library's own reading of the saved view. A window that opened the
-    /// view keeps the query of that version, whatever the view has since become elsewhere, as it keeps its filters.
+    /// The query the window reads the view's items with while its filters, From or Archived Items differ from the
+    /// view's own, and nil while they do not: the view's list is then the library's own reading of the saved view. A
+    /// window that opened the view keeps the query of that version, whatever the view has since become elsewhere, as it
+    /// keeps its filters, and reads the tiers and states the window chose.
     var viewPreview: (view: ItemID, query: LibraryViewQuery)? {
-        guard case .view(let id) = item, let seed = viewSeeds[id], let query = seed.preview,
-              !(tableOptions[item] ?? ItemTableOptions()).filter.isSame(as: seed.options.filter) else { return nil }
+        guard let id = shown.savedView, let seed = viewSeeds[id], var query = seed.preview else { return nil }
+        let options = tableOptions[shown] ?? ItemTableOptions()
+        let listing = listing(in: shown)
+        let viewScope = seed.options.scope ?? .all, viewArchived = seed.options.archived ?? .hidden
+        guard !options.filter.isSame(as: seed.options.filter) || listing.scope != viewScope || listing.archived != viewArchived
+        else { return nil }
+        query.tier = listing.scope.tier
+        query.states = listing.archived.states
         return (id, query)
     }
 
@@ -156,37 +166,37 @@ extension Browser {
     /// Whether the open place leaves out the groups with no items, in every layout that groups: a saved view's choice
     /// in the app's settings, else the place's default view's.
     var hidesEmptyGroups: Bool {
-        guard case .view(let id) = item else { return placeHidesEmptyGroups[item] ?? false }
+        guard let id = shown.savedView else { return placeHidesEmptyGroups[shown] ?? false }
         return macSettings(for: id).hidesEmptyGroups
     }
 
     /// Changes Hide Empty Groups. A saved view's is kept in the app's settings as it is made, and a place's in its default
     /// view. Undo takes either back.
     func setHidesEmptyGroups(_ hides: Bool) {
-        if case .view(let id) = item {
+        if let id = shown.savedView {
             changeViewSettings(id) { $0.hidesEmptyGroups = hides }
             return
         }
-        let place = item
+        let place = shown
         let before = hidesEmptyGroups
         guard hides != before else { return }
         placeHidesEmptyGroups[place] = hides ? true : nil
         updatePlaceDefault(place) { $0.hidesEmptyGroups = hides }
         registerUndo(String(localized: "Change View")) { browser in
-            guard browser.item == place else { return }
+            guard browser.shown.isSame(place) else { return }
             browser.setHidesEmptyGroups(before)
         }
     }
 
     /// What the gallery draws on each card in the open place: a saved view's choice, else the place's default view's.
     var cards: ViewCards {
-        if case .view(let id) = item { macSettings(for: id).cards } else { placeCards[item] ?? ViewCards() }
+        if let id = shown.savedView { macSettings(for: id).cards } else { placeCards[shown] ?? ViewCards() }
     }
 
     /// Whether the calendar shows a week or a month in the open place: a saved view's choice in the app's settings, else the
     /// place's default view's. A week until chosen.
     var calendarScale: CalendarScale {
-        if case .view(let id) = item { macSettings(for: id).calendarScale ?? .week } else { placeCalendarScales[item] ?? .week }
+        if let id = shown.savedView { macSettings(for: id).calendarScale ?? .week } else { placeCalendarScales[shown] ?? .week }
     }
 
     /// Changes the calendar's scale. A saved view's is kept in the app's settings as it is made, and a place's in its
@@ -194,17 +204,17 @@ extension Browser {
     func changeCalendarScale(_ scale: CalendarScale, calendar: Calendar = .chosenWeekStart) {
         // A week shown from a month starts where the calendar's weeks do, as a week chosen in the card does.
         if scale == .week, let day = calendarDay { calendarDay = CalendarLayout.firstDay(ofWeekHolding: day, calendar: calendar) }
-        if case .view(let id) = item {
+        if let id = shown.savedView {
             changeViewSettings(id) { $0.calendarScale = scale }
             return
         }
         let before = calendarScale
         guard scale != before else { return }
-        let place = item
+        let place = shown
         placeCalendarScales[place] = scale
         updatePlaceDefault(place) { $0.calendarScale = scale }
         registerUndo(String(localized: "Change Calendar")) { browser in
-            guard browser.item == place else { return }
+            guard browser.shown.isSame(place) else { return }
             browser.changeCalendarScale(before)
         }
     }
@@ -226,8 +236,8 @@ extension Browser {
     /// place. Nil follows Settings.
     var density: Density? {
         _ = densityRevision
-        if case .view(let id) = item { return macSettings(for: id).density }
-        return placeDensities.density(for: item)
+        if let id = shown.savedView { return macSettings(for: id).density }
+        return placeDensities.density(for: shown)
     }
 
     /// The densities this Mac keeps for places, read each time since every window shares them and another window may have
@@ -239,22 +249,22 @@ extension Browser {
     /// Changes the open place's density, where nil follows Settings. A saved view's is kept in the app's settings as it is made,
     /// like the view's others, and a place's is kept for the place. Undo takes either back.
     func changeDensity(_ density: Density?) {
-        if case .view(let id) = item {
+        if let id = shown.savedView {
             changeViewSettings(id) { $0.density = density }
             return
         }
         let before = self.density
-        let place = item
+        let place = shown
         guard density != before else { return }
         store(density, for: place)
         registerUndo(String(localized: "Change Density")) { browser in
-            guard browser.item == place else { return }
+            guard browser.shown.isSame(place) else { return }
             browser.changeDensity(before)
         }
     }
 
     /// Keeps a place's density, which a list reading it is told of.
-    func store(_ density: Density?, for place: SidebarItem) {
+    func store(_ density: Density?, for place: PlaceView) {
         PlaceDensities.update(in: defaults) { $0.set(density, for: place) }
         densityRevision += 1
     }
@@ -262,22 +272,22 @@ extension Browser {
     /// Changes what the gallery draws on each card. A saved view's change is kept in the app's settings as it is made, and a
     /// place's in its default view. Undo takes either back.
     func changeCards(_ change: (inout ViewCards) -> Void) {
-        if case .view(let id) = item {
+        if let id = shown.savedView {
             changeViewSettings(id) { change(&$0.cards) }
         } else {
-            let before = placeCards[item] ?? ViewCards()
+            let before = placeCards[shown] ?? ViewCards()
             var cards = before
             change(&cards)
             guard cards != before else { return }
-            setPlaceCards(cards, before: before, in: item)
+            setPlaceCards(cards, before: before, in: shown)
         }
     }
 
-    private func setPlaceCards(_ cards: ViewCards, before: ViewCards, in place: SidebarItem) {
+    private func setPlaceCards(_ cards: ViewCards, before: ViewCards, in place: PlaceView) {
         placeCards[place] = cards == ViewCards() ? nil : cards
         updatePlaceDefault(place) { $0.cards = cards }
         registerUndo(String(localized: "Change Cards")) { browser in
-            guard browser.item == place else { return }
+            guard browser.shown.isSame(place) else { return }
             browser.setPlaceCards(before, before: cards, in: place)
         }
     }
@@ -290,7 +300,7 @@ extension Browser {
         guard !settings.sameChoices(as: before) else { return }
         keep(settings, for: id)
         registerUndo(String(localized: "Change View")) { browser in
-            guard browser.item == .view(id) else { return }
+            guard browser.shown.isSame(.saved(id)) else { return }
             browser.changeViewSettings(id) { $0.take(choicesOf: before) }
         }
     }
@@ -309,10 +319,10 @@ extension Browser {
     /// the window showed.
     func recordLayout(from old: ItemViewMode) {
         guard !isApplyingLayout else { return }
-        guard case .view(let id) = item else {
+        guard let id = shown.savedView else {
             let layout = viewMode
-            updatePlaceDefault(item) { $0.layout = layout }
-            registerPlaceLayoutUndo(in: item, from: old, to: layout)
+            updatePlaceDefault(shown) { $0.layout = layout }
+            registerPlaceLayoutUndo(in: shown, from: old, to: layout)
             return
         }
         let before = macSettings(for: id)
@@ -324,9 +334,9 @@ extension Browser {
     }
 
     /// A place that is not a view keeps its layout in its default view, and Undo puts the earlier one back.
-    private func registerPlaceLayoutUndo(in place: SidebarItem, from old: ItemViewMode, to new: ItemViewMode) {
+    private func registerPlaceLayoutUndo(in place: PlaceView, from old: ItemViewMode, to new: ItemViewMode) {
         registerUndo(String(localized: "Change Layout")) { browser in
-            guard browser.item == place else { return }
+            guard browser.shown.isSame(place) else { return }
             browser.set(layout: old)
             browser.updatePlaceDefault(place) { $0.layout = old }
             browser.registerPlaceLayoutUndo(in: place, from: new, to: old)
@@ -335,7 +345,7 @@ extension Browser {
 
     private func registerLayoutUndo(of id: ItemID, from old: ItemViewMode, to new: ItemViewMode, mac before: ViewMacSettings) {
         registerUndo(String(localized: "Change Layout")) { browser in
-            guard browser.item == .view(id) else { return }
+            guard browser.shown.isSame(.saved(id)) else { return }
             let after = browser.macSettings(for: id)
             browser.set(layout: old)
             browser.keep(before, for: id)
@@ -357,18 +367,18 @@ extension Browser {
 
     /// Puts the window back to the view as the library holds it, dropping a choice Marfa has not taken.
     func revertView(in library: any ItemLibrary) {
-        guard case .view(let id) = item else { return }
+        guard let id = shown.savedView else { return }
         viewRefused(id, in: library)
     }
 
     /// The change that writes the window's choices to the view it shows, the version it is based on, and what of
     /// the window it leaves out.
     func viewUpdate(_ window: ViewDraft.Window, in library: any ItemLibrary) -> ViewUpdate? {
-        guard case .view(let id) = item, let seed = viewSeeds[id], let view = library.views.first(where: { $0.id == id }) else {
+        guard let id = shown.savedView, let seed = viewSeeds[id], let view = library.views.first(where: { $0.id == id }) else {
             return nil
         }
         let update = ViewDraft.change(
-            window, options: tableOptions[item], seed: seed.options, seedTimelineDate: seed.timelineDate, seededTypes: seed.types,
+            window, options: tableOptions[shown], seed: seed.options, seedTimelineDate: seed.timelineDate, seededTypes: seed.types,
             view: view, catalogue: library.catalogue, replaced: replacedGroups[id] ?? [:])
         return ViewUpdate(view: view, change: update.change, baseVersion: seed.version, unkept: update.unkept)
     }

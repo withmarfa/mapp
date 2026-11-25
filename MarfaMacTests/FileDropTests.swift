@@ -58,21 +58,21 @@ struct FileDropTests {
         let browser = Browser()
         browser.adopt(library)
         browser.show(.collection(collection.id), in: library, order: ItemOrder())
-        library.sendingFile = { browser.show(.allItems, in: library, order: ItemOrder()) }
+        library.sendingFile = { browser.show(.library, in: library, order: ItemOrder()) }
         let ids = await browser.importFiles([disk.url("a.txt"), disk.url("b.txt")], in: library, order: ItemOrder(), undoManager: nil)
         #expect(ids.count == 2)
         for id in ids { #expect(library.item(id)?.edgesOut.contains { $0.to == .item(collection.id) } == true) }
-        #expect(browser.item == .allItems)
+        #expect(browser.shown == .library)
     }
 
-    @Test func filesDroppedInTheInboxAllKeepTheInboxTierWhenThePersonMovesOnMidImport() async throws {
+    @Test func filesDroppedInTheFeedAllKeepTheFeedTierWhenThePersonMovesOnMidImport() async throws {
         let library = FakeItemLibrary()
         let browser = Browser()
         browser.adopt(library)
-        browser.show(.inbox, in: library, order: ItemOrder())
-        library.sendingFile = { browser.show(.allItems, in: library, order: ItemOrder()) }
+        browser.show(.feed, in: library, order: ItemOrder())
+        library.sendingFile = { browser.show(.library, in: library, order: ItemOrder()) }
         _ = await browser.importFiles([disk.url("a.txt"), disk.url("b.txt")], in: library, order: ItemOrder(), undoManager: nil)
-        #expect(library.addedPlaces == [.inbox, .inbox])
+        #expect(library.addedPlaces == [.feed, .feed])
     }
 
     @Test func aDropCutOffByALibraryChangeStillAddsEveryFileToTheLibraryItWasDroppedOn() async throws {
@@ -137,7 +137,7 @@ struct FileDropTests {
         let library = FakeItemLibrary()
         let browser = Browser()
         browser.adopt(library)
-        let id = try #require(await library.addFile(disk.url("scan.txt", "contents"), title: nil, parentID: nil, in: .allItems))
+        let id = try #require(await library.addFile(disk.url("scan.txt", "contents"), title: nil, parentID: nil, in: .library))
         library.files[id] = disk.url("kept")
         let reference = library.dragReference(of: id)
         #expect(library.fetches == 0)
@@ -212,7 +212,7 @@ struct FileDropTests {
     @Test func aQuickLookReplacedWhileFetchingStopsAndLeavesNoCopies() async throws {
         let library = FakeItemLibrary()
         let note = library.add("# Plans")
-        let fileID = try #require(await library.addFile(disk.url("scan.txt"), title: nil, parentID: nil, in: .allItems))
+        let fileID = try #require(await library.addFile(disk.url("scan.txt"), title: nil, parentID: nil, in: .library))
         library.files[fileID] = disk.url("kept", "file contents")
         library.fetchDelay[fileID] = .milliseconds(500)
         let browser = Browser()
@@ -233,7 +233,7 @@ struct FileDropTests {
 
     @Test func aQuickLookClosedWhileFetchingShowsNothingAndLeavesNoCopies() async throws {
         let library = FakeItemLibrary()
-        let fileID = try #require(await library.addFile(disk.url("scan.txt"), title: nil, parentID: nil, in: .allItems))
+        let fileID = try #require(await library.addFile(disk.url("scan.txt"), title: nil, parentID: nil, in: .library))
         library.files[fileID] = disk.url("kept", "file contents")
         library.fetchDelay[fileID] = .milliseconds(300)
         let browser = Browser()
@@ -250,7 +250,7 @@ struct FileDropTests {
     @Test func aQuickLookClosesWhenTheWindowChangesLibraryMidFetch() async throws {
         let library = FakeItemLibrary()
         let note = library.add("# Plans")
-        let fileID = try #require(await library.addFile(disk.url("scan.txt"), title: nil, parentID: nil, in: .allItems))
+        let fileID = try #require(await library.addFile(disk.url("scan.txt"), title: nil, parentID: nil, in: .library))
         library.files[fileID] = disk.url("kept", "file contents")
         library.fetchDelay[fileID] = .milliseconds(300)
         let browser = Browser()
@@ -267,7 +267,7 @@ struct FileDropTests {
 
     @Test func quickLookTellsThePersonWhenTheFileCannotBeFetched() async throws {
         let library = FakeItemLibrary()
-        let fileID = try #require(await library.addFile(disk.url("scan.txt"), title: nil, parentID: nil, in: .allItems))
+        let fileID = try #require(await library.addFile(disk.url("scan.txt"), title: nil, parentID: nil, in: .library))
         library.fetchFails = true
         let browser = Browser()
         browser.adopt(library)

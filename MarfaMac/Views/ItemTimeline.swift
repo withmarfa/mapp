@@ -17,7 +17,7 @@ struct ItemTimeline: View {
         let items = browser.filteredItems(in: library)
         let fields = browser.timelineFieldChoices(in: library)
         // Chosen in the toolbar's View Options (`ItemTimelineOptions`).
-        let field = ItemTimelineLayout.selectedField(browser.timelineFields[browser.item], fields: fields)
+        let field = ItemTimelineLayout.selectedField(browser.timelineFields[browser.shown], fields: fields)
         let looks = browser.looks(in: library)
         let now = library.now()
         let groups = ItemTimelineLayout.groups(
@@ -26,7 +26,7 @@ struct ItemTimeline: View {
             mixesTypes: Set(items.map(\.type)).count > 1, date: .look, format: dateFormat, datesApart: true, placedField: field, day: Calendar.current.startOfDay(for: now))
         let contents = rowContents.contents(
             of: items, in: library, looks: browser.propertyLooks(in: library), list: list, shape: CardShape(leaving: field))
-        let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
+        let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.shown)
 
         timeline(groups, contents: contents, now: now)
         .bandsToolbar()

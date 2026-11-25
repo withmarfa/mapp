@@ -19,17 +19,17 @@ nonisolated struct ItemIndexRow: Identifiable, Hashable, Sendable {
 /// a change of tab reads one of these and counts nothing.
 nonisolated struct ItemIndexTabs: Sendable {
     let all: [ItemIndexRow]
-    let yours: [ItemIndexRow]
-    let fromApps: [ItemIndexRow]
+    let library: [ItemIndexRow]
+    let feed: [ItemIndexRow]
 
-    static let empty = ItemIndexTabs(all: [], yours: [], fromApps: [])
+    static let empty = ItemIndexTabs(all: [], library: [], feed: [])
 
     /// The rows under `tab`. A tab the Items page lacks lists nothing.
     func rows(for tab: IndexTab) -> [ItemIndexRow] {
         switch tab {
         case .all: all
-        case .yours: yours
-        case .fromApps: fromApps
+        case .library: library
+        case .feed: feed
         case .apps, .keys: []
         }
     }
@@ -38,7 +38,7 @@ nonisolated struct ItemIndexTabs: Sendable {
 
     /// The tabs with only the rows `isKept` takes, in the order they were.
     func keeping(where isKept: (ItemIndexRow) -> Bool) -> ItemIndexTabs {
-        ItemIndexTabs(all: all.filter(isKept), yours: yours.filter(isKept), fromApps: fromApps.filter(isKept))
+        ItemIndexTabs(all: all.filter(isKept), library: library.filter(isKept), feed: feed.filter(isKept))
     }
 
     /// These tabs with the row of `id` at the place it held in `earlier`, in each tab that held it then and holds it now.
@@ -51,17 +51,17 @@ nonisolated struct ItemIndexTabs: Sendable {
             return moved
         }
         return ItemIndexTabs(
-            all: held(all, earlier.all), yours: held(yours, earlier.yours), fromApps: held(fromApps, earlier.fromApps))
+            all: held(all, earlier.all), library: held(library, earlier.library), feed: held(feed, earlier.feed))
     }
 }
 
 nonisolated extension IndexTab {
-    /// Whether an item in `tier` belongs under this tab: Yours is the library tier and From Apps the feed tier.
+    /// Whether an item in `tier` belongs under this tab: Library is the library tier and Feed the feed tier.
     func includes(tier: Tier) -> Bool {
         switch self {
         case .all: true
-        case .yours: tier == .library
-        case .fromApps: tier == .feed
+        case .library: tier == .library
+        case .feed: tier == .feed
         case .apps, .keys: false
         }
     }
@@ -92,8 +92,8 @@ nonisolated enum ItemIndexRows {
     /// The rows of each tab in the order given, which a search's relevance is.
     static func split(_ rows: [ItemIndexRow]) -> ItemIndexTabs {
         ItemIndexTabs(
-            all: rows, yours: rows.filter { IndexTab.yours.includes(tier: $0.tier) },
-            fromApps: rows.filter { IndexTab.fromApps.includes(tier: $0.tier) })
+            all: rows, library: rows.filter { IndexTab.library.includes(tier: $0.tier) },
+            feed: rows.filter { IndexTab.feed.includes(tier: $0.tier) })
     }
 
     /// The tabs for `items`, as the index page lists them.

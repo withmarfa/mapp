@@ -14,38 +14,39 @@ nonisolated struct PlaceEmpty: Equatable {
 
     /// `offered` is the types a person can make (`QuickAdd.types`), empty while the library cannot be written to or is
     /// not read yet. Only a type's own place has a button, and only for a type that is offered.
-    static func of(_ place: SidebarItem, in catalogue: Catalogue, offered: [String]) -> PlaceEmpty {
+    static func of(_ place: PlaceView, in catalogue: Catalogue, offered: [String]) -> PlaceEmpty {
         func plain(_ title: String, _ line: String? = nil) -> PlaceEmpty {
             PlaceEmpty(title: title, line: line, makes: nil, buttonTitle: nil)
         }
-        switch place {
-        case .inbox:
-            return plain(String(localized: "Inbox Is Empty"), String(localized: "Items from your apps wait here."))
-        case .favorites:
+        if place.savedView != nil {
+            return plain(String(localized: "No Items"), String(localized: "No items match this view."))
+        }
+        if place.isFavorites {
             return plain(String(localized: "No Favorites"), String(localized: "Items you favorite show here."))
-        case .recents:
-            return plain(String(localized: "No Recent Items"), String(localized: "Items you edit show here."))
-        case .files:
-            return plain(String(localized: "No Files"), String(localized: "Files you add show here."))
+        }
+        switch place.place {
+        case .feed:
+            return plain(String(localized: "Feed Is Empty"), String(localized: "Items from your apps wait here."))
+        case .archive:
+            return plain(String(localized: "Archive Is Empty"), String(localized: "Items you archive show here."))
         case .collection:
             return plain(String(localized: "No Items"), String(localized: "Items you add show here."))
         case .source:
             return plain(String(localized: "No Items"), String(localized: "Nothing from this source yet."))
-        case .view:
-            return plain(String(localized: "No Items"), String(localized: "No items match this view."))
-        case .allItems:
+        case .library:
             return plain(String(localized: "No Items"), String(localized: "Items you make show here."))
-        case .itemType(let id):
-            guard catalogue.itemTypes[TypeID(id)] != nil else { return plain(String(localized: "No Items")) }
-            let plural = catalogue.plural(for: TypeID(id))
-            let label = catalogue.label(for: TypeID(id))
+        case .type(let type):
+            guard catalogue.itemTypes[type] != nil else { return plain(String(localized: "No Items")) }
+            let id = type.rawValue
+            let plural = catalogue.plural(for: type)
+            let label = catalogue.label(for: type)
             let makes = offered.contains(id) ? id : nil
             // A long custom plural would run past the limit, so a fixed short line takes its place.
             let built = String(localized: "\(plural) you make show here.")
             return PlaceEmpty(
                 title: String(localized: "No \(plural)"), line: built.count < Self.lineLimit ? built : String(localized: "Nothing here yet."),
                 makes: makes, buttonTitle: makes == nil ? nil : String(localized: "New \(label)"))
-        case .collections, .sources, .favoriteItem:
+        case .types, .collections, .sources:
             return plain(String(localized: "No Items"))
         }
     }

@@ -4,7 +4,7 @@ import Foundation
 /// for each keystroke: the places it can open, and every item most recently edited first.
 struct PaletteIndex {
     struct Place {
-        let item: SidebarItem
+        let item: PlaceView
         let icon: RowIcon
         /// Nil where the library names the place itself (`ItemLibrary.name(of:)`).
         let title: String?
@@ -38,7 +38,7 @@ extension Browser {
 
     private static func makePaletteIndex(in library: any ItemLibrary) -> PaletteIndex {
         var places: [PaletteIndex.Place] = (SidebarPlace.destinations + SidebarPlace.builtInViews).compactMap { place in
-            place.item.flatMap { item in place.symbol.map { PaletteIndex.Place(item: item, icon: .symbol($0), title: nil) } }
+            place.opens.flatMap { item in place.symbol.map { PaletteIndex.Place(item: item, icon: .symbol($0), title: nil) } }
         }
         places += library.sourceCounts.map {
             .init(item: .source($0.code), icon: SourceTile.icon(for: library.sources.info($0.code)), title: $0.name)
@@ -47,8 +47,8 @@ extension Browser {
             .init(item: .collection($0.id), icon: .type(library.catalogue.icon(for: $0.type)), title: $0.displayTitle)
         }
         // The types the sidebar shows, under the names it gives them.
-        places += library.itemTypeCounts.map { .init(item: .itemType($0.id.rawValue), icon: .type($0.icon), title: $0.label) }
-        places += library.views.map { .init(item: .view($0.id), icon: .symbol(SidebarPlace.viewSymbol), title: $0.title) }
-        return PaletteIndex(places: places, recent: library.items(in: .allItems).sorted { $0.modified > $1.modified })
+        places += library.itemTypeCounts.map { .init(item: .type($0.id), icon: .type($0.icon), title: $0.label) }
+        places += library.views.map { .init(item: .saved($0.id), icon: .symbol(SidebarPlace.viewSymbol), title: $0.title) }
+        return PaletteIndex(places: places, recent: library.activeItems.sorted { $0.modified > $1.modified })
     }
 }

@@ -18,7 +18,6 @@ Read only the row you are building. A row says what was agreed; the boards it na
 
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
-| Places | The sidebar's places are Library, Feed, a type, a collection, a source, the Library's own lists, and an item. Recents, Favorites, Inbox and Files stop being places: Recents is the Library sorted by Edited, and Favorites is a view the Library starts with. A chosen view is part of a place, not a place. | `SidebarItem`, `Browser`, `SidebarLayout` | `Rethink-Library`, `Rethink-Item-Places` |
 | The two fixed zones | Search and New, then Library with its count and Feed with none. The Feed's symbol is `water.waves`. Search opens the Command Palette. | `SidebarGroups.swift`, `SidebarTypeRow.swift` | `Rethink-Sidebars`, `Rethink-Library` |
 | Under the pointer | A plus takes the place of the count on a type, a kind and a collection. Search and New show their shortcuts. A section's heading shows Add and More. Nothing in a row moves. | `SidebarTypeRow.swift`, `SidebarGroups.swift` | `Rethink-Sidebar-Pointer`, `Rethink-Sidebar-Sections` |
 | Pinned and Types | Pinned holds views, collections and items. Types list their kinds under them. A person's arrangement is read into the new sidebar: views they placed keep their sections, the rest go to Pinned, and an unknown group is ignored. | `SidebarLayout`, `SidebarGroups.swift` | `Rethink-Sidebars` |
@@ -39,15 +38,14 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | Collections | Name, Items, Source, Edited. The tabs, the source filter and the index's sidebar go. A collection can be archived, and cannot be moved to the Feed. | `SidebarIndex.swift`, `IndexInspector.swift` | `Rethink-Collections`, `Rethink-Collections-Full` |
 | Sources | Name, Items, Latest, and the types a source writes as marks and names, three and a count. Its page's panel has the facts. A source's Kind can be read by any app today: `GET /plugins` names each connector's source and the direction of its kinds, and an app's source starts with `oauth:`. Only New Items Go To waits, because it needs the owner's permission and the main window makes no owner calls. | `SidebarIndex.swift`, `SourceLook.swift` | `Rethink-Sources`, `Rethink-Sources-Full`, `Rethink-Source`, `Rethink-Sources-Waiting` |
 | Index pages go | The tabs, the New tiles, the index's own toolbar and filters. | `IndexPage.swift`, `NewTiles.swift`, `IndexToolbar.swift` | `Rethink-Library` |
-| A type counts its kinds | A type's place lists and counts its own items and its kinds' items. There is one count, the same beside its title, in the sidebar and in Types. Include Kinds is a switch in the View panel's Types. | `MarfaItemIndex`, `IncludeSubtypes.swift` | `Rethink-Types`, `Rethink-View-Types` |
 
 ## Feed, and moving between the two
 
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
-| Feed | A place like the Library: any layout, its own views, no count on its row, no words of waiting. Its first view is named All. | `SidebarItem`, `Browser` | `Rethink-Inbox`, `Rethink-Inbox-View`, `Rethink-Inbox-Page`, `Rethink-Inbox-Modal` |
-| Library or Feed control | After the count on a type, a collection and a source that has Feed items: All Items, Library, Feed, each with its count. It is quiet while it says what the setting says. With Library or Feed chosen, the title's count is of what is listed and the sidebar's stays. It is the first to give way for room. | `ListToolbar.swift`, `ItemTableOptions`, `PlaceDefault` | `Rethink-Scope-Menu`, `Rethink-Type-Inbox` |
-| What a type opens on | A setting in Lists: All Items (the default) or Library. | `PreferencesMap` | `Rethink-Scope-Menu` |
+| Feed | No count on its row, no words of waiting. Its first view is named All. | `SidebarGroups.swift`, `Browser` | `Rethink-Inbox`, `Rethink-Inbox-View`, `Rethink-Inbox-Page`, `Rethink-Inbox-Modal` |
+| Library or Feed control | After the count on a type, collection, or source with Feed items, offer All Items, Library, and Feed with their counts. Keep it quiet on the default and hide it first when space runs out. The title counts what is listed. The sidebar count stays the same. | `ListToolbar.swift`, `ListScope` | `Rethink-Scope-Menu`, `Rethink-Type-Inbox` |
+| Default From | Settings > Lists offers All Items (the default) and Library. | `PreferencesMap`, Settings > Lists | `Rethink-Scope-Menu` |
 | Feed's mark | In every list of all items, after a Feed item's name, in each layout that shows a name. | `ItemRow.swift`, `ItemTableCells.swift`, `GalleryCards.swift` | `Rethink-Type-Inbox`, `Rethink-Archive` |
 | Keep and Move to Feed | Commands on one item or several, with a toast that names the item or the count (`ItemLibrary.movedMessage`). Views and tables have neither. | `ItemActions.swift`, `ItemRowMenu.swift` | `Rethink-Keep-Toast`, `Rethink-Item-Menu`, `Rethink-Item-Menus` |
 | A table stays in the Library | A table item is offered no Move to Feed, as a collection and a view are not. **Waits for the package:** its catalogue does not say which types hold a table, and the app names no type (marfa-swift#561). | `ItemMoves.swift`, `Catalogue` | `Rethink-Item-Menus` |
@@ -63,9 +61,8 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | Archive and Unarchive | ⌃⌘A, in the item menu after Keep or Move to Feed and before Delete. | `ItemActions.swift` | `Rethink-Archive-Toast`, `Rethink-Item-Menu` |
 | Undo of state and tier where the copy cannot be sure | **Waits for Marfa:** an expected state on a transition (marfa#3523) and an update that refuses a stale version (marfa#3528). Until then, Undo does nothing and says so when the copy shows a change, and a change the copy has not yet learned of can still be overwritten. | `MarfaEngine+Writing.swift`, `MarfaLibrary+Bin.swift`, `MarfaLibrary+Moves.swift` | `Rethink-Archive-Toast` |
 | With sub-items | It asks: Archive All, Archive Only This Item, Cancel. The count is what `archivePlan` puts beneath. | `LibraryDialogs.swift` | `Rethink-Archive-Sub-Items` |
-| Library's Archive | The one list of everything archived, from both the Library and the Feed, with its own count and its own layout choice. One type's archived items are this place narrowed by a token in Search. | `SidebarIndex.swift`, `MarfaItemIndex` | `Rethink-Archive`, `Rethink-Type-Archive` |
+| Library's Archive | Its own count and its own layout choice in the Library's row of lists. One type's archived items are this place narrowed by a token in Search. | `SidebarIndex.swift` | `Rethink-Archive`, `Rethink-Type-Archive` |
 | An archived item's page | Says Archived over its title, and edits as any other. | `ItemPageHeader.swift`, `BatchSkips` | `Rethink-Archived-Page` |
-| Archived Items in a view | Hidden, Shown or Only Archived. A view that names no state lists both, so it reads Shown. | `ViewPanel`, `ViewDraft` | `Rethink-View-Panels` |
 
 ## Several items
 
@@ -94,7 +91,6 @@ Read only the row you are building. A row says what was agreed; the boards it na
 
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
-| A view belongs to a place | To its one type; else its one collection; else its one source; else the Feed, where From is Feed and nothing else narrows it; else the Library. Changing its Types moves it, and the window follows. | `SidebarItem`, `LibraryView` | `Rethink-Item-Places`, `Rethink-Library` |
 | The row of views | Pills in an order the app keeps for each place; a pill is dragged, and its menu has Hide. Past the room, N More, whose menu ends with New View…. A place with one view has no row. | `ListToolbar.swift`, `ViewMacSettings` | `Rethink-Top-Row-Lists`, `Rethink-View-Menu` |
 | The View panel | One panel replaces View Options, View As, Edit View and the filter row. Each part is one level in: Layout, Properties, Filter, Sort, Group, Types, From, Archived Items, Open Items, then the layout's own. | `ViewEditPanel.swift`, `ItemViewOptions.swift`, `FilterRow.swift` | `Rethink-View-Panels`, `Rethink-View-Filter`, `Rethink-View-Filter-Add`, `Rethink-View-Sort`, `Rethink-View-Group`, `Rethink-View-Properties`, `Rethink-View-Types`, `Rethink-View-From` |
 | Where it is kept | The foot of the View panel says "Kept for Marfa for Mac." for a place's first view, and "Saved in Marfa for every app." for a saved view alone. | `PlaceDefaults`, `ViewEditPanel.swift` | `Rethink-View-Panels` |

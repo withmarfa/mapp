@@ -5,12 +5,14 @@ import Observation
 /// and the menu bar's commands share it, so both act on the same selection.
 @Observable
 final class Browser {
-    var sidebarItem: SidebarItem? = .allItems {
+    var showing: PlaceView? = .library {
         // A scroll position belongs to the place and layout it was made in.
         didSet {
-            guard sidebarItem != oldValue else { return }
+            // A saved view that moves to another home is still what the window shows.
+            guard !(showing.map { $0.isSame(oldValue) } ?? (oldValue == nil)) else { return }
             modalItem = nil
             listMemory.scrollOffset = nil
+            laterPlace = nil
             viewPanelPlaceChanged()
         }
     }
@@ -27,6 +29,8 @@ final class Browser {
     @ObservationIgnored let sidebarMemory = ColumnMemory()
     /// How far the list, table or gallery is scrolled, kept for the same reasons and for the next launch (`snapshot()`).
     @ObservationIgnored let listMemory = ColumnMemory()
+    /// The place a later copy wrote for this window, kept as written until the person goes elsewhere.
+    @ObservationIgnored var laterPlace: [String: String]?
     /// The rows of the Items index under each tab, kept by the window so they survive an item's full page (`ItemIndexModel`).
     @ObservationIgnored let itemIndex = ItemIndexModel()
     /// The item whose row Items scrolls into view once it shows it, asked for by a reveal (`revealOnItems`).
@@ -36,7 +40,7 @@ final class Browser {
             // The modal shows the one item it was opened on, so any other selection, whoever made it, is the end of it.
             if let open = modalItem, selection != [open] { modalItem = nil }
             guard !isMovingThroughHistory, !isSelectingAutomatically || history.entries.isEmpty else { return }
-            history.record(selection, in: item)
+            history.record(selection, in: shown)
         }
     }
     /// The items the person chose in this window, for Back and Forward: a click, a key in the list, a link or a
@@ -76,12 +80,12 @@ final class Browser {
         let membership = library.membershipRevision
         // A saved view lists what the library reads for it, later, and without a membership change.
         let key = ViewModesKey(
-            library: ObjectIdentifier(library), membership: membership, place: item, stacked: stacksType,
+            library: ObjectIdentifier(library), membership: membership, place: shown, listing: listing,
             viewItems: isViewPlace ? placeItems(in: library).map(\.id) : nil)
         if let held = viewModesMemo, held.key == key { return held.modes }
         let modes = Cost.measure(.viewModes) {
             var types = Set(placeItems(in: library).map(\.type))
-            if case .itemType(let type) = item { types.insert(TypeID(type)) }
+            if case .type(let type) = shown.place { types.insert(type) }
             return ItemViewMode.available(forTypes: types, catalogue: library.catalogue)
         }
         viewModesMemo = (key, modes)
@@ -91,15 +95,15 @@ final class Browser {
     private struct ViewModesKey: Equatable {
         let library: ObjectIdentifier
         let membership: Int
-        let place: SidebarItem
-        let stacked: Bool
+        let place: PlaceView
+        let listing: PlaceListing
         let viewItems: [ItemID]?
     }
 
     /// Where each item stands in the sort the board's cards follow: the place's sort where the person or the view set
     /// one, else nil, which keeps the cards by title.
     func boardCardOrder(in library: any ItemLibrary) -> [ItemID: Int]? {
-        guard tableOptions[item]?.sort?.isEmpty == false else { return nil }
+        guard tableOptions[shown]?.sort?.isEmpty == false else { return nil }
         let rows = tableContent(in: library).rows
         return Dictionary(rows.enumerated().map { ($0.element.item.id, $0.offset) }, uniquingKeysWith: { first, _ in first })
     }
@@ -120,13 +124,13 @@ final class Browser {
     /// Sets the date field the timeline places every item by, or, with nil, lets each item sit on the date its type's
     /// look names. Nil is no choice, so a place that is not a view has only what its default view kept and a view writes no day grouping.
     func setTimelineField(_ key: String?, in library: any ItemLibrary) {
-        timelineFields[item] = key
+        timelineFields[shown] = key
     }
 
     private func fieldsKey(in library: any ItemLibrary) -> (key: FieldsKey, items: [Item]?) {
         let listed = isSearching || isViewPlace ? items(in: library) : nil
         let key = FieldsKey(
-            library: ObjectIdentifier(library), membership: library.membershipRevision, place: item, stacked: stacksType,
+            library: ObjectIdentifier(library), membership: library.membershipRevision, place: shown, listing: listing,
             ids: listed?.map(\.id))
         return (key, listed)
     }
@@ -134,8 +138,8 @@ final class Browser {
     private struct FieldsKey: Equatable {
         let library: ObjectIdentifier
         let membership: Int
-        let place: SidebarItem
-        let stacked: Bool
+        let place: PlaceView
+        let listing: PlaceListing
         let ids: [ItemID]?
     }
 
@@ -152,7 +156,7 @@ final class Browser {
     }
     /// How each place's table is grouped, sorted and filtered, as the person left it. A place that is not a saved view
     /// keeps them in its default view too (`Browser+PlaceDefaults`).
-    var tableOptions: [SidebarItem: ItemTableOptions] = [:]
+    var tableOptions: PlaceMemory<ItemTableOptions> = [:]
     /// The pages of the table the person has loaded, with what they belong to. Held apart from the table's content,
     /// which a page never makes again, and read as one page once the key has changed (`tablePaging`).
     var pagingState: (key: TablePagingKey, paging: TablePaging)?
@@ -169,13 +173,12 @@ final class Browser {
     /// choice works each out again.
     var lookChoices: [TypeID: TypeLookChoice] = [:]
     @ObservationIgnored var looksMemo: (key: LooksKey, looks: [TypeID: TypeLook])?
-    @ObservationIgnored var stackableMemo: (key: StackableKey, type: String?)?
     /// Held by `paletteIndex(in:)`.
     @ObservationIgnored var paletteMemo: (key: PaletteIndexKey, index: PaletteIndex)?
-    var compactBoards: [SidebarItem: Bool] = [:]
+    var compactBoards: PlaceMemory<Bool> = [:]
     /// The date field each place's timeline shows its items by, where the person chose one. A view's own comes from
     /// its day grouping (`followView`).
-    var timelineFields: [SidebarItem: String] = [:]
+    var timelineFields: PlaceMemory<String> = [:]
     /// Opens the Settings window at a page, or where it was left when none is given. Settings is a window of its own, so
     /// the browser keeps nothing of it; the window's views set this to the app's launcher.
     @ObservationIgnored var openSettings: (SettingsPage?, SettingsSubpage?) -> Void = { _, _ in }
@@ -241,12 +244,12 @@ final class Browser {
         case title
     }
 
-    var item: SidebarItem { sidebarItem ?? .allItems }
+    var shown: PlaceView { showing ?? .library }
     /// Whether the window shows Items as an index, the table of every item with its right sidebar. Items has no list
     /// column and no layout, so whatever layout the window was last left on is not shown there. An item opened from it
     /// as a full page takes the window until Back.
-    var showsItemsIndex: Bool { item == .allItems && !isCollectionItemPresented }
-    var showsSidebarIndex: Bool { item == .sources || item == .collections || showsItemsIndex }
+    var showsItemsIndex: Bool { shown == .library && !isCollectionItemPresented }
+    var showsSidebarIndex: Bool { shown == .sources || shown == .collections || showsItemsIndex }
     /// Whether an item's page is what the window shows, as against a collection, an index or Settings. The editor
     /// stays mounted behind the others, so every command that acts on the page asks this first. An item open in the
     /// modal is shown over an index as over any layout.
@@ -262,7 +265,7 @@ final class Browser {
     /// Whether the search lists its results as the library ranked them rather than by a sort. The list and Items start on
     /// relevance; the gallery and the table start on their own sorts and use relevance only once it is picked there.
     var ordersByRelevance: Bool {
-        isSearching && (relevanceChoice ?? (viewMode == .list || item == .allItems))
+        isSearching && (relevanceChoice ?? (viewMode == .list || shown == .library))
     }
 
     /// Picks relevance or one of the sorts for the search under way. Outside a search there is nothing to pick.
@@ -272,20 +275,27 @@ final class Browser {
 
     /// Whether the window shows the gallery or the table, which span it, rather than the list beside the page. Items is
     /// an index, not a layout, so it never does.
-    var usesCollection: Bool { viewMode.spansWindow && item != .allItems }
+    var usesCollection: Bool { viewMode.spansWindow && shown != .library }
     var showsCollection: Bool { usesCollection && !isCollectionItemPresented }
 
     /// Whether the view's options are on offer: the list and the gallery always, the table, board and timeline only
     /// while they are showing, not an item page opened from them, which hides their controls.
     var offersViewOptions: Bool { !isCollectionItemPresented }
 
-    /// Shows the place that lists an item no place on screen does: All Items, or for a deleted item Settings >
-    /// Recently Deleted, the only list that holds it.
+    /// Shows the place that lists an item no place on screen does: the Archive for an archived item, the Feed or the
+    /// Library by its tier, or for a deleted item Settings > Recently Deleted, the only list that holds it.
     private func showListing(_ item: Item, in library: any ItemLibrary, order: ItemOrder) {
-        if item.state == .trashed {
-            showSettings(.recentlyDeleted)
-        } else {
-            show(.allItems, in: library, order: order)
+        guard let place = Self.listing(of: item) else { return showSettings(.recentlyDeleted) }
+        show(PlaceView(place), in: library, order: order)
+    }
+
+    /// The place that lists an item whatever else does: the Archive, or the Library or the Feed by its tier. None lists a
+    /// deleted item.
+    nonisolated static func listing(of item: Item) -> Place? {
+        switch item.state {
+        case .trashed: nil
+        case .archived: .archive
+        default: item.tier == .feed ? .feed : .library
         }
     }
 
@@ -304,7 +314,7 @@ final class Browser {
             showListing(item, in: library, order: order)
         }
         selection = [item.id]
-        if self.item == .allItems { revealOnItems(item) }
+        if shown == .library { revealOnItems(item) }
     }
 
     /// Shows the item a link in the page names, as choosing it in the list does: the window's place, search, undo
@@ -360,21 +370,21 @@ final class Browser {
     }
 
     /// Shows the item before, or after, the one shown, skipping any that are gone. It is shown in the place it was
-    /// last seen when that place still lists it, and in All Items otherwise; any search is put away to show it.
+    /// last seen when that place still lists it, and in the Library otherwise; any search is put away to show it.
     func go(_ direction: SelectionHistory.Direction, in library: any ItemLibrary) {
         guard let (index, entry) = history.target(direction, in: library, shown: selection) else { return }
         isMovingThroughHistory = true
         defer { isMovingThroughHistory = false }
         isCollectionItemPresented = false
         modalItem = nil
-        if isSearching || sidebarItem != entry.place {
+        if isSearching || !entry.place.isSame(showing) {
             searchText = ""
             isSearchExpanded = false
-            sidebarItem = entry.place
+            showing = entry.place.savedView.map { PlaceView.saved($0, in: library) } ?? entry.place
         }
-        if !items(in: library).contains(where: { $0.id == entry.id }) { sidebarItem = .allItems }
+        if !items(in: library).contains(where: { $0.id == entry.id }) { showing = .library }
         selection = [entry.id]
-        if self.item == .allItems, let held = library.item(entry.id) { revealOnItems(held) }
+        if shown == .library, let held = library.item(entry.id) { revealOnItems(held) }
         history.move(to: index)
         focusRequest = .list
     }
@@ -383,10 +393,6 @@ final class Browser {
         isCollectionItemPresented = false
         focusRequest = .list
     }
-
-    /// The types whose list also shows their subtypes' items, kept in the defaults and mirrored here so the views
-    /// that list items follow a change (`IncludedSubtypes`).
-    var stackedTypes: Set<String> = []
 
     /// The selected items that still exist.
     func selectedItems(in library: any ItemLibrary) -> [Item] {
@@ -437,7 +443,6 @@ final class Browser {
         sectionsMemo = nil
         viewModesMemo = nil
         fieldsMemo = nil
-        stackableMemo = nil
         paletteMemo = nil
         guard !isFirst else { return }
         dismissQuickLook()
@@ -464,7 +469,7 @@ final class Browser {
         selection = []
         history = SelectionHistory()
         isCollectionItemPresented = false
-        sidebarItem = .allItems
+        showing = .library
         sidebarShowsAllTypes = false
         customizesSidebar = false
         sidebarTab = nil
@@ -508,7 +513,7 @@ final class Browser {
     @ObservationIgnored var library: (any ItemLibrary)?
 
     /// What each place's choices were when last looked at, so a change of them is the person's (`Browser+ViewWrites`).
-    @ObservationIgnored var observedChoices: [SidebarItem: ViewChoices] = [:]
+    @ObservationIgnored var observedChoices: PlaceMemory<ViewChoices> = [:]
 
     /// The views this window is writing, and those that changed again meanwhile (`Browser+ViewWrites`).
     @ObservationIgnored var writingViews: Set<ItemID> = []
@@ -525,7 +530,7 @@ final class Browser {
 
     /// Whether the row of filters above the list shows in a place the person chose, which is window state and never
     /// saved (`Browser+FilterRow`). A place the person did not choose for shows it by what it holds.
-    var filterRowChoice: [SidebarItem: Bool] = [:]
+    var filterRowChoice: PlaceMemory<Bool> = [:]
 
     /// Whether Add Filter… asked for its panel, which the row opens and then clears (`Browser+FilterRow`).
     var isAddFilterRequested = false
@@ -542,13 +547,13 @@ final class Browser {
 
     /// What the gallery draws on each card in a place that is not a saved view, as its default view keeps it
     /// (`Browser+PlaceDefaults`).
-    var placeCards: [SidebarItem: ViewCards] = [:]
+    var placeCards: PlaceMemory<ViewCards> = [:]
     /// The scale of each place's calendar that is not a saved view, as its default view keeps it (`calendarScale`).
-    var placeCalendarScales: [SidebarItem: CalendarScale] = [:]
+    var placeCalendarScales: PlaceMemory<CalendarScale> = [:]
     /// The places whose default view leaves out the groups with no items.
-    var placeHidesEmptyGroups: [SidebarItem: Bool] = [:]
+    var placeHidesEmptyGroups: PlaceMemory<Bool> = [:]
     /// The Properties list of each place that is not a saved view, as its default view keeps it (`properties`).
-    var placeProperties: [SidebarItem: ViewProperties] = [:]
+    var placeProperties: PlaceMemory<ViewProperties> = [:]
     /// A day in the week or month the calendar shows, or nil for the one that holds today. Kept for the window.
     var calendarDay: Date?
     /// Counts the moves of the calendar by its buttons, menu or keys, so the month card can follow one that leaves the day as it was.
@@ -567,7 +572,7 @@ final class Browser {
     @ObservationIgnored var defaults: UserDefaults = Browser.initialDefaults
 
     /// What `isDefaultViewChanged` last worked out, and the stored data it worked it out from (`Browser+PlaceDefaults`).
-    @ObservationIgnored var changedMemo: (place: SidebarItem, inputs: [Data?], changed: Bool)?
+    @ObservationIgnored var changedMemo: (place: PlaceView, inputs: [Data?], changed: Bool)?
     @ObservationIgnored var isApplyingLayout = false
 
     /// The order and grouping each view opened with (`Browser+SavedViews`).

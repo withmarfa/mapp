@@ -153,28 +153,25 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 
     @Test func changesFromTheSourceReplaceWhatWasHeld() async throws {
         let (library, source) = try await loaded()
-        #expect(library.items(in: .recents).first?.id == F.p1)
         var renamed = try #require(library.item(F.n2))
         renamed.title = "Renamed"
         renamed.tier = .library
         renamed.modified = Date(timeIntervalSince1970: 2_000_000)
         source.send(.upserted([renamed]))
         #expect(await eventually { library.item(F.n2)?.title == "Renamed" })
-        // An edit moves an item to the top of Recents, though what the library holds is the same.
-        #expect(library.items(in: .recents).first?.id == F.n2)
-        #expect(library.items(in: .inbox).isEmpty)
+        #expect(library.items(in: .feed).isEmpty)
 
         let added = F.item(ItemID("new"), F.task, "New task", age: 0, edges: [F.child("c9", ItemID("new"), of: F.p2)])
         source.setBody("Fresh", of: added.id)
         source.send(.upserted([added]))
         #expect(await eventually { library.item(added.id) != nil })
         #expect(library.body(of: added.id)?.text == "Fresh")
-        #expect(library.count(in: .itemType("aic.ticket.task")) == 2)
+        #expect(library.count(in: .type(TypeID("aic.ticket.task"))) == 2)
 
         source.send(.removed([F.n1]))
         #expect(await eventually { library.isGone(F.n1) })
         #expect(library.item(F.n1) == nil)
-        #expect(!ids(library.items(in: .favorites)).contains(F.n1))
+        #expect(!ids(library.favoriteItems(in: .all, archived: .hidden)).contains(F.n1))
         #expect(library.isGone(nil))
     }
 
@@ -249,14 +246,14 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let (library, source) = try await loaded()
         let undo = UndoManager()
         let id = try #require(library.createItem(
-            typeID: "aic.ticket.task", title: "  New task ", body: "Text", parentID: F.p1, in: .allItems, undoManager: undo))
+            typeID: "aic.ticket.task", title: "  New task ", body: "Text", parentID: F.p1, in: .library, undoManager: undo))
         #expect(id.rawValue == id.rawValue.lowercased())
         #expect(id.rawValue.dropFirst(14).first == "7")
         #expect(source.writes == [.create(id: id, ItemDraft(type: F.task, title: "New task", body: "Text", parent: F.p1))])
 
         // The Inbox is the feed tier, and a blank body is no text.
         let inbox = try #require(library.createItem(
-            typeID: "core.note", title: "Captured", body: "\n", parentID: nil, in: .inbox, undoManager: nil))
+            typeID: "core.note", title: "Captured", body: "\n", parentID: nil, in: .feed, undoManager: nil))
         #expect(source.writes.last == .create(id: inbox, ItemDraft(type: F.note, title: "Captured", tier: .feed)))
 
         // Undoing a create puts the item in the bin; redoing it brings it back.
@@ -274,10 +271,10 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 
     @Test func aCreateTheCatalogueRefusesIsToldAndNotSent() async throws {
         let (library, source) = try await loaded()
-        #expect(library.createItem(typeID: "no.such", title: "X", body: "", parentID: nil, in: .allItems, undoManager: nil) == nil)
+        #expect(library.createItem(typeID: "no.such", title: "X", body: "", parentID: nil, in: .library, undoManager: nil) == nil)
         #expect(library.notices.waiting.last?.title == String(localized: "Can’t Create Item"))
         library.notices.answerAll()
-        #expect(library.createItem(typeID: "core.note", title: " ", body: "", parentID: nil, in: .allItems, undoManager: nil) == nil)
+        #expect(library.createItem(typeID: "core.note", title: " ", body: "", parentID: nil, in: .library, undoManager: nil) == nil)
         #expect(library.notices.waiting.last != nil)
         #expect(source.writes.isEmpty)
     }
@@ -878,7 +875,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(source.attaching.attached.withLock { $0.map(\.file) } == ["plan.pdf"])
 
         let id = await library.addFile(
-            disk.url("photo.png", "png"), title: "Holiday", parentID: F.p1, in: .inbox)
+            disk.url("photo.png", "png"), title: "Holiday", parentID: F.p1, in: .feed)
         #expect(id != nil)
         let added = try #require(source.attaching.added.withLock { $0.first })
         #expect(added.file == "photo.png" && added.data == Data("png".utf8))
@@ -887,7 +884,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         source.attaching.failure.withLock { $0 = SourceFailure(kind: .failed, message: "No room.") }
         source.attaching.failures.withLock { $0["b.pdf"] = SourceFailure(kind: .failed, message: "No room.") }
         await #expect(throws: SourceFailure.self) { try await library.attach(file: disk.url("b.pdf"), to: F.n1) }
-        #expect(await library.addFile(disk.url("c.png"), title: nil, parentID: nil, in: .allItems) == nil)
+        #expect(await library.addFile(disk.url("c.png"), title: nil, parentID: nil, in: .library) == nil)
         #expect(library.notices.waiting.last?.message == "No room.")
     }
 
@@ -1074,6 +1071,36 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(attachedTo.targets.map(\.itemID) == [F.n1])
     }
 
+    @Test func anAttachedFileIsLeftOutOfEveryListAndCountButSearch() async throws {
+        let source = FakeItemSource()
+        let library = MarfaLibrary(source: source, notices: Notices())
+        let album = ItemID("al1"), scan = ItemID("f2"), old = ItemID("old")
+        func attached(_ id: ItemID) -> Edge {
+            Edge(id: EdgeID("\(id.rawValue)#at"), type: "attached-to", from: id, to: .item(F.n1), origin: .property("attached-to"))
+        }
+        var items = F.items
+        let photo = try #require(items.firstIndex { $0.id == F.f1 })
+        items[photo].tags = [ItemTag.favorite]
+        items[photo].edgesOut = [
+            attached(F.f1), Edge(id: EdgeID("f1#in"), type: "in-collection", from: F.f1, to: .item(album), origin: .property("in-collection")),
+        ]
+        items += [
+            F.item(album, F.album, "Trips", age: 10),
+            F.item(scan, F.image, "Scan", age: 11, state: .archived, edges: [attached(scan)], titleRule: .firstLine, content: .file(.png, byteCount: 0)),
+            F.item(old, F.note, "Archived note", age: 12, state: .archived),
+        ]
+        source.send(.loaded(SourceSnapshot(items: items, catalogue: Self.catalogue)))
+        try #require(await eventually { library.isLoaded })
+
+        #expect(!ids(library.favoriteItems(in: .all, archived: .hidden)).contains(F.f1))
+        #expect(library.items(in: .collection(album)).isEmpty)
+        #expect(library.count(in: .collection(album)) == 0)
+        #expect(ids(library.items(in: .archive, scope: .all, archived: .only, includingKinds: true)) == [old])
+        #expect(library.count(in: Place.archive) == 1)
+        #expect(library.count(in: .type(F.image)) == 0)
+        #expect(library.count(in: Place.library) == library.items(in: Place.library).count)
+    }
+
     @Test func theAttachmentsOfAnItemAreTheItemsWhoseAttachedToEdgePointsAtIt() async throws {
         let library = try await Self.loaded()
 
@@ -1165,7 +1192,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let (library, source) = try await loaded()
         _ = try #require(library.createItem(
             typeID: LibraryFixture.task.rawValue, title: "Kept", body: "Only copy", properties: ["status": .string("open")],
-            parentID: nil, in: .allItems, undoManager: nil))
+            parentID: nil, in: .library, undoManager: nil))
         let write = try #require(source.submitted.last?.id)
         source.send(.answered(write, .refused(SyncProblem(code: MarfaEngine.closedCode, message: MarfaEngine.notKept))))
         #expect(await eventually { !library.notices.waiting.isEmpty })
@@ -1218,7 +1245,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
     @Test func aCreateRefusedBeforeItWasQueuedGivesItsTextBack() async throws {
         let (library, source) = try await loaded()
         _ = try #require(library.createItem(
-            typeID: "core.note", title: "Kept", body: "Only copy", parentID: nil, in: .allItems, undoManager: nil
+            typeID: "core.note", title: "Kept", body: "Only copy", parentID: nil, in: .library, undoManager: nil
         ))
         let write = try #require(source.submitted.last?.id)
         let problem = SyncProblem(code: "type_not_permitted", message: "Not this type.", notQueued: true)

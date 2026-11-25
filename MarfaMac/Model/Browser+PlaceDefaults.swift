@@ -10,15 +10,12 @@ extension Browser {
     /// Whether a place has a default view: every place a person can arrange, which is any but a saved view, whose choices
     /// are its own, and the three indexes (Items, Collections and Sources), whose tab and sort are kept by
     /// `IndexPreferences` and which have no layout to choose.
-    nonisolated static func hasDefaultView(_ place: SidebarItem) -> Bool {
-        switch place {
-        case .view, .collections, .sources, .allItems: false
-        default: true
-        }
+    nonisolated static func hasDefaultView(_ place: PlaceView) -> Bool {
+        place.savedView == nil && place != .library && place.listsItems
     }
 
     /// Whether the open place has a default view the window can change.
-    var hasDefaultView: Bool { Self.hasDefaultView(item) }
+    var hasDefaultView: Bool { Self.hasDefaultView(shown) }
 
     /// The layout a place opens in until the person chooses one.
     nonisolated static let naturalLayout = ItemViewMode.list
@@ -27,7 +24,7 @@ extension Browser {
 
     /// Changes what is kept for a place's default view. While a new view's panel is open nothing is kept: the panel
     /// shapes a view that does not exist yet, and the place goes back as it was when the panel ends.
-    func updatePlaceDefault(_ place: SidebarItem, _ change: (inout PlaceDefault) -> Void) {
+    func updatePlaceDefault(_ place: PlaceView, _ change: (inout PlaceDefault) -> Void) {
         guard Self.hasDefaultView(place), viewPanel?.isNew != true else { return }
         PlaceDefaults.update(in: defaults) {
             var value = $0.default(for: place) ?? PlaceDefault()
@@ -36,25 +33,21 @@ extension Browser {
         }
     }
 
-    /// The types a place lists, whose fields a grouping may name though no item fills them: a type with its subtypes where
+    /// The types a place lists, whose fields a grouping may name though no item fills them: a type with its kinds where
     /// they show, and the types a saved view lists, with their subtypes. Empty for any other place, whose items' types are
     /// the ones it lists.
     func listedTypes(in library: any ItemLibrary) -> Set<TypeID> {
         let catalogue = library.catalogue
-        switch item {
-        case .itemType(let raw):
-            let type = TypeID(raw)
-            return stacksSubtypes(in: library) ? catalogue.descendants(of: type).union([type]) : [type]
-        case .view(let id):
+        if let id = shown.savedView {
             let types = library.views.first { $0.id == id }?.query.types ?? []
             return Set(types).union(types.flatMap { catalogue.descendants(of: $0) })
-        default:
-            return []
         }
+        guard case .type(let type) = shown.place, shown.view == .own else { return [] }
+        return listing.includesKinds ? catalogue.descendants(of: type).union([type]) : [type]
     }
 
     /// Keeps the open place's filters, sort, grouping and timeline date, which the window's funnel (`choicesChanged`) notes.
-    func keepPlaceChoices(of place: SidebarItem) {
+    func keepPlaceChoices(of place: PlaceView) {
         let options = tableOptions[place]
         let timeline = timelineFields[place]
         updatePlaceDefault(place) {
@@ -64,14 +57,14 @@ extension Browser {
     }
 
     /// Changes whether the open place's board draws compact cards, and keeps it.
-    func setCompactBoard(_ isCompact: Bool, in place: SidebarItem) {
+    func setCompactBoard(_ isCompact: Bool, in place: PlaceView) {
         compactBoards[place] = isCompact
         updatePlaceDefault(place) { $0.compactBoard = isCompact }
     }
 
     // MARK: Pruning
 
-    /// Forgets the entries of collections, types and favorites that no longer exist. The library says a thing is gone
+    /// Forgets the entries of collections and types that no longer exist. The library says a thing is gone
     /// only once its copy has been read whole and is current: a type or an item missing while the copy fills, refreshes or
     /// is another server's says nothing, so then every entry stays. Items, and the types of the catalogue, outlive being
     /// in Recently Deleted, so an entry stays for those.
@@ -79,9 +72,9 @@ extension Browser {
         guard library.isLoaded, library.syncReport.phase == .current, library.syncReport.fill?.state == .complete else { return }
         let types = library.catalogue.itemTypes
         let gone = PlaceDefaults.stored(in: defaults).keptPlaces.filter { place in
-            switch place {
-            case .collection(let id), .favoriteItem(let id): library.item(id) == nil
-            case .itemType(let type): !types.isEmpty && types[TypeID(type)] == nil
+            switch place.place {
+            case .collection(let id): library.item(id) == nil
+            case .type(let type): !types.isEmpty && types[type] == nil
             default: false
             }
         }
@@ -98,7 +91,7 @@ extension Browser {
     func followPlaceDefault(in library: any ItemLibrary) {
         guard hasDefaultView, library.isLoaded else { return }
         prunePlaceDefaults(in: library)
-        let place = item
+        let place = shown
         let stored = PlaceDefaults.stored(in: defaults).default(for: place) ?? PlaceDefault()
         let options = stored.options(replacing: tableOptions[place], in: place, catalogue: library.catalogue)
         if options != (tableOptions[place] ?? ItemTableOptions()) { tableOptions[place] = options }
@@ -124,7 +117,7 @@ extension Browser {
     /// only when it differs from what the answer was last worked out from, so a menu that is drawn again decodes nothing.
     var isDefaultViewChanged: Bool {
         guard hasDefaultView else { return false }
-        let place = item
+        let place = shown
         let inputs = [PlaceDefaults.key, PlaceDensities.key, ItemTableColumnLayouts.key].map { defaults.data(forKey: $0) }
         if let known = changedMemo, known.place == place, known.inputs == inputs { return known.changed }
         let stored = PlaceDefaults.stored(in: defaults).default(for: place)
@@ -143,7 +136,7 @@ extension Browser {
     /// layout, properties, column widths, density and cards. One step of Undo brings the person's choices back.
     func resetView(in library: any ItemLibrary) {
         guard hasDefaultView, viewPanel?.isNew != true else { return }
-        let place = item
+        let place = shown
         let before = viewSnapshot()
         PlaceDefaults.update(in: defaults) { $0.set(nil, for: place) }
         PlaceDensities.update(in: defaults) { $0.set(nil, for: place) }
@@ -167,7 +160,7 @@ extension Browser {
 
     private func registerResetUndo(restoring snapshot: ViewPanel.Snapshot) {
         registerUndo(String(localized: "Reset View")) { browser in
-            guard browser.item == snapshot.place else { return }
+            guard browser.shown.isSame(snapshot.place) else { return }
             let current = browser.viewSnapshot()
             browser.restore(snapshot)
             browser.registerResetUndo(restoring: current)
@@ -175,7 +168,7 @@ extension Browser {
     }
 
     /// Puts back what a place's default view kept, with what the window holds of it.
-    func reinstate(_ stored: PlaceDefault, for place: SidebarItem) {
+    func reinstate(_ stored: PlaceDefault, for place: PlaceView) {
         PlaceDefaults.update(in: defaults) { $0.set(stored, for: place) }
         compactBoards[place] = stored.compactBoard ? true : nil
         placeCalendarScales[place] = stored.calendarScale

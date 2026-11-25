@@ -146,9 +146,10 @@ import Observation
     @ObservationIgnored var readCatalogue = Catalogue(itemTypes: [])
     @ObservationIgnored var records: [ItemID: ItemRecord] = [:]
     @ObservationIgnored var index = MarfaItemIndex()
-    @ObservationIgnored var listed: [SidebarItem: Listing] = [:]
+    @ObservationIgnored var listed: [ListingKey: Listing] = [:]
     @ObservationIgnored var listedDeleted: Listing?
-    @ObservationIgnored var counted: [SidebarItem: (revision: Int, count: Int)] = [:]
+    @ObservationIgnored var counted: [Place: (revision: Int, counts: ScopeCounts)] = [:]
+    @ObservationIgnored var countedAlone: (revision: Int, counts: StandaloneCounts)?
     @ObservationIgnored var searches: [SearchKey: SearchRun] = [:]
     @ObservationIgnored var searchOrder: [SearchKey] = []
     /// What the latest search to be asked found, once it finishes, shown while the next one runs so the list does not
@@ -265,6 +266,15 @@ import Observation
 
     /// A place's order changes only with what it holds, so a change to one item maps the items again without
     /// sorting them.
+    /// What one listing was asked for: a place with its choices, or the Library's Favorites view.
+    nonisolated struct ListingKey: Hashable {
+        var place: Place
+        var favorites = false
+        var scope: ListScope
+        var archived: ArchivedItems
+        var includingKinds: Bool
+    }
+
     nonisolated struct Listing {
         var membership: Int
         var content = -1
@@ -348,7 +358,7 @@ import Observation
         var asksLeftOut = false
 
         var isOfView: Bool {
-            if case .place(.view) = scope { true } else { false }
+            if case .view = scope { true } else { false }
         }
     }
 

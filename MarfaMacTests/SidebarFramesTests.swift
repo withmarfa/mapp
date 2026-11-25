@@ -75,10 +75,10 @@ struct SidebarFramesTests {
             }
         }
 
-        try await move("list place") { browser.sidebarItem = .itemType("aic.decision") }
+        try await move("list place") { browser.showing = .type(TypeID("aic.decision")) }
         try await move("list to gallery") { browser.viewMode = .gallery }
-        try await move("gallery to index") { browser.sidebarItem = .sources }
-        try await move("index to gallery") { browser.sidebarItem = .allItems }
+        try await move("gallery to index") { browser.showing = .sources }
+        try await move("index to gallery") { browser.showing = .library }
         try await move("gallery to list") { browser.viewMode = .list }
         #endif
     }

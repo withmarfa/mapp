@@ -51,14 +51,13 @@ struct GeneralPage: View {
                 SettingsPopUp(title: "Start With", selection: $startWith) {
                     Text("Where I Left Off").tag(StartWith.leftOff)
                     Divider()
-                    Text("Inbox").tag(StartWith.place(.inbox))
-                    Text("Recents").tag(StartWith.place(.recents))
-                    Text("All Items").tag(StartWith.place(.allItems))
+                    Text("Library").tag(StartWith.place(.library))
+                    Text("Feed").tag(StartWith.place(.feed))
                     Text("Favorites").tag(StartWith.place(.favorites))
                     let types = library?.itemTypeCounts ?? []
                     if !types.isEmpty {
                         Divider()
-                        ForEach(types) { Text(verbatim: $0.label).tag(StartWith.place(.itemType($0.id.rawValue))) }
+                        ForEach(types) { Text(verbatim: $0.label).tag(StartWith.place(.type($0.id))) }
                     }
                     if let missing = missingStart(among: types) {
                         Divider()
@@ -81,12 +80,10 @@ struct GeneralPage: View {
 
     /// The pop-up's line for a stored place the library does not list, or nil where the choice is one the pop-up offers.
     private func missingStart(among types: [ItemTypeCount]) -> String? {
-        guard case .place(let place) = startWith else { return nil }
-        switch place {
-        case .inbox, .recents, .allItems, .favorites: return nil
-        case .itemType(let identifier) where types.contains(where: { $0.id.rawValue == identifier }): return nil
-        default: return missingName(MissingChoice.placeName(place))
-        }
+        guard case .place(let place, let item) = startWith else { return nil }
+        if item == nil, [.library, .feed, .favorites].contains(place) { return nil }
+        if item == nil, place.view == .own, case .type(let type) = place.place, types.contains(where: { $0.id == type }) { return nil }
+        return missingName(MissingChoice.placeName(place))
     }
 
     /// With no library open nothing can be said to be missing, so the name stands alone.
