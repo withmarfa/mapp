@@ -2,14 +2,12 @@ import Foundation
 
 /// The groups of the panel's Links for one item, made from edges the copy already holds: nothing is asked of the server.
 nonisolated enum PanelLinks {
+    private static let inversePrefix = "inverse:"
     /// Marfa's edge types that give a group its own place, so Referenced By does not list them again. A child is at the
     /// page's foot, a collection's member is its content, and a file is an attachment.
-    static let excerptEdge = "excerpt-of"
-    static let threadEdge = "in-thread"
-    private static let inversePrefix = "inverse:"
     private static let leftToOtherGroups: Set<String> = [
-        MarfaMapping.parentEdge, MarfaMapping.collectionEdge, excerptEdge, threadEdge, MarfaMapping.attachmentEdge,
-        MarfaMapping.placementEdge,
+        MarfaMapping.parentEdge, MarfaMapping.collectionEdge, MarfaMapping.excerptEdge, MarfaMapping.threadEdge,
+        MarfaMapping.attachmentEdge, MarfaMapping.placementEdge,
     ]
 
     /// The item's own link of the edge type `edge`, as the relationships name it.
@@ -62,17 +60,17 @@ nonisolated enum PanelLinks {
         }
         add(.referencedBy, links(referencing.flatMap(\.targets)))
         add(.linksInText, links(mentions, newestFirst: false))
-        add(.excerpts, links(inverse(excerptEdge, in: relationships)))
+        add(.excerpts, links(inverse(MarfaMapping.excerptEdge, in: relationships)))
 
-        let books = own(excerptEdge, in: relationships).compactMap(\.itemID)
+        let books = own(MarfaMapping.excerptEdge, in: relationships).compactMap(\.itemID)
         var fellows: [ItemRelationshipTarget] = []
-        for book in books { fellows += inverse(excerptEdge, in: library.relationships(for: book)) }
+        for book in books { fellows += inverse(MarfaMapping.excerptEdge, in: library.relationships(for: book)) }
         add(.moreFromBook, links(fellows))
 
         // A message's thread lists every message in it, this one in semibold.
         var thread: [ItemRelationshipTarget] = []
-        for owner in own(threadEdge, in: relationships).compactMap(\.itemID) {
-            thread += inverse(threadEdge, in: library.relationships(for: owner))
+        for owner in own(MarfaMapping.threadEdge, in: relationships).compactMap(\.itemID) {
+            thread += inverse(MarfaMapping.threadEdge, in: library.relationships(for: owner))
         }
         add(.thread, links(thread, keepingSelf: true))
 

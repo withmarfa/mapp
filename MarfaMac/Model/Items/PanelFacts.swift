@@ -111,16 +111,18 @@ nonisolated struct PanelKeptLine: Equatable, Sendable {
 }
 
 /// Who keeps an item, said once at the top of Info. A connector that only reads in makes the item Read Only, and one that
-/// carries changes both ways says the item is Synced With it. Where the server's connectors are not known (not read yet, or
+/// carries changes both ways says the item is Synced With it, unless Marfa has locked the item's fields, when the reason line says so. Where the server's connectors are not known (not read yet, or
 /// offline), the line is the item's own allowances alone (`Item.obstacle(to:)`), so the page, the commands and this line
 /// never disagree about what is locked; only the read-only case has one then.
 nonisolated enum PanelKeptBy {
     /// `direction` is how the connector that wrote the item moves items of its type, where the server has said.
     static func line(of item: Item, source: String?, direction: ConnectorDirection?) -> PanelKeptLine? {
+        let isLocked = item.obstacle(to: .fields) == .readOnly
         switch direction {
-        case .into?: readOnly(source)
-        case .both?: source.map { PanelKeptLine(symbol: "arrow.triangle.2.circlepath", text: String(localized: "Synced With \($0).")) }
-        case .out?, nil: item.obstacle(to: .fields) == .readOnly ? readOnly(source) : nil
+        case .into?: return readOnly(source)
+        case .both? where !isLocked:
+            return source.map { PanelKeptLine(symbol: "arrow.triangle.2.circlepath", text: String(localized: "Synced With \($0).")) }
+        case .both?, .out?, nil: return isLocked ? readOnly(source) : nil
         }
     }
 

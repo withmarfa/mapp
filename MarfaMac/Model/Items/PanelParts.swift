@@ -63,12 +63,6 @@ nonisolated struct PanelParts: Equatable, Sendable {
         rows[name] = .object(members)
         return displaced
     }
-
-    /// The part to show among those the item has: the one the type last showed, else the first.
-    func shown(of type: TypeID, among available: [PanelPart]) -> PanelPart? {
-        if let chosen = part(of: type), available.contains(chosen) { return chosen }
-        return available.first
-    }
 }
 
 /// The settings as `@AppStorage` keeps them: JSON with sorted keys, so the same choice is the same text.

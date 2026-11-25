@@ -2,8 +2,11 @@ import SwiftUI
 
 /// The panel beside an item's page: white behind a hairline, with a pill for each part the item has (Outline, Links,
 /// Info). One part has no pills. A type remembers the part last chosen (`PanelParts`), so a person can stay on Links.
+/// Where the type remembers none, the part shown is chosen once when the item opens and does not change as headings
+/// arrive or vanish, so a property being edited in Info is never taken from under the person.
 struct ItemPanel<Legacy: View>: View {
     @AppStorage(PanelParts.key) private var remembered = PanelParts()
+    @State private var opened = OpenedPart()
     let item: Item
     let outline: PanelOutlineModel
     let links: [PanelLinkGroup]
@@ -23,9 +26,22 @@ struct ItemPanel<Legacy: View>: View {
         return parts
     }
 
+    /// The part chosen when the item opened, held by the view for as long as it shows the item.
+    private final class OpenedPart {
+        var part: PanelPart?
+    }
+
+    /// A remembered part the item has; else the part chosen when it opened, while it is still there; else the first.
+    private func shown(among parts: [PanelPart]) -> PanelPart {
+        if let chosen = remembered.part(of: item.type), parts.contains(chosen) { return chosen }
+        let first = opened.part ?? parts.first ?? .info
+        if opened.part == nil { opened.part = first }
+        return parts.contains(first) ? first : (parts.first ?? .info)
+    }
+
     var body: some View {
         let parts = parts
-        let shown = remembered.shown(of: item.type, among: parts) ?? .info
+        let shown = shown(among: parts)
         VStack(alignment: .leading, spacing: 0) {
             if parts.count > 1 {
                 PanelPills(parts: parts, shown: shown) { PanelParts.choose($0, for: item.type) }

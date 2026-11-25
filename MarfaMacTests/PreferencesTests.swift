@@ -126,7 +126,6 @@ import Testing
         #expect(parts.part(of: TypeID("core.note")) == .links)
         #expect(parts.part(of: TypeID("core.task")) == nil, "a part a later version added is no choice here")
         #expect(parts.part(of: TypeID("core.event")) == nil)
-        #expect(parts.shown(of: TypeID("core.note"), among: [.outline, .info]) == .outline, "a part the item lacks is not shown")
         guard case .units(let units) = setting.read(here, library: "a") else { Issue.record("unreadable"); return }
         #expect(units[.row(.types, setting: "panelPart", key: "core.note")] == #"{"part":"links"}"#)
         #expect(here.stringArray(forKey: PanelParts.setAsideKey) == nil, "an unknown word is not unreadable text")
