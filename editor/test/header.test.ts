@@ -898,6 +898,34 @@ test('a row folded away keeps its place in the order a drag sends', () => {
   ])
 })
 
+test('a drag whose rows were redrawn before the release saves nothing', () => {
+  const { drag, drop } = draggable()
+  drag(50)
+  // The app sends a new head between the last pointer move and the release.
+  header.set({
+    ...ticket,
+    rows: ['b', 'a', 'c', 'd'].map((id) => ({
+      id,
+      label: id,
+      symbol: 'text.alignleft',
+      kind: 'text' as const,
+      text: id,
+      editable: true,
+      folded: id === 'd',
+    })),
+  })
+  drop()
+  expect(posted).toEqual([])
+})
+
+test('a drag of rows whose model changed without a redraw of them saves nothing', () => {
+  const { drag, drop } = draggable()
+  drag(50)
+  header.set({ ...ticket, rows: [] })
+  drop()
+  expect(posted).toEqual([])
+})
+
 test('a dragged key opens no menu, and a press that does not move still does', () => {
   const { key, drag, drop } = draggable()
   drag(50)

@@ -406,7 +406,11 @@ export class ItemHeader {
     this.parentPin = this.menuPin('ItemParentPin', 'parent', buttons)
     this.rowsBox = element('div', 'item-rows', root)
     this.properties = element('dl', 'item-props', this.rowsBox)
-    dragRows(this.properties, (row, shown) => this.moveRow(row, shown))
+    dragRows(
+      this.properties,
+      (row, shown) => this.moveRow(row, shown),
+      () => this.drawn,
+    )
     this.properties.setAttribute('aria-label', this.labels.properties)
     this.moreProperties = moreButton(this.rowsBox, () => {
       this.expanded.properties = !this.expanded.properties

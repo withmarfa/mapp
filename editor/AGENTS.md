@@ -33,7 +33,7 @@ The item editor's page: TypeScript on Inkkit, built by Vite into one self-contai
 
 - **The head draws what Swift sends and decides nothing:** not a type, which rows show, which pins, a cap, an order or a menu. A pin's value keeps to one line and its whole text is the help.
 - **It edits nothing and shows no error for a refused write.** A row flagged `editable` posts `editValue`, a field's name `fieldMenu`, a pin's button `headerMenu`, and Swift opens the editor or menu under the rectangle.
-- **A dragged row posts `moveRow` with the whole order it shows,** folded rows included (`row-drag.ts`). Swift stores it and the page draws what comes back. A right-click on a row posts `fieldMenu`, as a click on its name does.
+- **A dragged row posts `moveRow` with the whole order it shows,** folded rows included (`row-drag.ts`). Swift stores it and the page draws what comes back. A drop after the rows were drawn again posts nothing. A right-click on a row posts `fieldMenu`, as a click on its name does.
 - **Report scrolling only when something changes for the toolbar** (`headerScrolledAway`, `contentUnderToolbar`), never at every scroll.
 
 ## Editing

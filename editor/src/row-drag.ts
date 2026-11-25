@@ -20,12 +20,21 @@ function swallowNextClick() {
 }
 
 /** Lets a row of `list` be dragged by its key. The other rows make way as it passes. Escape puts it back, and a press
- *  that does not move stays a click. `move` gets the row and the rows' order once it has moved. */
-export function dragRows(list: HTMLElement, move: (row: string, order: string[]) => void) {
+ *  that does not move stays a click. `move` gets the row and the rows' order once it has moved.
+ *
+ *  `version` says what the list was drawn from. A drop is carried out only if every row it began with is still on the
+ *  page and `version` is what it was when the press began: the app may have redrawn the rows since the last move of the
+ *  pointer, and an order made from rows that are gone would save a stale order. Such a drag is dropped and sends nothing. */
+export function dragRows(
+  list: HTMLElement,
+  move: (row: string, order: string[]) => void,
+  version: () => unknown = () => 0,
+) {
   list.addEventListener('pointerdown', (down) => {
     const key = (down.target as Element | null)?.closest?.('.item-prop-label')
     const entry = key?.parentElement
     const rows = [...list.children] as HTMLElement[]
+    const began = version()
     if (down.button !== 0 || down.ctrlKey || !entry || rows.length < 2) return
 
     const from = rows.indexOf(entry)
@@ -98,7 +107,8 @@ export function dragRows(list: HTMLElement, move: (row: string, order: string[])
       // The release must not also open the row's editor.
       swallowNextClick()
 
-      if (!drop || target === from) return restore()
+      const current = version() === began && rows.every((row) => row.parentElement === list)
+      if (!drop || !current || target === from) return restore()
       const order = rows.filter((row) => row !== entry)
       if (entry?.dataset.row) {
         order.splice(target, 0, entry)

@@ -2,7 +2,7 @@
 
 :root {
   /* Rem-based dimensions scale with the native text-size preference. */
-  font-size: 13px;
+  font-size: 15px;
   --inkkit-accent-color: #0088ff;
   --inkkit-text-color: CanvasText;
   --inkkit-muted-color: color-mix(in srgb, CanvasText 55%, transparent);
