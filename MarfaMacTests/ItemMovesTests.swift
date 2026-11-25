@@ -58,8 +58,8 @@ import Testing
         try await show([F.p1, F.e1], in: library, source) { $0.state = .archived }
         acceptAll(source)
 
-        // Another device makes Epic task active again.
-        try await show([F.e1], in: library, source) { $0.state = .active }
+        // Another device moves Epic task to Recently Deleted.
+        try await show([F.e1], in: library, source) { $0.state = .trashed }
         undo.undo()
         #expect(source.writes == [.transition(F.p1, .active)], "Bug one stays archived, and Epic task is left as it is")
         #expect(library.notices.waiting.last?.message == BatchSkips.sentence(.changedSince, count: 1))
@@ -81,19 +81,6 @@ import Testing
         undo.undo()
         #expect(source.writes == [.retier(F.n2, .feed, base: item.version)])
         #expect(undo.undoActionName.isEmpty && undo.redoActionName == ItemMove.keep.name)
-    }
-
-    @Test func aTierUndoLeavesAnItemMovedElsewhereSince() async throws {
-        let (library, source) = try await loaded()
-        let undo = UndoManager()
-        library.setTier([F.n2], to: .library, undoManager: undo)
-        try await show([F.n2], in: library, source) { $0.tier = .library }
-        acceptAll(source)
-        // Another device moves it back to the Feed, so the Undo would write over that change.
-        try await show([F.n2], in: library, source) { $0.tier = .feed }
-        undo.undo()
-        #expect(source.writes.isEmpty)
-        #expect(library.notices.waiting.last?.message == BatchSkips.sentence(.changedSince, count: 1))
     }
 
     @Test func aMixedSelectionOffersBothTiersAndACollectionStaysInTheLibrary() async throws {

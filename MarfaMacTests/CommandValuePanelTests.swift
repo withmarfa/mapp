@@ -100,8 +100,8 @@ struct CommandValuePanelTests {
 
     @Test func anItemThatCannotTakeTagsDoesNotEmptyTheTagsTheOthersHold() {
         let world = world()
-        var kept = note("Kept by a connector")
-        kept.readOnly = true
+        var kept = note("In Recently Deleted")
+        kept.state = .trashed
         world.library.items.append(kept)
         world.library.addTag("shared", to: [world.first.id, world.second.id], undoManager: nil)
         let model = model(.tags, over: [world.first.id, world.second.id, kept.id], in: world.library)

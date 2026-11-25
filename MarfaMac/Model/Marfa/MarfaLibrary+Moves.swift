@@ -4,6 +4,7 @@ import Foundation
 /// write, and a command's writes are one undo step. Archive and Unarchive are state changes, made and undone as Delete's
 /// are (`setStates`); a tier is an update that carries the version the copy holds (`items/update-tier`).
 extension MarfaLibrary {
+    @discardableResult
     func setTier(_ ids: Set<ItemID>, to tier: Tier, undoManager: UndoManager?) -> CommandOutcome {
         let move: ItemMove = tier == .library ? .keep : .moveToFeed
         let plan = tierPlan(ids, to: tier)
@@ -14,6 +15,7 @@ extension MarfaLibrary {
         return CommandOutcome(changes.keys, skips: plan.skips)
     }
 
+    @discardableResult
     func archive(_ ids: Set<ItemID>, beneath: Bool, undoManager: UndoManager?) -> CommandOutcome {
         let plan = archivePlan(ids)
         let moving = beneath ? plan.archiving.union(plan.beneath) : plan.archiving
@@ -24,6 +26,7 @@ extension MarfaLibrary {
         return CommandOutcome(moving, skips: plan.skips)
     }
 
+    @discardableResult
     func unarchive(_ ids: Set<ItemID>, undoManager: UndoManager?) -> CommandOutcome {
         let plan = unarchivePlan(ids)
         var changes: [ItemID: StateChange] = [:]

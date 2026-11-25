@@ -419,7 +419,7 @@ struct ValueEditingTests {
         let library = Self.library([item])
         let model = ValueEditModel(Self.request(.tags, item: item, in: library))
         model.query = "fresh"
-        library.items[0].readOnly = true
+        library.items[0].state = .trashed
         model.finishTagField()
         #expect(library.notices.told == 1 && library.notices.waiting.first?.text == "fresh")
     }
@@ -556,7 +556,7 @@ struct ValueEditingTests {
         var toldAtClose: Int?
         model.close = { if toldAtClose == nil { toldAtClose = library.notices.told } }
         model.query = "bluer"
-        library.items[0].readOnly = true
+        library.items[0].state = .trashed
         model.activate("tag:bluer")
         model.finishTagField()
         #expect(toldAtClose == 1 && library.notices.told == 1 && library.notices.waiting.first?.text == "bluer")

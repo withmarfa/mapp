@@ -717,6 +717,7 @@ final class FakeItemLibrary: ItemLibrary {
 
     // MARK: Tier and state
 
+    @discardableResult
     func setTier(_ ids: Set<ItemID>, to tier: Tier, undoManager: UndoManager?) -> CommandOutcome {
         let move: ItemMove = tier == .library ? .keep : .moveToFeed
         let plan = tierPlan(ids, to: tier)
@@ -730,6 +731,7 @@ final class FakeItemLibrary: ItemLibrary {
         return CommandOutcome(plan.changing, skips: plan.skips)
     }
 
+    @discardableResult
     func archive(_ ids: Set<ItemID>, beneath: Bool, undoManager: UndoManager?) -> CommandOutcome {
         let plan = archivePlan(ids)
         let moving = beneath ? plan.archiving.union(plan.beneath) : plan.archiving
@@ -738,6 +740,7 @@ final class FakeItemLibrary: ItemLibrary {
         return CommandOutcome(moving, skips: plan.skips)
     }
 
+    @discardableResult
     func unarchive(_ ids: Set<ItemID>, undoManager: UndoManager?) -> CommandOutcome {
         let plan = unarchivePlan(ids)
         tellSkipped(plan.skips, didChange: !plan.changing.isEmpty, failing: ItemMove.unarchive.failing)

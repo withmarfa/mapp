@@ -227,7 +227,7 @@ struct InspectorFieldsTests {
         ], content: .file(.plainText, byteCount: 76))
         let library = try await Self.marfa([item], types: [Self.file])
         let hidden = library.hiddenPropertyKeys(of: item)
-        #expect(hidden == ["blob_ref", "mime_type", "size_bytes", "title"])
+        #expect(hidden == MarfaMapping.fileFacts.union(["title"]))
         #expect(InspectorFields.properties(of: item, type: Self.file, hidden: hidden).map(\.key) == ["description"])
         // None of them turns up under the other properties either.
         #expect(InspectorFields.accountedFor(type: Self.file, hidden: hidden).isSuperset(of: ["blob_ref", "mime_type", "size_bytes"]))

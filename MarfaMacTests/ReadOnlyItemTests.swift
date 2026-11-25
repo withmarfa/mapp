@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import UniformTypeIdentifiers
 @testable import MarfaMac
 
 /// An item a person's connector keeps, which the server marks read only: `Item.obstacle(to:)` refuses what the
