@@ -21,7 +21,7 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | The two fixed zones | Search and New, then Library with its count and Feed with none. The Feed's symbol is `water.waves`. Search opens the Command Palette. | `SidebarGroups.swift`, `SidebarTypeRow.swift` | `Rethink-Sidebars`, `Rethink-Library` |
 | Under the pointer | A plus takes the place of the count on a type, a kind and a collection. Search and New show their shortcuts. A section's heading shows Add and More. Nothing in a row moves. | `SidebarTypeRow.swift`, `SidebarGroups.swift` | `Rethink-Sidebar-Pointer`, `Rethink-Sidebar-Sections` |
 | Pinned and Types | Pinned holds views, collections and items. Types list their kinds under them. A person's arrangement is read into the new sidebar: views they placed keep their sections, the rest go to Pinned, and an unknown group is ignored. | `SidebarLayout`, `SidebarGroups.swift` | `Rethink-Sidebars` |
-| Customize Sidebar | Dashed places (Tab, Command, a Library list, Pinned, Type, Section) each open a menu of what can go there. One tabs row shows while customizing. | `CustomizeSidebar.swift` | `Rethink-Customize-Sidebar`, `Rethink-Customize-Sidebar-Add` |
+| Customize Sidebar | Dashed places (Tab, Command, a Library list, Pinned, Type, Section) each open a menu of what can go there. One tabs row shows while customizing. | new file in `MarfaMac/Views/` | `Rethink-Customize-Sidebar`, `Rethink-Customize-Sidebar-Add` |
 | Sidebar closed | The title gets an arrow that opens the sidebar's rows as a menu. Back and Forward stay. The control after the count follows the title. | `SidebarToolbar.swift`, `MainView.swift` | `Rethink-Sidebar-Closed`, `Rethink-Sidebar-Closed-Menu` |
 | The top row | Title and count on one baseline, the Library or Feed control, the place's views, then the buttons. At rest the views have their own row; scrolled, they sit beside the title. Types, Collections and Sources fold into one menu first, then views into N More, then one pill. It is drawn in the content, as `docs/window.md` says. | `WindowToolbar.swift`, `ListToolbar.swift`, `IndexScrollAway.swift` | `Rethink-Library-Scrolled`, `Rethink-Top-Row-Columns`, `Rethink-Top-Row-Lists` |
 | Customize Toolbar goes | Its commands stay in the menus and the palette. | `WindowToolbarLayout` | `Rethink-Library` |
@@ -49,9 +49,8 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | Feed's mark | In every list of all items, after a Feed item's name, in each layout that shows a name. The table of both tiers has it; the list and gallery do not yet. | `ItemRow.swift`, `GalleryCards.swift` | `Rethink-Type-Inbox`, `Rethink-Archive` |
 | A table stays in the Library | A table item is offered no Move to Feed, as a collection and a view are not. **Waits for the package:** its catalogue does not say which types hold a table, and the app names no type (marfa-swift#561). | `ItemMoves.swift`, `Catalogue` | `Rethink-Item-Menus` |
 | Quick Actions | Keep, Archive and Delete on the row under the pointer, a choice of each view, with the default that `docs/concepts.md` gives. | `ItemRow.swift`, `ViewMacSettings` | `Rethink-Inbox-Actions`, `Rethink-View-Quick-Actions` |
-| In | A value on the panel's Info for every item, Library or Feed, that a person changes there. | `ItemInspector.swift` | `Rethink-Feed-Page-In` |
-| Leaves the Feed | A date beside In, only where the type has a limit and the item is active in the Feed. Move to Feed asks first only where the limit would remove the item at once: the alert is built and asks `ItemLibrary.feedLimitQuestion`, which answers nothing until the limit is in the catalogue. **Waits for Marfa and the package:** a type's feed window in the catalogue (marfa#3560, marfa-swift#559). | `ItemInspector.swift`, `ItemMoves.swift` | `Rethink-Feed-Limit`, `Rethink-Feed-Limit-Move` |
-| Who else keeps an item | One line in Info: "Read only. RSS keeps this item, so a change made here would be overwritten." or "Synced with GitHub. A change made here is sent there." | `ItemInspector.swift` | `Rethink-Kept-By` |
+| Leaves the Feed | A date beside In, only where the type has a limit and the item is active in the Feed. Move to Feed asks first only where the limit would remove the item at once: the alert is built and asks `ItemLibrary.feedLimitQuestion`, which answers nothing until the limit is in the catalogue. **Waits for Marfa and the package:** a type's feed window in the catalogue (marfa#3560, marfa-swift#559). | `PanelInfoView.swift`, `ItemMoves.swift` | `Rethink-Feed-Limit`, `Rethink-Feed-Limit-Move` |
+| Who else keeps an item | "Synced with GitHub. A change made here is sent there." in Info. **Waits for Marfa:** the app's sign-in cannot read which connector carries changes back without an owner's call. | `PanelInfoView.swift` | `Rethink-Kept-By` |
 
 ## Archiving
 
@@ -141,11 +140,7 @@ Read only the row you are building. A row says what was agreed; the boards it na
 
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
-| The panel | White, closed by default, with pills: Outline, Links, Info. It remembers the pill for each type. One part has no pills. | `ItemInspector.swift` | `Rethink-Panel-Sizes`, `Rethink-Task-Page` |
-| Outline | Reading Time and Words, or a PDF's Pages, then the headings. | `ItemInspectorRows.swift` | `Rethink-Long-Page`, `Rethink-PDF` |
-| Links | In Collection, Referenced By, Links in the Text, Excerpts, Thread, Attachments. | `ItemRelationships.swift` | `Rethink-Highlight`, `Rethink-Message` |
-| Info | Source, version, created, edited, a file's facts, In, Leaves the Feed, who keeps it, History. The history is asked for when Info shows. | `ItemInspectorFields.swift` | `Rethink-Feed-Page-In`, `Rethink-Kept-By` |
-| What goes | Properties, Tags, Relationships, From Apps and the sidebar's own arrangement, once the rows carry them. Fields the type does not declare are the last rows, under Other. A sync problem is a page notice. | `ItemProperties.swift`, `ItemTags.swift`, `SidebarArrangement` | `Rethink-Properties-Rule` |
+| What goes | Properties, Tags and Relationships in Info, and the sync problem, once the page's rows carry them. Fields the type does not declare are the last rows, under Other. | `ItemInspector.swift`, `ItemProperties.swift`, `ItemTags.swift` | `Rethink-Properties-Rule` |
 
 ## Editing and links
 

@@ -62,7 +62,6 @@ struct GeneralSettingsTests {
     @Test func resetClearsEverySettingTheListNamesAndNothingElse() throws {
         let defaults = ThrowawayDefaults.make("GeneralSettingsTests")
         for key in MacSettings.keys { defaults.set("chosen", forKey: key) }
-        defaults.set("chosen", forKey: "\(InterfaceKey.inspectorAppOpen).app.one")
         // What is not a setting: the connection, the sign-in's pending state, a value set aside, a window's frame.
         let kept = [
             MarfaHost.addressKey, MarfaHost.discardedKey, ViewLayouts.setAsideKey, TypeLooks.setAsideKey, "NSWindow Frame MarfaMacSettings",
@@ -74,7 +73,6 @@ struct GeneralSettingsTests {
         for key in MacSettings.keys {
             #expect(defaults.object(forKey: key) == nil, "\(key) was not reset")
         }
-        #expect(defaults.object(forKey: "\(InterfaceKey.inspectorAppOpen).app.one") == nil)
         for key in kept { #expect(defaults.string(forKey: key) == "kept", "\(key) was cleared") }
         // Reopen Windows is removed, not written, so the Mac's own answer stands again.
         #expect(ReopenWindows.stored(in: defaults) == (ReopenWindows.system() ?? ReopenWindows.standard))

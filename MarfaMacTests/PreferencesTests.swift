@@ -114,6 +114,24 @@ import Testing
         #expect(NSDictionary(dictionary: joined) == NSDictionary(dictionary: layout.merging(["hidden": ["inbox", "recents"]]) { _, new in new }))
     }
 
+    @Test func theRememberedPanelPartIsReadBackAndAWordThisVersionLacksIsNoChoice() throws {
+        let here = defaults()
+        let setting = try setting(PanelParts.key)
+        setting.write([
+            .row(.types, setting: "panelPart", key: "core.note"): #"{"part":"links"}"#,
+            .row(.types, setting: "panelPart", key: "core.task"): #"{"part":"timeline"}"#,
+            .row(.types, setting: "panelPart", key: "core.event"): "{}",
+        ], to: here, library: "a")
+        let parts = try #require(here.string(forKey: PanelParts.key).flatMap(PanelParts.init(rawValue:)))
+        #expect(parts.part(of: TypeID("core.note")) == .links)
+        #expect(parts.part(of: TypeID("core.task")) == nil, "a part a later version added is no choice here")
+        #expect(parts.part(of: TypeID("core.event")) == nil)
+        #expect(parts.shown(of: TypeID("core.note"), among: [.outline, .info]) == .outline, "a part the item lacks is not shown")
+        guard case .units(let units) = setting.read(here, library: "a") else { Issue.record("unreadable"); return }
+        #expect(units[.row(.types, setting: "panelPart", key: "core.note")] == #"{"part":"links"}"#)
+        #expect(here.stringArray(forKey: PanelParts.setAsideKey) == nil, "an unknown word is not unreadable text")
+    }
+
     @Test func aRowThatIsNotJSONIsSetAsideAndTheStoreKeepsItsDefault() throws {
         let here = defaults()
         let setting = try setting(PagePlacements.key)
