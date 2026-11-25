@@ -2458,10 +2458,10 @@
     "Archive" : {
 
     },
-    "Archive Is Empty" : {
+    "Archive All" : {
 
     },
-    "Archive All" : {
+    "Archive Is Empty" : {
 
     },
     "Archive Only These Items" : {
@@ -2481,6 +2481,9 @@
       }
     },
     "Archive or Unarchive" : {
+
+    },
+    "Archive this item and the ^[%lld item](inflect: true) under it?" : {
 
     },
     "Archive “%@” and the ^[%lld item](inflect: true) under it?" : {
