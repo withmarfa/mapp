@@ -184,7 +184,7 @@ extension Browser {
             lanes = ItemBoardLayout.lanes(
                 items: items, key: key, catalogue: library.catalogue, order: order, statusGroups: true, asMarfa: isViewPlace)
         } else if mode == .value, let field = column.field, ItemBoardLayout.isCompatible(field) {
-            lanes = ItemBoardLayout.lanes(items: items, key: key, catalogue: library.catalogue, order: order)
+            lanes = ItemBoardLayout.lanes(items: items, key: key, catalogue: library.catalogue, order: order, asMarfa: isViewPlace)
         } else {
             let groups = ItemTableLayout.groups(
                 of: content.kept, by: column, mode: mode, catalogue: library.catalogue, declared: true, asMarfa: isViewPlace,

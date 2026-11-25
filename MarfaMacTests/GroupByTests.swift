@@ -132,6 +132,19 @@ struct GroupByTests {
         #expect(Set(try #require(lanes.first { $0.groupKey == "" }).items.map(\.id.rawValue)) == ["plan", "odd"])
     }
 
+    /// A saved view's board of a choice puts an item whose type lacks the field in the null group, as the table does, so
+    /// hiding that group hides it on the board too.
+    @Test func aSavedViewsBoardOfAChoiceHidesTheNullGroupsItems() {
+        let items = [Self.item("day", Self.event, ["precision": .string("day")]), Self.item("plan", Self.task)]
+        let place = ItemBoardLayout.lanes(items: items, key: "precision", catalogue: Self.catalogue)
+        #expect(place.contains { $0.id == .notApplicable })
+        let view = ItemBoardLayout.lanes(items: items, key: "precision", catalogue: Self.catalogue, asMarfa: true)
+        #expect(!view.contains { $0.id == .notApplicable })
+        #expect(view.first { $0.groupKey == GroupKey.none }?.items.map(\.id.rawValue) == ["plan"])
+        let shown = ItemBoardLayout.arranged(view, order: nil, hidden: [GroupKey.none], hidesEmpty: false)
+        #expect(!shown.flatMap(\.items).contains { $0.id.rawValue == "plan" })
+    }
+
     // MARK: In a window
 
     private static func library(_ items: [MarfaMac.Item]) -> FakeItemLibrary {

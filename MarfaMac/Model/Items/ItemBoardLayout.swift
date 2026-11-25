@@ -88,8 +88,9 @@ nonisolated enum ItemBoardLayout {
     /// item needs them. A board's fields are closed, so a word no type declares is an invalid value. Where the types
     /// keep their status in different fields, or the person groups by them (`statusGroups`), the lanes are Marfa's
     /// status groups instead. Within a lane the cards follow `order`, each item's place in the sort the window shows, or
-    /// the title where nothing sorts them. With `asMarfa`, as a saved view groups, status groups put a word no group
-    /// claims in No Status, as Marfa does (`device/view-group-status`).
+    /// the title where nothing sorts them. With `asMarfa`, as a saved view groups, every item is in a group Marfa names:
+    /// status groups put a word no group claims in No Status (`device/view-group-status`), and an item whose type lacks
+    /// the field is in the lane of items with no value, as the table groups it (`ItemTableLayout.groups`).
     static func lanes(
         items: [Item], key: String, catalogue: Catalogue, order: [ItemID: Int]? = nil, statusGroups: Bool = false, asMarfa: Bool = false
     ) -> [ItemBoardLane] {
@@ -109,7 +110,10 @@ nonisolated enum ItemBoardLayout {
         }
         // Words in one group, and the words of a choice, which has no groups, stay in declared order.
         values = values.enumerated().sorted { ($0.element.bucket.rank, $0.offset) < ($1.element.bucket.rank, $1.offset) }.map(\.element)
-        let groups = Dictionary(grouping: items) { lane(for: $0, key: key, catalogue: catalogue) }
+        let groups = Dictionary(grouping: items) { item in
+            let lane = lane(for: item, key: key, catalogue: catalogue)
+            return asMarfa && lane == .notApplicable ? .missing : lane
+        }
         var lanes = values.map { entry in
             ItemBoardLane(
                 id: .option(entry.word), title: ItemTypeInfo.Field.label(ofOption: entry.word),
