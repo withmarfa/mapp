@@ -30,9 +30,16 @@ struct SidebarFoot: View {
             openPanel: host == nil ? nil : { showsPanel.toggle() },
             openProblems: { browser.showSettings(.connection) },
             openSettings: { browser.showSettings() })
-        // The panel's leading edge lines up with the row's, as the board draws it, not centred on the foot.
-        .popover(isPresented: $showsPanel, attachmentAnchor: .rect(.rect(CGRect(x: 10, y: 0, width: MarfaPanel.width, height: 56))), arrowEdge: .top) {
-            if let host { panel(name, host: host) }
+        // A popover centres on what it hangs from, so it hangs from an empty area as wide as the panel that starts where
+        // the row does: the panel's leading edge lines up with the row's, as the board draws it, inside the window.
+        .overlay(alignment: .topLeading) {
+            Color.clear
+                .frame(width: MarfaPanel.width, height: 56)
+                .allowsHitTesting(false)
+                .popover(isPresented: $showsPanel, arrowEdge: .top) {
+                    if let host { panel(name, host: host) }
+                }
+                .padding(.leading, 10)
         }
     }
 
@@ -96,7 +103,8 @@ struct SidebarFootRow: View {
             .accessibilityLabel(Text(verbatim: name))
             .accessibilityHint(Text("Shows the Marfa’s latest updates."))
             .accessibilityIdentifier("SidebarMarfa")
-            HStack(alignment: .center, spacing: 4) {
+            // The cog's own frame leaves the room between it and the line.
+            HStack(alignment: .center, spacing: 0) {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(verbatim: name)
                         .interfaceFont(.body.weight(.medium))
