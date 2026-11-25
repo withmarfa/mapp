@@ -1,6 +1,13 @@
 import Foundation
 
 extension Browser {
+    /// Selection is set before the window applies the destination's layout.
+    func opensInDigest(_ place: PlaceView) -> Bool {
+        if let id = place.savedView { return (macSettings(for: id).layout ?? viewMode) == .digest }
+        let layout = PlaceDefaults.stored(in: defaults).default(for: place)?.layout ?? naturalLayout(of: place)
+        return layout == .digest
+    }
+
     var currentDigest: DigestLayout.Display? {
         digestDisplay?.place == shown ? digestDisplay : nil
     }
