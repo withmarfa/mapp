@@ -170,20 +170,27 @@ window.addEventListener(
   { capture: true },
 )
 
-// WebKit opens its own menu, which the app adds to: it hears which embed and which header row the pointer is
-// over just before. Heard first on the window, so a menu over neither clears what the last one named.
+// A right-click on a row of the head opens the row's menu, as a click on its name does. Elsewhere WebKit opens its own
+// menu, which the app adds to: it hears which embed and which row of the footer the pointer is over just before. Heard
+// first on the window, so a menu over neither clears what the last one named.
 window.addEventListener(
   'contextmenu',
   (event) => {
     postToHost({ type: 'embedMenu', embed: null, opens: false })
+    if (header.openRowMenuAt(event.target)) {
+      event.preventDefault()
+      event.stopPropagation()
+      postToHost({ type: 'rowMenu', row: null })
+      return
+    }
     postToHost({ type: 'rowMenu', row: header.rowAt(event.target) })
   },
   { capture: true },
 )
 
 let generation = 0
-// The toolbar shows the title once the header has gone under it; the app hears only when that changes. A page
-// with no header to show, as for a deleted item, has its title there from the start.
+// The toolbar shows the title once the head has gone under it; the app hears only when that changes. A page with no
+// head to show, as in Focus, has its title there from the start.
 let headerScrolledAway = false
 function checkHeaderScrolledAway(): void {
   const away = header.isHidden || window.scrollY >= header.bottom

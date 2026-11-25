@@ -15,7 +15,7 @@ Keep SwiftUI out. `ItemLibrary` is the app's whole view of the working copy; `Ma
 ## One rule decides, the view draws
 
 - **What a list row or card says is `RowContent`,** which is pure, from the item, its type's look and the list (`RowList`). `RowContents` keeps it for each item value, so no row body resolves a look or reads the catalogue.
-- **What sits under a page's title is `PagePins`,** and what a person chose for a type is `PagePlacements`.
+- **What a page's head shows is `PageHead`,** and what a person chose for a type is `PagePlacements`.
 
 ## Settings the app keeps
 

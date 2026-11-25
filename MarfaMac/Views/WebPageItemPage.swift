@@ -109,10 +109,6 @@ struct WebPageItemPage: View {
         return loaded.mode(choosing: mode, mailChoice: mailChoice)
     }
 
-    /// The look the header is drawn for. While the page loads it is the look it will most likely have, the one kept for
-    /// articles, so the title does not change type when the page arrives.
-    private var headerMode: SourceViewMode { shownMode ?? mode }
-
     /// The look to show on the corner's switch, while the page has an article to switch from.
     private var offeredMode: SourceViewMode? {
         guard case .ready(let loaded) = content, loaded.reader != nil else { return nil }
@@ -149,7 +145,7 @@ struct WebPageItemPage: View {
                         }
                         // Focus leaves only the page: its title is in the toolbar and its properties are hidden.
                         if !drafts.isFocused(on: item.id) {
-                            WebPageHeader(item: item, inset: inset, drafts: drafts, open: open, reading: headerMode == .reader)
+                            WebPageHeader(item: item, inset: inset, drafts: drafts, open: open)
                                 // As far down as the header reaches, with the callout above it counted.
                                 .onGeometryChange(for: CGFloat.self) { [space = Self.headerBlock] in $0.frame(in: .named(space)).maxY } action: { headerHeight = $0 }
                         }
@@ -171,16 +167,17 @@ struct WebPageItemPage: View {
         }
         .onDisappear {
             drafts.offerPageLook(nil, for: item.id)
-            drafts.headerScrolled(away: false, for: item.id)
+            drafts.headerScrolled(nil, for: item.id)
         }
         .onChange(of: offeredMode) { offerLook() }
         .onChange(of: item.id) { previous, _ in
             drafts.offerPageLook(nil, for: previous)
-            drafts.headerScrolled(away: false, for: previous)
+            drafts.headerScrolled(nil, for: previous)
             headerScroll.reset()
             offerLook()
         }
         .onChange(of: headerHeight) { feedAway() }
+        .onChange(of: item.displayTitle) { feedAway() }
         // A header taken out by Focus reports no height of its own, so its last one is forgotten here: otherwise the
         // page would still count it as scrolled away, and the toolbar's title would stay on once the header is back.
         .onChange(of: drafts.isFocused(on: item.id)) { _, focused in
@@ -219,7 +216,8 @@ struct WebPageItemPage: View {
     }
 
     private func feedAway() {
-        drafts.headerScrolled(away: headerScroll.isAway(headerHeight: headerHeight), for: item.id)
+        let head = ScrolledHead(item: item.id, title: item.displayTitle, typeIcon: library.catalogue.icon(for: item.type))
+        drafts.headerScrolled(headerScroll.isAway(headerHeight: headerHeight) ? head : nil, for: item.id)
     }
 
     @ViewBuilder private func pageBody(toolbarHeight: CGFloat) -> some View {
@@ -426,9 +424,8 @@ struct PageLookSwitch {
     let choose: (SourceViewMode) -> Void
 }
 
-/// The page's header, drawn in SwiftUI as the item page's is drawn on the web: the title, then the pins. The same in
-/// either look: the look sets only the title's type, so changing it never moves the pins.
-/// `PageHeaderParts` gives both pages their kind, lead and pins, and `PageChip` their looks.
+/// The page's head, drawn in SwiftUI from the same `PageHead` as the item page's web head: the kicker, the title, the
+/// pins and the rows. The same in either look, which sets only the title's type, so changing it never moves the rows.
 private struct WebPageHeader: View {
     @CurrentLibrary private var library
     @AppStorage(InterfaceKey.textSize) private var interfaceTextSize = InterfaceStyle.defaultTextSize
@@ -436,34 +433,30 @@ private struct WebPageHeader: View {
     @AppStorage(PagePlacements.key) private var placements = PagePlacements()
     @AppStorage(PageKey.titleLines) private var titleLines = TitleLines.standard
     @AppStorage(PageKey.showsCoordinates) private var showsCoordinates = false
+    @AppStorage(PageKey.pinsProperties) private var pinsProperties = false
     @StoredPageStyle private var style
     let item: Item
     let inset: CGFloat
     let drafts: DetailsPresentation
     let open: (ItemID) -> Void
-    /// Whether the page is shown, or is about to be, in Reader, which gives the title the reading header's serif.
-    let reading: Bool
 
     var body: some View {
-        let parts = PageHeaderParts(of: item, in: library, placements: placements, dateFormat: dateFormat, showsCoordinates: showsCoordinates)
-        let step = CGFloat(interfaceTextSize) * 4 / 13
+        let head = PageHead(
+            of: item, in: library, placements: placements, pinsProperties: pinsProperties, dateFormat: dateFormat,
+            showsCoordinates: showsCoordinates)
         let textSize = CGFloat(style.textSize)
-        let statusField = parts.type?.statusField
-        VStack(alignment: .leading, spacing: 10) {
-            Text(verbatim: item.displayTitle)
-                .font(reading
-                    ? .system(size: textSize * 2.1, weight: .semibold, design: .serif)
-                    : .system(size: textSize * 1.9, weight: .semibold))
-                .tracking(reading ? -textSize * 2.1 * 0.01 : 0)
-                .lineLimit(TitleLines.resolved(titleLines))
-                .truncationMode(.tail)
-                .fixedSize(horizontal: false, vertical: true)
-                .textSelection(.enabled)
-                .accessibilityAddTraits(.isHeader)
-                .accessibilityIdentifier("WebPageTitle")
-            if !parts.pins.pins.isEmpty {
-                PagePinsView(item: item, pins: parts.pins.pins, statusField: statusField, drafts: drafts, open: open)
-                    .padding(.top, step * 1.5)
+        let statusField = library.catalogue.itemTypes[item.type]?.statusField
+        VStack(alignment: .leading, spacing: 0) {
+            PageHeadView(item: item, head: head, statusField: statusField, drafts: drafts, open: open) {
+                Text(verbatim: item.displayTitle)
+                    .font(.system(size: textSize * 28 / 15, weight: .bold))
+                    .tracking(-textSize * 28 / 15 * 0.022)
+                    .lineLimit(TitleLines.resolved(titleLines))
+                    .truncationMode(.tail)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityIdentifier("WebPageTitle")
             }
             if let statusField, drafts.draft(for: item.id, key: statusField.key).rejected {
                 Text("The value could not be saved.")

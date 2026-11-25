@@ -124,7 +124,7 @@ struct ItemPage: View {
         .onChange(of: style, initial: true) { _, style in editor.setStyle(style) }
         .onChange(of: formatShortcuts, initial: true) { _, shortcuts in editor.setFormatShortcuts(shortcuts) }
         .onChange(of: item.id, initial: true) { old, id in
-            if old != id { headerDrafts.headerScrolled(away: false, for: old) }
+            if old != id { headerDrafts.headerScrolled(nil, for: old) }
             guard let item = library.item(id) else { return }
             // Returning from Settings reattaches the same editor without resetting its scroll position or undo.
             editor.select(item)
@@ -132,7 +132,8 @@ struct ItemPage: View {
         }
         .onChange(of: editor.isHeaderScrolledAway) { feedHeaderScroll() }
         .onChange(of: editor.pageItemID) { feedHeaderScroll() }
-        .onDisappear { headerDrafts.headerScrolled(away: false, for: item.id) }
+        .onChange(of: item.title) { feedHeaderScroll() }
+        .onDisappear { headerDrafts.headerScrolled(nil, for: item.id) }
         // The editor takes in only a change to the item's text or to whether it can be written in. A change the
         // server has taken takes a new version, but the copy shows a delete, a recovery or a problem before then,
         // and a server that keeps its own text over the person's changes the text without one. The action may run
@@ -142,10 +143,12 @@ struct ItemPage: View {
         .onChange(of: library.body(of: item.id)) { itemChanged() }
     }
 
-    /// Tells the window whether this item's header is away. The editor may still hold the item before, whose header it
+    /// Tells the window whether this item's head is away. The editor may still hold the item before, whose head it
     /// reports on, so only its own item's counts.
     private func feedHeaderScroll() {
-        headerDrafts.headerScrolled(away: editor.pageItemID == item.id && editor.isHeaderScrolledAway, for: item.id)
+        let away = editor.pageItemID == item.id && editor.isHeaderScrolledAway
+        headerDrafts.headerScrolled(
+            away ? ScrolledHead(item: item.id, title: item.title, typeIcon: library.catalogue.icon(for: item.type)) : nil, for: item.id)
     }
 
     private func itemChanged() {

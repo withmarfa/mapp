@@ -171,7 +171,7 @@ struct FilterChoices {
             var counts: [String: Int] = [:]
             for row in rows { for name in FilterMatching.members(of: row, target) { counts[name, default: 0] += 1 } }
             for name in counts.keys.sorted(by: { counts[$0]! != counts[$1]! ? counts[$0]! > counts[$1]! : $0.localizedStandardCompare($1) == .orderedAscending }) {
-                row(name, name, .person(initials: PersonHeader.initials(of: name.split(separator: " ").map(String.init))))
+                row(name, name, .person(initials: PersonInitials.of(name) ?? ""))
             }
             searchPrompt = "Search People"
         case .date, .number, .text, .moment:

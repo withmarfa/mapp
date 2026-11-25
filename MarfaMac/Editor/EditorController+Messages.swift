@@ -97,10 +97,8 @@ extension EditorController {
             ValueEditPresenter.shared.valueMoved(item: item, row: row, to: containerRect(rect, viewportHeight: viewportHeight))
         case .moveRow(let item, let row, let order):
             onHeaderEvent(.moveRow(row: row, order: order, item))
-        case .toggleLayout:
-            onHeaderEvent(.toggleLayout)
-        case .showLinked:
-            onHeaderEvent(.showLinked)
+        case .changeType(let item, let rect, let viewportHeight):
+            onHeaderEvent(.changeType(item, containerRect(rect, viewportHeight: viewportHeight)))
         case .openLink(let href):
             // The page has already refused what Inkkit's `canOpenLink` does not allow.
             openAddress(href)

@@ -79,25 +79,6 @@ nonisolated struct PageLayout: Equatable, Sendable {
         return moved
     }
 
-    /// Lists the page's rows in `order`, the order the page drew them in once `id` was dragged, which is not always
-    /// this layout's own (a pin an event's time pushed out is drawn among them, and the default order can differ from
-    /// what was shown). Rows named come first, in that order; page rows it does not name follow as they were; an id
-    /// that is not a page row is ignored. Nil where `id` is not a page row, such as a pin.
-    func listing(_ order: [String], moving id: String) -> PageLayout? {
-        guard group(of: id) == .page else { return nil }
-        let byID = Dictionary(page.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        var seen = Set<String>()
-        let named = order.compactMap { name -> Row? in
-            guard let row = byID[name], seen.insert(name).inserted else { return nil }
-            return row
-        }
-        // The named rows take the places named rows held, so a row the page did not draw stays where it was.
-        var listed = self
-        let slots = page.indices.filter { seen.contains(page[$0].id) }
-        for (slot, row) in zip(slots, named) { listed.page[slot] = row }
-        return listed
-    }
-
     /// Moves the row up (negative) or down within its group. Nil at either end, or for a row not listed.
     func moved(_ id: String, by offset: Int) -> PageLayout? {
         guard let group = self.group(of: id), let from = rows(in: group).firstIndex(where: { $0.id == id }) else { return nil }
@@ -139,20 +120,16 @@ nonisolated extension PagePlacements {
 }
 
 nonisolated extension PageLayout {
-    /// The rows the page can place for `item`, in their default order: its type, source and last edit, the type's fields
-    /// as the catalogue orders them (those `PageCustomization.fields` offers, with the parent after the status and one
-    /// Location for the latitude, the longitude and a name for the place), its other relationships, its tags and Linked
-    /// From. The type's own rows are there whether or not the item has a value, and a type with no fields has these
-    /// built-in rows only. The latitude and longitude are rows of their own with `showsCoordinates`.
+    /// The rows the page can place for `item`, in their default order: the type's fields as the catalogue orders them
+    /// (those `PageCustomization.fields` offers, with the parent after the status and one Location for the latitude, the
+    /// longitude and a name for the place), its other relationships, its tags and Linked From. The type's own rows are
+    /// there whether or not the item has a value, and a type with no fields has these built-in rows only. The latitude
+    /// and longitude are rows of their own with `showsCoordinates`.
     static func rows(
         of item: Item, type: ItemTypeInfo?, hidden: Set<String>, relationships: [ItemRelationship], catalogue: Catalogue,
         showsCoordinates: Bool = false
     ) -> [Row] {
-        var rows = [Row(id: PagePlacement.type, label: String(localized: "Type"), symbol: "square.grid.2x2")]
-        if let source = item.source?.trimmingCharacters(in: .whitespacesAndNewlines), !source.isEmpty {
-            rows.append(Row(id: PagePlacement.source, label: String(localized: "Source"), symbol: "dot.radiowaves.left.and.right"))
-        }
-        rows.append(Row(id: PagePlacement.updated, label: String(localized: "Updated"), symbol: "calendar"))
+        var rows: [Row] = []
         let offered = relationships.filter { !$0.field.hasPrefix("inverse:") }
         let parent = offered.first { $0.field == PagePlacement.parent }.map {
             Row(id: $0.field, label: $0.label, symbol: "square.stack")
@@ -189,7 +166,7 @@ nonisolated extension PageLayout {
         case .boolean: "checkmark.square"
         case .date: "calendar"
         case .choice: "list.bullet"
-        case .number: "number"
+        case .number: "text.alignleft"
         case .list(let shape): shape.holdsPeople ? "person.2" : "list.bullet"
         case .text: field.format == .url ? "globe" : field.format == .email ? "envelope" : "text.alignleft"
         case .words: "list.bullet"

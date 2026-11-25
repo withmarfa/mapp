@@ -1,30 +1,36 @@
 import Foundation
 import Marfa
 
-/// When an event happens, for the first pin of its page: the date and time or the range, the zone and how far off it
-/// is. Worked out from the event's own fields, in the event's own time zone, so the day an event falls on is the same
+/// When an event happens, for the When row that leads its page: the date and time or the range, the zone and how far off
+/// it is. Worked out from the event's own fields, in the event's own time zone, so the day an event falls on is the same
 /// for every reader. It is laid out in the event's zone and ignores the Dates setting (`DateFormat`).
 nonisolated struct EventHeader: Hashable, Sendable {
     /// "Thu 29 Oct, 10:00 to 11:00", or "Thu 29 Oct" for a whole day, or the dates of a run of days.
     let time: String
     /// "London time (BST)". Nil for a whole-day event, which has no hour to place.
     let zone: String?
-    /// "All day" for a single whole day; nil for anything else, whose time says so.
+    /// "All Day" for a single whole day; nil for anything else, whose time says so.
     private let span: String?
     /// "in 2 days", "tomorrow", "Happening now".
     let relative: String
 
-    /// The pin's help: all of its time, which a narrow page may cut, then the zone and how far off it is.
+    /// What the row says in grey after the time: All Day for a single whole day, else how far off it is.
+    var note: String {
+        if let span { return span }
+        return relative.prefix(1).uppercased() + relative.dropFirst()
+    }
+
+    /// The row's help: all of its time, which a narrow page may cut, then the zone and how far off it is.
     var help: String {
         time + "\n" + [span, zone, relative].compactMap { $0 }.joined(separator: ", ")
     }
 
-    /// The properties the pin says, which the property block leaves out.
+    /// The properties the When row says, which no other row repeats.
     static let keys: Set<String> = [
         "starts_at", "ends_at", "duration", "all_day", "timezone", "end_timezone", "precision",
     ]
 
-    /// Nil where the event has no start the pin can place: none, one that is not a date, or one known only to the
+    /// Nil where the event has no start the row can place: none, one that is not a date, or one known only to the
     /// month or the year, which no calendar day stands for. The fields then stay in the property block.
     init?(item: Item, now: Date, calendar: Calendar = .current, locale: Locale = .current) {
         guard let event = EventSpan(item: item, calendar: calendar, locale: locale) else { return nil }
@@ -47,7 +53,7 @@ nonisolated struct EventHeader: Hashable, Sendable {
             let (first, last) = (event.firstDay, event.lastDay)
             if last == first {
                 time = dayText(first, in: inZone)
-                span = String(localized: "All day")
+                span = String(localized: "All Day")
             } else {
                 time = String(localized: "\(dayText(first, in: inZone)) to \(dayText(last, in: inEndZone))")
                 span = nil
@@ -89,7 +95,7 @@ nonisolated struct EventHeader: Hashable, Sendable {
     }
 
     /// How far off the event is, from `now`. A day counts on the event's own calendar, so "tomorrow" agrees with
-    /// the date the pin shows. An event under way says so, and one today is told in hours or minutes.
+    /// the date the row shows. An event under way says so, and one today is told in hours or minutes.
     static func relative(from now: Date, start: Date, last: Date?, finish: Date?, zone: Calendar, locale: Locale) -> String {
         let formatter = RelativeDateTimeFormatter()
         formatter.locale = locale

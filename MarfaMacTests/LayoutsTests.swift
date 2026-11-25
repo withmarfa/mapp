@@ -43,8 +43,8 @@ struct LayoutsTests {
         store.change(task, in: server, catalogue: catalogue) { $0.date = .created }
         store.change(note, in: server, catalogue: catalogue) { $0.date = .occurred }
         var placements = PagePlacements()
-        placements.setPins([PagePlacement.updated], of: task)
-        placements.setPins([PagePlacement.type], of: note)
+        placements.setPins([PagePlacement.tags], of: task)
+        placements.setPins([PagePlacement.tags], of: note)
 
         store.restore(task, in: server)
         placements.reset(task)

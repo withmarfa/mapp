@@ -174,17 +174,16 @@ nonisolated struct ItemLocation: Hashable, Sendable {
 
     // MARK: Row
 
-    /// The row for the property block and the pins, or nil where there is nothing to show and nothing to offer. A value
-    /// the item does not have yet is an Empty row that opens the panel (`offersEmpty`), as every value the page sets is. An
-    /// item that cannot be edited still opens the panel where it has a point, which then only shows it.
-    func row(of item: Item, offersEmpty: Bool) -> PropertyRow? {
+    /// The row for the head and the pins. A value the item does not have is an Empty row that opens the panel where the
+    /// item can take the edit, as every value the page sets does. An item that cannot be edited still opens the panel where
+    /// it has a point, which then only shows it.
+    func row(of item: Item) -> PropertyRow {
         let label = String(localized: "Location")
         if let summary = summary(of: item) {
             return PropertyRow(
                 id: Self.rowID, label: label, value: .text(summary), editable: item.allows(.fields) || hasPoint(item), symbol: Self.symbol)
         }
-        guard offersEmpty, item.allows(.fields) else { return nil }
-        return PropertyRow(id: Self.rowID, label: label, value: .empty(symbol: Self.symbol), editable: true)
+        return PropertyRow(id: Self.rowID, label: label, value: .empty(symbol: Self.symbol), editable: item.allows(.fields))
     }
 
     // MARK: Writing
