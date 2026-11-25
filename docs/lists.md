@@ -35,8 +35,10 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **Undo takes back only the settings of its own step**, so another app's change stays.
 - **An entry for a thing that is gone is forgotten only when the copy is whole and current.**
 - **New View… saves what Marfa can hold and names the rest first** (`ViewDraft.Unkept`). A type's place saves the type with its kinds, and an exact-type condition only with Include Kinds off; a Type filter takes its place. The window's From and Archived Items become the view's tier and states, and the reverse (`ViewDraft`).
-- **Making, renaming and deleting a view needs the server.** A rename never replaces another app's; a view has no bin, so deleting one asks.
-- **A saved view belongs to one place** (`Place.home(of:catalogue:)`). Use its sole type, else the sole collection or source its filter requires. Collection membership uses the item's outbound edge. For the feed tier alone, use the Feed. Otherwise use the Library.
+- **Making, renaming and deleting a view needs the server and is never queued.** Offline, a refusal or a taken name keeps a new view in its panel. A rename never replaces another app's; a view has no bin, so deleting one asks.
+- **Starting points are what Marfa saves exactly** (`NewViewStart`).
+- **Each place keeps its views' order and hidden ones** (`ViewOrders`).
+- **A saved view belongs to one place** (`Place.home(of:catalogue:)`). Use its sole type, else the sole collection or source its filter requires. Collection membership uses the item's outbound edge. For the feed tier alone, or with only sources, use the Feed. Otherwise use the Library.
 - **The Library and the Feed list their own tier.** A type, a collection and a source choose a From (`ListScope`), starting on `lists.defaultScope`.
 - **Favorites has an ordinary From,** starting on Library; a person may choose All Items. Its row counts what that From lists.
 - **A type counts and lists its kinds** unless Include Kinds is off. A saved view that names no state shows archived items (`ArchivedItems`).

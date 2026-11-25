@@ -33,11 +33,13 @@ struct NewViewTests {
         return (browser, library)
     }
 
-    /// The settings as the server is sent them, through JSON, and read back as any app reads a view.
-    private static func overTheWire(_ view: LibraryView) throws -> LibraryView? {
-        let sent = MarfaMapping.viewSettings(LibraryViewSettings(title: view.title, query: view.query, sort: view.sort, group: view.group))
-        let read = try JSONDecoder().decode(ViewSettings.self, from: JSONEncoder().encode(sent))
-        return MarfaMapping.view(SavedView(id: view.id.rawValue, version: view.version, settings: read))
+    /// The settings as the package is given them, and read back as any app reads a view through the package.
+    private static func overTheWire(_ view: LibraryView) -> LibraryView? {
+        MarfaMapping.view(SavedView(id: view.id.rawValue, version: view.version, settings: sent(view)))
+    }
+
+    private static func sent(_ view: LibraryView) -> ViewSettings {
+        MarfaMapping.viewSettings(LibraryViewSettings(title: view.title, query: view.query, sort: view.sort, group: view.group))
     }
 
     private static func make(_ start: NewViewStart, in browser: Browser, _ library: FakeItemLibrary) async throws -> LibraryView {
@@ -52,7 +54,11 @@ struct NewViewTests {
     @Test func recentlyAddedIsSortedByCreatedNewestFirstOverTheWire() async throws {
         let (browser, library) = Self.window()
         let made = try await Self.make(.recentlyAdded, in: browser, library)
-        let read = try #require(try Self.overTheWire(made))
+        let read = try #require(Self.overTheWire(made))
+        let sent = Self.sent(made)
+        #expect(sent.query.types == [Self.task.rawValue])
+        #expect(sent.sort.first?.by == "created_at")
+        #expect(sent.sort.first?.direction == .descending)
         #expect(read.query.types == [Self.task])
         #expect(read.sort.first == LibraryViewSort(field: "created_at", ascending: false))
         #expect(read.group == nil)
@@ -63,7 +69,8 @@ struct NewViewTests {
     @Test func byStatusGroupsByStatusGroupOnABoardOverTheWire() async throws {
         let (browser, library) = Self.window()
         let made = try await Self.make(.byStatus, in: browser, library)
-        let read = try #require(try Self.overTheWire(made))
+        let read = try #require(Self.overTheWire(made))
+        #expect(Self.sent(made).group?.by == ViewDraft.statusGroupField)
         #expect(read.group?.field == ViewDraft.statusGroupField)
         #expect(ViewLayouts.stored(in: browser.defaults).settings(for: made.id)?.layout == .board)
     }
@@ -71,7 +78,7 @@ struct NewViewTests {
     @Test func favoritesIsTheTagConditionTheLibrarysFavoritesUses() async throws {
         let (browser, library) = Self.window()
         let made = try await Self.make(.favorites, in: browser, library)
-        let read = try #require(try Self.overTheWire(made))
+        let read = try #require(Self.overTheWire(made))
         let terms = try ViewDraft.terms(of: read.query.filter).terms
         #expect(terms.contains { $0.field == .tags && $0.operator == .contains && $0.value == .text(ItemTag.favorite) })
         #expect(Place.home(of: read.query, catalogue: library.catalogue) == .type(Self.task))
@@ -85,7 +92,8 @@ struct NewViewTests {
         options.filter.clauses.append(FilterClause(field: FilterTarget.source.id, op: .is, values: ["mail", "web"]))
         browser.tableOptions[browser.shown] = options
         let made = try #require(await browser.finishViewPanel(in: library, order: Self.order))
-        let read = try #require(try Self.overTheWire(made))
+        let read = try #require(Self.overTheWire(made))
+        #expect(Self.sent(made).query.tier == .feed)
         #expect(read.query.tier == .feed)
         #expect(Place.home(of: read.query, catalogue: library.catalogue) == .feed)
         #expect(ViewLayouts.stored(in: browser.defaults).settings(for: made.id)?.quickActions == true)
