@@ -74,7 +74,7 @@ import Testing
             case .link, .unlink, .moveEdge:
                 return notWhole
             case .editProperties(let id, _, _), .editBody(let id, _, _, _), .retype(let id, _, _, _), .retier(let id, _, _),
-                .transition(let id, _), .restore(let id), .tag(let id, _, _):
+                .transition(let id, _, _), .restore(let id), .tag(let id, _, _):
                 return missing.withLock { $0.contains(id.rawValue) } ? notWhole : nil
             case .create, .purge:
                 return nil

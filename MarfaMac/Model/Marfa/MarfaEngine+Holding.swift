@@ -179,7 +179,7 @@ extension MarfaEngine {
         switch write {
         case .editProperties(let id, _, _), .retype(let id, _, _, _), .retier(let id, _, _), .editBody(let id, _, _, _):
             item(id)
-        case .transition(let id, _), .restore(let id), .tag(let id, _, _):
+        case .transition(let id, _, _), .restore(let id), .tag(let id, _, _):
             place(id.rawValue)
         case .link(let draft):
             place(draft.from.rawValue)

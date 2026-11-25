@@ -72,7 +72,7 @@ extension MarfaLibrary {
         switch write {
         case .create, .editBody:
             break
-        case .editProperties(let id, _, _), .retype(let id, _, _, _), .retier(let id, _, _), .transition(let id, _),
+        case .editProperties(let id, _, _), .retype(let id, _, _, _), .retier(let id, _, _), .transition(let id, _, _),
             .restore(let id), .purge(let id, _), .tag(let id, _, _):
             sendWaitingText(of: id)
         case .link, .unlink, .moveEdge:

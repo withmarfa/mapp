@@ -264,9 +264,9 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(await eventually { library.item(id) != nil })
         source.clearWrites()
         undo.undo()
-        #expect(source.writes == [.transition(id, .trashed)])
+        #expect(source.writes == [.transition(id, .trashed, from: .active)])
         undo.redo()
-        #expect(source.writes == [.transition(id, .trashed), .restore(id)])
+        #expect(source.writes == [.transition(id, .trashed, from: .active), .restore(id)])
     }
 
     @Test func aCreateTheCatalogueRefusesIsToldAndNotSent() async throws {
@@ -445,7 +445,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let (library, source) = try await loaded()
         let undo = UndoManager()
         library.delete([F.n1, F.n3], undoManager: undo)
-        #expect(source.writes == [.transition(F.n1, .trashed)])
+        #expect(source.writes == [.transition(F.n1, .trashed, from: .active)])
         #expect(undo.undoActionName == String(localized: "Delete Item"))
         undo.undo()
         #expect(source.writes.last == .restore(F.n1))
@@ -453,7 +453,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         library.recover([F.n3, F.n1], undoManager: undo)
         #expect(source.writes == [.restore(F.n3)])
         undo.undo()
-        #expect(source.writes.last == .transition(F.n3, .trashed))
+        #expect(source.writes.last == .transition(F.n3, .trashed, from: .active))
     }
 
     @Test func anItemTheServersBinHoldsIsListedAndRecoveredLikeAnyOther() async throws {

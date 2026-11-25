@@ -54,15 +54,22 @@ import Testing
         let undo = UndoManager()
         let outcome = library.archive([F.p1], beneath: true, undoManager: undo)
         #expect(outcome == CommandOutcome(changed: 2, onlyItem: nil, skips: BatchSkips()))
-        #expect(Set(source.writes) == [.transition(F.p1, .archived), .transition(F.e1, .archived)])
+        #expect(Set(source.writes) == [.transition(F.p1, .archived, from: .active), .transition(F.e1, .archived, from: .active)])
         try await show([F.p1, F.e1], in: library, source) { $0.state = .archived }
         acceptAll(source)
 
         // Another device moves Epic task to Recently Deleted.
         try await show([F.e1], in: library, source) { $0.state = .trashed }
         undo.undo()
-        #expect(source.writes == [.transition(F.p1, .active)], "Bug one stays archived, and Epic task is left as it is")
-        #expect(library.notices.waiting.last?.message == BatchSkips.sentence(.changedSince, count: 1))
+        #expect(Set(source.writes) == [.transition(F.p1, .active, from: .archived), .transition(F.e1, .active, from: .archived)],
+                "Bug one stays archived")
+        // The engine queues the one the copy shows archived and skips the one in the bin.
+        let epic = try #require(source.submitted.first { $0.write == .transition(F.e1, .active, from: .archived) })
+        let alpha = try #require(source.submitted.first { $0.write == .transition(F.p1, .active, from: .archived) })
+        source.send(.answered(epic.id, .refused(MarfaEngine.skipped(.inBin).problem)))
+        source.send(.taken(alpha.id))
+        #expect(await eventually { library.notices.waiting.last?.message == BatchSkips.sentence(.inBin, count: 1) })
+        #expect(library.notices.told == 1)
     }
 
     @Test func keepOnAnArchivedFeedItemChangesOnlyItsTierAndItsUndoMovesItBack() async throws {
@@ -115,12 +122,37 @@ import Testing
 
     @Test func undoAndRedoLeaveATierAnotherDeviceSetAlone() async throws {
         let (library, source, undo) = try await keep(answering: [.accepted])
-        // Another device moves Feed note back to the Feed.
+        // Another device moves Feed note back to the Feed, and the engine skips the Undo's write.
         try await show([F.n2], in: library, source) { $0.tier = .feed }
         undo.undo()
-        #expect(source.writes.isEmpty)
+        let write = try #require(source.submitted.last)
+        source.send(.answered(write.id, .refused(MarfaEngine.skipped(.changedSince).problem)))
+        #expect(await eventually { library.notices.waiting.last?.message == BatchSkips.sentence(.changedSince, count: 1) })
+        source.clearWrites()
         undo.redo()
         #expect(source.writes.isEmpty, "the redo leaves the item in the Feed where the other device put it")
+    }
+
+    @Test func anUndoPressedWhileTheKeepIsUnansweredWaitsAndLeavesAnotherDevicesKeep() async throws {
+        let (library, source) = try await loaded()
+        let undo = UndoManager()
+        library.setTier([F.n2], to: .library, undoManager: undo)
+        let keep = try #require(source.submitted.last)
+        try await show([F.n2], in: library, source) { $0.tier = .library }
+        source.send(.taken(keep.id))
+        source.clearWrites()
+
+        undo.undo()
+        #expect(source.writes.isEmpty, "only the server's answer says whose Keep stands")
+        #expect(library.notices.waiting.last?.message.hasPrefix(MarfaLibrary.earlierNotAnswered) == true)
+        #expect(await eventually { undo.canUndo }, "the Undo goes back on its stack")
+
+        // The Keep meets another device's Keep and is merged over it.
+        source.send(.answered(keep.id, .merged(fields: [MarfaMapping.tierField])))
+        try #require(await eventually { library.tierWrites.isEmpty })
+        undo.undo()
+        #expect(source.writes.isEmpty, "the other device's Keep stands")
+        #expect(library.notices.waiting.last?.message == String(localized: "That change wasn’t made, so there is nothing to undo here."))
     }
 
     @Test func aMixedSelectionOffersBothTiersAndACollectionStaysInTheLibrary() async throws {

@@ -30,7 +30,7 @@ nonisolated extension MarfaSource {
                 throw SourceFailure(kind: .failed, message: Words.message(for: error))
             }
         case (.conflictedCopy(let copy), .discard):
-            submit(.transition(copy, .trashed), as: WriteID())
+            submit(.transition(copy, .trashed, from: nil), as: WriteID())
             return true
         case (.conflictedCopy(let copy), .keep):
             submit(.tag(copy, MarfaProblems.conflictedCopyTag, on: false), as: WriteID())

@@ -36,7 +36,7 @@ import Testing
     private func ids(_ count: Int) -> [Item] { (1...count).map { Self.note("n\($0)") } }
 
     private func deletes(_ source: FakeItemSource) -> Set<ItemID> {
-        Set(source.writes.compactMap { if case .transition(let id, .trashed) = $0 { id } else { nil } })
+        Set(source.writes.compactMap { if case .transition(let id, .trashed, _) = $0 { id } else { nil } })
     }
 
     @Test(arguments: [2, 7, 20])

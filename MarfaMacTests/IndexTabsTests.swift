@@ -28,7 +28,7 @@ import Testing
         undo.groupsByEvent = false
         Browser.delete([holiday], in: library, undoManager: undo, toasts: toasts, naming: "Holiday")
 
-        #expect(source.writes == [.transition(holiday, .trashed)], "the collection is written, and no member")
+        #expect(source.writes == [.transition(holiday, .trashed, from: .active)], "the collection is written, and no member")
         #expect(toasts.current?.message == "Moved “Holiday” to Recently Deleted")
         #expect(toasts.current?.undo != nil)
         for id in members {

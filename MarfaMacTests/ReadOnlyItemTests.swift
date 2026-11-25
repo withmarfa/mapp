@@ -82,6 +82,15 @@ import UniformTypeIdentifiers
         #expect(library.setItemProperty(F.n1, key: "title", value: .string("Renamed"), undoManager: nil), "its neighbours still take edits")
     }
 
+    @Test func aFileTitleMarfaSetsIsNotWritten() async throws {
+        let (library, source) = try await loaded()
+        let file = F.item(F.f1, F.image, "Photo", age: 8, titleRule: .property("extracted_text"), content: .file(.png, byteCount: 0))
+        source.send(.upserted([file]))
+        try #require(await eventually { library.item(F.f1)?.titleRule == .property("extracted_text") })
+        #expect(!library.setItemProperty(F.f1, key: "title", value: .string("Renamed"), undoManager: nil))
+        #expect(source.writes.isEmpty)
+    }
+
     @Test func theBodyOfAReadOnlyItemIsNotWrittenAndTheTextIsGivenBack() async throws {
         let (library, source) = try await loaded()
         let read = try #require(library.item(F.n2)).version
@@ -98,7 +107,7 @@ import UniformTypeIdentifiers
         #expect(await library.changeItemRelationship(F.n2, field: "about", adding: [F.p1], removing: [], undoManager: nil))
         library.delete([F.n2], undoManager: nil)
         #expect(source.writes.count == 5, "sent \(source.writes)")
-        #expect(source.writes.last == .transition(F.n2, .trashed))
+        #expect(source.writes.last == .transition(F.n2, .trashed, from: .active))
         #expect(library.notices.waiting.isEmpty)
     }
 

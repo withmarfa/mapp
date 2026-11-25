@@ -157,32 +157,21 @@ extension MarfaEngine {
             let (properties, clearing) = Self.propertyEdit(changes)
             return [try await send(id, properties, clearing: clearing, type: type.rawValue) { base.rawValue }]
         case .retier(let id, let tier, let base):
+            try await judge(id, tier: tier == .library ? .feed : .library)
             return [try await send(id, JSONObject(), tier: MarfaMapping.marfaTier(tier)) { base.rawValue }]
         case .tag(let id, let tag, let on):
             return [
                 on ? try await copy.tags.add(tag, to: id.rawValue) : try await copy.tags.remove(tag, from: id.rawValue)
             ]
-        case .transition(let id, let state):
+        case .transition(let id, let state, let from):
+            try await judge(id, state: from)
             if state == .trashed { return [try await copy.items.delete(id.rawValue)] }
-            // Marfa takes `trashed` to `active` and brings back what the delete took, so an item another device moved
-            // to Recently Deleted is left there. A transition names no state it expects (withmarfa/marfa#3523), so
-            // one queued before the copy shows the delete is still sent.
-            if rows[id.rawValue]?.state == .trashed {
-                throw Refused(problem: SyncProblem(code: "in_bin", message: BatchSkips.sentence(.inBin, count: 1)))
-            }
             return [try await copy.items.transition(id.rawValue, to: MarfaMapping.marfaState(state))]
         case .restore(let id):
-            switch rows[id.rawValue]?.state {
-            case .active:
-                return []
-            case .archived:
-                // The copy would show it as active until the server refused the restore.
-                throw Refused(problem: SyncProblem(code: "changed_since", message: BatchSkips.sentence(.changedSince, count: 1)))
-            default:
-                // A row the copy does not hold, as one the slice let go, is restored by its id and shown nowhere
-                // until the server answers.
-                return [try await copy.items.restore(id.rawValue)]
-            }
+            // A row the copy does not hold, as one the slice let go, is restored by its id and shown nowhere until
+            // the server answers.
+            try await judge(id, state: .trashed)
+            return [try await copy.items.restore(id.rawValue)]
         case .link(let draft):
             return [
                 try await copy.edges.create(
@@ -210,6 +199,34 @@ extension MarfaEngine {
             preconditionFailure("a purge is made at the server by perform(_:as:)")
         }
     }
+
+    /// The one rule for every write of a state or a tier, Undo and Redo among them: it is queued only while the copy,
+    /// with the writes queued before it, shows the item as the command or step that sends it left it, in `state` and
+    /// `tier` where given and out of Recently Deleted unless `state` is. Otherwise it is skipped (`skipped(_:)`), never
+    /// taken, so nothing follows it. Marfa takes a transition with no state it expects (withmarfa/marfa#3523) and a tier
+    /// with `conflict=auto`, so a change the copy has not yet learned of is still written over. A row the copy does not
+    /// hold is left to the package.
+    private func judge(_ id: ItemID, state: ItemState? = nil, tier: Tier? = nil) async throws {
+        guard let row = try await copy.items.get(id.rawValue) else { return }
+        let now = MarfaMapping.state(row.state)
+        if now == .trashed, state != .trashed { throw Self.skipped(.inBin) }
+        if let state, now != state { throw Self.skipped(.changedSince) }
+        if let tier, (row.tier.map(MarfaMapping.tier) ?? .library) != tier { throw Self.skipped(.changedSince) }
+    }
+
+    /// A write the engine did not queue because its item no longer stands as the step left it, told with the
+    /// command's other skips (`MarfaLibrary.gatheringSkips`).
+    nonisolated static func skipped(_ reason: BatchSkips.Reason) -> Refused {
+        Refused(problem: SyncProblem(code: skipCodes[reason] ?? skippedCode, message: BatchSkips.sentence(reason, count: 1)))
+    }
+
+    /// Why a write answered `code` was skipped, where it was.
+    nonisolated static func skipReason(_ code: String) -> BatchSkips.Reason? {
+        skipCodes.first { $0.value == code }?.key
+    }
+
+    private nonisolated static let skippedCode = "skipped_changed_since"
+    private nonisolated static let skipCodes: [BatchSkips.Reason: String] = [.changedSince: skippedCode, .inBin: "skipped_in_bin"]
 
     /// The item keeps the id the app minted, a lowercase UUIDv7 as the server requires. A body for a type with
     /// no body field is refused rather than dropped.

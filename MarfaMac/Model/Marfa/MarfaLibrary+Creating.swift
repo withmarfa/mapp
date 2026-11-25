@@ -26,7 +26,9 @@ extension MarfaLibrary {
         submitCreate(id, draft, failing: cantCreate)
         let name = String(localized: "New Item")
         registerUndo(undoManager, name: name) { [weak undoManager] library in
-            library.setStates([id: (from: .active, to: .trashed)], name: name, undoManager: undoManager)
+            library.gatheringSkips(failing: name) {
+                library.setStates([id: (from: .active, to: .trashed)], name: name, undoManager: undoManager)
+            }
         }
         return id
     }

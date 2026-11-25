@@ -41,6 +41,8 @@ extension MarfaLibrary {
             refusals[id] = nil
             undoRuns[id] = nil
             notices.notKept(title, text: refusal.text)
+        } else {
+            gather(id)
         }
         return id
     }
