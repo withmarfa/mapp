@@ -842,6 +842,9 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         source.send(.upserted([Self.note(about: Array(all.dropFirst()))]))
         source.send(.taken(removal))
         #expect(await first.value == .taken)
+        // A removal answers once the copy takes it.
+        try #require(await eventually { source.writes.count == 2 }, "sent \(source.writes)")
+        source.send(.taken(try #require(source.submitted.last?.id)))
         #expect(await second.value == .taken)
         #expect(source.writes == [.unlink(EdgeDraft(type: "about", from: F.n1, to: F.p1, id: EdgeID("a1"))), .unlink(EdgeDraft(type: "about", from: F.n1, to: F.p2, id: EdgeID("a2")))], "sent \(source.writes)")
     }
