@@ -12,6 +12,8 @@ import os
     typealias Opener = @Sendable (MarfaConnection, any SignIns, MarfaStoreLocation) async throws -> any ItemSource
     /// Reads the name the server at an address gives itself. It sends no sign-in.
     typealias Describer = @Sendable (MarfaConnection) async throws -> String
+    /// Reads the instance the server at an address says it is. It sends no sign-in.
+    typealias Identifier = @Sendable (MarfaConnection) async throws -> String
     /// Removes the copy at a store, provided every change it holds that the server has not taken is one of the ids
     /// the person agreed to lose. Tests stand in for the package's answers that a real copy can't be made to give.
     typealias Remover = @Sendable (URL, Agreed) async throws -> Void
@@ -117,7 +119,7 @@ import os
     /// The address of each copy the person discarded but which could not be removed, with the ids of the changes
     /// they agreed to lose with it.
     static let discardedKey = "MarfaDiscardedCopies"
-    /// The last name each server gave itself, by address, so a launch and an offline window show it.
+    /// The last name each server gave itself, by its copy's folder, so a launch and an offline window show it.
     private static let namesKey = "MarfaInstanceNames"
 
     let defaults: UserDefaults
@@ -125,6 +127,7 @@ import os
     let location: MarfaStoreLocation
     private let opener: Opener
     private let describer: Describer
+    private let identifier: Identifier
     let remover: Remover
     private let cleaner: Cleaner
     /// Removes what a library kept outside its copy: the files it fetched and the pictures it cached.
@@ -167,6 +170,11 @@ import os
         }
     }
     private var reading: Task<Void, Never>?
+    var sendingOthers: Task<Void, Never>?
+    /// Moves each time the record of copies changes, so what reads it is drawn again.
+    var copiesRevision = 0
+    /// The other copies of this Marfa the person has been told still hold changes, in this run.
+    var toldOtherCopies: Set<String> = []
     private var instanceNames: [String: String]
     /// Hands every open page's last edit to the library it came from. The host runs it before the windows change
     /// library and again right before it reads or closes a copy, so text typed while a step waited on the network
@@ -183,6 +191,7 @@ import os
         defaults: UserDefaults, signIns: any SignIns, location: MarfaStoreLocation,
         opener: @escaping Opener = { try await MarfaSource.open($0, signIns: $1, location: $2) },
         describer: @escaping Describer = { try await $0.server(key: "").instanceDescription().name },
+        identifier: @escaping Identifier = { try await $0.server(key: "").instanceDescription().instanceId },
         remover: @escaping Remover = { try await MarfaHost.removeStore($0, agreedToLose: $1) },
         cleaner: @escaping Cleaner = MarfaHost.standardCleaner,
         historian: @escaping Historian = { MarfaServerCalls(connection: $0, signIns: $1) },
@@ -197,6 +206,7 @@ import os
         self.location = location
         self.opener = opener
         self.describer = describer
+        self.identifier = identifier
         self.remover = remover
         self.cleaner = cleaner
         self.historian = historian
@@ -210,7 +220,16 @@ import os
 
     /// The name the server at `connection` last gave itself, nil until one has been read.
     func instanceName(for connection: MarfaConnection) -> String? {
-        instanceNames[connection.address.absoluteString]
+        instanceNames[location.directory(for: connection).lastPathComponent]
+    }
+
+    /// Names the library by the Marfa its copy holds, so its sidebar layout and its type looks are its own however
+    /// its address is typed; by the origin until the copy knows its instance.
+    func libraryKey(for connection: MarfaConnection?) -> String {
+        _ = copiesRevision
+        guard let connection else { return "marfa:" }
+        let folder = location.directory(for: connection).lastPathComponent
+        return "marfa:" + (location.copies.instance(ofFolder: folder) ?? MarfaCopies.origin(of: connection))
     }
 
     /// The last time the copy of the server connected to finished a pull from it without an error, which is more
@@ -309,15 +328,29 @@ import os
         defer { isBusy = false }
         await dropPendingSignIn()
         guard await handOverEdits() else { throw .unavailable(message: String(localized: "Finish editing the current item before changing libraries.")) }
+        let instance = await identify(connection)
         try await signIn(to: connection, via: method)
+        let earlier: MarfaCopies.Record
+        do {
+            earlier = try place(connection, in: await plannedFolder(for: connection, instance: instance), instance: instance)
+        } catch {
+            await endSignIn(of: connection)
+            throw error
+        }
         do {
             try await open(connection)
         } catch {
+            restorePlacement(earlier)
             await endSignIn(of: connection)
             standing = .disconnected
             throw error
         }
         remember(connection)
+    }
+
+    /// The instance the server at `connection` says it is, asked without a sign-in. Nil where it does not answer.
+    private func identify(_ connection: MarfaConnection) async -> String? {
+        try? await identifier(connection)
     }
 
     /// Closes the copy and forgets the address and sign-in. `choice` is needed while writes wait in the copy, and is
@@ -433,6 +466,11 @@ import os
         // Taken at once, so a step that stops before the approval is used or dropped does not leave it live.
         let kept = pendingSignIn
         pendingSignIn = nil
+        let instance = await identify(connection)
+        let folder = await plannedFolder(for: connection, instance: instance)
+        if folder == location.directory(for: old).lastPathComponent {
+            return try await moveCopy(from: old, to: connection, in: folder, instance: instance, via: method, kept: kept)
+        }
         let agreed: Agreed?
         let current = source
         let fresh: Bool
@@ -446,7 +484,7 @@ import os
                 let unsent = await Self.unsentChanges(in: location.store(for: old))
                 if unsent?.ids.isEmpty != true { throw Problem.changesWaiting(unsent) }
             }
-            fresh = !hasCopy(connection)
+            fresh = !FileManager.default.fileExists(atPath: location.directory(named: folder).path)
         } catch {
             if let kept { await endSignIn(of: kept) }
             throw error
@@ -471,10 +509,18 @@ import os
             }
         }
         let opened: any ItemSource
+        let earlier: MarfaCopies.Record
+        do {
+            earlier = try place(connection, in: folder, instance: instance)
+        } catch {
+            await endSignIn(of: connection)
+            throw error
+        }
         do {
             try await clearDiscarded(connection)
             opened = try await Self.open(connection, signIns: signIns, location: location, with: opener)
         } catch {
+            restorePlacement(earlier)
             await endSignIn(of: connection)
             throw error
         }
@@ -489,17 +535,60 @@ import os
                 await opened.close()
                 await endSignIn(of: connection)
                 if fresh { _ = await removeCopy(connection, agreed: Agreed(ids: [])) }
+                restorePlacement(earlier)
                 throw error
             }
         }
         // The new copy is shown before the old one's sign-in and copy are removed, so the windows go from one library
         // to the other and never show the connect page between them.
+        await recordCopy(of: connection, from: opened)
         remember(connection)
         attach(opened, for: connection)
         forgetName(of: old)
         // The old sign-in is ended only here: a same-origin address returned above as Sign In Again, so the package's
         // origin-keyed sign-in is never one the new connection shares.
         if let problem = await finishLeaving(old, agreed: agreed) { throw problem }
+    }
+
+    /// Moves to the same Marfa at another address: its copy is closed with nothing lost, since it is the copy the new
+    /// address opens, and opened again with the new address's own sign-in. A failure opens it again as it was.
+    private func moveCopy(
+        from old: MarfaConnection, to connection: MarfaConnection, in folder: String, instance: String?,
+        via method: SignInMethod, kept: MarfaConnection?
+    ) async throws(Problem) {
+        if let kept, kept.sameServer(as: connection), await holdsSignIn(for: connection) {
+            // The person has answered the question put after this sign-in, so it is used and not made again.
+        } else {
+            if let kept { await endSignIn(of: kept) }
+            try await signIn(to: connection, via: method)
+        }
+        let current = source
+        if current != nil, !(await handOverEdits()) {
+            await endSignIn(of: connection)
+            throw .unavailable(message: String(localized: "Finish editing the current item before changing libraries."))
+        }
+        let earlier: MarfaCopies.Record
+        do {
+            earlier = try place(connection, in: folder, instance: instance)
+        } catch {
+            await endSignIn(of: connection)
+            throw error
+        }
+        if let current {
+            standing = .connecting
+            detach()
+            await current.close()
+        }
+        do {
+            try await open(connection)
+        } catch {
+            restorePlacement(earlier)
+            await endSignIn(of: connection)
+            try? await open(old)
+            throw error
+        }
+        remember(connection)
+        if let problem = await finishLeaving(old, agreed: nil) { throw problem }
     }
 
     /// Whether what the person agreed to lose takes in every write the copy holds: nothing, without a choice.
@@ -622,7 +711,9 @@ import os
         standing = .connecting
         do {
             try await clearDiscarded(connection)
-            attach(try await Self.open(connection, signIns: signIns, location: location, with: opener), for: connection)
+            let opened = try await Self.open(connection, signIns: signIns, location: location, with: opener)
+            await recordCopy(of: connection, from: opened)
+            attach(opened, for: connection)
         } catch {
             switch error {
             case .notSignedIn: standing = .keyRefused
@@ -717,6 +808,7 @@ import os
             cameOnline: { [weak self] in
                 guard let self, self.connection == connection else { return }
                 readName(of: connection)
+                sendOtherCopies(of: connection, from: source)
             })
         self.library = library
         libraryChanged(library)
@@ -747,19 +839,21 @@ import os
         reading = Task { [weak self, describer] in
             // Leaving the copy cancels the read, so a late answer never names another server's library.
             guard let name = try? await describer(connection), !Task.isCancelled, let self else { return }
-            self.instanceNames[connection.address.absoluteString] = name
+            self.instanceNames[self.location.directory(for: connection).lastPathComponent] = name
             self.defaults.set(self.instanceNames, forKey: Self.namesKey)
         }
     }
 
     private func forgetName(of connection: MarfaConnection) {
-        instanceNames.removeValue(forKey: connection.address.absoluteString)
+        instanceNames.removeValue(forKey: location.directory(for: connection).lastPathComponent)
         defaults.set(instanceNames, forKey: Self.namesKey)
     }
 
     private func detach() {
         reading?.cancel()
         reading = nil
+        sendingOthers?.cancel()
+        sendingOthers = nil
         if library != nil {
             library = nil
             libraryChanged(nil)

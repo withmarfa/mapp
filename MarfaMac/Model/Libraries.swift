@@ -103,7 +103,7 @@ import MarfaTesting
         let domain = defaultsDomain ?? (defaults === UserDefaults.standard ? Bundle.main.bundleIdentifier : nil)
         preferences = PreferencesSync(
             defaults: defaults, domain: domain, enabled: syncsPreferences, restorePoints: restorePoints,
-            library: { [host] in Libraries.libraryKey(for: host.configuredConnection?.address) },
+            library: { [host] in host.libraryKey(for: host.configuredConnection) },
             refusedShortcuts: { [anyAppShortcuts] in Set(anyAppShortcuts.refused.map(\.rawValue)) },
             reload: { [sidebarLayouts, typeLooks, searchLeaveOuts, shortcuts, anyAppShortcuts, automaticExport] in
                 sidebarLayouts.reload()
@@ -168,7 +168,7 @@ import MarfaTesting
         preferences.attach(
             WorkingCopyPreferences(
                 copy: source.copy, answers: source.preferenceAnswers, sendSoon: { [engine = source.engine] in await engine.sync.drain() }),
-            library: Self.libraryKey(for: connection.address),
+            library: host.libraryKey(for: connection),
             name: { [host] in host.instanceName(for: connection) })
     }
 
@@ -203,13 +203,10 @@ import MarfaTesting
         mode == .marfa ? host.library : nil
     }
 
-    /// Names the library the windows read by its server's address, so its sidebar layout and its type looks are its own.
+    /// Names the library the windows read by the Marfa its copy holds (`MarfaHost.libraryKey(for:)`), so its sidebar
+    /// layout and its type looks are its own.
     var libraryKey: String {
-        Self.libraryKey(for: host.configuredConnection?.address)
-    }
-
-    nonisolated static func libraryKey(for address: URL?) -> String {
-        "marfa:" + (address?.absoluteString ?? "")
+        host.libraryKey(for: host.configuredConnection)
     }
 
     var sidebarLayout: SidebarLayout { sidebarLayouts.layout(for: libraryKey) }
@@ -374,6 +371,7 @@ import MarfaTesting
                     return SampleLibrary.open(connection, galleryFiles: files)
                 },
                 describer: { _ in SampleLibrary.name },
+                identifier: { _ in SampleCastell.requested == nil ? SampleLibrary.instanceID : SampleCastell.instanceID },
                 historian: { _, _ in nil }, configurer: { _, _ in nil },
                 sourceNamer: { _, _ in SampleCastell.requested == nil ? nil : SampleCastell.sourceNames })
             host.presetTestServer(sample)

@@ -61,7 +61,7 @@ extension MarfaHost {
         _ connection: MarfaConnection, agreed: Agreed?, choice: DisconnectChoice?, forgettingAddress: Bool = true
     ) -> PriorMark? {
         guard case .discardCopy = choice, let agreed else { return nil }
-        let prior = PriorMark(agreed: discarded[connection.address.absoluteString])
+        let prior = PriorMark(agreed: discardMark(for: connection))
         if forgettingAddress { defaults.removeObject(forKey: Self.addressKey) }
         markDiscarded(connection, agreed: agreed)
         return prior
@@ -110,15 +110,28 @@ extension MarfaHost {
         (defaults.dictionary(forKey: Self.discardedKey) ?? [:]).mapValues(Agreed.init(stored:))
     }
 
+    /// The mark of the copy `connection` opens, under whichever address marked it.
+    func discardMark(for connection: MarfaConnection) -> Agreed? {
+        let folder = location.directory(for: connection)
+        return discarded.first { address, _ in markedFolder(address) == folder }?.value
+    }
+
+    private func markedFolder(_ address: String) -> URL? {
+        (try? MarfaConnection(address: address, completing: false)).map(location.directory(for:))
+    }
+
+    /// Marks the copy `connection` opens, replacing a mark made under any other address for it.
     func markDiscarded(_ connection: MarfaConnection, agreed: Agreed?) {
         var marks = defaults.dictionary(forKey: Self.discardedKey) ?? [:]
+        let folder = location.directory(for: connection)
+        for address in marks.keys where markedFolder(address) == folder { marks[address] = nil }
         marks[connection.address.absoluteString] = agreed?.stored
         defaults.set(marks, forKey: Self.discardedKey)
     }
 
     /// A copy the person discarded is removed before its address is opened again, or not opened at all.
     func clearDiscarded(_ connection: MarfaConnection) async throws(Problem) {
-        guard let agreed = discarded[connection.address.absoluteString] else { return }
+        guard let agreed = discardMark(for: connection) else { return }
         switch await removeCopy(connection, agreed: agreed) {
         case .removed:
             markDiscarded(connection, agreed: nil)

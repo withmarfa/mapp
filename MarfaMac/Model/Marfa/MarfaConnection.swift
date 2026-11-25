@@ -10,7 +10,7 @@ nonisolated struct MarfaConnection: Hashable, Sendable {
         case hasMore
     }
 
-    /// The completed server address. An explicit default port still names its own copy and discard marks.
+    /// The completed server address, as typed. A port the scheme already means names the same copy (`MarfaStoreLocation`).
     let address: URL
 
     init(address text: String, completing: Bool = true) throws(Problem) {
@@ -62,7 +62,7 @@ nonisolated struct MarfaConnection: Hashable, Sendable {
     }
 
     /// Whether `other` names the same server: the same address once a port the scheme already means is left out. The
-    /// package keys the sign-in by this origin, so two spellings share one sign-in but keep two copies.
+    /// package keys the sign-in by this origin, so two spellings share one sign-in and one copy.
     func sameServer(as other: MarfaConnection) -> Bool {
         Self.origin(address) == Self.origin(other.address)
     }
@@ -96,7 +96,9 @@ nonisolated struct MarfaConnection: Hashable, Sendable {
     }
 }
 
-/// Where a Marfa library's working copy lives: in the app's own storage, one directory for each server address.
+/// Where a Marfa library's working copy lives: in the app's own storage, one folder for each Marfa. The folder an
+/// origin opens is recorded (`MarfaCopies`); before it is, an address finds the copy either spelling of its origin
+/// made, and otherwise names a new one.
 nonisolated struct MarfaStoreLocation: Hashable, Sendable {
     /// This copy's working copies. Named for the bundle identifier, never `Marfa`, which is the command line's folder.
     static let applicationSupport = AppPaths.applicationSupport
@@ -107,14 +109,64 @@ nonisolated struct MarfaStoreLocation: Hashable, Sendable {
         self.root = root
     }
 
-    /// A store refuses a server other than the one it was hydrated from, so each address keeps its own.
+    var copies: MarfaCopies { MarfaCopies.at(root) }
+
+    /// A store refuses a server other than the instance it was hydrated from, so each Marfa keeps its own.
     func directory(for connection: MarfaConnection) -> URL {
-        let digest = SHA256.hash(data: Data(connection.address.absoluteString.utf8))
-        let name = digest.prefix(16).map { String(format: "%02x", $0) }.joined()
-        return root.appending(path: name, directoryHint: .isDirectory)
+        if let folder = copies.folder(forOrigin: MarfaCopies.origin(of: connection)), exists(folder) {
+            return directory(named: folder)
+        }
+        let spellings = Self.spellings(of: connection.address)
+        let folder = spellings.map(Self.folderName).first(where: exists) ?? Self.folderName(spellings[0])
+        return directory(named: folder)
     }
 
     func store(for connection: MarfaConnection) -> URL {
         directory(for: connection).appending(path: "copy.sqlite", directoryHint: .notDirectory)
+    }
+
+    func directory(named folder: String) -> URL {
+        root.appending(path: folder, directoryHint: .isDirectory)
+    }
+
+    func store(in folder: String) -> URL {
+        directory(named: folder).appending(path: "copy.sqlite", directoryHint: .notDirectory)
+    }
+
+    /// A new folder for the instance `instance` at an address whose own folder holds another instance.
+    func newDirectory(for connection: MarfaConnection, instance: String) -> URL {
+        directory(named: Self.folderName(connection.address.absoluteString + " " + instance))
+    }
+
+    /// The other copy folders on this Mac that the same origin made under its other spelling.
+    func otherSpellings(of connection: MarfaConnection) -> [String] {
+        let primary = directory(for: connection).lastPathComponent
+        return Self.spellings(of: connection.address).map(Self.folderName).filter { $0 != primary && exists($0) }
+    }
+
+    /// Every copy folder on this Mac.
+    func folders() -> [String] {
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: root.path)) ?? []
+        return names.filter { FileManager.default.fileExists(atPath: store(in: $0).path) }.sorted()
+    }
+
+    private func exists(_ folder: String) -> Bool {
+        FileManager.default.fileExists(atPath: directory(named: folder).path)
+    }
+
+    /// The address as typed first, then the same origin with or without the port its scheme already means.
+    static func spellings(of address: URL) -> [String] {
+        let typed = address.absoluteString
+        guard var components = URLComponents(url: address, resolvingAgainstBaseURL: false), let scheme = components.scheme
+        else { return [typed] }
+        let standard = scheme == "https" ? 443 : scheme == "http" ? 80 : nil
+        guard let standard, components.port == nil || components.port == standard else { return [typed] }
+        components.port = components.port == nil ? standard : nil
+        return [typed] + (components.url.map { [$0.absoluteString] } ?? [])
+    }
+
+    private static func folderName(_ text: String) -> String {
+        let digest = SHA256.hash(data: Data(text.utf8))
+        return digest.prefix(16).map { String(format: "%02x", $0) }.joined()
     }
 }
