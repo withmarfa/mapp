@@ -69,7 +69,7 @@ struct PageChip: View {
             }
         }
         .font(looks.chipFont(for: size, textSize: CGFloat(textSize)))
-        .foregroundStyle(.primary)
+        .foregroundStyle(looks.chipText(for: scheme))
         .padding(.leading, start(looks: looks) * scale)
         .padding(.trailing, looks.padding * scale)
         .frame(height: looks.height(for: size) * CGFloat(textSize) / 13)
@@ -78,7 +78,7 @@ struct PageChip: View {
 
     private func start(looks: ChipLooks) -> CGFloat {
         switch kind {
-        case .status: looks.typePaddingStart
+        case .status: looks.statusPaddingStart
         case .tag: looks.tagPaddingStart
         case .option, .plain: looks.padding
         }
@@ -114,6 +114,7 @@ struct MarkedName: View {
     var size: ChipSize = .page
     var underlinesOnHover = false
 
+    @Environment(\.colorScheme) private var scheme
     @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
     @State private var isHovering = false
 
@@ -127,8 +128,8 @@ struct MarkedName: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
         }
-        .font(.system(size: (size == .page ? 13 : 12) * scale))
-        .foregroundStyle(.primary)
+        .font(looks.factFont(for: size, textSize: CGFloat(textSize)))
+        .foregroundStyle(size == .page ? Color.primary : looks.chipText(for: scheme))
         .frame(height: looks.height(for: size) * scale)
         .background { if underlinesOnHover { Color.clear.onHover { isHovering = $0 } } }
     }
@@ -140,9 +141,13 @@ struct TintedChip: View {
     let text: String
     let icon: String?
     var chevron = true
+    /// The panel's scale, where the chip stands in one that scales itself (`ValueChipView`); otherwise the interface's.
+    var scale: CGFloat?
+    /// Set by a menu that holds the chip as its label, where the label does not see its menu's keyboard focus.
+    var isFocused = false
 
     @Environment(\.colorScheme) private var scheme
-    @Environment(\.isFocused) private var isFocused
+    @Environment(\.isFocused) private var isInFocus
     @AppStorage(AppearanceKey.typeChipTint) private var tint = TypeChipTint.standard
     @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
 
@@ -150,7 +155,7 @@ struct TintedChip: View {
         let looks = ChipLooks.current
         let tone = TypeTone(icon: icon)
         let tinted = tint != .gray
-        let scale = CGFloat(textSize) / 13
+        let scale = scale ?? CGFloat(textSize) / 13
         HStack(spacing: looks.gap * scale) {
             TonedGlyph(id: icon, size: looks.chipMarkSize * scale)
             Text(verbatim: text).lineLimit(1).truncationMode(.tail)
@@ -161,8 +166,8 @@ struct TintedChip: View {
                     .accessibilityHidden(true)
             }
         }
-        .font(looks.chipFont(for: .page, textSize: CGFloat(textSize)))
-        .foregroundStyle(tinted ? tone.tintedInk(looks, for: scheme) : Color.primary)
+        .font(looks.chipFont(for: .page, textSize: scale * 13))
+        .foregroundStyle(tinted ? tone.nameInk(looks, for: scheme) : looks.chipText(for: scheme))
         .padding(.leading, looks.typePaddingStart * scale)
         .padding(.trailing, looks.padding * scale)
         .frame(height: looks.height * scale)
@@ -171,7 +176,7 @@ struct TintedChip: View {
             in: RoundedRectangle(cornerRadius: looks.cornerRadius * scale)
         )
         .overlay {
-            if isFocused { AppButtonStyle.focusRing(AnyShape(.rect(cornerRadius: looks.cornerRadius * scale))) }
+            if isFocused || isInFocus { AppButtonStyle.focusRing(AnyShape(.rect(cornerRadius: looks.cornerRadius * scale))) }
         }
     }
 }
@@ -198,7 +203,8 @@ struct PersonCircle: View {
         let scale = CGFloat(textSize) / 13
         // A name with no letters keeps its circle, so the person still reads as a person and rows stay aligned.
         Text(verbatim: initials ?? "")
-            .font(.system(size: looks.personInitialsSize(for: size) * scale, weight: .semibold))
+            .font(.system(size: looks.personInitialsSize(for: size) * scale, weight: ChipLooks.weight(looks.initialsWeight)))
+            .tracking(0.02 * looks.personInitialsSize(for: size) * scale)
             .foregroundStyle(looks.personInkColor(for: scheme))
             .lineLimit(1)
             .minimumScaleFactor(0.6)
@@ -218,6 +224,7 @@ struct PagePerson: View {
     /// person there is read by name. The page's person always has it.
     var showsName = false
 
+    @Environment(\.colorScheme) private var scheme
     @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
 
     var body: some View {
@@ -232,8 +239,8 @@ struct PagePerson: View {
                     .truncationMode(.tail)
             }
         }
-        .font(.system(size: looks.textSize(for: size) * scale, weight: size == .page ? .medium : .regular))
-        .foregroundStyle(.primary)
+        .font(looks.factFont(for: size, textSize: CGFloat(textSize)))
+        .foregroundStyle(size == .page ? Color.primary : looks.chipText(for: scheme))
         .padding(.trailing, named ? 2 * scale : 0)
         .frame(height: looks.height(for: size) * scale)
         .accessibilityElement(children: .ignore)

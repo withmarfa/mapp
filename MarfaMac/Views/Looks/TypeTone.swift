@@ -72,40 +72,25 @@ nonisolated enum TypeTone: String, CaseIterable, Sendable {
         color(for: scheme).opacity(opacity)
     }
 
-    /// The color of an icon or a name on the tone's tint, a step apart from it: `inkDepth` of the way to black in light.
-    /// In dark, where the tint is the darker of the two, it goes `inkDepthDark` of the way to white, then dims to
-    /// `inkCeilingDark` if that leaves it brighter.
-    func ink(_ looks: ChipLooks, for scheme: ColorScheme) -> Color {
-        let (r, g, b) = inkComponents(looks, dark: scheme == .dark)
+    /// The name on a tint of the tone (the tinted chip and a person's circle), a step apart from it so the words read:
+    /// `depth` (the chip's `tintedInkDepth` unless given) of the way to black in light, and `nameLiftDark` of the way to white in dark.
+    func nameInk(_ looks: ChipLooks, depth: Double? = nil, for scheme: ColorScheme) -> Color {
+        let (r, g, b) = nameInkComponents(looks, depth: depth, dark: scheme == .dark)
         return Color(.sRGB, red: r, green: g, blue: b)
     }
 
-    /// The name on the tinted chip: `tintedInkDepth` of the way to black in light, and the ink of a mark in dark.
-    func tintedInk(_ looks: ChipLooks, for scheme: ColorScheme) -> Color {
-        guard scheme != .dark else { return ink(looks, for: scheme) }
-        let (r, g, b) = components(dark: false)
-        let keep = 1 - looks.tintedInkDepth
-        return Color(.sRGB, red: r * keep, green: g * keep, blue: b * keep)
+    func nameInkComponents(_ looks: ChipLooks, depth: Double? = nil, dark: Bool) -> (Double, Double, Double) {
+        let (r, g, b) = components(dark: dark)
+        guard dark else {
+            let keep = 1 - (depth ?? looks.tintedInkDepth)
+            return (r * keep, g * keep, b * keep)
+        }
+        let lift = looks.nameInkLiftDark
+        return (r + (1 - r) * lift, g + (1 - g) * lift, b + (1 - b) * lift)
     }
 
-    /// The tone as CSS custom properties for the web page: `--tone`, `--tone-ink` for an icon on its tint, and
-    /// and `--tone-mark` for the pale square behind a mark.
-    @MainActor static func cssColors(for icon: String?, dark: Bool, looks: ChipLooks = .current) -> [String: String] {
-        cssColors(for: TypeTone(icon: icon), dark: dark, looks: looks)
-    }
-
-    /// The same for a tone chosen directly, such as an option's (`OptionTone`).
-    @MainActor static func cssColors(for tone: TypeTone, dark: Bool, looks: ChipLooks = .current) -> [String: String] {
-        let (r, g, b) = tone.components(dark: dark)
-        let (red, green, blue) = (Int((r * 255).rounded()), Int((g * 255).rounded()), Int((b * 255).rounded()))
-        let ink = tone.inkComponents(looks, dark: dark)
-        let inkBytes = [ink.0, ink.1, ink.2].map { String(Int(($0 * 255).rounded())) }.joined(separator: ", ")
-        return [
-            "--tone": "rgb(\(red), \(green), \(blue))",
-            "--tone-ink": "rgb(\(inkBytes))",
-            "--tone-mark": "rgba(\(red), \(green), \(blue), \(String(format: "%g", looks.markOpacity)))",
-        ]
-    }
+    /// The tone as the page's `--tone-<name>` custom property: a mark's color, which is the tone itself.
+    func cssColor(dark: Bool) -> String { Self.cssRGB(of: components(dark: dark)) }
 
     /// The tone as a CSS `rgb()` at `alpha`, and a color of the page's own as the same function.
     func cssRGBA(_ alpha: Double, dark: Bool) -> String {
@@ -122,22 +107,6 @@ nonisolated enum TypeTone: String, CaseIterable, Sendable {
     func components(dark: Bool) -> (Double, Double, Double) {
         let hex = dark ? darkHex : lightHex
         return (Double((hex >> 16) & 0xFF) / 255, Double((hex >> 8) & 0xFF) / 255, Double(hex & 0xFF) / 255)
-    }
-
-    func inkComponents(_ looks: ChipLooks, dark: Bool) -> (Double, Double, Double) {
-        let (r, g, b) = components(dark: dark)
-        guard dark else { return (r * (1 - looks.inkDepth), g * (1 - looks.inkDepth), b * (1 - looks.inkDepth)) }
-        let lift = looks.inkDepthDark
-        let ink = (r + (1 - r) * lift, g + (1 - g) * lift, b + (1 - b) * lift)
-        let luminance = Self.luminance(ink)
-        guard luminance > looks.inkCeilingDark else { return ink }
-        let dimming = pow(looks.inkCeilingDark / luminance, 1 / 2.2)
-        return (ink.0 * dimming, ink.1 * dimming, ink.2 * dimming)
-    }
-
-    /// Relative luminance, with sRGB read as a plain 2.2 gamma: near enough to compare tones.
-    private static func luminance(_ color: (Double, Double, Double)) -> Double {
-        0.2126 * pow(color.0, 2.2) + 0.7152 * pow(color.1, 2.2) + 0.0722 * pow(color.2, 2.2)
     }
 
     private var lightHex: Int {

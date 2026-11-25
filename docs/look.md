@@ -31,26 +31,29 @@ Each kind of thing has one drawing, used on the page, in the right sidebar, in a
 | Date, number, address, source | Plain text |
 
 - **A value from a set is a chip, and anything else is text or a fact**, so a value that can be picked is told from one that was typed.
-- **A chip has one gray wash and no edge:** radius 7, text 12 at medium weight (11.5 at regular in a row). Only the type being given to an item is tinted (`TintedChip`); Appearance chooses Tinted (default) or Gray.
-- **A person's circle is 18 points: purple letters on pale purple, no edge** (`PersonCircle`).
+- **A chip has one gray wash and no edge:** radius 7, text 12 at medium weight in the ink at 72% (11.5 at regular in a row). A status's symbol is 12.5 points with 7 before it. Only the type being given to an item is tinted (`TintedChip`); Appearance chooses Tinted (default) or Gray.
+- **A person's circle is 18 points: purple letters (8.5 points, semibold) on pale purple, no edge** (`PersonCircle`). The name beside it is a fact: 13 points, regular.
 - **Chips come from one family** (`PageChip`, `PersonCircle`, `ChipLine`) in two sizes (`ChipSize`). `ChipLooks` owns the measures, the web header reads them as `--chip-*` variables, and `ChipLooksTests` checks they agree.
 - **Several values show as two, then a count.**
-- **A type's mark in a row, on the page and in a palette is its glyph in its tone** (`TonedGlyph`, 14 points). A tile (`TypeTile`) is only for a gallery cover with no picture and the Settings type page.
+- **A type's mark in a row, on the page and in a palette is its glyph in the plain tone** (`TonedGlyph`, 14 points), never a darker or lighter ink. A tile (`TypeTile`) is only for the Settings type page.
 - **A filter chip reads in order:** field, operator, values, then its close button.
 
 ### Dark values
 
-Neutral washes are white at the same strength, hairlines are white at 12%, and a tone keeps its hue at the macOS dark weight (`TypeTone`).
+Neutral washes are white at the same strength, hairlines are white at 12%, and a tone keeps its hue at the macOS dark weight (`TypeTone`). `ChipLooksTests` computes the contrast of the person's letters, the tinted names and the chip text on their fills from these values and holds each to 4.5 to 1 or better, in light and in dark.
 
 | Color | Light | Dark | Where used |
 | --- | --- | --- | --- |
 | Chip wash | Ink 3.5% | White 3.5% | Every chip |
 | Tinted type chip | Tone 14% | Tone 20% | `TintedChip` |
 | Person fill | Purple 15% | Purple 26% | `PersonCircle` |
-| Letters and marks | Tone toward black: 28% person, 46% tinted name, 22% mark | Tone ink: 8% toward white, luminance at most 0.36 | `PersonCircle`, `TintedChip`, `TonedGlyph` |
+| Chip text | Ink 72% | White 72% | Chips, a fact in a row |
+| Person letters | Purple 28% toward black | Purple 50% toward white | `PersonCircle` |
+| Tinted name | Tone 46% toward black | Tone 50% toward white | `TintedChip`, `NewTiles` |
+| Type mark | The tone | The tone | `TonedGlyph`, `TypeTile` |
 | Chosen, hover row | Ink 8%, 4.7% | White 8%, 4.7% | Panels, calendars (`SelectionLooks`) |
 | Keycap edge | Ink 20% | White 20% | `KeyCap` |
-| Focus ring | Ink 26% | White 26% | Every keyboard control |
+| Focus ring | Ink 26% | White 26% | Every keyboard control (`appFocusRing`) |
 
 ## Status, priority and empty values
 
@@ -74,7 +77,7 @@ Neutral washes are white at the same strength, hairlines are white at 12%, and a
 - **A symbol on its own is a gray circle.** On a header row, and for a close button inside a banner or chip, it is plain until the pointer is over it.
 - **Two arrows choose a value and one arrow opens a menu of commands** (`appMenu`, with `.value` or `.commands`).
 - **A label ends in an ellipsis when the button opens** a sheet, a dialog, a chooser, a confirmation or a browser page. A button that acts at once, or is a menu, has none.
-- **Keyboard focus is the app's own 3 point gray ring** in the control's shape, on every control that takes the keyboard, the search field included.
+- **Keyboard focus is the app's own 3 point gray ring** in the control's shape, on every control that takes the keyboard, the search field included: `appFocusRing` on a field, `AppButtonStyle` on a button. The toolbar's glass search field and a system alert's field keep the system's.
 - **In a sheet, a destructive action stands alone at the leading edge**, and Cancel and the main action are at the trailing edge. The button says Delete, not Delete Collection.
 - **A field, a chip and a token keep soft corners**, so a value never reads as a button.
 

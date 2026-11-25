@@ -457,12 +457,13 @@ body[data-text='none'] #editor {
   --c-text: calc(var(--chip-text-size, 12px) * var(--chip-scale));
   --c-padding: calc(var(--chip-padding, 8px) * var(--chip-scale));
   --c-gap: calc(var(--chip-gap, 5px) * var(--chip-scale));
-  --c-type-start: calc(var(--chip-type-padding-start, 6px) * var(--chip-scale));
+  --c-status-start: calc(var(--chip-status-padding-start, 7px) * var(--chip-scale));
   --c-tag-start: calc(var(--chip-tag-padding-start, 7px) * var(--chip-scale));
   --c-mark: calc(var(--chip-mark-size, 14px) * var(--chip-scale));
   --c-person: calc(var(--chip-person-circle, 18px) * var(--chip-scale));
   --c-initials: calc(var(--chip-person-initials-size, 8.5px) * var(--chip-scale));
   --c-person-gap: calc(var(--chip-person-gap, 6px) * var(--chip-scale));
+  --c-fact: calc(var(--chip-fact-size, 13px) * var(--chip-scale));
   --c-dot: calc(7px * var(--chip-scale));
 }
 
@@ -480,9 +481,9 @@ body[data-text='none'] #editor {
   border: 0;
   border-radius: var(--c-radius);
   background: var(--chip-wash, var(--label-quinary));
-  color: var(--label-primary);
+  color: var(--chip-text-color, var(--label-primary));
   font:
-    500 var(--c-text) / normal -apple-system,
+    var(--chip-weight, 500) var(--c-text) / normal -apple-system,
     system-ui,
     sans-serif;
   text-align: start;
@@ -512,8 +513,9 @@ body[data-text='none'] #editor {
 .item-chip[data-kind='link'] {
   padding-inline: 0;
   background: transparent;
-  font-weight: 400;
-  font-size: calc(13px * var(--chip-scale));
+  color: var(--label-primary);
+  font-weight: var(--chip-fact-weight, 400);
+  font-size: var(--c-fact);
 }
 
 .item-chip[data-kind='link']:not(:disabled):hover .item-chip-text {
@@ -524,14 +526,14 @@ body[data-text='none'] #editor {
   flex: none;
   width: var(--c-mark);
   height: var(--c-mark);
-  background: var(--tone-ink);
+  background: var(--tone);
   -webkit-mask: center / contain no-repeat;
   mask: center / contain no-repeat;
 }
 
 /* Status: its group's mark on the one wash, with no edge. */
 .item-chip[data-kind='status'] {
-  padding-inline-start: var(--c-type-start);
+  padding-inline-start: var(--c-status-start);
 }
 
 /* A status the item does not have yet reads as any empty value does: quiet text with no edge. Its fill, under the
@@ -582,9 +584,13 @@ body[data-text='none'] #editor {
   padding-inline-start: var(--c-tag-start);
 }
 
+/* The number sign is the app's own `number` symbol, drawn by the app and used as a mask. */
 .item-chip-hash {
+  flex: none;
   margin-inline-end: calc(var(--chip-scale) * -2px);
-  color: var(--label-secondary);
+  background: var(--label-secondary);
+  -webkit-mask: center / contain no-repeat;
+  mask: center / contain no-repeat;
 }
 
 /* A person: one or two initials in a pale purple circle with no edge, then the name. No chip round it. */
@@ -603,7 +609,7 @@ body[data-text='none'] #editor {
   background: transparent;
   color: var(--label-primary);
   font:
-    500 var(--c-text) / normal -apple-system,
+    var(--chip-fact-weight, 400) var(--c-fact) / normal -apple-system,
     system-ui,
     sans-serif;
   white-space: nowrap;
@@ -622,8 +628,8 @@ body[data-text='none'] #editor {
   background: var(--chip-person-fill);
   color: var(--chip-person-ink);
   font-size: var(--c-initials);
-  font-weight: 600;
-  letter-spacing: 0;
+  font-weight: var(--chip-person-initials-weight, 600);
+  letter-spacing: 0.02em;
 }
 
 .item-pin-icon {

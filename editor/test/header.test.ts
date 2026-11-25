@@ -422,8 +422,8 @@ test('the property block reads as label and value pairs, each drawn by its kind'
   expect(pairs[0]!.querySelector('dd #ItemStatusPin')).not.toBeNull()
   expect(pairs[1]!.querySelector('dd #ItemParentPin')).not.toBeNull()
   expect([...pairs[3]!.querySelectorAll('.item-chip')].map((chip) => chip.textContent)).toEqual([
-    '#marfa-mac',
-    '#storage',
+    'marfa-mac',
+    'storage',
   ])
   expect(pairs[6]!.querySelector('dd')!.textContent).toBe('Yes')
   posted = []
@@ -456,7 +456,6 @@ test('an item a row links to is a chip in its own tone, with the icon of its typ
   const chip = root.querySelector<HTMLElement>('.item-prop-value .item-chip')!
   expect(chip.dataset.kind).toBe('link')
   expect(chip.style.getPropertyValue('--tone')).toBe('var(--tone-blue)')
-  expect(chip.style.getPropertyValue('--tone-ink')).toBe('var(--tone-blue-ink)')
   expect(chip.querySelector('.item-chip-mark')).not.toBeNull()
   expect(chip.querySelector('.item-chip-text')!.textContent).toBe('Ship it')
   posted = []
@@ -553,7 +552,8 @@ test('each kind of value has its own chip, and its text is never read as markup'
   expect(chips[0]!.querySelector('.item-chip-dot')).not.toBeNull()
   expect(chips[0]!.style.getPropertyValue('--tone')).toBe('var(--tone-pink)')
   expect(chips[2]!.querySelector('.item-chip-dot')).toBeNull()
-  expect(chips[2]!.querySelector('.item-chip-hash')!.textContent).toBe('#')
+  expect(chips[2]!.querySelector('.item-chip-hash')!.getAttribute('aria-hidden')).toBe('true')
+  expect(chips[2]!.querySelector('.item-chip-hash')!.textContent).toBe('')
   expect(chips[1]!.querySelector('.item-chip-text')!.textContent).toBe(
     '<img src=x onerror=alert(1)>',
   )
@@ -1039,7 +1039,7 @@ test("a pinned list shows what the app sent and the app's words for what it left
   })
   expect(
     [...pinned('#tags').querySelectorAll('.item-chip')].map((chip) => chip.textContent),
-  ).toEqual(['#one'])
+  ).toEqual(['one'])
   expect(pinned('#tags').querySelector('.item-pin-more')!.textContent).toBe('+3 more')
   header.set({ ...ticket, pins: [{ ...pinRows[3]!, text: 'Today' }] })
   expect(root.querySelector('.item-pin-more')).toBeNull()

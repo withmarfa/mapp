@@ -34,8 +34,8 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
     }
 
     /// Every chip look as CSS custom properties for the page, resolved for light and for dark so an appearance
-    /// change needs no resend: the sizes and fills (`ChipLooks.cssVariables`) and each tone's colors as
-    /// `--tone-<name>`, `--tone-<name>-ink` and `--tone-<name>-mark`. A chip names its tone and the page forwards the name.
+    /// change needs no resend: the sizes and fills (`ChipLooks.cssVariables`) and each tone's color as
+    /// `--tone-<name>`. A chip names its tone and the page forwards the name.
     struct ChipStyle: Encodable, Equatable, Sendable {
         var light: [String: String]
         var dark: [String: String]
@@ -44,11 +44,7 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
         init(looks: ChipLooks = .current) {
             func variables(dark: Bool) -> [String: String] {
                 var all = ChipLooks.cssVariables(dark: dark, looks: looks)
-                for tone in TypeTone.allCases {
-                    for (name, value) in TypeTone.cssColors(for: tone, dark: dark, looks: looks) {
-                        all["--tone-\(tone.rawValue)\(name.dropFirst("--tone".count))"] = value
-                    }
-                }
+                for tone in TypeTone.allCases { all["--tone-\(tone.rawValue)"] = tone.cssColor(dark: dark) }
                 return all
             }
             light = variables(dark: false)
@@ -262,6 +258,9 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
     /// The symbols of the row above the title: Linked From and Customize Layout.
     static let titleToolSymbols = ["arrow.down.left", "rectangle.split.2x1"]
 
+    /// The symbol a tag's chip starts with, drawn at the size the app's tag chip draws it.
+    static let tagSymbol = "number"
+
     /// What a row's key shows under the pointer, to say it can be dragged.
     static let rowGripSymbol = "line.3.horizontal"
 
@@ -277,6 +276,8 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
         for name in PropertyRow.Value.symbols + [Self.pictureSymbol, Self.rowGripSymbol] + Self.titleToolSymbols {
             symbols[name] = Self.symbol(name, size: size, weight: .regular)
         }
+        symbols[Self.tagSymbol] = Self.symbol(
+            Self.tagSymbol, size: ChipLooks.current.textSize * InterfaceStyle.scale(for: textSize) * 0.85, weight: .medium)
         symbols[Self.closeSymbol] = Self.symbol(Self.closeSymbol, size: size * 9 / 13, weight: .bold)
         // A status's four symbols at the size a status chip draws them, which the page uses as they come.
         for name in StatusSymbol.systemNames {

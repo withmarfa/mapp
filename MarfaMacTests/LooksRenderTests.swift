@@ -43,6 +43,17 @@ import Testing
                     PagePerson(name: "August Cayzer", initials: "AC")
                     PersonCircle(initials: "MK", size: .row)
                 }
+                row("Type marks") {
+                    TonedGlyph(id: "lucide:sticky-note")
+                    TonedGlyph(id: "lucide:check-square")
+                    TonedGlyph(id: "lucide:user")
+                    TonedGlyph(id: "lucide:film")
+                }
+                row("Focus ring") {
+                    TextField("Search", text: .constant("")).textFieldStyle(.plain).padding(.horizontal, 8).frame(width: 160, height: 28)
+                        .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 7, style: .continuous))
+                        .appFocusRing(isFocused: true)
+                }
                 row("Keycaps") {
                     ShortcutKeys("⇧⌘P")
                     KeyCap(key: "K")
@@ -62,7 +73,7 @@ import Testing
     @Test func looks() async throws {
         for (scheme, label) in [(ColorScheme.light, "light"), (.dark, "dark")] {
             try await SettingsRender.png(
-                Sheet().background(Color(nsColor: .windowBackgroundColor)), size: CGSize(width: 620, height: 380),
+                Sheet().background(Color(nsColor: .windowBackgroundColor)), size: CGSize(width: 620, height: 470),
                 named: "Looks, \(label)", appearance: scheme, settle: .milliseconds(300))
         }
     }

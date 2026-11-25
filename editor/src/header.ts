@@ -3,13 +3,15 @@ import { dragRows } from './row-drag'
 
 /** The symbol a row's key shows under the pointer, a key of `HeaderIcons.symbols`. */
 const rowGrip = 'line.3.horizontal'
+/** The symbol a tag's chip starts with, a key of `HeaderIcons.symbols`. */
+const tagSymbol = 'number'
 
 /** How a status pin draws its mark: the SF Symbol of the status's group, a key of `HeaderIcons.symbols`, and the tint
  *  the page colors it in, from its own system colors. */
 export type HeaderTint = 'blue' | 'secondary' | 'tertiary'
 
 /** Every chip look as CSS custom properties, resolved by the app for light and for dark: the sizes and fills
- *  (`--chip-*`) and each tone's colors (`--tone-<name>`, `--tone-<name>-ink`, `--tone-<name>-mark`). The page applies
+ *  (`--chip-*`) and each tone's colors (`--tone-<name>`). The page applies
  *  the set for the appearance it is in and never picks a color or a size of its own. */
 export interface HeaderChipStyle {
   light: Record<string, string>
@@ -247,14 +249,12 @@ function element<K extends keyof HTMLElementTagNameMap>(
 /** Gives a chip the tone the app named, from the custom properties the app sent (`--tone-<name>`); the page chooses no
  *  color. A name that is not a word leaves the chip with no tone. */
 function useTone(node: HTMLElement, name: string | null | undefined) {
-  const tones = ['--tone', '--tone-ink', '--tone-mark']
+  const tones = ['--tone']
   if (!name || !/^[a-z]+$/.test(name)) {
     for (const property of tones) node.style.removeProperty(property)
     return
   }
   node.style.setProperty('--tone', `var(--tone-${name})`)
-  node.style.setProperty('--tone-ink', `var(--tone-${name}-ink)`)
-  node.style.setProperty('--tone-mark', `var(--tone-${name}-mark)`)
 }
 
 /** A symbol the app drew, as a mask in the tone's color. */
@@ -823,8 +823,12 @@ export class ItemHeader {
     if (kind === 'option')
       element('span', 'item-chip-dot', chip).setAttribute('aria-hidden', 'true')
     if (kind === 'tag') {
-      element('span', 'item-chip-hash', chip).textContent = '#'
-      chip.lastElementChild!.setAttribute('aria-hidden', 'true')
+      const hash = element('span', 'item-chip-hash', chip)
+      hash.setAttribute('aria-hidden', 'true')
+      const icon = this.symbols[tagSymbol]
+      maskSymbol(hash, icon)
+      hash.style.width = icon ? `${icon.width}px` : ''
+      hash.style.height = icon ? `${icon.height}px` : ''
     }
     element('span', 'item-chip-text', chip).textContent = text
     return chip

@@ -94,14 +94,11 @@ nonisolated enum LinkLook: String, CaseIterable, Identifiable, Sendable {
     /// The look as the page's custom properties: Inkkit's link and wiki link tokens, and for each tone the colors a link to
     /// an item of a type with that tone takes (`--link-icon-<tone>`), resolved for light and for
     /// dark at once by `light-dark()` so an appearance change needs no resend.
-    @MainActor
-    func cssVariables(looks: ChipLooks = .current) -> [String: String] {
+    func cssVariables() -> [String: String] {
         var all: [String: String] = [:]
         for tone in TypeTone.allCases {
-            let light = TypeTone.cssColors(for: tone, dark: false, looks: looks)
-            let dark = TypeTone.cssColors(for: tone, dark: true, looks: looks)
             all["--link-icon-\(tone.rawValue)"] =
-                colorsIcon ? Self.appearance(light["--tone-ink"]!, dark["--tone-ink"]!) : "currentcolor"
+                colorsIcon ? Self.appearance(tone.cssColor(dark: false), tone.cssColor(dark: true)) : "currentcolor"
         }
         all.merge(Self.openCue) { _, new in new }
         let prefix = "--inkkit-wiki-link-"

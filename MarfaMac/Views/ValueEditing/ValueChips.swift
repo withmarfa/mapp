@@ -49,7 +49,7 @@ struct ValueChipView: View {
 
     var body: some View {
         if chip.givesType, case .type(let icon) = chip.mark {
-            TintedChip(text: chip.title, icon: icon, chevron: false)
+            TintedChip(text: chip.title, icon: icon, chevron: false, scale: scale)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(Text(verbatim: chip.title))
         } else {

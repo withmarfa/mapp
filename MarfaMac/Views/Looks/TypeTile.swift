@@ -1,8 +1,8 @@
 import MarfaIcons
 import SwiftUI
 
-/// A type's icon in its tone on a pale rounded square of the same color, with no shadow. It is only for a gallery cover
-/// with no picture and the Settings type pages; everywhere else a type's mark is the bare `TonedGlyph`. Sizes follow the
+/// A type's icon in its tone on a pale rounded square of the same color, with no shadow. It is only for the Settings type
+/// pages; everywhere else a type's mark is the bare `TonedGlyph`. Sizes follow the
 /// design's `tileSizes` (Foundations F6).
 struct TypeTile: View {
     enum Size: CaseIterable, Sendable {
@@ -32,7 +32,7 @@ struct TypeTile: View {
                 Image(typeGlyph: icon)
                     .resizable()
                     .scaledToFit()
-                    .foregroundStyle(tone.ink(ChipLooks.current, for: scheme))
+                    .foregroundStyle(tone.color(for: scheme))
                     .frame(width: metrics.icon, height: metrics.icon)
             }
             .accessibilityHidden(true)
