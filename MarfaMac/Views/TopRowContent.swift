@@ -85,13 +85,15 @@ struct TopRowContent {
 
         // The Archive is a page of the Library and keeps its title through a search; its count says how many items it
         // holds and how many of them a search or a filter leaves.
-        var count = results == nil ? listed : everything
-        var narrowed = results.map(\.items.count)
+        // The tokens narrow the list as the filters do, so with them the list's own count is what the search leaves.
+        let tokened = browser.hasSearchTokens
+        var count = results == nil && !tokened ? listed : everything
+        var narrowed = tokened ? listed : results.map(\.items.count)
         if browser.showsPlaceIndex {
             (count, narrowed) = (library.count(in: .library), nil)
         } else if browser.listsArchive {
             let held = library.count(in: .archive, scope: .all)
-            let leaves = results?.items.count ?? browser.listedCount(in: library) ?? browser.filteredItems(in: library).count
+            let leaves = results.flatMap { tokened ? nil : $0.items.count } ?? browser.listedCount(in: library) ?? browser.filteredItems(in: library).count
             (count, narrowed) = (held, leaves == held ? nil : leaves)
         }
 

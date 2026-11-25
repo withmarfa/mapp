@@ -24,12 +24,20 @@ final class ItemTableContent {
     /// When the table was worked out, which a filter relative to the day reads as today.
     private let now: Date
 
-    /// The rows the filters keep, in the order the items came in: what a layout that sorts and groups the items
-    /// itself (the list, the board, the timeline) works from.
-    lazy var kept: [ItemTableRow] = options.isFiltering
-        ? FilterMatching.filter(
-            allRows, by: options.filter, targets: filterOffer.targets, catalogue: catalogue, clock: .init(now: now, calendar: .current))
-        : allRows
+    /// The search's tokens and the fields they ask about, which narrow the rows beside the filters.
+    private let tokens: FilterState
+    private let tokenTargets: [String: FilterTarget]
+
+    /// The rows the filters and the search's tokens keep, in the order the items came in: what a layout that sorts and
+    /// groups the items itself (the list, the board, the timeline) works from.
+    lazy var kept: [ItemTableRow] = {
+        let clock = FilterMatching.Clock(now: now, calendar: .current)
+        let filtered = options.isFiltering
+            ? FilterMatching.filter(allRows, by: options.filter, targets: filterOffer.targets, catalogue: catalogue, clock: clock)
+            : allRows
+        return tokens.isEmpty
+            ? filtered : FilterMatching.filter(filtered, by: tokens, targets: tokenTargets, catalogue: catalogue, clock: clock)
+    }()
 
     /// What Filter By offers for the place: the fields of the types it lists, then what every item has.
     lazy var filterOffer = FilterOffer.make(
@@ -79,6 +87,8 @@ final class ItemTableContent {
         listedTypes = browser.listedTypes(in: library)
         now = library.now()
         self.options = options
+        tokens = FilterState(clauses: browser.searchTokens)
+        tokenTargets = browser.tokenTargets(in: library)
         // Relevance is the order the rows come in, which the sort leaves alone when it is empty.
         sort = browser.ordersByRelevance ? [] : ItemTableLayout.sort(
             options, columns: columns, keepsGivenOrder: browser.keepsPlaceOrder, listsByOrigin: browser.listsByOrigin)

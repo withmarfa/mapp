@@ -73,7 +73,7 @@ struct ListEmptyState: View {
             FilteredEmptyState(browser: browser)
         } else if browser.listHidesEveryGroup(in: library) {
             HiddenGroupsEmptyState()
-        } else if browser.isSearching {
+        } else if browser.narrowsBySearch {
             SearchEmptyState(browser: browser)
         } else {
             PlaceEmptyState(browser: browser)

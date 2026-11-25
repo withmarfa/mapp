@@ -145,6 +145,7 @@ nonisolated enum FilterMatching {
     static func present(_ row: ItemTableRow, _ target: FilterTarget) -> Bool {
         switch target.kind {
         case .type, .moment: return true
+        case .source where target.isTier: return true
         case .tags: return !row.item.tags.isEmpty
         case .parent: return row.parent != nil
         case .collection: return !row.collections.isEmpty
@@ -160,7 +161,7 @@ nonisolated enum FilterMatching {
         switch target.kind {
         case .type: row.item.type.rawValue
         case .parent: row.parent?.id.rawValue
-        case .source: row.item.source
+        case .source: target.isTier ? row.item.tier.word : row.item.source
         default: target.key.flatMap { ItemTableValue.string(row, key: $0) }
         }
     }

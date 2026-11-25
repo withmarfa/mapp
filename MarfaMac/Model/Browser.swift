@@ -213,9 +213,9 @@ final class Browser {
     /// layout's own start (`ordersByRelevance`). It is forgotten when the search ends, so the next one starts again
     /// and the person's own sort, which relevance never touches, is the order once more.
     var relevanceChoice: Bool?
-    /// Whether the search covers only the place shown rather than everything. It applies wherever the place can be
-    /// searched alone (`SearchScope.narrows`) and means everything elsewhere.
-    var searchesPlace = false
+    /// What the search's tokens filter by, joined by AND beside the place's own filters (`Browser+Search`). Like the
+    /// text, they belong to the field and are never saved; a change of place clears both.
+    var searchTokens: [FilterClause] = []
     /// Where the keyboard should go next, asked for by an action such as New Item or Search Items. Whatever
     /// can take it grants it once, when it is able to, and clears it.
     var focusRequest: Pane?
@@ -396,9 +396,8 @@ final class Browser {
         defer { isMovingThroughHistory = false }
         isCollectionItemPresented = false
         modalItem = nil
-        if isSearching || !entry.place.isSame(showing) {
-            searchText = ""
-            isSearchExpanded = false
+        if isSearching || hasSearchTokens || !entry.place.isSame(showing) {
+            clearSearch()
             showing = entry.place.savedView.map { PlaceView.saved($0, in: library) } ?? entry.place
         }
         if !items(in: library).contains(where: { $0.id == entry.id }) { showing = .library }
@@ -496,9 +495,7 @@ final class Browser {
         sidebarTab = nil
         sidebarMemory.forget()
         listMemory.forget()
-        searchText = ""
-        searchesPlace = false
-        isSearchExpanded = false
+        clearSearch()
         palette = nil
         fetchedFile = nil
         giveUpNewItem(because: .windowLeft)

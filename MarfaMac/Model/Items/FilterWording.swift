@@ -47,6 +47,7 @@ nonisolated enum FilterWording {
         case .choice: return ItemTypeInfo.Field.label(ofOption: value)
         case .boolean: return value == "true" ? String(localized: "Yes") : String(localized: "No")
         case .parent, .collection, .type: return titles(value) ?? value
+        case .source where target.isTier: return Tier(word: value)?.title ?? value
         default: return value
         }
     }

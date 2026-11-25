@@ -26,7 +26,7 @@ nonisolated extension ViewDraft {
     private static func filterField(of target: FilterTarget) -> FilterField? {
         switch target.kind {
         case .type: .system(.type)
-        case .source: .system(.source)
+        case .source: target.isTier ? .system(.tier) : .system(.source)
         case .parent: .edge(type: MarfaMapping.parentEdge, direction: .backref)
         case .collection: .edge(type: MarfaMapping.collectionEdge, direction: .outbound)
         case .tags: .tags
