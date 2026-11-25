@@ -10,6 +10,8 @@ struct MainView: View {
     @State private var browser = Browser()
     @State private var editorSlot = EditorSlot()
     @State private var details = DetailsPresentation()
+    /// What the capsule and the pile say about several chosen items (`SelectionSummary`).
+    @State private var selectionSummary = SelectionSummary()
     @SceneStorage("detailsPresented") private var storedDetailsPresented = false
     @StoredOrder private var order
     @SceneStorage("window") private var storedBrowser: Data?
@@ -134,7 +136,7 @@ struct MainView: View {
             Group {
                 if browser.isModalPresented { Color.clear } else { itemPage.topRowOverPage(tools: pageTools, signal: topRowSignal) }
             }
-                .toastOverlay()
+                .toastOverlay(capsuleFor: browser, spansLayout: false)
                 .modifier(itemInspector)
                 .toolbar { windowToolbar(hasListColumn: true) }
         }
@@ -245,7 +247,7 @@ struct MainView: View {
                         }
                     }
                     .besidePage(browser, editor: editor, details: details)
-                    .toastOverlay()
+                    .toastOverlay(capsuleFor: browser, spansLayout: browser.showsCollection)
                     .modifier(itemInspector)
                     .toolbar { windowToolbar() }
                 }
@@ -352,8 +354,10 @@ struct MainView: View {
         .focusedSceneValue(\.browser, browser)
         .focusedSceneValue(\.editor, browser.showsPage ? editor : nil)
         .focusedSceneValue(\.focusedItems, FocusedItems(ids: browser.selection, undoManager: undoManager))
+        .background { SelectionSummaryKeeper(browser: browser, summary: selectionSummary) }
         // Last, so the toolbars, the context menus and the palette above the workspace all read it.
         .environment(details)
+        .environment(selectionSummary)
     }
 
     private var lifecycleWindow: some View {
@@ -439,6 +443,10 @@ struct MainView: View {
                     browser.show(place, in: library, order: order)
                 }
                 if let layout = SampleLibrary.launchLayout { browser.set(layout: layout) }
+                if let count = launchSelectionCount {
+                    try? await Task.sleep(for: .seconds(1))
+                    browser.selection = Set(browser.items(in: library).prefix(count).map(\.id))
+                }
                 #endif
                 isRestored = true
                 takeItemLink()
@@ -491,6 +499,14 @@ struct MainView: View {
     }
 
     #if DEBUG
+    /// A sample launch can choose the first items of the place it opens, as `-MarfaMacSelectCount <n>`.
+    private var launchSelectionCount: Int? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard SampleLibrary.isRequested, let flag = arguments.firstIndex(of: "-MarfaMacSelectCount"),
+              arguments.indices.contains(flag + 1) else { return nil }
+        return Int(arguments[flag + 1]).flatMap { $0 >= 0 ? $0 : nil }
+    }
+
     private var launchSelection: ItemID? {
         let arguments = ProcessInfo.processInfo.arguments
         guard SampleLibrary.isRequested, let flag = arguments.firstIndex(of: "-MarfaMacSelectItem"),
@@ -519,6 +535,22 @@ struct MainView: View {
         case nil: return
         }
         browser.focusRequest = nil
+    }
+}
+
+/// Works the facts of the window's choice out again when the choice or the items change. A view of its own, so that
+/// reading the library's revision runs this body and not the window's.
+private struct SelectionSummaryKeeper: View {
+    @CurrentLibrary private var library
+    let browser: Browser
+    let summary: SelectionSummary
+
+    var body: some View {
+        Color.clear
+            .onChange(of: browser.selection, initial: true) { summary.update(browser.selection, in: library) }
+            .onChange(of: library.membershipRevision) { summary.update(browser.selection, in: library) }
+            .onChange(of: library.contentRevision) { summary.refreshTop(browser.selection, in: library) }
+            .onChange(of: library.isLoaded) { summary.update(browser.selection, in: library) }
     }
 }
 

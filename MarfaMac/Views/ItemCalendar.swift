@@ -27,6 +27,7 @@ struct ItemCalendar: View {
         let visible = scale == .week
             ? DateInterval(start: firstShown, end: calendar.date(byAdding: .day, value: 7, to: firstShown) ?? firstShown)
             : CalendarLayout.interval(of: scale, containing: anchor, calendar: calendar)
+        let drawn = CalendarLayout.drawn(scale, firstShown: firstShown, anchor: anchor, calendar: calendar)
 
         Group {
             switch scale {
@@ -64,6 +65,11 @@ struct ItemCalendar: View {
             browser.selection = []
             keyboard.day = nil
             return .handled
+        }
+        // The menu and the capsule act on the whole choice, so a choice never holds an event the calendar has left behind.
+        .onChange(of: drawn) {
+            let kept = browser.selection.intersection(CalendarLayout.ids(in: placed.entries, within: drawn))
+            if kept != browser.selection { browser.selection = kept }
         }
         .searchStatus(browser)
         .overlay {

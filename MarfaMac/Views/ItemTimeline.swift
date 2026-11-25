@@ -29,6 +29,8 @@ struct ItemTimeline: View {
 
         timeline(groups, contents: contents, now: now)
         .topRowScrolls()
+        .clearsSeveralOnEscape(browser)
+        .deletesChosen(browser) { Set(items.map(\.id)) }
         .searchStatus(browser)
         .overlay {
             if items.isEmpty {

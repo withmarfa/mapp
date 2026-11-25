@@ -65,15 +65,20 @@ extension MarfaLibrary {
     }
 
     /// Removes the items' `in-collection` edges to the collection, in one undo step. An undo puts each back at its
-    /// position. An item in the collection that can't be changed is left out and the person is told.
+    /// position. An item in the collection that can't be changed, or that the library no longer holds, is left out and
+    /// the person is told.
     @discardableResult
     func removeFromCollection(_ ids: Set<ItemID>, _ collection: ItemID, undoManager: UndoManager?) -> Bool {
         let title = String(localized: "Can’t Remove from Collection")
         var skips = BatchSkips()
         var drafts: [EdgeDraft] = []
         for id in ids {
+            guard let held = item(id) else {
+                skips.skip(.gone)
+                continue
+            }
             guard let link = index.link(type: MarfaMapping.collectionEdge, from: id, to: collection) else { continue }
-            if let reason = item(id)?.obstacle(to: .collections) {
+            if let reason = held.obstacle(to: .collections) {
                 skips.skip(reason)
             } else {
                 drafts.append(EdgeDraft(type: link.type, from: link.from, to: link.to, position: link.position))

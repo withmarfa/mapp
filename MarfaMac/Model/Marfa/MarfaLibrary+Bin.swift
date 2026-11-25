@@ -21,8 +21,16 @@ extension MarfaLibrary {
     /// The copy holds the bin, so an item binned here or elsewhere is restored like any other.
     func recover(_ ids: Set<ItemID>, undoManager: UndoManager?) {
         var changes: [ItemID: (from: ItemState, to: ItemState)] = [:]
-        for id in ids { if item(id)?.state == .trashed { changes[id] = (.trashed, .active) } }
+        var missing = 0
+        for id in ids {
+            guard let held = item(id) else {
+                missing += 1
+                continue
+            }
+            if held.state == .trashed { changes[id] = (.trashed, .active) }
+        }
         gatheringSkips(failing: String(localized: "Can’t Recover")) {
+            for _ in 0..<missing { skip(.gone) }
             setStates(changes, name: String(localized: "Recover"), undoManager: undoManager)
         }
     }

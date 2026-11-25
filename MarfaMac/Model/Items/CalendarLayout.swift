@@ -75,6 +75,24 @@ nonisolated enum CalendarLayout {
         return DateInterval(start: day, end: calendar.date(byAdding: .day, value: scale == .week ? 7 : 30, to: day) ?? day)
     }
 
+    /// What the calendar draws for `scale`: the seven days from `firstShown`, or the whole weeks that hold the month,
+    /// whose first and last rows reach into the months beside it.
+    static func drawn(_ scale: CalendarScale, firstShown: Date, anchor: Date, calendar: Calendar) -> DateInterval {
+        if scale == .week {
+            return DateInterval(start: firstShown, end: calendar.date(byAdding: .day, value: 7, to: firstShown) ?? firstShown)
+        }
+        let month = interval(of: .month, containing: anchor, calendar: calendar)
+        let last = calendar.date(byAdding: .second, value: -1, to: month.end) ?? month.start
+        return DateInterval(
+            start: interval(of: .week, containing: month.start, calendar: calendar).start,
+            end: interval(of: .week, containing: last, calendar: calendar).end)
+    }
+
+    /// The items among `entries` with any time inside `drawn`: the ones the calendar shows.
+    static func ids(in entries: [CalendarEntry], within drawn: DateInterval) -> Set<ItemID> {
+        Set(entries.lazy.filter { $0.start < drawn.end && $0.end > drawn.start }.map(\.id))
+    }
+
     /// The first day of the week that holds `day`: the calendar's first weekday on or before it.
     static func firstDay(ofWeekHolding day: Date, calendar: Calendar) -> Date {
         interval(of: .week, containing: day, calendar: calendar).start

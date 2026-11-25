@@ -29,8 +29,6 @@ struct ItemInspectorHost: View {
                     details: details, onOpen: open
                 )
                 .id(id)
-            } else if let browser, browser.selection.count > 1 {
-                EmptyState(title: Text("^[\(browser.selection.count) item](inflect: true) selected"), detail: nil, actions: { EmptyView() })
             } else if selectedID != nil {
                 // The library has not read the chosen item yet.
                 if library.isLoaded && library.syncReport.phase == .current { Color.clear } else { InspectorReadingView() }
