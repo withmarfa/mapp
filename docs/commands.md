@@ -92,7 +92,7 @@ The `ItemLibrary` calls take the whole selection and return a `CommandOutcome` w
 | View | Make Text Bigger, Smaller | ⌘+, ⌘- | Yes |
 | View | Actual Size | ⌘0 | Yes |
 | View | Show Markdown Source or Formatted Text, Show Reader or Original, Show or Hide Formats, Show or Hide Filters, Clear Filters, View…, New View…, Revert View, Reset View, Save View, Duplicate View, Delete View…, Collapse All Groups, Expand All Groups, Standard Width, Full Width, Customize Sidebar…, Close Modal, Zoom to Fit, Next Page, Previous Page | – | Yes |
-| View | View as Digest, View as Map, Show All Items, Show Library, Show Feed, Save as New View… | – | Agreed |
+| View | View as Digest, View as Map, Show All Items, Show Library, Show Feed | – | Agreed |
 | Format | Heading 1, 2, 3 | ⇧⌘T, ⇧⌘H, ⇧⌘J | Yes |
 | Format | Body | ⇧⌘B | Yes |
 | Format | Bold, Italic, Strikethrough | ⌘B, ⌘I, ⇧⌘X | Yes |

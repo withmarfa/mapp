@@ -89,7 +89,7 @@ enum SavedViews {
         return settings
     }
 
-    /// Whether a place that is not a view shows something a view could keep, which Save as View offers to.
+    /// Whether a place's list has filter, sort or group choices a saved view could keep.
     static func hasChoicesToKeep(_ browser: Browser, in library: any ItemLibrary) -> Bool {
         shown(browser, in: library) == nil && canEdit(browser, in: library)
             && (browser.tableOptions[browser.shown]?.isFiltering == true || browser.listShape?.arranged == true)

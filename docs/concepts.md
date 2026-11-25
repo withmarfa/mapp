@@ -145,7 +145,7 @@ The server one person owns, and the source of every item the app shows.
 - **A change to a saved view is written to Marfa as it is made.** Its pill has a dot while it differs from how it was when last opened on that Mac, and Revert View puts that back.
 - **Changing a view never makes another one quietly.** Making one is a short setup of its own, not a form of filters.
 - **What Marfa cannot save is not offered in a view.** Filter groups, and dates relative to the current day, wait for it.
-- **Quick Actions puts Keep, Archive and Delete on the row under the pointer.** It is on by default only in the Feed and in a view whose From is Feed.
+- **Quick Actions puts actions such as Keep, Archive and Delete on the row under the pointer.** It is on by default in the Archive, the Feed and saved views whose From is Feed.
 - **An inbox is a view a person makes.** The app ships none, and the word never names the Feed.
 
 ## Layout

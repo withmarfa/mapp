@@ -527,8 +527,7 @@ final class Browser {
     /// The view the window asks the person to confirm deleting.
     var deletingView: ItemID?
 
-    /// The right sidebar's panel for editing a view, while it is open (`Browser+ViewPanel`). It holds the name typed,
-    /// of a new view or a rename, until the server takes it, so a window that closes or changes library can give it back.
+    /// The active View popover. It holds a typed name so the window can hand it back if the server has yet to take it.
     var viewPanel: ViewPanel?
 
     /// The saved view the window shows as it was when the window opened it, which Revert View puts back.
