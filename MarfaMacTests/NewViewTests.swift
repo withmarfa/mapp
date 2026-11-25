@@ -557,11 +557,20 @@ struct NewViewTests {
         let (browser, library) = Self.window()
         browser.openNewViewPanel(in: library)
         browser.chooseStart(.recentlyAdded, in: library)
-        browser.viewMode = .table
-        let window = SavedViews.window(browser, in: library, order: Self.order)
-        let draft = try #require(ViewDraft.draft(window, catalogue: library.catalogue, views: []))
+        let started = [LibraryViewSort(field: "created_at", ascending: false)]
+        // A layout whose own order is not the starting point's.
+        var draft: ViewDraft.Draft?
+        for layout in browser.availableViewModes(in: library) where layout != .list {
+            browser.viewMode = layout
+            let window = SavedViews.window(browser, in: library, order: Self.order)
+            if let found = ViewDraft.draft(window, catalogue: library.catalogue, views: []), found.sort != started {
+                draft = found
+                break
+            }
+        }
+        let own = try #require(draft)
         let made = try #require(await browser.finishViewPanel(in: library, order: Self.order))
-        #expect(made.sort == draft.sort)
+        #expect(made.sort == own.sort)
     }
 
     @Test func aSortChosenAfterAStartingPointIsTheOneWritten() async throws {
