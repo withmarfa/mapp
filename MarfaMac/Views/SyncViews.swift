@@ -21,9 +21,9 @@ struct SyncFootReading<Content: View>: View {
     @ViewBuilder let content: (SyncFootLine?) -> Content
 
     var body: some View {
-        let synced = host.lastSynced
-        TimelineView(.periodic(from: synced ?? .now, by: host.report.waiting > 0 ? 1 : 60)) { context in
-            content(host.hasServer ? SyncFootLine(state: host.state, report: host.report, lastSynced: synced, now: context.date) : nil)
+        let standing = FootStanding(host: host)
+        TimelineView(.periodic(from: standing.lastSynced ?? .now, by: standing.report.waiting > 0 ? 1 : 60)) { context in
+            content(standing.line(now: context.date))
         }
     }
 }

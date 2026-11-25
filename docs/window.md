@@ -18,7 +18,7 @@ paths:
 
 # The window
 
-`docs/look.md` has the window's areas. `docs/commands.md` has every command and shortcut.
+`docs/look.md` has the window's areas; `docs/commands.md`, every command.
 
 ## Places
 
@@ -42,8 +42,11 @@ paths:
 - **What was put under them is pinned; what a hidden one held stays hidden, row by row.** `views` in `hidden` hides every saved view; one shown again goes in `shown`. The Library and the Feed stay fixed.
 - **A row whose section is gone shows under Pinned, a page under the Library;** its home is kept.
 - **The later arrangement wins whole,** also when two Macs change what is hidden before syncing.
-- **Accepted:** an older copy draws it its own way, and its Views edits miss Pinned, until Sparkle updates it.
 - **Recently Deleted is a page of Settings**, never a row.
+
+## Foot
+
+- **The foot is one button that opens the Marfa's panel** (`SidebarFoot`, `MarfaPanel`). Refresh, Settings and a warning line are buttons of their own; that line opens Settings › Connection.
 
 ## Toolbar
 
@@ -77,7 +80,7 @@ paths:
 
 ## Opening an item
 
-- **Open, Return, a double click and a link follow Open Items** (`ItemOpening`), and the menu offers the other ways.
+- **Open, Return, a double click and a link follow Open Items** (`ItemOpening`).
 - **Beside the List is the standard:** a layout that spans the window shows the chosen item's page in a column of 372 (`BesideColumn`), and a new row replaces it once the selection rests (`BesideSettler`).
 - **A column, a modal and a full page show one item** with the window's one editor, one at a time. New Window takes several and asks first above a limit (`ItemWindows`).
 - **The modal** (`ItemModal`) has Close, Up and Down, Keep on a Feed item, Favorite, Share, More and Open as Page, and no panel. Escape, Close and a click outside save and close it. Up and down follow the list behind it (`ListNeighbors`), Keep moves on once queued, and a followed link stays in it.

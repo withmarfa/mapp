@@ -18,7 +18,6 @@ Read only the row you are building. A row says what was agreed; the boards it na
 
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
-| The Marfa's panel | The foot opens a panel: the Marfa's name and count, its latest sources, and the Marfas the app has signed in to, with a tick and a plus on the heading. Switching signs out of nothing. Pages flush first, and changes that were not sent stay queued. | `SidebarFoot.swift`, `MarfaHost` | `Rethink-Marfa` |
 
 ## Feed, and moving between the two
 
@@ -146,7 +145,6 @@ Read only the row you are building. A row says what was agreed; the boards it na
 
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
-| The sync line | A warning mark on the two states that ask for action; the whole foot is one button. | `SidebarFoot.swift` | `Rethink-Sync-Lines`, `Rethink-Offline` |
 | Settings the design adds | Each goes through `PreferencesMap`, optional when read, so an older copy of the app loses none. | `PreferencesMap` | – |
 
 ## Looks
