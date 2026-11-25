@@ -1,13 +1,12 @@
 import SwiftUI
 
 /// A sidebar row's mark and name, laid out as the system lays out its own sidebar labels. A place's mark is a
-/// symbol in the system's grey, or in its `tone` where it has one, as a view's does with no tile; a type's is its
-/// colored `TonedGlyph`. Without a mark it is the name alone.
+/// symbol in the system's gray; a type's is its colored `TonedGlyph`, or the same glyph in gray for a collection
+/// (`grayType`). Without a mark it is the name alone.
 struct SidebarLabel: View {
-    @Environment(\.colorScheme) private var scheme
     let title: String
     let icon: RowIcon?
-    var tone: TypeTone?
+    var grayType = false
 
     var body: some View {
         if let icon {
@@ -16,8 +15,10 @@ struct SidebarLabel: View {
             } icon: {
                 switch icon {
                 case .symbol(let symbol):
-                    Image(systemName: symbol).interfaceFont(.body)
-                        .foregroundStyle(tone.map { AnyShapeStyle($0.color(for: scheme)) } ?? AnyShapeStyle(.secondary))
+                    Image(systemName: symbol).interfaceFont(.body).foregroundStyle(.secondary)
+                case .type(let id) where grayType:
+                    Image(typeGlyph: id).resizable().scaledToFit().foregroundStyle(.secondary)
+                        .frame(width: ChipLooks.defaults.chipMarkSize, height: ChipLooks.defaults.chipMarkSize)
                 case .type(let id): TonedGlyph(id: id)
                 }
             }
@@ -35,26 +36,29 @@ struct SidebarLabel: View {
 }
 
 /// A row of the Types section: the type's mark and name, a count at the trailing edge in line with the system's own,
-/// and, where the row folds subtypes under it, a chevron.
+/// and, where the row folds kinds under it, a chevron. Under the pointer a plus takes the count's place, which makes an
+/// item of the type; the chevron and everything else stay where they are.
 ///
-/// Only a parent type's row has a mark by default; its subtypes, such as Sessions and Logs under Agent, have none.
-///
-/// A subtype sits one step in under its parent, and a thin guide runs down the rows the parent holds and bends into
-/// each of them from under the parent's mark. A subtype either keeps its mark, so the mark lies under its parent's
-/// name, or has none, so its name starts level with its parent's.
+/// A kind sits one step in under its type: with its mark, the mark lies under its type's name; without, which the
+/// person can choose in Settings, its name starts level with its type's.
 struct SidebarTypeRow: View {
     let row: SidebarPlan.TypeRow
     let count: Int
     /// The largest count on a row that folds. The count column of every folding row is as wide as it, so their
     /// chevrons share one place whatever each count is.
     let widestFoldingCount: Int
-    /// The guide columns before the row's own content, outermost first.
+    /// The indent columns before the row's own content, outermost first.
     let steps: [Step]
     let showsIcon: Bool
+    /// Makes an item of the type, where the person can; nil leaves the count under the pointer.
+    var add: (() -> Void)?
+    /// What the plus makes, as its help says: "New Note".
+    var addName = ""
     let toggle: () -> Void
+    @State private var isHovering = false
 
-    /// The padding above and below the content. The list's own row inset is set to zero (`listRowInsets`) so the
-    /// guide runs unbroken from one row to the next, and this puts the space back inside the row.
+    /// The padding above and below the content, in place of the list's own row inset, which is set to zero
+    /// (`listRowInsets`).
     private static let verticalInset: CGFloat = 4
 
     /// Measured so that a count here ends where the system's count on the rows above does.
@@ -62,10 +66,12 @@ struct SidebarTypeRow: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            ForEach(steps.indices, id: \.self) { SidebarGuide(step: steps[$0]) }
+            ForEach(steps.indices, id: \.self) { SidebarIndent(step: steps[$0]) }
             content.padding(.vertical, Self.verticalInset).padding(.trailing, Self.countInset)
         }
         .frame(maxHeight: .infinity)
+        .onHover { isHovering = $0 }
+        .sidebarRowGround(isHovering)
         .overlay(alignment: .trailing) {
             if row.isExpandable {
                 HStack(spacing: 0) {
@@ -91,16 +97,27 @@ struct SidebarTypeRow: View {
             label
             Spacer(minLength: 8)
             if row.isExpandable { disclosure.hidden().accessibilityHidden(true) }
-            SidebarCount(count: count, widest: row.isExpandable ? widestFoldingCount : 0)
+            ZStack(alignment: .trailing) {
+                SidebarCount(count: count, widest: row.isExpandable ? widestFoldingCount : 0)
+                    .opacity(isHovering && add != nil ? 0 : 1)
+                if isHovering, let add {
+                    SidebarPlus(name: addName) {
+                        // The quick add's window takes the pointer, which then never leaves the row.
+                        isHovering = false
+                        add()
+                    }
+                    .padding(.trailing, -4)
+                }
+            }
         }
         .accessibilityElement(children: .combine)
+        .accessibilityActions {
+            if let add { Button(addName, action: add) }
+        }
     }
 
-    /// One column of the guide before a row's content.
+    /// One column of a kind's indent before its content.
     struct Step: Equatable {
-        /// Whether the guide carries on below the row, and whether it ends at this row's own bend.
-        var continues: Bool
-        var bends: Bool
         /// Whether the column is as wide as the mark and the space after it that its parent's row has, plus `extra`.
         var spansParentMark: Bool
         var extra: CGFloat
@@ -110,11 +127,8 @@ struct SidebarTypeRow: View {
 
     /// How far a name sits in from its parent's name when the parent has no mark to step by.
     static let indent: CGFloat = 12
-    /// The horizontal part of a bend, and the gap it stops short of what follows.
-    nonisolated static let elbow: CGFloat = 9
-    nonisolated static let elbowGap: CGFloat = 3
 
-    /// Whether a row has a mark. Subtypes lose theirs unless `subtypeIcons`; top-level types and groups keep theirs.
+    /// Whether a row has a mark. Kinds lose theirs unless `subtypeIcons`; top-level types and groups keep theirs.
     static func showsIcon(_ row: SidebarPlan.TypeRow, subtypeIcons: Bool) -> Bool {
         subtypeIcons || row.depth == 0 || !row.node.opens
     }
@@ -123,31 +137,13 @@ struct SidebarTypeRow: View {
     /// with its mark or, with none, its name; a row under a parent with no mark steps in from the parent's name by
     /// `indent`.
     static func steps(for rows: [SidebarPlan.TypeRow], subtypeIcons: Bool) -> [[Step]] {
-        let flags = guides(for: rows)
         var marks: [Bool] = []
-        return rows.indices.map { index in
-            let row = rows[index]
+        return rows.map { row in
             marks = Array(marks.prefix(row.depth)) + [showsIcon(row, subtypeIcons: subtypeIcons)]
-            return flags[index].indices.map { level in
-                Step(
-                    continues: flags[index][level], bends: level == row.depth - 1, spansParentMark: marks[level],
-                    extra: marks[level] ? 0 : indent)
+            return (0..<row.depth).map { level in
+                Step(spansParentMark: marks[level], extra: marks[level] ? 0 : indent)
             }
         }
-    }
-
-    /// For each row, whether a row after it sits under the same parent at each level from the top, outermost first:
-    /// where a guide carries on below the row, and where it ends at the row's own bend.
-    static func guides(for rows: [SidebarPlan.TypeRow]) -> [[Bool]] {
-        // A row at one depth closes every deeper level above it, so a later row there is under another parent.
-        var carries: [Int: Bool] = [:]
-        var result: [[Bool]] = []
-        for row in rows.reversed() {
-            result.append((0..<row.depth).map { carries[$0 + 1] ?? false })
-            for level in carries.keys where level > row.depth { carries[level] = false }
-            carries[row.depth] = true
-        }
-        return result.reversed()
     }
 }
 
@@ -168,81 +164,28 @@ private struct SidebarCount: View {
     }
 }
 
-/// One column of a subtype's indent. It ends at the left edge of what follows, a short bend before it: a guide runs
-/// down it, and in the innermost column bends toward the row.
-private struct SidebarGuide: View {
+/// One column of a kind's indent: as wide as its parent's mark and the space after it, where the parent has one, and
+/// `extra`.
+private struct SidebarIndent: View {
     let step: SidebarTypeRow.Step
 
     var body: some View {
-        SidebarGuideLayout(spansParentMark: step.spansParentMark, extra: step.extra) {
+        HStack(spacing: 0) {
             if step.spansParentMark {
                 // The system's own label gives the width of a mark and the space after it, so nesting follows its metrics.
                 Label {
                     Text(verbatim: "")
                 } icon: {
-                    TonedGlyph(id: nil).alignmentGuide(.markCenter) { $0[HorizontalAlignment.center] }
+                    TonedGlyph(id: nil)
                 }
                 .interfaceFont(.body)
+                .labelStyle(.titleAndIcon)
+                .fixedSize()
                 .hidden()
             }
-            GuideShape(continues: step.continues, bends: step.bends).stroke(.quaternary, lineWidth: 1)
+            Color.clear.frame(width: step.extra)
         }
-        .frame(maxHeight: .infinity)
         .accessibilityHidden(true)
-    }
-}
-
-/// Sizes a column as its parent's mark, where it has one, and `extra`, and draws the guide in its last stretch.
-private struct SidebarGuideLayout: Layout {
-    let spansParentMark: Bool
-    let extra: CGFloat
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let mark = spansParentMark ? subviews[0].sizeThatFits(.unspecified).width : 0
-        return CGSize(width: mark + extra, height: proposal.height ?? 0)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        var start = bounds.maxX - SidebarTypeRow.elbowGap - SidebarTypeRow.elbow
-        if spansParentMark {
-            let mark = subviews[0]
-            mark.place(at: bounds.origin, proposal: .unspecified)
-            // The guide leaves from under the middle of the parent's mark, as the Claude app's does from its folder.
-            start = bounds.minX + mark.dimensions(in: .unspecified)[.markCenter]
-        }
-        let end = bounds.maxX - SidebarTypeRow.elbowGap
-        subviews[subviews.count - 1].place(
-            at: CGPoint(x: start, y: bounds.minY),
-            proposal: ProposedViewSize(width: max(end - start, 0), height: bounds.height))
-    }
-}
-
-private extension HorizontalAlignment {
-    private nonisolated enum MarkCenter: AlignmentID {
-        static func defaultValue(in context: ViewDimensions) -> CGFloat { context[HorizontalAlignment.center] }
-    }
-
-    /// The middle of a row's mark, which the guide leaves from.
-    nonisolated static let markCenter = HorizontalAlignment(MarkCenter.self)
-}
-
-/// A guide in its rectangle: down the left edge, and in a bend turning right at the middle to the far edge.
-private nonisolated struct GuideShape: Shape {
-    let continues: Bool
-    let bends: Bool
-
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        guard continues || bends else { return path }
-        let radius: CGFloat = 3
-        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.minX, y: continues ? rect.maxY : rect.midY - radius))
-        if bends {
-            path.move(to: CGPoint(x: rect.minX, y: rect.midY - radius))
-            path.addQuadCurve(to: CGPoint(x: rect.minX + radius, y: rect.midY), control: CGPoint(x: rect.minX, y: rect.midY))
-            path.addLine(to: CGPoint(x: rect.maxX, y: rect.midY))
-        }
-        return path
     }
 }
 

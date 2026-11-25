@@ -1,51 +1,61 @@
 import SwiftUI
 
-/// The types section: the library's types as one list of rows that fold their subtypes open, at most
-/// `SidebarPlan.shownTypeCount` types until Show More. While the sidebar is being customized it lists the top-level
-/// types alone, each with a handle, and they drag to reorder; the section's menu shows or hides them.
+/// The types section: the library's types as one list of rows that fold their kinds open, at most
+/// `SidebarPlan.shownTypeCount` types until the "N More" row. While the sidebar is being customized it lists the
+/// top-level types alone, each with a handle, and they drag to reorder; the Type place shows one again.
 struct SidebarTypesSection: View, Equatable {
     @CurrentLibrary private var library
     @Environment(Libraries.self) private var libraries
-    @AppStorage(SidebarTypeRow.subtypeIconsKey) private var showsSubtypeIcons = false
+    @AppStorage(SidebarTypeRow.subtypeIconsKey) private var showsSubtypeIcons = true
+    @AppStorage(QuickAdd.lastTypeKey) private var lastType = ""
     /// Every shown row, folded open as the person left them.
     let rows: [SidebarPlan.TypeRow]
     let plan: SidebarPlan
     let showsAll: Bool
+    /// The type the window shows, which keeps its row when it is past "N More".
+    let open: TypeID?
     let customizing: Bool
+    /// The types a plus under the pointer can make an item of.
+    let creatable: Set<String>
     let folding: SidebarFolding
     let browser: Browser
     @Binding var choosingIcon: TypeIconRequest?
     let header: SidebarGroupHeader
+    let place: SidebarAddPlace
 
     /// The section's data and nothing else, so a change of selection does not run its body. `folding` and the plan it
     /// holds are worked out from the same layout and types, which are compared; the closures and the binding are not.
     static func == (a: Self, b: Self) -> Bool {
-        a.rows == b.rows && a.showsAll == b.showsAll && a.customizing == b.customizing && a.header == b.header
+        a.rows == b.rows && a.showsAll == b.showsAll && a.open == b.open && a.customizing == b.customizing && a.header == b.header
             && a.plan.types == b.plan.types && a.plan.layout == b.plan.layout && a.folding.order == b.folding.order
+            && a.creatable == b.creatable && a.place.offers == b.place.offers
     }
 
     var body: some View {
         let _ = Cost.record(.sidebarBody, since: .now)
+        // A section never folds, so a press on the heading's menu cannot fold it.
         Section {
             if customizing {
                 customizingRows
+                place
             } else {
                 typeRows
             }
         } header: {
             header
         }
+        .collapsible(false)
     }
 
     @ViewBuilder private var typeRows: some View {
-        let limited = SidebarPlan.limited(rows, showsAll: showsAll)
+        let limited = SidebarPlan.limited(rows, showsAll: showsAll, open: open)
         let rows = limited.rows
         let steps = SidebarTypeRow.steps(for: rows, subtypeIcons: showsSubtypeIcons)
         let widest = rows.filter(\.isExpandable).map(\.node.count).max() ?? 0
         ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
             typeRow(row, widestFoldingCount: widest, steps: steps[index])
         }
-        if limited.hasMore { showMoreRow }
+        if limited.more > 0 { moreRow(limited.more) }
     }
 
     /// The top-level types, in the person's order, each draggable.
@@ -59,7 +69,7 @@ struct SidebarTypesSection: View, Equatable {
             }
             .selectionDisabled()
             .contextMenu {
-                SidebarHideButtons(place: .type(node.id))
+                Button("Remove from Sidebar") { libraries.updateSidebarLayout { $0.take(.type(node.id)) } }
                 Divider()
                 SidebarCustomizeButton(browser: browser)
             }
@@ -79,7 +89,8 @@ struct SidebarTypesSection: View, Equatable {
         let node = row.node
         let content = SidebarTypeRow(
             row: row, count: row.node.count, widestFoldingCount: widestFoldingCount, steps: steps,
-            showsIcon: SidebarTypeRow.showsIcon(row, subtypeIcons: showsSubtypeIcons), toggle: { toggle(row) })
+            showsIcon: SidebarTypeRow.showsIcon(row, subtypeIcons: showsSubtypeIcons), add: add(node), addName: addName(node),
+            toggle: { toggle(row) })
         if node.opens, let type = node.type {
             content
                 .tag(PlaceView.type(type))
@@ -87,32 +98,37 @@ struct SidebarTypesSection: View, Equatable {
                 .contextMenu { typeMenu(node) }
                 .accessibilityIdentifier("SidebarType-\(node.id)")
         } else {
-            // A group only folds, so a click anywhere on its row does.
-            Button { toggle(row) } label: {
-                content.contentShape(.rect)
-            }
-            .buttonStyle(.plain)
-            .selectionDisabled()
-            .listRowInsets(.vertical, 0)
-            .contextMenu { typeMenu(node) }
-            .accessibilityLabel(Text(node.label))
-            .accessibilityValue(row.isExpanded ? Text("Expanded") : Text("Collapsed"))
-            .accessibilityIdentifier("SidebarTypeGroup-\(node.id)")
+            // A group only folds, so a click anywhere on its row does. A tap, not a button, so the row's ground under
+            // the pointer reaches the list.
+            content
+                .contentShape(.rect)
+                .onTapGesture { toggle(row) }
+                .selectionDisabled()
+                .listRowInsets(.vertical, 0)
+                .contextMenu { typeMenu(node) }
+                .accessibilityElement(children: .ignore)
+                .accessibilityAddTraits(.isButton)
+                .accessibilityAction { toggle(row) }
+                .accessibilityLabel(Text(node.label))
+                .accessibilityValue(row.isExpanded ? Text("Expanded") : Text("Collapsed"))
+                .accessibilityIdentifier("SidebarTypeGroup-\(node.id)")
         }
     }
 
-    /// A row of text under the types, starting where the marks of the type rows above it do. A mark sits a little
-    /// inside the list's own leading content edge, measured from the sidebar's screenshot.
-    private var showMoreRow: some View {
+    /// "N More" under the types, in gray, starting where the names of the rows above do; "Show Less" once they show.
+    private func moreRow(_ more: Int) -> some View {
         Button {
             withAnimation(.snappy(duration: 0.2)) { browser.sidebarShowsAllTypes.toggle() }
         } label: {
-            Group {
-                if showsAll { Text("Show Less") } else { Text("Show More") }
+            Label {
+                Group {
+                    if showsAll { Text("Show Less") } else { Text("\(more) More") }
+                }
+                .interfaceFont(.body)
+                .foregroundStyle(.secondary)
+            } icon: {
+                TonedGlyph(id: nil).hidden()
             }
-            .interfaceFont(.body)
-            .foregroundStyle(.secondary)
-            .padding(.leading, 5)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(.rect)
         }
@@ -128,7 +144,20 @@ struct SidebarTypesSection: View, Equatable {
                 .disabled(!library.reachesServer)
             Divider()
         }
-        SidebarHideButtons(place: .type(node.id))
+        Button("Remove from Sidebar") { libraries.updateSidebarLayout { $0.take(.type(node.id)) } }
+        Divider()
+        SidebarCustomizeButton(browser: browser)
+    }
+
+    /// Makes an item of the row's type, where quick add can make one.
+    private func add(_ node: TypeNode) -> (() -> Void)? {
+        guard let type = node.type, creatable.contains(type.rawValue) else { return nil }
+        return { browser.openQuickAdd(typeID: type.rawValue, in: library) }
+    }
+
+    private func addName(_ node: TypeNode) -> String {
+        guard let type = node.type else { return "" }
+        return String(localized: "New \(library.catalogue.label(for: type))")
     }
 
     private func toggle(_ row: SidebarPlan.TypeRow) {

@@ -522,26 +522,6 @@
         }
       }
     },
-    "%@, %@ items" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@, %2$@ items"
-          }
-        }
-      }
-    },
-    "%@, %@ of %@ items" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@, %2$@ of %3$@ items"
-          }
-        }
-      }
-    },
     "%@, %@ of ^[%lld item](inflect: true)" : {
       "localizations" : {
         "en" : {
@@ -572,6 +552,9 @@
         }
       }
     },
+    "%@, Archived" : {
+
+    },
     "%@, ^[%lld item](inflect: true)" : {
       "localizations" : {
         "en" : {
@@ -581,9 +564,6 @@
           }
         }
       }
-    },
-    "%@, Archived" : {
-
     },
     "%@, changed" : {
 
@@ -1417,9 +1397,6 @@
     "%lld more left out of search." : {
 
     },
-    "%lld more views" : {
-
-    },
     "%lld not started" : {
       "extractionState" : "manual"
     },
@@ -1776,16 +1753,7 @@
     "A" : {
 
     },
-    "A Collection" : {
-
-    },
     "A Folder" : {
-
-    },
-    "A Source" : {
-
-    },
-    "A Type" : {
 
     },
     "A View" : {
@@ -2078,6 +2046,9 @@
     "Add" : {
       "extractionState" : "manual"
     },
+    "Add %@" : {
+
+    },
     "Add Address" : {
 
     },
@@ -2138,12 +2109,6 @@
     "Add Row Below" : {
 
     },
-    "Add Section" : {
-
-    },
-    "Add Shortcut" : {
-
-    },
     "Add Sort" : {
 
     },
@@ -2156,10 +2121,16 @@
     "Add Text" : {
       "extractionState" : "manual"
     },
+    "Add Under the Library" : {
+
+    },
     "Add Website" : {
 
     },
     "Add a Choice" : {
+
+    },
+    "Add a Command" : {
 
     },
     "Add a Connector" : {
@@ -2178,6 +2149,9 @@
 
     },
     "Add a Passkey…" : {
+
+    },
+    "Add a Section" : {
 
     },
     "Add a Website" : {
@@ -2320,7 +2294,13 @@
     "All Links" : {
 
     },
+    "All Pages Are Shown" : {
+
+    },
     "All Types" : {
+
+    },
+    "All Types Are Shown" : {
 
     },
     "All day" : {
@@ -2576,6 +2556,9 @@
 
     },
     "Archived Items" : {
+
+    },
+    "Archived items leave your lists. You can find them in Library > Archive." : {
 
     },
     "Archived “%@”" : {
@@ -3512,6 +3495,9 @@
     "Comfortable Cards" : {
 
     },
+    "Command" : {
+
+    },
     "Command Line" : {
 
     },
@@ -4189,9 +4175,6 @@
 
     },
     "Disk" : {
-
-    },
-    "Dismiss" : {
 
     },
     "Display" : {
@@ -4935,9 +4918,6 @@
     "Go" : {
 
     },
-    "Go To" : {
-
-    },
     "Go back to settings saved before a change." : {
 
     },
@@ -4954,6 +4934,9 @@
 
     },
     "Gray" : {
+
+    },
+    "Gray, or white behind a hairline." : {
 
     },
     "Green" : {
@@ -5079,13 +5062,7 @@
     "Hide Sidebar" : {
 
     },
-    "Hide Views from Sidebar" : {
-
-    },
     "Hide from Page" : {
-
-    },
-    "Hide from Sidebar" : {
 
     },
     "Hide on %@ Pages" : {
@@ -5591,6 +5568,9 @@
 
     },
     "Items: %@." : {
+
+    },
+    "Item…" : {
 
     },
     "Its %@ %@" : {
@@ -6412,6 +6392,9 @@
     "Move Up" : {
 
     },
+    "Move ^[%lld item](inflect: true) to the Feed?" : {
+
+    },
     "Move to Feed" : {
 
     },
@@ -6422,6 +6405,9 @@
 
     },
     "Move to Tab" : {
+
+    },
+    "Move “%@” to the Feed?" : {
 
     },
     "Moved an item to Recently Deleted" : {
@@ -6564,6 +6550,9 @@
       "extractionState" : "manual",
       "generatesSymbol" : false
     },
+    "New Item in %@" : {
+
+    },
     "New Items" : {
 
     },
@@ -6595,9 +6584,6 @@
 
     },
     "New Tab" : {
-
-    },
-    "New Tab…" : {
 
     },
     "New Type" : {
@@ -7629,6 +7615,9 @@
     "Pin a Property…" : {
 
     },
+    "Pin an Item" : {
+
+    },
     "Pink" : {
 
     },
@@ -7992,9 +7981,6 @@
     "Remove Old Activity" : {
 
     },
-    "Remove Shortcut" : {
-
-    },
     "Remove Sort" : {
 
     },
@@ -8020,6 +8006,9 @@
       "extractionState" : "manual"
     },
     "Remove from Favorites" : {
+
+    },
+    "Remove from Sidebar" : {
 
     },
     "Remove from “%@”" : {
@@ -8123,9 +8112,6 @@
       "extractionState" : "manual"
     },
     "Rename Source…" : {
-
-    },
-    "Rename Tab" : {
 
     },
     "Rename View" : {
@@ -8394,9 +8380,6 @@
       "extractionState" : "manual"
     },
     "Saved" : {
-
-    },
-    "Saved Views" : {
 
     },
     "Saved as “%@”." : {
@@ -8763,9 +8746,6 @@
     },
     "Show Month" : {
       "extractionState" : "manual"
-    },
-    "Show More" : {
-
     },
     "Show Original" : {
 
@@ -9375,6 +9355,15 @@
       "extractionState" : "manual"
     },
     "The Connector" : {
+
+    },
+    "The Feed lets items go after a while, and %lld of these are older. They would go to Recently Deleted within the hour." : {
+
+    },
+    "The Feed lets items go after a while, and 1 of these is older. It would go to Recently Deleted within the hour." : {
+
+    },
+    "The Feed lets items go after a while, and this one is older. It would go to Recently Deleted within the hour." : {
 
     },
     "The Folder Is Missing Where This Copy Is Kept" : {
@@ -10742,9 +10731,6 @@
     "This needs the server. Try again when you’re back online." : {
       "extractionState" : "manual"
     },
-    "This place can’t be saved as a view" : {
-      "extractionState" : "manual"
-    },
     "This plugin needs Marfa %@ or later. This server runs %@." : {
       "localizations" : {
         "en" : {
@@ -11037,6 +11023,9 @@
 
     },
     "Types that Marfa or a plugin provides can’t be changed. Add the field to a type of your own instead." : {
+
+    },
+    "Types, Collections, or Sources" : {
 
     },
     "Typing" : {
@@ -11367,7 +11356,7 @@
     "View as Timeline" : {
       "extractionState" : "manual"
     },
-    "View, %@" : {
+    "View, Collection, or Item" : {
 
     },
     "Views" : {
@@ -11585,6 +11574,9 @@
 
     },
     "Which and Where" : {
+
+    },
+    "White" : {
 
     },
     "Who" : {

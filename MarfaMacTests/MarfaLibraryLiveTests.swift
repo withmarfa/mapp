@@ -406,7 +406,7 @@ extension LiveMarfaTests {
                 do {
                     let place = PlaceView.saved(ItemID(view.id))
                     try #require(await eventually { library.views.contains { $0.id.rawValue == view.id } })
-                    #expect(SidebarPlan(library, layout: SidebarLayout()).library.contains(.views))
+                    #expect(SidebarPlan(library, layout: SidebarLayout()).section(.pinned)?.shown.contains(.view(ItemID(view.id))) == true)
                     #expect(library.name(of: place) == "MARFAMACTEST view \(token)")
                     #expect(await eventually { library.items(inView: ItemID(view.id)).map(\.id) == [id] })
 

@@ -3,8 +3,8 @@ import Testing
 
 @testable import MarfaMac
 
-/// The sidebar's tabs and sections, the shortcuts, and the color of a view's mark: what a layout stored by today's
-/// build still reads as, and what each change to the arrangement leaves behind, at the edges.
+/// The sidebar's tabs and sections and the commands: what each change to the arrangement leaves behind, at the edges.
+/// How a layout an earlier copy stored reads is `SidebarReadingTests`.
 @Suite(.hangLimit)
 @MainActor
 struct SidebarTabsTests {
@@ -28,67 +28,26 @@ struct SidebarTabsTests {
         return (layout, work, section)
     }
 
-    // MARK: A layout stored by today's build
-
-    @Test func aStoredLayoutWithNoTabsOrColorsLoadsAsOneTabUnchanged() throws {
-        let saved = Data(#"{"hidden":["favorites","type:core.task"],"order":["view:v-Reading","view:v-Open work"],"collapsed":["type:core.note"]}"#.utf8)
-        let layout = try JSONDecoder().decode(SidebarLayout.self, from: saved)
-        #expect(layout.tabs == nil && layout.groups == nil && layout.homes == nil && layout.colors == nil)
-        #expect(layout.allTabs.map(\.id) == [SidebarTab.homeID])
-        #expect(kinds(layout) == [.shortcuts, .library, .views, .types])
-        #expect(layout.isHidden(.favorites) && layout.isCollapsed(.type("core.note")))
-
-        let plan = SidebarPlan(library(), layout: layout)
-        #expect(plan.tabs.count == 1)
-        #expect(plan.shownBuiltInViews == [.feed])
-        #expect(plan.shownSavedViews.map(\.title) == ["Reading", "Open work"], "the person's order of views holds")
-        #expect(plan.groups(in: SidebarTab.homeID, customizing: false).map(\.group.kind) == [.shortcuts, .library, .views, .types])
-        // Written back, it is the layout it was, with nothing added.
-        #expect(try JSONDecoder().decode(SidebarLayout.self, from: JSONEncoder().encode(layout)) == layout)
-    }
-
-    @Test func aSectionOfAKindThisCopyDoesNotKnowIsSkippedAloneAndKept() throws {
-        let saved = Data(#"""
-        {"groups":[{"id":"library","kind":"library","tab":"home","isHidden":false,"shortcuts":[]},
-        {"id":"later","kind":"pinboard","tab":"home","extra":1},
-        {"id":"types","kind":"types","tab":"home","isHidden":false,"shortcuts":[]}],"order":["library"]}
-        """#.utf8)
-        var layout = try JSONDecoder().decode(SidebarLayout.self, from: saved)
-        #expect(layout.allGroups.map(\.id) == ["library", "types"])
-        #expect(layout.order == ["library"])
-        layout.setHidden(.library, true)
-        let back = try #require(try JSONSerialization.jsonObject(with: JSONEncoder().encode(layout)) as? [String: Any])
-        let groups = try #require(back["groups"] as? [[String: Any]])
-        #expect(groups.map { $0["id"] as? String } == ["library", "later", "types"])
-        #expect(groups[1]["kind"] as? String == "pinboard" && groups[1]["extra"] as? Int == 1)
-        // Only sections this copy cannot read show none, not the sections a new sidebar starts with.
-        let onlyLater = Data(#"{"groups":[{"id":"later","kind":"pinboard","tab":"home"}]}"#.utf8)
-        #expect(try JSONDecoder().decode(SidebarLayout.self, from: onlyLater).allGroups.isEmpty)
-    }
-
     @Test func draggingARowAcrossTheBlocksOfADefaultSectionIsKept() {
         var layout = SidebarLayout()
-        let members = SidebarPlan(library(), layout: layout).section(.views)?.members ?? []
-        // The first saved view, dragged above Inbox.
-        let from = members.firstIndex(of: .view(ItemID("v-Open work"))) ?? 0
-        layout.moveInSection("views", places: members, shown: members, fromOffsets: [from], toOffset: 0)
-        let after = SidebarPlan(library(), layout: layout).section(.views)?.shown ?? []
-        #expect(after.first == .view(ItemID("v-Open work")))
-        #expect(Set(after) == Set(members))
+        let members = SidebarPlan(library(), layout: layout).section(.places)?.members ?? []
+        #expect(members == [.library, .feed])
+        layout.moveInSection("places", places: members, shown: members, fromOffsets: [1], toOffset: 0)
+        #expect(SidebarPlan(library(), layout: layout).section(.places)?.shown == [.feed, .library])
     }
 
     @Test func placingARowInASectionByHandMakesItOneListInThePersonsOrder() {
         var layout = SidebarLayout()
-        layout.put(.view(ItemID("v-Reading")), in: "views")
-        let places = SidebarPlan(library(), layout: layout).section(.views)?.shown ?? []
+        layout.put(.view(ItemID("v-Reading")), in: "pinned")
+        let places = SidebarPlan(library(), layout: layout).section(.pinned)?.shown ?? []
         #expect(places.first == .view(ItemID("v-Reading")), "placed, so it has a position, ahead of those never placed")
     }
 
-    @Test func aNewLibrarysShortcutsAreNewAndSearchAndNoneMakesAnItemOfATypeThePersonMade() {
+    @Test func aNewLibrarysShortcutsAreSearchAndNewAndNoneMakesAnItemOfATypeThePersonMade() {
         let shortcuts = SidebarGroup.defaults(tab: SidebarTab.homeID).first { $0.kind == .shortcuts }?.shortcuts
-        #expect(shortcuts == [.new, .search])
+        #expect(shortcuts == [.search, .new])
         let plan = SidebarPlan(library(), layout: SidebarLayout())
-        #expect(plan.section(.shortcuts)?.group.shortcuts == [.new, .search])
+        #expect(plan.section(.shortcuts)?.group.shortcuts == [.search, .new])
         #expect(shortcuts?.contains { if case .create = $0 { true } else { false } } == false)
     }
 
@@ -136,7 +95,7 @@ struct SidebarTabsTests {
         #expect(SidebarPlan(library, layout: layout).groups.first { $0.id == section }?.shown == [.collection(collection.id)])
     }
 
-    @Test func removingASectionFreesItsCollectionsAndSourcesToBeAddedAgain() {
+    @Test func removingASectionFreesOnlyItsOwnPlaces() {
         let library = library()
         let collection = FakeItemLibrary.collection("Reading list")
         library.items.append(collection)
@@ -147,28 +106,9 @@ struct SidebarTabsTests {
         layout.put(.source("feed"), in: section)
         layout.put(.source("kept"), in: other)
         #expect(layout.home(of: .collection(collection.id)) == section)
-
-        let placed = SidebarContent(library: library, layout: layout, tab: nil, customizing: true).choices
-        #expect(!placed.unplacedCollections.contains { $0.key == SidebarPlace.collection(collection.id).key }, "in a section already")
-        #expect(placed.collections.contains { $0.key == SidebarPlace.collection(collection.id).key }, "Go To still offers it")
-
         layout.hideGroup(section)
         #expect(layout.homes == [SidebarPlace.source("kept").key: other], "only the removed section's places are freed")
         #expect(layout.home(of: .collection(collection.id)) == nil)
-        let freed = SidebarContent(library: library, layout: layout, tab: nil, customizing: true).choices
-        #expect(freed.unplacedCollections.contains { $0.key == SidebarPlace.collection(collection.id).key })
-    }
-
-    @Test func aCollectionMissingFromTheCopyIsOfferedNowhereAndKeepsItsPlace() {
-        let library = library()
-        let collection = FakeItemLibrary.collection("Reading list")
-        var layout = SidebarLayout()
-        let section = layout.addGroup(.custom, toTab: SidebarTab.homeID, id: "mine")
-        layout.put(.collection(collection.id), in: section)
-        // Missing from the copy, as in a sync gap: its key stays so the row returns, and no picker offers what the library lacks.
-        let choices = SidebarContent(library: library, layout: layout, tab: nil, customizing: true).choices
-        #expect(choices.collections.isEmpty && choices.unplacedCollections.isEmpty)
-        #expect(layout.homes?[SidebarPlace.collection(collection.id).key] == section)
     }
 
     @Test func aShortcutToWhatIsGoneIsKeptInTheLayout() {
@@ -188,16 +128,16 @@ struct SidebarTabsTests {
         layout.moveGroup(before[before.count - 1], by: 1)
         #expect(ids(layout, tab: SidebarTab.homeID) == before)
         layout.moveGroup("types", by: -1)
-        #expect(ids(layout, tab: SidebarTab.homeID) == ["shortcuts", "library", "types", "views"])
+        #expect(ids(layout, tab: SidebarTab.homeID) == ["shortcuts", "places", "types", "pinned"])
         layout.moveGroup("types", by: 1)
         #expect(ids(layout, tab: SidebarTab.homeID) == before)
     }
 
     @Test func movingPassesAHiddenSectionByAndNeverMakesAnInvisibleMove() {
         var layout = SidebarLayout()
-        layout.hideGroup("views")
+        layout.hideGroup("pinned")
         layout.moveGroup("types", by: -1)
-        #expect(ids(layout, tab: SidebarTab.homeID) == ["shortcuts", "types", "views", "library"], "Types takes Library's place")
+        #expect(ids(layout, tab: SidebarTab.homeID) == ["shortcuts", "types", "pinned", "places"], "Types takes the Library's place")
     }
 
     @Test func aSectionMovedToATabWithNoneJoinsItAndTheSourceTabKeepsTheRest() {
@@ -206,7 +146,7 @@ struct SidebarTabsTests {
         layout.moveGroup(section, toTab: work)
         #expect(ids(layout, tab: work) == [section])
         #expect(!ids(layout, tab: SidebarTab.homeID).contains(section))
-        #expect(kinds(layout) == [.shortcuts, .library, .views, .types])
+        #expect(kinds(layout) == [.shortcuts, .places, .pinned, .types])
     }
 
     @Test func aSectionMovedToATabThatDoesNotExistStaysWhereItIs() {
@@ -223,15 +163,15 @@ struct SidebarTabsTests {
         #expect(layout.allTabs.map(\.id).contains(work))
         #expect(ids(layout, tab: work).isEmpty, "a person's own section is removed with its hiding")
 
-        layout.moveGroup("views", toTab: work)
-        layout.hideGroup("views")
+        layout.moveGroup("pinned", toTab: work)
+        layout.hideGroup("pinned")
         #expect(layout.allTabs.map(\.id).contains(work))
         let plan = SidebarPlan(library(), layout: layout)
         #expect(plan.groups(in: work, customizing: false).isEmpty)
-        // Add Section brings the built-in one back, here.
-        layout.addGroup(.views, toTab: work)
-        #expect(ids(layout, tab: work) == ["views"])
-        #expect(SidebarPlan(library(), layout: layout).groups(in: work, customizing: false).map(\.id) == ["views"])
+        // The Section place brings the built-in one back, here.
+        layout.addGroup(.pinned, toTab: work)
+        #expect(ids(layout, tab: work) == ["pinned"])
+        #expect(SidebarPlan(library(), layout: layout).groups(in: work, customizing: false).map(\.id) == ["pinned"])
     }
 
     @Test func removingTheSecondTabReturnsItsSectionsToTheFirstAndLosesNone() {
@@ -242,7 +182,7 @@ struct SidebarTabsTests {
         #expect(removed)
         #expect(layout.allTabs.map(\.id) == [SidebarTab.homeID])
         let home = ids(layout, tab: SidebarTab.homeID)
-        #expect(Set(home) == ["shortcuts", "library", "views", "types", section])
+        #expect(Set(home) == ["shortcuts", "places", "pinned", "types", section])
         #expect(home.count == 5)
         #expect(layout.allGroups.count == 5)
     }
@@ -278,19 +218,21 @@ struct SidebarTabsTests {
 
     @Test func aSectionIsRenamedAndAnEmptyNameReturnsTheKindsOwn() {
         var layout = SidebarLayout()
-        layout.renameGroup("library", to: "Stuff")
-        #expect(layout.allGroups.first { $0.id == "library" }?.name == "Stuff")
-        layout.renameGroup("library", to: "")
-        #expect(layout.allGroups.first { $0.id == "library" }?.name == String(localized: "Library"))
+        layout.renameGroup("pinned", to: "Stuff")
+        #expect(layout.allGroups.first { $0.id == "pinned" }?.name == "Stuff")
+        layout.renameGroup("pinned", to: "")
+        #expect(layout.allGroups.first { $0.id == "pinned" }?.name == String(localized: "Pinned"))
+        layout.renameGroup("places", to: "Stuff")
+        #expect(layout.allGroups.first { $0.id == "places" }?.title == nil, "the zones have no heading to name")
     }
 
     @Test func draggingASectionOntoAnotherTakesItsPlaceAndNeverCrossesTabs() {
         var (layout, work, section) = arranged()
-        layout.moveGroup(section, onto: "library")
-        #expect(ids(layout, tab: SidebarTab.homeID) == ["shortcuts", section, "library", "views", "types"])
+        layout.moveGroup(section, onto: "pinned")
+        #expect(ids(layout, tab: SidebarTab.homeID) == ["shortcuts", "places", section, "pinned", "types"])
         layout.moveGroup(section, toTab: work)
         let before = layout
-        layout.moveGroup(section, onto: "library")
+        layout.moveGroup(section, onto: "pinned")
         #expect(layout == before)
     }
 
@@ -299,33 +241,52 @@ struct SidebarTabsTests {
     @Test func aPlacePutInASectionLeavesItsOldOneAndTakingItBackHidesOrForgetsIt() {
         var layout = SidebarLayout()
         layout.addGroup(.custom, toTab: SidebarTab.homeID, id: "mine")
-        layout.put(.favorites, in: "mine")
-        #expect(layout.home(of: .favorites) == "mine")
+        let view = SidebarPlace.view(ItemID("v-Reading"))
+        layout.put(view, in: "mine")
+        #expect(layout.home(of: view) == "mine")
         let plan = SidebarPlan(library(), layout: layout)
-        #expect(plan.section(.views)?.shown.contains(.favorites) == false)
-        #expect(plan.groups.first { $0.id == "mine" }?.shown == [.favorites])
+        #expect(plan.section(.pinned)?.shown.contains(view) == false)
+        #expect(plan.groups.first { $0.id == "mine" }?.shown == [view])
 
-        layout.take(.favorites)
-        #expect(layout.isHidden(.favorites))
+        layout.take(view)
+        #expect(layout.isHidden(view))
         layout.put(.collection(ItemID("c")), in: "mine")
         layout.take(.collection(ItemID("c")))
         #expect(layout.homes?[SidebarPlace.collection(ItemID("c")).key] == nil)
     }
 
-    @Test func aPlaceCannotBePutInTheTypesSectionOrAMissingOne() {
+    @Test func aSectionTakesOnlyWhatItCanHold() {
         var layout = SidebarLayout()
-        layout.put(.favorites, in: "types")
-        layout.put(.favorites, in: "gone")
+        layout.put(.view(ItemID("v-Reading")), in: "types")
+        layout.put(.view(ItemID("v-Reading")), in: "gone")
+        layout.put(.view(ItemID("v-Reading")), in: "places")
+        layout.put(.collections, in: "pinned")
         #expect(layout.homes == nil)
-        #expect(layout.home(of: .favorites) == "views")
+        #expect(layout.home(of: .view(ItemID("v-Reading"))) == "pinned")
+        layout.put(.collections, in: "places")
+        #expect(layout.home(of: .collections) == "places")
+        #expect(SidebarPlan(library(), layout: layout).section(.places)?.shown == [.library, .feed, .collections])
     }
 
     @Test func aPlaceInASectionThatIsGoneReturnsToItsOwn() {
         var layout = SidebarLayout()
         layout.addGroup(.custom, toTab: SidebarTab.homeID, id: "mine")
-        layout.put(.favorites, in: "mine")
+        layout.put(.view(ItemID("v-Reading")), in: "mine")
         layout.hideGroup("mine")
-        #expect(layout.home(of: .favorites) == "views")
+        #expect(layout.home(of: .view(ItemID("v-Reading"))) == "pinned")
+    }
+
+    @Test func anItemIsPinnedWhileTheCopyHoldsItAndTakingItOutForgetsIt() {
+        let library = library()
+        let note = library.items[0]
+        var layout = SidebarLayout()
+        layout.put(.item(note.id), in: "pinned")
+        #expect(SidebarPlan(library, layout: layout).section(.pinned)?.shown.contains(.item(note.id)) == true)
+        library.items.removeAll()
+        #expect(SidebarPlan(library, layout: layout).section(.pinned)?.shown.contains(.item(note.id)) == false)
+        #expect(layout.home(of: .item(note.id)) == "pinned", "kept, so the row returns with the item")
+        layout.take(.item(note.id))
+        #expect(layout.homes == nil)
     }
 
     // MARK: Shortcuts
@@ -334,9 +295,9 @@ struct SidebarTabsTests {
         var layout = SidebarLayout()
         layout.addShortcut(.settings, toTab: SidebarTab.homeID)
         layout.addShortcut(.settings, toTab: SidebarTab.homeID)
-        #expect(layout.groups(in: SidebarTab.homeID).first?.shortcuts == [.new, .search, .settings])
+        #expect(layout.groups(in: SidebarTab.homeID).first?.shortcuts == [.search, .new, .settings])
         layout.moveShortcuts(in: "shortcuts", fromOffsets: IndexSet(integer: 2), toOffset: 0)
-        #expect(layout.groups(in: SidebarTab.homeID).first?.shortcuts == [.settings, .new, .search])
+        #expect(layout.groups(in: SidebarTab.homeID).first?.shortcuts == [.settings, .search, .new])
         layout.removeShortcut(.new, from: "shortcuts")
         #expect(layout.groups(in: SidebarTab.homeID).first?.shortcuts == [.settings, .search])
     }
@@ -346,48 +307,6 @@ struct SidebarTabsTests {
         layout.addShortcut(.search, toTab: work)
         #expect(layout.groups(in: work).map(\.kind) == [.shortcuts])
         #expect(layout.groups(in: work).first?.shortcuts == [.search])
-    }
-
-    // MARK: Colors
-
-    @Test func aViewsColorIsKeptAndReadBackAndNilReturnsItsOwn() throws {
-        let view = SidebarPlace.view(ItemID("v-Reading"))
-        var layout = SidebarLayout()
-        #expect(layout.color(of: view) == .gray)
-        for place in [SidebarPlace.feed, .favorites, .library, .sources, .collections, .collection(ItemID("c-One")), .source("rss")] {
-            #expect(layout.color(of: place) == .gray && place.defaultTone == .gray)
-        }
-        #expect(SidebarPlace.type("core.note").defaultTone == nil)
-        layout.setColor(.blue, of: .library)
-        #expect(layout.color(of: .library) == .blue)
-        layout.setColor(nil, of: .library)
-        layout.setColor(.purple, of: view)
-        #expect(layout.color(of: view) == .purple)
-        let stored = try JSONDecoder().decode(SidebarLayout.self, from: JSONEncoder().encode(layout))
-        #expect(stored.color(of: view) == .purple)
-        layout.setColor(nil, of: view)
-        #expect(layout.color(of: view) == .gray)
-        #expect(layout.colors == nil)
-    }
-
-    @Test func aColorSurvivesRelaunchForItsLibraryAlone() throws {
-        let defaults = ThrowawayDefaults.make("SidebarTabsTests.colors")
-        let view = SidebarPlace.view(ItemID("v-Reading"))
-        SidebarLayouts(defaults: defaults).update("marfa:one") { $0.setColor(.teal, of: view) }
-        #expect(SidebarLayouts(defaults: defaults).layout(for: "marfa:one").color(of: view) == .teal)
-        #expect(SidebarLayouts(defaults: defaults).layout(for: "marfa:two").color(of: view) == .gray)
-    }
-
-    @Test func aColorChosenBeforeGrayBecameTheDefaultStays() throws {
-        let saved = Data(#"{"colors":{"inbox":"blue","favorites":"pink"}}"#.utf8)
-        let layout = try JSONDecoder().decode(SidebarLayout.self, from: saved)
-        #expect(layout.color(of: .feed) == .blue && layout.color(of: .favorites) == .pink && layout.color(of: .library) == .gray)
-    }
-
-    @Test func anUnknownStoredColorReadsAsTheViewsOwn() throws {
-        let saved = Data(#"{"colors":{"view:v-Reading":"chartreuse"}}"#.utf8)
-        let layout = try JSONDecoder().decode(SidebarLayout.self, from: saved)
-        #expect(layout.color(of: .view(ItemID("v-Reading"))) == .gray)
     }
 
     // MARK: Two windows

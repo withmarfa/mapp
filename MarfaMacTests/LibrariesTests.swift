@@ -54,12 +54,12 @@ import Testing
         let libraries = try libraries(bench)
         try await libraries.host.connect(address: address, key: "key")
         #expect(libraries.libraryKey == "marfa:\(address)")
-        libraries.updateSidebarLayout { $0.setHidden(.favorites, true) }
-        #expect(libraries.sidebarLayout.isHidden(.favorites))
+        libraries.updateSidebarLayout { $0.setHidden(.feed, true) }
+        #expect(libraries.sidebarLayout.isHidden(.feed))
 
         try await libraries.host.changeAddress(to: "http://second.test:8210", key: "other")
         #expect(libraries.libraryKey == "marfa:http://second.test:8210")
-        #expect(!libraries.sidebarLayout.isHidden(.favorites), "another server's sidebar is its own")
+        #expect(!libraries.sidebarLayout.isHidden(.feed), "another server's sidebar is its own")
 
         libraries.typeLooks.importLooks(
             LooksFile(looks: [TypeID("core.note"): TypeLook(date: .created, secondary: [], facts: [])]), into: libraries.libraryKey,

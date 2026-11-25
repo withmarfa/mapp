@@ -1,28 +1,26 @@
 import SwiftUI
 
-/// The window's sidebar, in the manner of the Claude desktop app: tabs (none shown while there is one), and in each tab the
-/// person's sections, which start as New and Search, the Library, the Views and the Types. A Control-click on the sidebar
-/// offers Customize Sidebar, which arranges it in place (`Browser.customizesSidebar`); the foot holds the instance.
+/// The window's sidebar: Search and New, then the Library and the Feed, then Pinned, the Types and the person's own
+/// sections, in tabs where there is more than one. A Control-click on the sidebar offers Customize Sidebar, which
+/// arranges it in place (`Browser.customizesSidebar`); the foot holds the instance. Settings can draw it white.
 struct Sidebar: View {
     @CurrentLibrary private var library
     @Environment(Libraries.self) private var libraries
-    /// The places' kept choices, for the From whose favorites the Favorites row counts.
-    @AppStorage(PlaceDefaults.key) private var placeDefaults: Data?
+    @AppStorage(SidebarColor.key) private var color = SidebarColor.gray
     let browser: Browser
     let order: ItemOrder
 
     /// Works out what the list draws once, from what the sidebar depends on and nothing else: the library's
-    /// membership, its saved views and catalogue, the person's layout, the places' kept choices (for the Favorites
-    /// view's From), and this window's tab and whether it is customizing. A click, a selection or an edit that moves
-    /// none of them never runs it, and its parts are handed down as values, so a row whose own input is the same is not
-    /// drawn again.
+    /// membership, its saved views and catalogue, the person's layout, and this window's tab and whether it is
+    /// customizing. A click, a selection or an edit that moves none of them never runs it, and its parts are handed
+    /// down as values, so a row whose own input is the same is not drawn again.
     var body: some View {
         let _ = Cost.record(.sidebarBody, since: .now)
         SidebarList(
             content: SidebarContent(
-                library: library, layout: libraries.sidebarLayout, tab: browser.sidebarTab, customizing: browser.customizesSidebar,
-                favoritesScope: PlaceDefaults.favoritesScope(in: placeDefaults)),
+                library: library, layout: libraries.sidebarLayout, tab: browser.sidebarTab, customizing: browser.customizesSidebar),
             browser: browser, order: order)
+            .sidebarColor(color)
     }
 }
 
@@ -35,18 +33,19 @@ struct SidebarContent {
     let canCreate: Bool
     /// The sections of the open tab that show: all of them while customizing, otherwise those with something in them.
     let sections: [SidebarSectionData]
-    /// Every shown type row, folded open as the person left them, before Show More cuts them short.
+    /// Every shown type row, folded open as the person left them, before the "N More" row cuts them short.
     let typeRows: [SidebarPlan.TypeRow]
+    /// The types a plus under the pointer can make an item of, by identifier.
+    let creatable: Set<String>
     /// Everything the rows' look depends on, so the soft selection redraws when any of it changes.
     let marksSignature: Int
-    /// What Add Shortcut and Add Section offer; empty unless customizing.
-    let choices: SidebarChoices
-    /// The built-in sections hidden from the tab, which Add Section brings back.
-    let hiddenKinds: [SidebarGroup.Kind]
+    /// What the faint places of Customize Sidebar and a heading's Add offer.
+    let offers: SidebarOffers
 
-    var showsTabs: Bool { tabs.count > 1 }
+    /// The tabs show once there is a second, and always while customizing, so one can be added.
+    var showsTabs: Bool { tabs.count > 1 || customizing }
 
-    init(library: any ItemLibrary, layout: SidebarLayout, tab: String?, customizing: Bool, favoritesScope: ListScope = .library) {
+    init(library: any ItemLibrary, layout: SidebarLayout, tab: String?, customizing: Bool) {
         let plan = SidebarPlan(library, layout: layout)
         self.plan = plan
         self.customizing = customizing
@@ -54,82 +53,53 @@ struct SidebarContent {
         self.tab = layout.tab(tab)
         canCreate = QuickAdd.isAvailable(in: library)
         typeRows = plan.typeRows
-        let creatable = Set(QuickAdd.types(in: library).map(\.id.rawValue))
-        func row(_ place: SidebarPlace) -> SidebarPlaceRowData? {
-            guard let item = place.opens, let symbol = place.symbol else { return nil }
-            return SidebarPlaceRowData(
-                place: place, item: item, title: library.name(of: item), symbol: symbol,
-                count: place.showsCount ? library.count(in: item, favoritesScope: favoritesScope) : 0, tone: place.defaultTone == nil ? nil : layout.color(of: place))
-        }
+        creatable = Set(QuickAdd.types(in: library).map(\.id.rawValue))
+        let creatable = creatable
         sections = plan.groups(in: self.tab.id, customizing: customizing).map { group in
             SidebarSectionData(
-                plan: group, rows: group.shown.compactMap(row),
-                choices: customizing ? Self.showChoices(of: group, in: library, plan: plan) : [],
+                plan: group, rows: group.shown.compactMap { Self.row($0, in: library, creatable: creatable) },
                 shortcuts: group.group.shortcuts.compactMap { Self.shortcutRow($0, in: library, creatable: creatable) })
         }
-        hiddenKinds = customizing
-            ? plan.groups.filter { layout.hides($0.group) && [.library, .views, .types].contains($0.group.kind) }.map(\.group.kind)
-            : []
-        choices = customizing ? Self.choices(in: library, plan: plan, layout: layout) : SidebarChoices()
+        offers = SidebarOffers(library: library, plan: plan, creatable: creatable)
         var hasher = Hasher()
         hasher.combine(customizing)
         hasher.combine(self.tab.id)
         hasher.combine(tabs)
         hasher.combine(sections.map { [$0.id, $0.plan.group.name] + $0.rows.map(\.title) + $0.shortcuts.map(\.title) })
-        hasher.combine(sections.flatMap(\.rows).map { $0.tone?.rawValue ?? "" })
         hasher.combine(layout.collapsed.sorted() + layout.hidden.sorted())
         hasher.combine(plan.types.map(\.id))
         hasher.combine(plan.views.map(\.id))
         marksSignature = hasher.finalize()
     }
 
-    /// What a section's Show list offers, shown or not: its places, and for Views the saved views as a whole. Types lists
-    /// the top-level rows, and the subtypes hidden by their own row's Hide from Sidebar, which only Show can bring back.
-    static func showChoices(of group: SidebarGroupPlan, in library: any ItemLibrary, plan: SidebarPlan) -> [SidebarShowChoice] {
-        let layout = plan.layout
-        switch group.group.kind {
-        case .shortcuts: return []
-        case .types:
-            func hiddenSubtypes(of node: TypeNode) -> [SidebarShowChoice] {
-                node.children.flatMap { child in
-                    let own = layout.isHidden(.type(child.id))
-                        ? [SidebarShowChoice(place: .type(child.id), title: String(localized: "\(node.label) > \(child.label)"), isShown: false)]
-                        : []
-                    return own + hiddenSubtypes(of: child)
-                }
-            }
-            return plan.types.flatMap { node in
-                [SidebarShowChoice(place: .type(node.id), title: node.label, isShown: !layout.isHidden(.type(node.id)))]
-                    + hiddenSubtypes(of: node)
-            }
-        case .views, .library, .custom:
-            let saved = group.group.kind == .views
-                ? [SidebarShowChoice(place: .views, title: String(localized: "Saved Views"), isShown: !layout.isHidden(.views))] : []
-            return saved + group.members.compactMap { place in
-                place.opens.map { SidebarShowChoice(place: place, title: library.name(of: $0), isShown: !layout.isHidden(place)) }
-            }
-        }
-    }
-
-    /// The views, types, collections and sources a shortcut or a new section can name.
-    static func choices(in library: any ItemLibrary, plan: SidebarPlan, layout: SidebarLayout) -> SidebarChoices {
+    /// A place as a row, or nil where what it names is gone.
+    static func row(_ place: SidebarPlace, in library: any ItemLibrary, creatable: Set<String>) -> SidebarPlaceRowData? {
         let catalogue = library.catalogue
-        func types(_ ids: [TypeID]) -> [SidebarPick] {
-            ids.map { SidebarPick(key: SidebarPlace.type($0.rawValue).key, title: catalogue.plural(for: $0)) }
+        switch place {
+        case .library:
+            return SidebarPlaceRowData(place: place, opens: .library, title: library.name(of: .library), mark: .symbol("square.grid.2x2"),
+                                       count: library.count(in: .library))
+        case .feed, .types, .collections, .sources:
+            guard let opens = place.opens, let symbol = place.symbol else { return nil }
+            return SidebarPlaceRowData(place: place, opens: opens, title: library.name(of: opens), mark: .symbol(symbol))
+        case .view(let id):
+            guard let view = library.views.first(where: { $0.id == id }) else { return nil }
+            return SidebarPlaceRowData(place: place, opens: .saved(id), title: view.title, mark: .view(id))
+        case .collection(let id):
+            guard let item = library.item(id) else { return nil }
+            return SidebarPlaceRowData(
+                place: place, opens: .collection(id), title: item.displayTitle, mark: .grayType(catalogue.icon(for: item.type)),
+                adds: true)
+        case .source(let code):
+            guard let info = library.sourceCounts.first(where: { $0.code == code }) else { return nil }
+            return SidebarPlaceRowData(
+                place: place, opens: .source(code), title: info.name, mark: .icon(SourceTile.icon(for: library.sources.info(code))))
+        case .item(let id):
+            guard let item = library.item(id) else { return nil }
+            return SidebarPlaceRowData(place: place, opens: nil, title: item.displayTitle, mark: .icon(.type(catalogue.icon(for: item.type))))
+        case .type:
+            return nil
         }
-        let collections = library.collections.map { SidebarPick(key: SidebarPlace.collection($0.id).key, title: $0.displayTitle) }
-        let sources = library.sourceCounts.map { SidebarPick(key: SidebarPlace.source($0.code).key, title: $0.name) }
-        // A collection or a source has a row only where it was put, in a section that is still there, so only one with
-        // no home can be added to a new section. Going to one is always possible, placed or not.
-        func unplaced(_ picks: [SidebarPick]) -> [SidebarPick] {
-            picks.filter { pick in SidebarPlace(key: pick.key).map { layout.home(of: $0) == nil } ?? false }
-        }
-        return SidebarChoices(
-            views: plan.views.map { SidebarPick(key: SidebarPlace.view($0.id).key, title: $0.title) },
-            types: types(QuickAdd.typeIDs(of: plan.types)),
-            collections: collections, sources: sources,
-            unplacedCollections: unplaced(collections), unplacedSources: unplaced(sources),
-            creatable: QuickAdd.types(in: library).map { SidebarPick(key: $0.id.rawValue, title: $0.label) })
     }
 
     /// A shortcut as a row, or nil where what it names is gone: a type or collection deleted, or a view that left
@@ -150,20 +120,12 @@ struct SidebarContent {
             return row(String(localized: "New \(catalogue.label(for: TypeID(type)))"), .type(catalogue.icon(for: TypeID(type))))
         case .go(let key):
             guard let place = SidebarPlace(key: key) else { return nil }
-            switch place {
-            case .type(let id):
+            if case .type(let id) = place {
                 guard library.catalogue.itemTypes[TypeID(id)] != nil else { return nil }
                 return row(library.catalogue.plural(for: TypeID(id)), .type(library.catalogue.icon(for: TypeID(id))), opens: .type(TypeID(id)))
-            case .view(let id):
-                guard library.views.contains(where: { $0.id == id }) else { return nil }
-                return row(library.name(of: .saved(id)), .symbol(SidebarPlace.viewSymbol), opens: .saved(id))
-            case .collection(let id):
-                guard library.collections.contains(where: { $0.id == id }) else { return nil }
-                return row(library.name(of: .collection(id)), .symbol(place.symbol ?? "square.stack"), opens: .collection(id))
-            default:
-                guard let item = place.opens, let symbol = place.symbol else { return nil }
-                return row(library.name(of: item), .symbol(symbol), opens: item)
             }
+            guard let data = Self.row(place, in: library, creatable: creatable), let opens = data.opens else { return nil }
+            return row(data.title, data.menuIcon, opens: opens)
         }
     }
 }
@@ -172,23 +134,44 @@ struct SidebarContent {
 nonisolated struct SidebarSectionData: Identifiable, Equatable {
     let plan: SidebarGroupPlan
     let rows: [SidebarPlaceRowData]
-    /// What the section's Show list offers; empty unless customizing.
-    let choices: [SidebarShowChoice]
     let shortcuts: [SidebarShortcutRowData]
 
     var id: String { plan.id }
 }
 
-/// A place's row: its mark, its name and the count the row says, if any.
+/// What a sidebar row draws before its name.
+nonisolated enum SidebarMark: Equatable {
+    /// A gray symbol.
+    case symbol(String)
+    /// A type's mark in its own color, or a source's.
+    case icon(RowIcon)
+    /// A collection's type mark, drawn gray, as a place's is.
+    case grayType(String?)
+    /// A saved view's mark, the symbol of its layout on this Mac (`SidebarViewMark`).
+    case view(ItemID)
+}
+
+/// A place's row: its mark, its name, the count the row says, and whether a plus under the pointer makes an item in it.
 nonisolated struct SidebarPlaceRowData: Equatable {
     let place: SidebarPlace
-    /// What choosing the row opens.
-    let item: PlaceView
+    /// What choosing the row opens; nil for a pinned item, which opens the item.
+    let opens: PlaceView?
     let title: String
-    let symbol: String
-    let count: Int
-    /// The color of a view's mark; nil for a place whose mark is gray.
-    let tone: TypeTone?
+    let mark: SidebarMark
+    /// The Library's count; nil for every other place.
+    var count: Int?
+    /// A collection's row offers a plus under the pointer.
+    var adds = false
+
+    /// The row's mark as a menu item or a shortcut draws it.
+    @MainActor var menuIcon: RowIcon {
+        switch mark {
+        case .symbol(let name): .symbol(name)
+        case .icon(let icon): icon
+        case .grayType(let id): .type(id)
+        case .view(let id): .symbol(SidebarPlace.symbol(ofView: id, in: ViewLayouts.stored()))
+        }
+    }
 }
 
 /// A shortcut's row. It does something or goes somewhere, so it never takes the selection.
@@ -210,6 +193,7 @@ private struct SidebarList: View {
     @State private var choosingIcon: TypeIconRequest?
     @State private var naming: SidebarNaming?
     @State private var name = ""
+    @State private var choosingItem: SidebarItemRequest?
     let content: SidebarContent
     let browser: Browser
     let order: ItemOrder
@@ -228,29 +212,31 @@ private struct SidebarList: View {
     var body: some View {
         let plan = content.plan
         let folding = SidebarFolding(library: library, libraries: libraries, browser: browser, order: order, plan: plan)
-        let ask: (SidebarNaming) -> Void = { request in
-            name = request.current
-            naming = request
-        }
+        let actions = SidebarActions(
+            ask: { request in
+                name = request.current
+                naming = request
+            },
+            chooseItem: { choosingItem = SidebarItemRequest(group: $0) })
         List(selection: selection) {
             if content.customizing, !content.sections.contains(where: { $0.plan.group.kind == .shortcuts }) {
                 Section {
-                    SidebarAddShortcutRow(tab: content.tab.id, present: [], choices: content.choices)
+                    SidebarAddPlace(group: nil, kind: .shortcuts, tab: content.tab.id, offers: content.offers, actions: actions)
                 }
             }
             ForEach(content.sections) { section in
-                sectionView(section, folding: folding, ask: ask)
+                sectionView(section, folding: folding, actions: actions)
             }
             if content.customizing {
                 Section {
-                    SidebarAddSectionRow(tab: content.tab.id, hiddenKinds: content.hiddenKinds, choices: content.choices)
+                    SidebarAddPlace(group: nil, kind: .custom, tab: content.tab.id, offers: content.offers, actions: actions)
                 }
             }
         }
         .listStyle(.sidebar)
         .safeAreaInset(edge: .top, spacing: 0) {
             if content.showsTabs {
-                SidebarTabBar(tabs: content.tabs, chosen: content.tab.id, browser: browser, ask: ask)
+                SidebarTabBar(tabs: content.tabs, chosen: content.tab.id, customizing: content.customizing, browser: browser)
             }
         }
         // The foot is a bar on the list's bottom edge that draws the toolbar's band mirrored, and only while rows pass
@@ -271,107 +257,102 @@ private struct SidebarList: View {
         .onKeyPress(.rightArrow, phases: [.down, .repeat]) { folding.press(.right, $0) }
         .onKeyPress(.leftArrow, phases: [.down, .repeat]) { folding.press(.left, $0) }
         .sheet(item: $choosingIcon) { TypeIconPicker(request: $0, library: library) }
-        .namingAlert($naming, name: $name) { apply($0, name: $1) }
+        .sheet(item: $choosingItem) { request in
+            SidebarItemChooser { id in
+                // A collection chosen as an item is pinned as the collection, so it has one row.
+                let place: SidebarPlace = library.collections.contains { $0.id == id } ? .collection(id) : .item(id)
+                libraries.updateSidebarLayout { $0.put(place, in: request.group) }
+            }
+        }
+        .namingAlert($naming, name: $name) { request, name in
+            libraries.updateSidebarLayout { request.apply(name: name, to: &$0) }
+        }
     }
 
-    @ViewBuilder private func sectionView(_ section: SidebarSectionData, folding: SidebarFolding, ask: @escaping (SidebarNaming) -> Void) -> some View {
-        let shown = content.sections.filter { $0.plan.group.kind != .shortcuts }
-        let position = shown.firstIndex { $0.id == section.id }
+    @ViewBuilder private func sectionView(_ section: SidebarSectionData, folding: SidebarFolding, actions: SidebarActions) -> some View {
+        let headed = content.sections.filter { $0.plan.group.hasHeading }
+        let position = headed.firstIndex { $0.id == section.id }
         let header = SidebarGroupHeader(
-            section: section, tabs: content.tabs, tab: content.tab.id, customizing: content.customizing, browser: browser,
-            isFirst: position == 0, isLast: position == shown.count - 1, ask: ask)
+            section: section, tabs: content.tabs, tab: content.tab.id, customizing: content.customizing, offers: content.offers,
+            browser: browser, isFirst: position == 0, isLast: position == headed.count - 1, actions: actions)
         switch section.plan.group.kind {
         case .shortcuts:
             SidebarShortcutsSection(
                 section: section, tab: content.tab.id, canCreate: content.canCreate, customizing: content.customizing,
-                addsShortcuts: content.sections.first { $0.plan.group.kind == .shortcuts }?.id == section.id, choices: content.choices,
-                browser: browser, order: order)
+                addsShortcuts: content.sections.first { $0.plan.group.kind == .shortcuts }?.id == section.id, offers: content.offers,
+                actions: actions, browser: browser, order: order)
         case .types:
             SidebarTypesSection(
-                rows: content.typeRows, plan: content.plan, showsAll: browser.sidebarShowsAllTypes, customizing: content.customizing,
-                folding: folding, browser: browser, choosingIcon: $choosingIcon, header: header)
-        case .library, .views, .custom:
+                rows: content.typeRows, plan: content.plan, showsAll: browser.sidebarShowsAllTypes, open: openType,
+                customizing: content.customizing,
+                creatable: content.creatable, folding: folding, browser: browser, choosingIcon: $choosingIcon, header: header,
+                place: SidebarAddPlace(group: section.id, kind: .types, tab: content.tab.id, offers: content.offers, actions: actions))
+        case .places, .pinned, .custom:
             SidebarPlacesSection(
                 section: section, groups: groupChoices(excluding: section.id), customizing: content.customizing, browser: browser,
-                header: header)
+                order: order, header: section.plan.group.hasHeading ? header : nil,
+                place: SidebarAddPlace(
+                    group: section.id, kind: section.plan.group.kind, tab: content.tab.id, offers: content.offers, actions: actions,
+                    name: section.plan.group.name))
         }
+    }
+
+    /// The type the window shows, if it shows one.
+    private var openType: TypeID? {
+        if case .type(let type)? = browser.showing?.place { type } else { nil }
     }
 
     /// The sections a row can move to, apart from the one it is in.
     private func groupChoices(excluding id: String) -> [SidebarGroupChoice] {
-        content.plan.groups.filter { $0.group.holdsPlaces && !$0.group.isHidden && $0.id != id }
-            .map { SidebarGroupChoice(id: $0.id, name: $0.group.name) }
-    }
-
-    private func apply(_ request: SidebarNaming, name: String) {
-        var created: String?
-        libraries.updateSidebarLayout { created = request.apply(name: name, to: &$0) }
-        if let created { browser.sidebarTab = created }
+        content.plan.groups.filter { $0.group.holdsPlaces && !content.plan.layout.hides($0.group) && $0.id != id }
+            .map { SidebarGroupChoice(id: $0.id, name: $0.group.name, kind: $0.group.kind) }
     }
 }
 
-/// What the alert that names a tab or a section is for.
+/// What a row or a place asks of the list: a name, or an item to pin.
+struct SidebarActions {
+    let ask: (SidebarNaming) -> Void
+    /// Opens the chooser that pins an item in the section with this identifier.
+    let chooseItem: (String) -> Void
+}
+
+/// The chooser of an item to pin, and the section it goes in.
+struct SidebarItemRequest: Identifiable {
+    let group: String
+    var id: String { group }
+}
+
+/// What the alert that names a section is for. A tab is named in place, in the tab bar.
 enum SidebarNaming: Identifiable, Equatable {
-    /// A new tab, with the section to move into it, where it was made from a section's menu.
-    case newTab(moving: String?)
-    case renameTab(String, current: String)
     case renameGroup(String, current: String)
 
     var id: String {
         switch self {
-        case .newTab(let moving): "new:" + (moving ?? "")
-        case .renameTab(let id, _): "tab:" + id
         case .renameGroup(let id, _): "group:" + id
         }
     }
 
     var current: String {
         switch self {
-        case .newTab: ""
-        case .renameTab(_, let name), .renameGroup(_, let name): name
+        case .renameGroup(_, let name): name
         }
     }
 
-    var title: LocalizedStringKey {
+    func apply(name: String, to layout: inout SidebarLayout) {
         switch self {
-        case .newTab: "New Tab"
-        case .renameTab: "Rename Tab"
-        case .renameGroup: "Rename Section"
-        }
-    }
-
-    /// Makes the change the person named, returning the identifier of the tab it made.
-    @discardableResult
-    func apply(name: String, to layout: inout SidebarLayout) -> String? {
-        switch self {
-        case .newTab(let moving):
-            let created = layout.addTab(named: name)
-            if let moving { layout.moveGroup(moving, toTab: created) }
-            return created
-        case .renameTab(let id, _):
-            layout.renameTab(id, to: name)
-        case .renameGroup(let id, _):
-            layout.renameGroup(id, to: name)
-        }
-        return nil
-    }
-
-    var confirmation: LocalizedStringKey {
-        switch self {
-        case .newTab: "Add"
-        case .renameTab, .renameGroup: "Rename"
+        case .renameGroup(let id, _): layout.renameGroup(id, to: name)
         }
     }
 }
 
 extension View {
-    /// The alert that names a tab or a section, for the sidebar.
+    /// The alert that names a section, for the sidebar.
     func namingAlert(_ naming: Binding<SidebarNaming?>, name: Binding<String>, apply: @escaping (SidebarNaming, String) -> Void) -> some View {
-        alert(naming.wrappedValue?.title ?? "", isPresented: Binding { naming.wrappedValue != nil } set: { if !$0 { naming.wrappedValue = nil } },
+        alert("Rename Section", isPresented: Binding { naming.wrappedValue != nil } set: { if !$0 { naming.wrappedValue = nil } },
               presenting: naming.wrappedValue) { request in
             TextField("Name", text: name)
             Button("Cancel", role: .cancel) {}
-            Button(request.confirmation) { apply(request, name.wrappedValue) }
+            Button("Rename") { apply(request, name.wrappedValue) }
         }
     }
 }
@@ -380,10 +361,11 @@ extension View {
 struct SidebarGroupChoice: Equatable, Identifiable {
     let id: String
     let name: String
+    let kind: SidebarGroup.Kind
 }
 
 /// Done, at the foot while the sidebar is being customized, in place of the instance.
-private struct SidebarDoneBar: View {
+struct SidebarDoneBar: View {
     let browser: Browser
 
     var body: some View {
@@ -404,19 +386,5 @@ struct SidebarCustomizeButton: View {
     var body: some View {
         Button("Customize Sidebar…") { browser.customizesSidebar = true }
             .disabled(browser.customizesSidebar)
-    }
-}
-
-/// Hide from Sidebar for a row's context menu. A saved view's row hides that view alone, and offers the whole Views
-/// block's saved views as well.
-struct SidebarHideButtons: View {
-    @Environment(Libraries.self) private var libraries
-    let place: SidebarPlace
-
-    var body: some View {
-        Button("Hide from Sidebar") { libraries.updateSidebarLayout { $0.take(place) } }
-        if case .view = place {
-            Button("Hide Views from Sidebar") { libraries.updateSidebarLayout { $0.setHidden(.views, true) } }
-        }
     }
 }

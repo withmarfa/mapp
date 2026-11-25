@@ -40,7 +40,7 @@ import Testing
         }
         libraries.shortcuts.set(refresh, for: .refresh)
         #expect(libraries.anyAppShortcuts.set(hotKey, for: .commandPalette) == nil)
-        libraries.sidebarLayouts.update(library) { $0.setHidden(.favorites, true) }
+        libraries.sidebarLayouts.update(library) { $0.setHidden(.feed, true) }
         libraries.searchLeaveOuts.update(library) { $0.types.insert(TypeID("core.note")) }
         // Another Marfa's look too, which only a restore point holds.
         let looks = #"{"\#(library)":{"core.note":{"date":"created"}},"marfa:https://two":{"core.task":{"date":"created"}}}"#
@@ -89,7 +89,7 @@ import Testing
         #expect(held(sync) == before)
         #expect(applied == .init(applied: before.count, skipped: 0))
         #expect(setAside().isEmpty)
-        #expect(libraries.sidebarLayouts.layout(for: libraries.libraryKey).isHidden(.favorites))
+        #expect(libraries.sidebarLayouts.layout(for: libraries.libraryKey).isHidden(.feed))
         #expect(libraries.typeLooks.hasChoice(for: TypeID("core.note"), in: libraries.libraryKey))
         #expect(libraries.searchLeaveOuts.leaveOut(for: libraries.libraryKey).types == [TypeID("core.note")])
         #expect(libraries.shortcuts.shortcut(for: .refresh) == refresh)
@@ -229,10 +229,10 @@ import Testing
 
     @Test func resetShowsTheDefaultsInTheStoresAtOnce() throws {
         let libraries = libraries()
-        libraries.sidebarLayouts.update(libraries.libraryKey) { $0.setHidden(.favorites, true) }
+        libraries.sidebarLayouts.update(libraries.libraryKey) { $0.setHidden(.feed, true) }
         var followed = false
         libraries.resetMacSettings { followed = true }
-        #expect(!libraries.sidebarLayouts.layout(for: libraries.libraryKey).isHidden(.favorites))
+        #expect(!libraries.sidebarLayouts.layout(for: libraries.libraryKey).isHidden(.feed))
         #expect(followed)
     }
 

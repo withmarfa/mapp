@@ -37,9 +37,10 @@ extension Browser {
     }
 
     private static func makePaletteIndex(in library: any ItemLibrary) -> PaletteIndex {
-        var places: [PaletteIndex.Place] = (SidebarPlace.destinations + SidebarPlace.builtInViews).compactMap { place in
+        var places: [PaletteIndex.Place] = (SidebarPlace.places + SidebarPlace.pages).compactMap { place in
             place.opens.flatMap { item in place.symbol.map { PaletteIndex.Place(item: item, icon: .symbol($0), title: nil) } }
         }
+        places.append(.init(item: .favorites, icon: .symbol("star"), title: nil))
         places.append(.init(item: .archive, icon: .symbol(GoMenu.archiveSymbol), title: nil))
         places += library.sourceCounts.map {
             .init(item: .source($0.code), icon: SourceTile.icon(for: library.sources.info($0.code)), title: $0.name)
@@ -49,7 +50,8 @@ extension Browser {
         }
         // The types the sidebar shows, under the names it gives them.
         places += library.itemTypeCounts.map { .init(item: .type($0.id), icon: .type($0.icon), title: $0.label) }
-        places += library.views.map { .init(item: .saved($0.id), icon: .symbol(SidebarPlace.viewSymbol), title: $0.title) }
+        let layouts = ViewLayouts.stored()
+        places += library.views.map { .init(item: .saved($0.id), icon: .symbol(SidebarPlace.symbol(ofView: $0.id, in: layouts)), title: $0.title) }
         return PaletteIndex(places: places, recent: library.activeItems.sorted { $0.modified > $1.modified })
     }
 }

@@ -14,7 +14,7 @@ struct GoMenu: Equatable {
         let icon: RowIcon
     }
 
-    /// The Library, Sources, Collections and Archive.
+    /// The Library, its pages and Archive.
     let places: [Entry]
     /// The Feed and Favorites.
     let builtInViews: [Entry]
@@ -33,12 +33,16 @@ struct GoMenu: Equatable {
                 return Entry(id: place.key, item: item, title: library.name(of: item), icon: .symbol(symbol))
             }
         }
-        places = entries(SidebarPlace.destinations) + [Self.archive(in: library)]
-        builtInViews = entries(SidebarPlace.builtInViews)
-        views = layout.isHidden(.views) ? [] : plan.views.filter { plan.isShown(.view($0.id)) }.map {
-            Entry(id: SidebarPlace.view($0.id).key, item: .saved($0.id), title: $0.title, icon: .symbol(SidebarPlace.viewSymbol))
+        places = entries([.library] + SidebarPlace.pages) + [Self.archive(in: library)]
+        builtInViews = entries([.feed])
+            + [Entry(id: "favorites", item: .favorites, title: library.name(of: .favorites), icon: .symbol("star"))]
+        let layouts = ViewLayouts.stored()
+        views = plan.views.filter { plan.isShown(.view($0.id)) }.map {
+            Entry(
+                id: SidebarPlace.view($0.id).key, item: .saved($0.id), title: $0.title,
+                icon: .symbol(SidebarPlace.symbol(ofView: $0.id, in: layouts)))
         }
-        let nodes = layout.isHidden(.types) ? [] : plan.shownTypes
+        let nodes = layout.allGroups.contains { $0.kind == .types && layout.hides($0) } ? [] : plan.shownTypes
         types = nodes.prefix(SidebarPlan.shownTypeCount).flatMap { Self.entries(of: $0, under: nil) }
         let listed = Set(types.map(\.id))
         moreTypes = plan.types.flatMap { Self.entries(of: $0, under: nil) }.filter { !listed.contains($0.id) }

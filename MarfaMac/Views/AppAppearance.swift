@@ -9,7 +9,24 @@ nonisolated enum AppearanceKey {
     static let textFont = "textFont"
     static let codeFont = "codeFont"
     static let typeChipTint = TypeChipTint.key
-    static let all = [theme, accent, highlights, textFont, codeFont, typeChipTint]
+    static let sidebar = SidebarColor.key
+    static let all = [theme, accent, highlights, textFont, codeFont, typeChipTint, sidebar]
+}
+
+/// The main window's sidebar: the system's gray, or white behind a hairline.
+nonisolated enum SidebarColor: String, CaseIterable, Identifiable {
+    case gray, white
+
+    static let key = "sidebarColor"
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .gray: String(localized: "Gray")
+        case .white: String(localized: "White")
+        }
+    }
 }
 
 /// Whether the app follows the Mac's light or dark appearance, or keeps one of its own.
