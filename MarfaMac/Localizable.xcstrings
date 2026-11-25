@@ -2077,10 +2077,16 @@
     "Add Text" : {
       "extractionState" : "manual"
     },
+    "Add Under the Library" : {
+
+    },
     "Add Website" : {
 
     },
     "Add a Choice" : {
+
+    },
+    "Add a Command" : {
 
     },
     "Add a Connector" : {
@@ -2099,6 +2105,9 @@
 
     },
     "Add a Passkey…" : {
+
+    },
+    "Add a Section" : {
 
     },
     "Add a Website" : {
