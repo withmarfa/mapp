@@ -41,11 +41,11 @@ enum PaletteMetrics {
     static let markInset: CGFloat = listInset + rowInset
     static let markWidth: CGFloat = 20
     static let markGap: CGFloat = 10
-    /// The tallest the results grow, the filter row included; the bar adds its own height under them.
+    /// The tallest the results grow; the bar adds its own height under them.
     static let resultsHeight: CGFloat = 460
 }
 
-/// The bar at the foot of the results, which rows scroll under: the filter button in Search Items, and Open and Actions.
+/// The bar at the foot of the results, which rows scroll under: Open and Actions.
 enum PaletteBar {
     static let inset: CGFloat = 10
     static let spacing: CGFloat = 8

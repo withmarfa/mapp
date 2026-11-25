@@ -35,7 +35,7 @@ Each kind of thing has one drawing, used on the page and in a panel, row, card o
 - **A person's circle is 18 points: purple letters on pale purple, no edge** (`PersonCircle`). The name beside it is a fact: 13 points, regular.
 - **Chips come from one family** (`PageChip`, `PersonCircle`, `ChipLine`) in two sizes. `ChipLooks` owns the measures, the web header reads them as `--chip-*` variables, and `ChipLooksTests` checks they agree.
 - **Several values show as two, then a count.**
-- **A type's mark in a row, on the page and in a palette is its glyph in the plain tone** (`TonedGlyph`, 14 points). A tile (`TypeTile`) is only for the Settings type page.
+- **A type's mark in a row and on the page is its glyph in the plain tone** (`TonedGlyph`); the palette draws marks in one gray. A tile (`TypeTile`) is only for the Settings type page.
 - **A filter chip reads in order:** field, operator, values, then its close button.
 
 ### Dark values

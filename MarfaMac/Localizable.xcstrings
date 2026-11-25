@@ -4495,9 +4495,6 @@
     "Everything" : {
 
     },
-    "Everywhere" : {
-      "extractionState" : "manual"
-    },
     "Excerpts" : {
 
     },
@@ -8414,9 +8411,6 @@
     },
     "Search People" : {
 
-    },
-    "Search Scope" : {
-      "extractionState" : "manual"
     },
     "Search Shortcuts" : {
 
