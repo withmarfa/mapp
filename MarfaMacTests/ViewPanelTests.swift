@@ -922,7 +922,9 @@ struct ViewPanelTests {
         browser.changeDensity(.compact)
         Self.close(undo)
         #expect(browser.density == .compact)
-        #expect(!undo.canUndo)
+        // No step was made, so an Undo cannot take back the choice another Mac made.
+        if undo.canUndo { undo.undo() }
+        #expect(ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)?.density == .compact)
     }
 
     @Test func anUndoFromBeforeADraftTakesBackTheViewsLayoutAndLeavesTheDrafts() {

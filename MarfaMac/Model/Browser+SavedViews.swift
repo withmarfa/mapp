@@ -1,4 +1,5 @@
 import Foundation
+import Marfa
 
 /// Following the saved view a window shows: its order, grouping, filters and timeline date from Marfa, and its
 /// layout, columns, cards and rows from this Mac (`ViewLayouts`). What the person changes is written as they change it:
