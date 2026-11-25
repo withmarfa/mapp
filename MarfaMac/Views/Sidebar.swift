@@ -124,7 +124,7 @@ struct SidebarContent {
                 guard library.catalogue.itemTypes[TypeID(id)] != nil else { return nil }
                 return row(library.catalogue.plural(for: TypeID(id)), .type(library.catalogue.icon(for: TypeID(id))), opens: .type(TypeID(id)))
             }
-            guard let data = row(place, in: library, creatable: creatable), let opens = data.opens else { return nil }
+            guard let data = Self.row(place, in: library, creatable: creatable), let opens = data.opens else { return nil }
             let icon: RowIcon = switch data.mark {
             case .symbol(let name): .symbol(name)
             case .icon(let icon): icon
