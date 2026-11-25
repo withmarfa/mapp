@@ -105,13 +105,23 @@ extension ItemLibrary {
 
     /// The items among `ids` that Delete moves to Recently Deleted, and why it leaves the others. An item a connector
     /// keeps goes too: its next run leaves an item in the bin there (`items/natural-key-trashed`). An item already in
-    /// the bin or no longer held is not skipped, since there is nothing to do for it.
+    /// the bin or no longer held is skipped and counted, though a choice made only of items in the bin is not a Delete
+    /// but an erase (`Browser.delete`), which says nothing of them.
     func deletePlan(_ ids: Set<ItemID>) -> (moving: Set<ItemID>, skips: BatchSkips) {
         var skips = BatchSkips()
         var moving: Set<ItemID> = []
         for id in ids {
-            guard let item = item(id), item.state != .trashed else { continue }
-            if let reason = item.obstacle(to: .delete) { skips.skip(reason) } else { moving.insert(id) }
+            guard let item = item(id) else {
+                skips.skip(.gone)
+                continue
+            }
+            if item.state == .trashed {
+                skips.skip(.inBin)
+            } else if let reason = item.obstacle(to: .delete) {
+                skips.skip(reason)
+            } else {
+                moving.insert(id)
+            }
         }
         return (moving, skips)
     }

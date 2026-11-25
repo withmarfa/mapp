@@ -3,26 +3,27 @@ import Foundation
 extension Browser {
     /// Moves the live items among `ids` to Recently Deleted, which undoes; more than one is handed to `confirm`
     /// where there is one, which asks the person first and then moves them. A selection with a live item in it never
-    /// erases anything: the items already in Recently Deleted stay there, since erasing cannot be undone and a
-    /// command that also moves other items must not do it. Only a selection made entirely of items already there
-    /// asks to erase them for good, and only where the library can; otherwise the person is told why not.
+    /// erases anything: the items already in Recently Deleted stay there and are counted as skipped, since erasing
+    /// cannot be undone and a command that also moves other items must not do it. Only a selection made entirely of
+    /// items already there asks to erase them for good, and only where the library can; otherwise the person is told
+    /// why not.
     static func delete(
         _ ids: Set<ItemID>, in library: any ItemLibrary, undoManager: UndoManager?, toasts: ToastPresenter? = nil,
         naming title: String? = nil, asking confirm: ((Set<ItemID>) -> Void)? = nil
     ) {
         let binned = Set(ids.filter { library.item($0)?.state == .trashed })
-        // Told here, before anything asks the person to confirm items that would be left alone.
-        let plan = library.deletePlan(ids.subtracting(binned))
-        let moving = plan.moving
-        library.tellSkipped(plan.skips, didChange: !moving.isEmpty || !binned.isEmpty, failing: String(localized: "Can’t Delete"))
-        if !moving.isEmpty {
-            if moving.count > 1, let confirm {
-                confirm(moving)
-            } else {
-                moveToRecentlyDeleted(moving, in: library, undoManager: undoManager, toasts: toasts, naming: title)
-            }
-        } else if !binned.isEmpty, ids.subtracting(binned).isEmpty {
+        if !binned.isEmpty, binned.count == ids.count {
             if library.reachesServer { library.itemsToPurge = binned } else { library.tellCannotPurge() }
+            return
+        }
+        // Told here, before anything asks the person to confirm items that would be left alone.
+        let plan = library.deletePlan(ids)
+        let moving = plan.moving
+        library.tellSkipped(plan.skips, didChange: !moving.isEmpty, failing: String(localized: "Can’t Delete"))
+        if moving.count > 1, let confirm {
+            confirm(moving)
+        } else if !moving.isEmpty {
+            moveToRecentlyDeleted(moving, in: library, undoManager: undoManager, toasts: toasts, naming: title)
         }
     }
 

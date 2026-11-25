@@ -33,7 +33,7 @@ import Testing
         Browser.delete([f.first.id, f.second.id, f.binned.id], in: f.library, undoManager: nil, asking: { asked.append($0) })
         #expect(asked == [[f.first.id, f.second.id]], "one confirmation, naming only the live items")
         #expect(f.library.itemsToPurge.isEmpty, "a command that also moves items never offers to erase")
-        #expect(f.library.notices.told == 0)
+        #expect(f.library.notices.waiting.last?.message == BatchSkips.sentence(.inBin, count: 1), "the item in the bin is counted, and why")
         #expect(states(f.library) == before, "nothing changes until the person confirms")
 
         f.library.delete(asked[0], undoManager: nil)
@@ -41,6 +41,14 @@ import Testing
         #expect(f.library.item(f.second.id)?.state == .trashed)
         #expect(f.library.item(f.binned.id)?.state == .trashed, "the item already in the bin is neither erased nor touched")
         #expect(f.library.items.count == 4)
+    }
+
+    @Test func aMixedSelectionCountsEveryItemAlreadyInTheBinAsSkipped() {
+        let f = fixture()
+        Browser.delete([f.first.id, f.binned.id, f.alsoBinned.id], in: f.library, undoManager: nil)
+        #expect(f.library.item(f.first.id)?.state == .trashed)
+        #expect(f.library.notices.waiting.last?.title == "Some Items Were Skipped")
+        #expect(f.library.notices.waiting.last?.message == BatchSkips.sentence(.inBin, count: 2))
     }
 
     @Test func cancellingTheMoveLeavesEveryItemAsItWas() {
