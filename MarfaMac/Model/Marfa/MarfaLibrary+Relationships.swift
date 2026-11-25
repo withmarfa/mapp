@@ -349,7 +349,8 @@ extension MarfaLibrary {
     /// The change is worked out, the core asked of every link it makes (`Edges.check(from:to:type:)` of a new link,
     /// `Edges.check(_:moving:)` of a move), and then worked out again from the links the copy holds then and written in
     /// the same step, with its undo, so an earlier change that landed meanwhile is kept and not repeated, and a move's
-    /// old parent is the one it left. A link new in that second look is asked too.
+    /// old parent is the one it left. A link new in that second look is asked too, but a move only of an edge seen in
+    /// the first: where it would move another, as one another device made in place of the old, the change is refused.
     /// Changes run one after another in the order they were made, each once the copy has taken the writes of the one
     /// before (see `relationshipChain`). Nothing is written until the core has answered.
     ///
@@ -397,9 +398,10 @@ extension MarfaLibrary {
     ) async -> (verdict: EdgeVerdict, step: LinkStep?) {
         let cantChange = String(localized: "Can’t Change This Relationship")
         var asked: Set<MadeLink> = []
-        // Each removal names the edge this Mac held when the change was first worked out, before any wait for the
-        // core, so an edge another device puts between the same ends meanwhile is never the one removed.
+        // Each removal and move names an edge this Mac held when the change was first worked out, before any wait for
+        // the core, so an edge another device puts between the same ends meanwhile is never the one removed or moved.
         var seenRemovals: [EdgeEnds: EdgeDraft]?
+        var seenMoves: Set<EdgeID>?
         while true {
             var plan: (change: RelationshipChange, made: [MadeLink])
             switch self.plan(id, field: field, adding: adding, removing: removing) {
@@ -413,6 +415,13 @@ extension MarfaLibrary {
                 plan.change.removing.compactMap(seen).map { (EdgeEnds($0), $0) }, uniquingKeysWith: { first, _ in first })
             seenRemovals = firstLook
             plan.change.removing = plan.change.removing.compactMap { firstLook[EdgeEnds($0)] }
+            let movable = seenMoves ?? Set(plan.change.moving.map(\.edge))
+            seenMoves = movable
+            guard plan.change.moving.allSatisfy({ movable.contains($0.edge) }) else {
+                let reason = BatchSkips.sentence(.changedSince, count: 1)
+                notices.tell(cantChange, reason)
+                return (.refused(reason), nil)
+            }
             guard !plan.change.isEmpty else { return (.taken, nil) }
             let unasked = plan.made.filter { !asked.contains($0) }
             guard !unasked.isEmpty else {

@@ -722,6 +722,23 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(source.writes.last == .unlink(EdgeDraft(type: "about", from: F.n1, to: F.p1, id: EdgeID("a1"))))
     }
 
+    /// A replacement of the one parent moves only the edge this Mac saw before the check. Where another device removes
+    /// it and links the same parent again during the check, the new edge is not moved: the change is refused as changed.
+    @Test func aReplacementMovesOnlyTheEdgeSeenBeforeTheCheck() async throws {
+        let (library, source) = try await loaded()
+        source.holdingChecks.withLock { $0 = true }
+        let change = Task { await library.changeLinks(F.t1, field: "child-of", adding: [F.p1], removing: [F.e1], undoManager: nil) }
+        try #require(await eventually { library.relationshipChangesInFlight == 1 })
+        source.send(.upserted([F.item(F.t1, F.bug, "Bug one", age: 3, tags: [ItemTag.favorite], edges: [F.child("theirs", F.t1, of: F.e1)])]))
+        try #require(await eventually { library.index.link(type: "parent-of", from: F.e1, to: F.t1)?.id == EdgeID("theirs") })
+        source.holdingChecks.withLock { $0 = false }
+        let reason = BatchSkips.sentence(.changedSince, count: 1)
+        #expect(await change.value == .refused(reason))
+        #expect(library.notices.waiting.last?.message == reason)
+        #expect(source.writes.isEmpty, "sent \(source.writes)")
+        #expect(library.relationships(for: F.t1).first { $0.field == "child-of" }?.targets.map(\.itemID) == [F.e1])
+    }
+
     /// A removal held back for a new link names the edge this Mac saw, by its id, so it never removes one another
     /// device made between the same ends meanwhile. Skipped, it is not put back by the undo, which removes only the
     /// link the change made.
@@ -913,12 +930,13 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         try #require(await eventually { source.writes.count == 2 }, "sent \(source.writes)")
         source.send(.taken(try #require(source.submitted.last?.id)))
         #expect(await second.value == .taken)
-        // A source that closes ends every wait: the stream finishes, though the write was never taken.
+        // A source that closes ends every wait: the stream finishes, though the write was never taken, so the change
+        // is not answered taken and a panel waiting on it does not close as if saved.
         let third = Task { await library.changeLinks(F.n1, field: "about", adding: [F.p2], removing: [], undoManager: nil) }
         try #require(await eventually { source.writes.count == 3 })
         let fourth = Task { await library.changeLinks(F.n1, field: "about", adding: [F.e1], removing: [], undoManager: nil) }
         await source.close()
-        #expect(await third.value == .taken)
+        #expect(await third.value == .refused(MarfaEngine.closedLibrary))
         _ = await fourth.value
     }
 
