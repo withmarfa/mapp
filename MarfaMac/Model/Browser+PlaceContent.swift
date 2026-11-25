@@ -393,7 +393,7 @@ extension Browser {
         let options = tableOptions[shown] ?? ItemTableOptions()
         let searching = isSearching
         let token = UUID()
-        let from = update.map { (made: $0.content.made, wants: $0.content.wants, earlier: $0.content.earlier, changed: $0.changed) }
+        let from = update.map { (made: $0.content.made, wants: $0.content.wants, earlier: $0.content.earlierOffMainActor, changed: $0.changed) }
         let task = Task { [weak self] in
             if settles { try? await Task.sleep(for: Browser.arrangeSettling) }
             await previous?.value
@@ -424,7 +424,10 @@ extension Browser {
             let remade = plan?.remade
             Cost.record(.tableArrange, since: start)
             let ordered = await Task.detached(priority: .userInitiated) {
-                if let from, let remade { ordering.updated(from: from.earlier, changed: remade) } else { ordering.ordered() }
+                guard let from, let remade else { return ordering.ordered() }
+                let earlier = ItemTableContent.Ordering.Earlier(
+                    columns: from.earlier.columns, sort: from.earlier.sort, ordered: from.earlier.landed ?? from.earlier.ordering.ordered())
+                return ordering.updated(from: earlier, changed: remade)
             }.value
             guard self.isLive(token, place, searching) else { return self.endArranging(token) }
             start = ContinuousClock.now

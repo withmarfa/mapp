@@ -393,6 +393,12 @@ final class ItemTableContent {
         return Ordering.Earlier(columns: columns, sort: sort, ordered: ordered)
     }
 
+    /// What an update off the main actor starts from: what the table landed with, or else how to order its rows there,
+    /// so a large table first worked out in place is never sorted on the main actor for an update.
+    var earlierOffMainActor: (columns: [ItemTableColumn], sort: [ItemTableComparator], landed: Ordering.Ordered?, ordering: Ordering) {
+        (columns, sort, landed, ordering)
+    }
+
     /// The columns Add Sort offers: those of the types the view shows after its filters, in a sensible order.
     lazy var sortChoices: [ItemTableColumn] = ItemTableLayout.sortChoices(
         from: columns, types: Set(kept.map(\.item.type)), catalogue: catalogue)
