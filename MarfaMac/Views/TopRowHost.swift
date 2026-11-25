@@ -390,8 +390,8 @@ private struct WindowTitleHider: NSViewRepresentable {
 
 /// Reports how far full screen has slid the toolbar down to show the menu bar. The content's safe area does not change
 /// as it does: only the toolbar's own window moves, so the row drawn under the toolbar reads that window's frame. That
-/// window paints a title bar background of its own, which the main window's hidden toolbar background does not reach: it
-/// covers the row's title from its leading edge, so the probe makes it transparent too.
+/// window also lays an opaque layer of its own (`NSOpaqueBackstop`) over the column's top edge, from the sidebar's edge to
+/// the panel's width while the panel is open, which hides the first letters of the title: the probe hides it.
 private struct ToolbarRevealProbe: NSViewRepresentable {
     @Binding var reveal: CGFloat
 
@@ -432,7 +432,12 @@ private struct ToolbarRevealProbe: NSViewRepresentable {
             barObservers.forEach { NotificationCenter.default.removeObserver($0) }
             barObservers = []
             if let bar {
-                bar.titlebarAppearsTransparent = true
+                hideBackstop(of: bar)
+                for delay in [0.1, 0.5] {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                        if let bar = self?.bar { self?.hideBackstop(of: bar) }
+                    }
+                }
                 barObservers.append(NotificationCenter.default.addObserver(forName: NSWindow.didMoveNotification, object: bar, queue: .main) { [weak self] _ in
                     MainActor.assumeIsolated { self?.measure() }
                 })
@@ -440,8 +445,15 @@ private struct ToolbarRevealProbe: NSViewRepresentable {
             measure()
         }
 
+        private func hideBackstop(of bar: NSWindow) {
+            for layer in bar.contentView?.layer?.sublayers ?? [] where layer.name == "NSOpaqueBackstop" && !layer.isHidden {
+                layer.isHidden = true
+            }
+        }
+
         private func measure() {
             guard let window, let bar else { return report(0) }
+            hideBackstop(of: bar)
             // Hidden above the screen it is not over the row, which then stays.
             report(max(0, window.frame.maxY - bar.frame.maxY))
         }
