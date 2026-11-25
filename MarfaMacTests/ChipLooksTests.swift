@@ -11,7 +11,7 @@ struct ChipLooksTests {
     }
 
     private static func matches(_ pattern: String, in text: String) throws -> [[String]] {
-        try Regex(pattern).allMatches(in: text).map { match in
+        try text.matches(of: Regex(pattern)).map { match in
             (0..<match.output.count).map { index in
                 (match.output[index].substring ?? "").description
             }
