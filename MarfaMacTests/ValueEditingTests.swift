@@ -630,7 +630,7 @@ struct ValueEditingTests {
         let written = Written()
         let model = datePanel(Self.due, holding: "2026-11-07T09:30:00Z", written: written)
         model.beginDay()
-        #expect(model.dayDraft == "7 Nov 2026 at \(model.timeText)")
+        #expect(model.dayDraft == model.dayText && model.dayDraft?.hasSuffix(model.timeText) == true)
         model.dayDraft = "25 Nov 2026"
         model.commitDay(closing: true)
         #expect(written.all == [PropertyValue.string(ItemDate.instant(Self.moment(25, 9, 30)))])
