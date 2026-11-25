@@ -1476,9 +1476,6 @@
     "%lld secrets to set again" : {
 
     },
-    "%lld set" : {
-
-    },
     "%lld settings are set on the machine %@ runs on." : {
 
     },
@@ -4697,6 +4694,9 @@
 
     },
     "Filter By" : {
+
+    },
+    "Filters" : {
 
     },
     "Filters that would join conditions with both “and” and “or”" : {
@@ -8391,6 +8391,9 @@
     "Search Commands and Items" : {
 
     },
+    "Search Filters" : {
+
+    },
     "Search Icons" : {
       "extractionState" : "manual"
     },
@@ -8415,6 +8418,9 @@
     "Search Shortcuts" : {
 
     },
+    "Search Suggestions" : {
+
+    },
     "Search Tags" : {
 
     },
@@ -8429,6 +8435,9 @@
     },
     "Search for a Place" : {
       "extractionState" : "manual"
+    },
+    "Search for “%@”" : {
+
     },
     "Search isn’t available right now." : {
       "extractionState" : "manual"
@@ -10487,9 +10496,6 @@
     "This Week" : {
 
     },
-    "This Year" : {
-
-    },
     "This address includes a sign-in, so it isn’t loaded." : {
 
     },
@@ -11121,9 +11127,6 @@
 
     },
     "Update to %@" : {
-
-    },
-    "Updated" : {
 
     },
     "Updated %@" : {
@@ -11865,6 +11868,9 @@
     "activity and webhook deliveries" : {
 
     },
+    "after" : {
+      "comment" : "Typed in the list's search: a date field is after a day"
+    },
     "after today" : {
 
     },
@@ -11876,6 +11882,9 @@
     },
     "another plugins release" : {
 
+    },
+    "before" : {
+      "comment" : "Typed in the list's search: a date field is before a day"
     },
     "before today" : {
 
@@ -12073,7 +12082,7 @@
 
     },
     "on" : {
-
+      "comment" : "Typed in the list's search: a date field is on a day"
     },
     "pt" : {
 
