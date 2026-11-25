@@ -19,7 +19,7 @@ nonisolated extension SampleCastell.Maker {
         var specs: [Spec] = []
         func make(
             _ id: String, _ type: String, _ title: String?, _ source: String, _ day: Int, _ time: String = "09:00",
-            body: String = "", tier: Marfa.Tier = .library, state: Marfa.ItemState = .active, parent: String? = nil,
+            tier: Marfa.Tier = .library, state: Marfa.ItemState = .active, body: String = "", parent: String? = nil,
             due: Int? = nil, props: JSONObject = [:], collections: [String] = [], favorite: Bool = false
         ) {
             specs.append(Spec(
@@ -112,8 +112,8 @@ nonisolated extension SampleCastell.Maker {
             make("img-zine-\(index)", Kind.image, name, mfm, 2 + index, "12:00", collections: ["collection-zine-photos"])
         }
         make("note-fair-layout", Kind.note, "Print fair: stall layout", mfm, 3, "10:00", collections: ["collection-print-fair"])
-        make("event-fair", Kind.event, "Lewes print fair, March", mfm, 3, "10:00", collections: ["collection-print-fair"],
-             props: ["starts_at": .string(Self.stamp(start + 90 * 86_400 + 9 * 3600))])
+        make("event-fair", Kind.event, "Lewes print fair, March", mfm, 3, "10:00",
+             props: ["starts_at": .string(Self.stamp(start + 90 * 86_400 + 9 * 3600))], collections: ["collection-print-fair"])
         make("t-van", Kind.task, "Book the van for the print fair", raycast, 5, "10:00", due: 0, props: ["priority": "medium", "status": "pending"],
              collections: ["collection-print-fair"])
 
