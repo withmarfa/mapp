@@ -22,18 +22,21 @@ struct PlaceChangeCostTests {
         for (layout, setUp) in Self.layouts where named?.contains(layout.name) ?? true {
             try await hosted(layout) { browser, library, source, step in
                 setUp(browser)
+                // The same items are edited in every round.
+                let targets = library.items(in: .library).prefix(Self.changed).map(\.id)
                 try await step("idle", nil) {}
                 try await step("open (\(library.items(in: .library).count))", nil) { browser.viewMode = layout.mode }
                 for (round, name) in [(1, "2000 edited"), (2, "2000 edited again")] {
-                    let edited = Self.edited(library, round: round)
+                    let edited = Self.edited(targets, in: library, round: round)
                     let expected = try await Self.drawn(after: Self.upserting(edited, in: library), like: browser, mode: layout.mode)
                     try await step(name, expected) { source.send(.upserted(edited)) }
                 }
-                let added = Self.added(round: 1)
+                let first = try #require(Self.drawn(in: browser, mode: layout.mode, library: library)?.first.flatMap { library.item($0.id) })
+                let added = Self.added(round: 1, like: first)
                 let joined = try await Self.drawn(after: Self.upserting(added, in: library), like: browser, mode: layout.mode)
                 try await step("2000 new", joined) { source.send(.upserted(added)) }
                 // The copy read whole again, with a sync's edits in it, as a rehydration brings them.
-                let reread = Self.upserting(Self.edited(library, round: 3), in: library)
+                let reread = Self.upserting(Self.edited(targets, in: library, round: 3), in: library)
                 let snapshot = SourceSnapshot(items: reread, catalogue: BigLibrary.catalogue)
                 let expected = try await Self.drawn(after: reread, like: browser, mode: layout.mode)
                 try await step("whole copy read again", expected) { source.send(.loaded(snapshot)) }
@@ -77,10 +80,10 @@ struct PlaceChangeCostTests {
         browser.tableOptions[.library, default: ItemTableOptions()].sort = [ItemTableComparator(column: .title)]
     }
 
-    /// `changed` items of the Library with a new title and edit date, which moves them to the front of a sort by name or
-    /// by Edited, so the first page drawn shows them.
-    private static func edited(_ library: any ItemLibrary, round: Int) -> [Item] {
-        library.items(in: .library).prefix(changed).enumerated().map { index, item in
+    /// `targets` with a new title and edit date, which moves them to the front of a sort by name or by Edited, so the first
+    /// page drawn shows them.
+    private static func edited(_ targets: [ItemID], in library: any ItemLibrary, round: Int) -> [Item] {
+        targets.compactMap { library.item($0) }.enumerated().map { index, item in
             var item = item
             item.title = String(format: "0 Round %d %04d", round, index)
             item.name = item.title
@@ -89,13 +92,16 @@ struct PlaceChangeCostTests {
         }
     }
 
-    /// `changed` new items, made and edited after every other, so the first page drawn by any order shows them.
-    private static func added(round: Int) -> [Item] {
+    /// `changed` new items like `template`, the first item the layout draws, of its type, values, tier, tags and date, made and
+    /// edited after every other item, so the first page drawn in any order, grouping or date shows them.
+    private static func added(round: Int, like template: Item) -> [Item] {
         (0..<changed).map { index in
             let title = String(format: "0 Added %04d", index)
             var item = LibraryFixture.item(
-                ItemID("added-\(round)-\(index)"), BigLibrary.note, title, age: index,
-                properties: [Property(key: "title", value: .string(title))])
+                ItemID("added-\(round)-\(index)"), template.type, title, age: index, tier: template.tier, tags: template.tags,
+                properties: template.properties.filter { $0.key != "title" } + [Property(key: "title", value: .string(title))])
+            item.occurred = template.occurred
+            item.source = template.source
             item.created = Date(timeIntervalSince1970: 1_000_000 + Double(changed - index))
             item.modified = Date(timeIntervalSince1970: 1_790_100_000 - Double(index))
             return item
