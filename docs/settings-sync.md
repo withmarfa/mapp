@@ -23,7 +23,7 @@ paths:
 - **The defaults are the store the app reads**, so a launch needs no network. Synced, they are this Mac's copy.
 - **Store only what a person chose.** A default value is left out, so a better default reaches them.
 - **A new member of a stored value is optional**, so older values decode.
-- **A library's own settings are named by its Marfa,** else its copy's folder. `LibrarySettings` moves an earlier name's first, saving each losing value in `Restore Points/Library Settings Set Aside/`.
+- **A library's own settings are named by its Marfa,** else its copy's folder. `LibrarySettings` moves earlier names' first; losers go to `Restore Points/Library Settings Set Aside/`, unreadable or undecided stay unsynced.
 
 ## In the Marfa
 
