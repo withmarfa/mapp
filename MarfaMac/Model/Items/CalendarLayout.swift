@@ -36,7 +36,7 @@ nonisolated enum CalendarLayout {
     /// The shortest a block is taken to be when blocks are set side by side, so a short item does not hide behind its neighbour.
     static let shortestBlock = 30
 
-    /// The items placed on the calendar, and how many had no date to place them by and were left out.
+    /// The calendar entries and the IDs of items that could not be placed.
     static func entries(
         for items: [Item], looks: [TypeID: TypeLook], catalogue: Catalogue, calendar: Calendar = .current, marksFeed: Bool = false,
         placing: CalendarChoices.Placing = .eachType

@@ -1,8 +1,8 @@
 import AppKit
 import SwiftUI
 
-/// The calendar layout: a week of day columns with hours, or a month of days, with each item where its type's date puts
-/// it (`CalendarLayout`). Choosing an item opens the right sidebar, as the timeline does. A selection that moves runs
+/// The week or month places each item by the view's chosen field or its type's date (`CalendarLayout`). Choosing an
+/// item opens the right sidebar, as in the timeline. A selection that moves runs
 /// the bodies of the cells that wrap an item and of no calendar: the browser works the layout out from the items alone.
 struct ItemCalendar: View {
     @CurrentLibrary private var library
