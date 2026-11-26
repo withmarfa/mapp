@@ -136,9 +136,8 @@ import Testing
         #expect(approvalAt == nil)
     }
 
-    /// After moving the same Marfa to another address, whose copy goes with it, the words are about the address left,
-    /// not the one now open.
-    @Test func aMoveThatLeavesAnApprovalNamesThePreviousServer() async throws {
+    /// Moving the same Marfa to another address keeps the address left signed in, so there is no approval to doubt.
+    @Test func aMoveToAnotherAddressOfTheSameMarfaSignsNothingOutAndTellsNothing() async throws {
         let bench = HostBench()
         let first = try MarfaConnection(address: "http://first.test:8210")
         let second = try MarfaConnection(address: "http://second.test:8210")
@@ -147,16 +146,12 @@ import Testing
         try await host.connect(address: "http://first.test:8210", key: "k")
         bench.signIns.script(signOut: .success(.notConfirmed))
 
-        let told = try #require(await problem { () throws(MarfaHost.Problem) in
-            try await host.changeAddress(to: "http://second.test:8210", via: host.scripted("k"))
-        })
-        let notice = try #require(MarfaSettingsModel.notice(for: told, reached: .switched))
-        #expect(notice.message.contains("previous server"), "\(notice.message)")
-        #expect(notice.message.contains("http://first.test:8210"), "the previous server is named by its address: \(notice.message)")
-        #expect(!notice.message.contains("second.test"))
-        #expect(notice.message.contains("marfa apps revoke <id>"))
-        #expect(!notice.message.contains("older app entry"))
+        try #require(await problem { () throws(MarfaHost.Problem) in
+            try await host.changeAddress(to: "http://second.test:8210", via: host.scripted("k2"))
+        } == nil)
         #expect(host.connection?.address.absoluteString == "http://second.test:8210")
+        #expect(!bench.signIns.calls.contains { $0.hasPrefix("signOut") }, "\(bench.signIns.calls)")
+        #expect(host.notices.waiting.isEmpty)
     }
 
     @Test(arguments: [MarfaHost.Problem.notRevoked(address: "https://marfa.test"), .copyKept(.changed(now: 2), signIn: nil, approvalAt: "https://marfa.test"), .notRemoved(signIn: nil, copy: "x", approvalAt: "https://marfa.test")])

@@ -301,6 +301,8 @@ import Testing
         let host = bench.host()
         try await host.connect(address: first.address.absoluteString, key: "a")
         try await host.changeAddress(to: alias.address.absoluteString, key: "b")
+        try #require(bench.servers.last).report.set(SyncReport(waiting: 1, queueRead: true))
+        #expect(await eventually { host.waitingChanges == 1 })
 
         try await discardEverything(host)
         #expect(!bench.hasCopy(alias))

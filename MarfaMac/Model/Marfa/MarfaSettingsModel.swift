@@ -356,7 +356,8 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         case .signIn(let outcome):
             signInNotice(outcome)
         case .notRevoked(let address):
-            approvalNotice(reached == .switched ? .previous : .left, address: address)
+            // Only a disconnect signs out: a switch keeps the Marfa left signed in.
+            approvalNotice(.left, address: address)
         case .notRemoved(let signIn, let copy, let approvalAt):
             switch reached {
             case .left:
@@ -366,7 +367,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
             case .switched:
                 Notice(
                     title: String(localized: "Switched Servers, but Not Everything Was Removed"),
-                    message: withApproval(previousRemovalMessage(signIn: signIn, copy: copy), approvalAt, .previous))
+                    message: String(localized: "The previous server’s copy is still on this Mac. The app removes it before it connects to that server again."))
             case .notOpened, .signedInAgain:
                 Notice(
                     title: String(localized: "Can’t Open the Library"),
@@ -471,7 +472,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         }
         let note = signIn == nil ? nil : String(localized: "The sign-in is still in your Keychain. Remove it in Keychain Access.")
         let told = note.map { sentences(body, $0) } ?? body
-        let message = withApproval(told, approvalAt, reached == .switched ? .previous : .left)
+        let message = withApproval(told, approvalAt, .left)
         switch reached {
         case .left:
             return Notice(title: String(localized: "Disconnected, but the Copy Was Kept"), message: message)
@@ -502,15 +503,6 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         }
     }
 
-    /// A switch ends no sign-in and a move to another address of the same Marfa removes no copy, so a step leaves one
-    /// or the other behind, never both.
-    private static func previousRemovalMessage(signIn: String?, copy: String?) -> String {
-        if signIn != nil {
-            String(localized: "The previous server’s sign-in is still in your Keychain. Remove it in Keychain Access.")
-        } else {
-            String(localized: "The previous server’s copy is still on this Mac. The app removes it before it connects to that server again.")
-        }
-    }
 
     // MARK: Running a step
 

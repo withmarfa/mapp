@@ -630,8 +630,9 @@ import os
     }
 
     /// Moves to the same Marfa at another address: its copy is closed with nothing lost, since it is the copy the new
-    /// address opens, and opened again with the new address's own sign-in, which may be one it already holds. A
-    /// failure opens it again as it was.
+    /// address opens, and opened again with the new address's own sign-in, which may be one it already holds. The old
+    /// address keeps its own sign-in, so a return opens the copy with it and no browser, until a disconnect there ends
+    /// it. A failure opens it again as it was.
     private func moveCopy(
         from old: MarfaConnection, to connection: MarfaConnection, in folder: String, instance: String?,
         via method: SignInMethod, kept: MarfaConnection?
@@ -663,8 +664,6 @@ import os
             throw error
         }
         remember(connection)
-        // The copy now opens only at the new address, so the old address's sign-in would outlive any disconnect.
-        if let problem = await finishLeaving(old, agreed: nil) { throw problem }
     }
 
     /// Whether what the person agreed to lose takes in every write the copy holds: nothing, without a choice.

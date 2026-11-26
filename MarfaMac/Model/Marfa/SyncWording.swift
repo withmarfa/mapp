@@ -263,8 +263,6 @@ nonisolated enum Words {
     enum ForgottenApproval {
         /// The sign-in of the server the person left.
         case left
-        /// The sign-in of the server the person switched away from.
-        case previous
         /// A sign-in made for a step that did not go on, such as a switch that was abandoned.
         case abandoned
     }
@@ -272,18 +270,15 @@ nonisolated enum Words {
     static func approvalMayStandTitle(_ which: ForgottenApproval) -> String {
         switch which {
         case .left: String(localized: "Disconnected, but This App May Still Be Approved")
-        case .previous: String(localized: "Switched Servers, but This App May Still Be Approved on the Previous One")
         case .abandoned: String(localized: "This App May Still Be Approved")
         }
     }
 
-    /// `address` is the server whose approval may stand: after a switch, the previous one.
+    /// `address` is the server whose approval may stand.
     static func approvalMayStand(_ which: ForgottenApproval, address: String) -> String {
         let told = switch which {
         case .left:
             String(localized: "The app forgot its sign-in on this Mac, but couldn’t confirm that \(address) ended the approval.")
-        case .previous:
-            String(localized: "The app forgot the previous server’s sign-in on this Mac, but couldn’t confirm that \(address) ended the approval.")
         case .abandoned:
             String(localized: "The app dropped a sign-in it didn’t use, but couldn’t confirm that \(address) ended its approval.")
         }
