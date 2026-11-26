@@ -249,8 +249,20 @@ private struct FilePDFView: NSViewRepresentable {
             let width = page.rotation % 180 == 0 ? box.width : box.height
             guard width > 0 else { return }
             let scale = FileZoom.clamped(min(Self.paperWidth / width, view.scaleFactorForSizeToFit))
+            // PDFKit keeps the middle of what shows as the size changes; a file at its start, or not yet fitted, stays
+            // at its start, with the head above it.
+            let scroll = scroller(of: view)
+            let atStart = fitted == nil || scroll.map { abs($0.contentView.bounds.origin.y + top) < 1 } == true
             fitted = scale
             if abs(view.scaleFactor - scale) > 0.0005 { view.scaleFactor = scale }
+            guard atStart, let scroll else { return }
+            let start = { [top] in
+                scroll.contentView.scroll(to: NSPoint(x: scroll.contentView.bounds.origin.x, y: -top))
+                scroll.reflectScrolledClipView(scroll.contentView)
+            }
+            start()
+            // PDFKit lays the pages out again a turn later.
+            DispatchQueue.main.async(execute: start)
         }
 
         /// The width of a page in the boards (`PDF`, `PDF-Full`).
