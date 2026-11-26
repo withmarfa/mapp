@@ -9679,9 +9679,6 @@
     "Switched Servers, but Not Everything Was Removed" : {
       "extractionState" : "manual"
     },
-    "Switched Servers, but This App May Still Be Approved on the Previous One" : {
-
-    },
     "Switched Servers, but the Copy Was Kept" : {
       "extractionState" : "manual"
     },
@@ -10051,9 +10048,6 @@
     },
     "The app forgot its sign-in on this Mac, but couldn’t confirm that %@ ended the approval." : {
       "extractionState" : "manual"
-    },
-    "The app forgot the previous server’s sign-in on this Mac, but couldn’t confirm that %@ ended the approval." : {
-
     },
     "The app holds %lld of the owner’s %lld permissions." : {
 
