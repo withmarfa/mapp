@@ -19,7 +19,7 @@ import Testing
         try Data("Waiting to upload".utf8).write(to: file)
         let upload = try await copy.blobs.put(file: file)
         let queued = try await copy.queue.all()
-        let files = MarfaDownloads(copy: copy)
+        let files = MarfaDownloads(copy: copy, keptFolder: directory.appending(path: "Kept"))
         try await files.removeDownloadedFiles()
         #expect(try await files.read().budget == .keepAll)
         #expect(try await copy.queue.all() == queued)
@@ -38,12 +38,12 @@ import Testing
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let store = directory.appending(path: "copy.sqlite")
         let first = try await WorkingCopy.open(store: store)
-        let files = MarfaDownloads(copy: first)
+        let files = MarfaDownloads(copy: first, keptFolder: directory.appending(path: "Kept"))
         #expect(try await files.read().budget == .automatic)
         try await files.setBudget(.bytes(12345))
         await first.close()
         let reopened = try await WorkingCopy.open(store: store)
-        let again = MarfaDownloads(copy: reopened)
+        let again = MarfaDownloads(copy: reopened, keptFolder: directory.appending(path: "Kept"))
         #expect(try await again.read().budget == .bytes(12345))
         try await again.setBudget(.automatic)
         #expect(try await again.read().budget == .automatic)
@@ -57,7 +57,7 @@ import Testing
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let store = directory.appending(path: "copy.sqlite")
         let copy = try await WorkingCopy.open(store: store, fileBudget: budget.marfa)
-        try await MarfaDownloads(copy: copy).removeDownloadedFiles()
+        try await MarfaDownloads(copy: copy, keptFolder: directory.appending(path: "Kept")).removeDownloadedFiles()
         #expect(try await copy.blobs.cache().setting == budget.marfa)
         await copy.close()
         let reopened = try await WorkingCopy.open(store: store)
@@ -71,6 +71,6 @@ import Testing
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let copy = try await WorkingCopy.open(store: directory.appending(path: "copy.sqlite"))
         await copy.close()
-        await #expect(throws: SourceFailure.self) { try await MarfaDownloads(copy: copy).removeDownloadedFiles() }
+        await #expect(throws: SourceFailure.self) { try await MarfaDownloads(copy: copy, keptFolder: directory.appending(path: "Kept")).removeDownloadedFiles() }
     }
 }

@@ -395,6 +395,7 @@ final class FakeItemLibrary: ItemLibrary {
     private(set) var createdTags: [ItemID: [String]] = [:]
     /// The library a draft names, which a test sets to tell two apart.
     var serverKey = "fake"
+    let pictures = WebPictures.kept(for: "Fake")
 
     func createItem(
         as id: ItemID, typeID: String, title: String, body: String, properties: [String: PropertyValue], tags: [String],

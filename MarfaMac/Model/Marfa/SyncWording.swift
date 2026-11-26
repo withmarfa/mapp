@@ -295,8 +295,9 @@ nonisolated enum Words {
         String(localized: "Changes Are Waiting")
     }
 
-    static func changesWait(_ count: Int, address: String) -> String {
-        String(localized: "\(count) changes for \(address) are kept on this Mac. They’re sent when you switch back to it.")
+    /// `name` is the Marfa left, or its address until it has given a name.
+    static func changesWait(at name: String) -> String {
+        String(localized: "Changes you made in \(name) are kept on this Mac. They’re sent when you switch back to it.")
     }
 
     /// The copy could not be opened or made, for a reason the package did not name.

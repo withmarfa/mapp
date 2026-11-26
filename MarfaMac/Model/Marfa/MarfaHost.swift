@@ -369,8 +369,9 @@ import os
         case code(shown: @MainActor @Sendable (CodeSignIn) -> Void)
     }
 
-    /// Signs in to the server at `address`, keeping the sign-in once the copy opens. Connecting while connected
-    /// changes the address, or only signs in again where the address is the same.
+    /// Signs in to the server at `address`, keeping the sign-in once the copy opens, or uses the one the address
+    /// already holds. Connecting while connected changes the address, or only signs in again where the address is the
+    /// same.
     func connect(address: String, via method: SignInMethod) async throws(Problem) {
         let connection = try typed(address)
         if let current = self.connection {
@@ -382,19 +383,19 @@ import os
         await dropPendingSignIn()
         guard await handOverEdits() else { throw .unavailable(message: String(localized: "Finish editing the current item before changing libraries.")) }
         let instance = await identify(connection)
-        try await signIn(to: connection, via: method)
+        let made = try await signInUnlessHeld(to: connection, via: method)
         let earlier: MarfaCopies.Record
         do {
             earlier = try place(connection, in: await plannedFolder(for: connection, instance: instance), instance: instance)
         } catch {
-            await endSignIn(of: connection)
+            if made { await endSignIn(of: connection) }
             throw error
         }
         do {
             try await open(connection)
         } catch {
             restorePlacement(earlier)
-            await endSignIn(of: connection)
+            if made { await endSignIn(of: connection) }
             standing = .disconnected
             throw error
         }
@@ -510,7 +511,9 @@ import os
 
     /// Moves to another server's library. Another address is another copy, so writes waiting in this one need
     /// the person's `choice`, asked for again when more arrive while the new copy opens. The new copy is opened
-    /// before this one is left, so a failure leaves things as they were.
+    /// before this one is left, so a failure leaves things as they were. The Marfa left keeps its sign-in, and its copy
+    /// unless the person discards it, so coming back opens it with no browser and sends what waits in it. A sign-in the
+    /// new address already holds is used, and a step that stops ends only a sign-in it made.
     func changeAddress(to address: String, via method: SignInMethod, choice: DisconnectChoice? = nil) async throws(Problem) {
         let connection = try typed(address)
         guard let old = self.connection else { return try await connect(address: address, via: method) }
@@ -529,7 +532,8 @@ import os
         let current = source
         let fresh: Bool
         do throws(Problem) {
-            agreed = try agreedLoss(choice, of: old)
+            // A switch removes the copy it leaves only where the person chose to discard it.
+            agreed = if case .discardCopy = choice { try agreedLoss(choice, of: old) } else { nil }
             if current != nil { guard await handOverEdits() else { throw Problem.unavailable(message: String(localized: "Finish editing the current item before changing libraries.")) } }
             if let current, choice == nil {
                 let unsent = await current.unsentWrites()
@@ -543,22 +547,18 @@ import os
             if let kept { await endSignIn(of: kept) }
             throw error
         }
-        if let kept, kept.sameServer(as: connection), await holdsSignIn(for: connection) {
-            // The person has answered the question put after this sign-in, so it is used and not made again.
-        } else {
-            if let kept { await endSignIn(of: kept) }
-            try await signIn(to: connection, via: method)
-        }
+        let made = try await signInFor(connection, via: method, kept: kept)
         // The sign-in can take minutes, and so can the question after it. Writes made meanwhile are asked about,
-        // with the approval kept for the answer, rather than refused when the copy closes and the approval revoked.
+        // with an approval made for this step kept for the answer, rather than refused when the copy closes.
         if let current, choice != .keepCopy {
             guard await handOverEdits() else {
-                await endSignIn(of: connection)
+                if made { await endSignIn(of: connection) }
                 throw .unavailable(message: String(localized: "Finish editing the current item before changing libraries."))
             }
             let unsent = await current.unsentWrites()
             if !Self.covers(choice, unsent) {
-                pendingSignIn = connection
+                // One held before the step is the person's, and the answer finds it held, so nothing is kept for it.
+                if made { pendingSignIn = connection }
                 throw .changesWaiting(unsent)
             }
         }
@@ -567,7 +567,7 @@ import os
         do {
             earlier = try place(connection, in: folder, instance: instance)
         } catch {
-            await endSignIn(of: connection)
+            if made { await endSignIn(of: connection) }
             throw error
         }
         do {
@@ -575,57 +575,78 @@ import os
             opened = try await Self.open(connection, signIns: signIns, location: location, with: opener)
         } catch {
             restorePlacement(earlier)
-            await endSignIn(of: connection)
+            if made { await endSignIn(of: connection) }
             throw error
         }
+        var lateWrites = false
         if let current {
             // Marked before the copy closes, so a quit while it closes never sends what the person discarded.
             let marked = markBeforeLeaving(old, agreed: agreed, choice: choice, forgettingAddress: false)
             do {
-                try await close(current, for: choice)
+                if choice == nil {
+                    lateWrites = try await closeKeeping(current)
+                } else {
+                    try await close(current, for: choice)
+                }
             } catch {
                 if let marked { restoreAfterRefusal(old, marked, rememberingAddress: false) }
-                // The move is abandoned, so the copy and the sign-in made for it go too.
+                // The move is abandoned, so the copy and any sign-in made for it go too.
                 await opened.close()
-                await endSignIn(of: connection)
+                if made { await endSignIn(of: connection) }
                 if fresh { _ = await removeCopy(connection, agreed: Agreed(ids: [])) }
                 restorePlacement(earlier)
                 throw error
             }
         }
-        // The new copy is shown before the old one's sign-in and copy are removed, so the windows go from one library
-        // to the other and never show the connect page between them.
+        // The new copy is shown before the old one is removed, so the windows go from one library to the other and
+        // never show the connect page between them.
+        let leftName = instanceName(for: old) ?? old.address.absoluteString
         await recordCopy(of: connection, from: opened)
         remember(connection)
         attach(opened, for: connection)
+        if lateWrites { notices.tell(Words.changesWaitTitle, Words.changesWait(at: leftName)) }
+        guard let agreed else { return }
+        let leftFolder = location.directory(for: old).lastPathComponent
         forgetName(of: old)
-        // The old sign-in is ended only here: a same-origin address returned above as Sign In Again, so the package's
-        // origin-keyed sign-in is never one the new connection shares.
-        if let problem = await finishLeaving(old, agreed: agreed) { throw problem }
+        await cleaner(leftFolder)
+        if let problem = await finishLeaving(old, agreed: agreed, signingOut: false) { throw problem }
+    }
+
+    /// Closes the copy left by a switch the person was asked nothing about, keeping it. True where writes reached it
+    /// after the last count, which stay in it for the person's return.
+    private func closeKeeping(_ source: any ItemSource) async throws(Problem) -> Bool {
+        guard await handOverEdits() else { throw .unavailable(message: String(localized: "Finish editing the current item before changing libraries.")) }
+        guard case .waiting = await source.close(agreeing: UnsentChanges(ids: [])) else { return false }
+        await source.close()
+        return true
+    }
+
+    /// Uses the approval kept for the person's answer to a question this switch asked, or else the sign-in the
+    /// address holds, or else signs in. True where the sign-in is this switch's own, which a step that stops ends.
+    private func signInFor(_ connection: MarfaConnection, via method: SignInMethod, kept: MarfaConnection?) async throws(Problem) -> Bool {
+        if let kept, kept.sameServer(as: connection), await holdsSignIn(for: connection) { return true }
+        if let kept { await endSignIn(of: kept) }
+        return try await signInUnlessHeld(to: connection, via: method)
     }
 
     /// Moves to the same Marfa at another address: its copy is closed with nothing lost, since it is the copy the new
-    /// address opens, and opened again with the new address's own sign-in. A failure opens it again as it was.
+    /// address opens, and opened again with the new address's own sign-in, which may be one it already holds. A
+    /// failure opens it again as it was.
     private func moveCopy(
         from old: MarfaConnection, to connection: MarfaConnection, in folder: String, instance: String?,
         via method: SignInMethod, kept: MarfaConnection?
     ) async throws(Problem) {
-        if let kept, kept.sameServer(as: connection), await holdsSignIn(for: connection) {
-            // The person has answered the question put after this sign-in, so it is used and not made again.
-        } else {
-            if let kept { await endSignIn(of: kept) }
-            try await signIn(to: connection, via: method)
-        }
+        let made = try await signInFor(connection, via: method, kept: kept)
         let current = source
         if current != nil, !(await handOverEdits()) {
-            await endSignIn(of: connection)
+            if made { await endSignIn(of: connection) }
             throw .unavailable(message: String(localized: "Finish editing the current item before changing libraries."))
         }
         let earlier: MarfaCopies.Record
         do {
             earlier = try place(connection, in: folder, instance: instance)
         } catch {
-            await endSignIn(of: connection)
+            if made { await endSignIn(of: connection) }
             throw error
         }
         if let current {
@@ -637,11 +658,12 @@ import os
             try await open(connection)
         } catch {
             restorePlacement(earlier)
-            await endSignIn(of: connection)
+            if made { await endSignIn(of: connection) }
             try? await open(old)
             throw error
         }
         remember(connection)
+        // The copy now opens only at the new address, so the old address's sign-in would outlive any disconnect.
         if let problem = await finishLeaving(old, agreed: nil) { throw problem }
     }
 
@@ -705,6 +727,14 @@ import os
         if signedIn.replacedApprovalStands {
             notices.tell(Words.replacedApprovalTitle, Words.replacedApproval(address: connection.address.absoluteString))
         }
+    }
+
+    /// Uses the sign-in the Keychain holds for `connection`'s origin, or signs in as the person chose. True where this
+    /// made it, since only a sign-in a step made is ended when the step stops: one held before is the person's.
+    private func signInUnlessHeld(to connection: MarfaConnection, via method: SignInMethod) async throws(Problem) -> Bool {
+        if await holdsSignIn(for: connection) { return false }
+        try await signIn(to: connection, via: method)
+        return true
     }
 
     /// Whether the Keychain holds a sign-in for `connection` that can be used, read where the main actor never waits.
@@ -857,7 +887,7 @@ import os
             source: source, notices: notices, history: historian(connection, signIns), typeIcons: iconKeeper(connection, signIns),
             typeSchemas: schemaKeeper(connection, signIns),
             config: configurer(connection, signIns), sourceNames: sourceNamer(connection, signIns),
-            links: linkReader(connection, signIns),
+            links: linkReader(connection, signIns), pictures: .kept(for: location.directory(for: connection).lastPathComponent),
             // Each return to the server may find it renamed. A library the host has left may still be told once more.
             cameOnline: { [weak self] in
                 guard let self, self.connection == connection else { return }

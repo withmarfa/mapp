@@ -56,6 +56,8 @@ protocol ItemLibrary: AnyObject, Observable {
     /// as an item typed and not yet added, waits for it and goes to no other, even a server that later takes its
     /// address. Empty until the copy has read its instance, and where there is no server.
     var serverKey: String { get }
+    /// What fetches and keeps the pictures at web addresses its items show, in a cache of this library's own.
+    var pictures: WebPictures { get }
     func item(_ id: ItemID) -> Item?
     /// The instance id of the Marfa the library's copy holds, as its `GET /` names it, which an item's `marfa://` link
     /// is checked against; nil until the copy has read it. Reads only the copy.

@@ -5,8 +5,8 @@ import Synchronization
 /// The pictures fetched for items, kept on this Mac so a picture shows again without a request or a question.
 ///
 /// They live in the system's caches folder, in a folder of the app's own named for the bundle identifier, so a Debug and
-/// a Release build never share them and the system may clear them. Each picture is in a folder named for a hash of
-/// its address. When the pictures together pass `limit`, the least recently used go first.
+/// a Release build never share them and the system may clear them, with a folder for each library's copy
+/// (`folder(for:)`). Each picture is in a folder named for a hash of its address. When the pictures together pass `limit`, the least recently used go first.
 actor PictureCache {
     /// The most the cache holds, in bytes.
     nonisolated static let standardLimit = 200 << 20
@@ -35,7 +35,7 @@ actor PictureCache {
     nonisolated let hooks = TestHooks()
     #endif
 
-    init(folder: URL = PictureCache.standardFolder, limit: Int = PictureCache.standardLimit) {
+    init(folder: URL, limit: Int = PictureCache.standardLimit) {
         self.folder = folder
         self.limit = limit
     }
@@ -126,9 +126,9 @@ actor PictureCache {
         }
     }
 
-    /// Removes every picture, as when the library is disconnected, so pictures fetched for its items don't outlast it.
+    /// Removes every picture in `folder`, as when its library is disconnected, so pictures fetched for its items don't outlast it.
     /// A fetch still on its way is not stored when it ends (`generation`).
-    @concurrent static func removeAll(in folder: URL = standardFolder) async {
+    @concurrent static func removeAll(in folder: URL) async {
         emptied.withLock { emptied in
             emptied[folder, default: 0] += 1
             try? FileManager.default.removeItem(at: folder)
