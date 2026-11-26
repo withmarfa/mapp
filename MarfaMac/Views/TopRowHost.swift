@@ -245,7 +245,9 @@ private struct TopRowTableProbe: NSViewRepresentable {
             // The inset style starts its first row a few points into the table, which under column headings reads as air
             // above the first row that no other row has, so the table starts that far higher.
             let rowTop = table.headerView != nil && table.numberOfRows > 0 ? max(0, table.rect(ofRow: 0).minY - table.bounds.minY) : 0
-            let extra = max(0, space.lineHeight + space.restHeight - covered - rowTop)
+            // Negative where the window already covers the title line and no row of views stands under it: the first row
+            // would otherwise stay `rowTop` below the headings, so the scroll view's inset gives that much back.
+            let extra = max(-covered, space.lineHeight + space.restHeight - covered - rowTop)
             if scroll.additionalSafeAreaInsets.top != extra {
                 var added = scroll.additionalSafeAreaInsets
                 added.top = extra
