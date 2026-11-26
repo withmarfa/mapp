@@ -354,6 +354,99 @@ import Testing
         #expect(TypeLooks(defaults: bench.defaults).choices(for: key)[TypeID("core.note")]?.date == .edited, "nor takes the Marfa's")
     }
 
+    /// An earlier name holds looks its store cannot read, which the store sets aside as it starts, before the move
+    /// sees them. Each launch keeps the looks out of the sync until the copy says which Marfa it holds; then the
+    /// Marfa's rows that name held stay, the other name's own look moves, the stored bytes are kept in the file, and
+    /// two syncs later the Marfa and this Mac hold the same while a choice of another setting still syncs.
+    @Test(arguments: [true, false])
+    func whatAStoreSetsAsideAtLaunchKeepsTheMarfasRows(wholeEntry: Bool) async throws {
+        let bench = HostBench()
+        try FileManager.default.createDirectory(at: bench.location.directory(for: bare), withIntermediateDirectories: true)
+        let bareLooks = wholeEntry ? #""broken""# : #"{"core.note":{"date":7},"core.task":{"date":"edited"}}"#
+        let original = Data(#"{"\#(bareKey)":\#(bareLooks),"\#(portKey)":{"core.event":{"date":"created"}}}"#.utf8)
+        bench.defaults.set(original, forKey: TypeLooks.defaultsKey)
+        bench.defaults.set(Data(#"{"\#(portKey)":{"sources":["rss"],"types":[]}}"#.utf8), forKey: SearchLeaveOuts.defaultsKey)
+        bench.defaults.set(bare.address.absoluteString, forKey: MarfaHost.addressKey)
+        bench.signIns.save("k", for: bare.address)
+        let look = { (type: String) in PreferenceUnit.row(.types, setting: "look", key: type) }
+        let search = PreferenceUnit.member(.search, SearchLeaveOuts.defaultsKey)
+        // What the bare spelling synced last, which only it held.
+        let synced: PreferenceUnits = [look("core.note"): #"{"date":"created"}"#, look("core.task"): #"{"date":"edited"}"#]
+        let copy = FakePreferencesCopy()
+        await copy.set(PreferencesReadiness(filled: true, holdsType: true, tablesWhole: true, instance: "instance-x"))
+        let item = await copy.add(synced)
+        var record = PreferencesSync.Record()
+        record.marfas["instance-x"] = .init(item: item, base: synced)
+        record.last = "instance-x"
+        record.save(bench.defaults)
+
+        // Two launches before the copy says its Marfa: the store sets the looks aside once, and they stay out of the sync.
+        for _ in 0..<2 {
+            let libraries = libraries(bench)
+            #expect(bench.defaults.array(forKey: TypeLooks.setAsideKey)?.count == 1)
+            #expect(libraries.librarySettings.unsettled[libraries.libraryKey]?.contains(TypeLooks.defaultsKey) == true)
+        }
+
+        bench.servers.instances.withLock { $0 = [bare: "instance-x"] }
+        let key = "marfa:instance-x"
+        let expected: [TypeID: LookDate?] = [TypeID("core.note"): .created, TypeID("core.task"): .edited, TypeID("core.event"): .created]
+        for launch in 0..<2 {
+            let libraries = libraries(bench)
+            await libraries.launch()
+            #expect(libraries.libraryKey == key)
+            #expect(libraries.librarySettings.unsettled.isEmpty, "launch \(launch)")
+            let sync = PreferencesSync(
+                defaults: bench.defaults, domain: bench.suite, enabled: true, coalescing: .milliseconds(50), restorePoints: points,
+                unsettled: { libraries.librarySettings.unsettled[$0] ?? [] }) {}
+            sync.attach(copy, library: key, name: { nil })
+            await sync.flush()
+            #expect(sync.standing == .syncing)
+            let held = await copy.unitsHeld(item)
+            for (unit, value) in synced { #expect(held[unit] == value, "launch \(launch): \(unit)") }
+            #expect(held[look("core.event")] == #"{"date":"created"}"#, "launch \(launch)")
+            #expect(held[search] == #"{"sources":["rss"],"types":[]}"#, "launch \(launch)")
+            let choices = TypeLooks(defaults: bench.defaults).choices(for: key)
+            #expect(choices.mapValues(\.date) == expected, "launch \(launch)")
+            #expect(storedLibraries(bench, TypeLooks.defaultsKey) == [key])
+            if launch == 1 {
+                libraries.searchLeaveOuts.update(key) { $0.sources = ["github"] }
+                await sync.flush()
+                #expect(await copy.unitsHeld(item)[search] == #"{"sources":["github"],"types":[]}"#)
+            }
+            sync.detach()
+        }
+        #expect(bench.defaults.array(forKey: TypeLooks.setAsideKey)?.count == 1)
+
+        let files = try FileManager.default.contentsOfDirectory(at: aside, includingPropertiesForKeys: nil)
+        #expect(files.count == 1)
+        let file = try #require(files.first)
+        let object = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any])
+        let unreadable = try #require(object["unreadable"] as? [[String: Any]])
+        #expect(unreadable.count == 1)
+        #expect(unreadable.first?["library"] as? String == bareKey)
+        #expect(unreadable.first?["setting"] as? String == TypeLooks.defaultsKey)
+        #expect((unreadable.first?["stored"] as? String).flatMap { Data(base64Encoded: $0) } == original)
+    }
+
+    /// A removal later than the other name's value wins even where it took the last part its name held, so the name
+    /// holds nothing any more.
+    @Test func aRemovalOfANamesLastPartStillWins() throws {
+        let bench = HostBench()
+        try FileManager.default.createDirectory(at: bench.location.directory(for: bare), withIntermediateDirectories: true)
+        let looks = #"{"\#(bareKey)":{"core.note":{"date":"created"}},"\#(portKey)":{"core.note":{"date":"edited"}}}"#
+        bench.defaults.set(Data(looks.utf8), forKey: TypeLooks.defaultsKey)
+        let host = bench.host()
+        host.bindOrigin(of: bare)
+        let folder = bench.location.directory(for: bare).lastPathComponent
+        try bench.location.copies.change { $0.instances[folder] = "instance-x" }
+        let settings = LibrarySettings(defaults: bench.defaults, aside: aside, lastOpen: portKey)
+        TypeLooks(defaults: bench.defaults).restore(TypeID("core.note"), in: bareKey)
+        #expect(storedLibraries(bench, TypeLooks.defaultsKey) == [portKey])
+        try settings.settle(rename: { host.currentLibraryKey(forStored: $0) })
+        #expect(TypeLooks(defaults: bench.defaults).choices(for: "marfa:instance-x")[TypeID("core.note")] == nil)
+        #expect(storedLibraries(bench, TypeLooks.defaultsKey).isEmpty)
+    }
+
     // MARK: Removals
 
     private func writeLook(_ bench: HostBench, _ library: String, _ type: String, _ date: String?) throws {
