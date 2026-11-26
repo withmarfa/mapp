@@ -43,7 +43,7 @@ struct SettingsControlTests {
             try sendKey("\u{1b}", code: 53, in: window)
             window.makeFirstResponder(nil)
         case .submit:
-            try sendKey("\r", code: 36, in: window)
+            try sendKey("\r", code: 36, in: window, directlyTo: editor)
         case .blur:
             window.makeFirstResponder(nil)
         }
@@ -71,11 +71,11 @@ struct SettingsControlTests {
         #expect(await eventually(within: .seconds(3)) { !model.isSearching && model.hasResults })
     }
 
-    private func sendKey(_ characters: String, code: UInt16, in window: NSWindow) throws {
+    private func sendKey(_ characters: String, code: UInt16, in window: NSWindow, directlyTo editor: NSTextView? = nil) throws {
         let event = try #require(NSEvent.keyEvent(
             with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber,
             context: nil, characters: characters, charactersIgnoringModifiers: characters, isARepeat: false, keyCode: code))
-        NSApp.sendEvent(event)
+        if let editor { editor.keyDown(with: event) } else { NSApp.sendEvent(event) }
     }
 
     private func clickClear(in field: NSSearchField) throws {
@@ -115,10 +115,14 @@ struct SettingsControlTests {
     private func host(_ content: some View) -> NSWindow {
         let app = AXUIElementCreateApplication(getpid())
         AXUIElementSetAttributeValue(app, "AXManualAccessibility" as CFString, NSNumber(value: true))
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 900, height: 800), styleMask: [.titled], backing: .buffered, defer: false)
+        let window = BackgroundWindow(contentRect: NSRect(x: 0, y: 0, width: 900, height: 800), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = NSHostingView(rootView: content)
         return window
+    }
+
+    private final class BackgroundWindow: NSWindow {
+        override var isKeyWindow: Bool { true }
     }
 
     private func press(in window: NSWindow, matching value: String, attribute: String) async throws {

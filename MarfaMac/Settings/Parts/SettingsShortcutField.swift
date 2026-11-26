@@ -128,8 +128,7 @@ struct SettingsShortcutSearch: View {
             if byKeys {
                 SettingsSearchField(
                     prompt: String(localized: "Press a Shortcut"),
-                    text: Binding { pressed ?? "" } set: { if $0.isEmpty { clearPressed() } },
-                    identifier: "ShortcutSearch")
+                    text: .constant(pressed ?? ""), identifier: "ShortcutSearch", onClear: clearPressed)
             } else {
                 SettingsSearchField(prompt: String(localized: "Search Shortcuts"), text: $text, identifier: "ShortcutSearch")
             }
