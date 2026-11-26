@@ -70,7 +70,7 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 
 - **The table and the list nest items under a listed parent** (`ItemNesting`). A parent starts closed. The table's "1 of 3" is Marfa's count of finished sub-items.
 - **A child whose parent is unlisted or in another group stands at the top,** as does a cycle's first item. An item stands once.
-- **A page counts drawn rows,** not a closed parent's. A chosen sub-item opens its parents.
+- **A page counts drawn rows,** not a closed parent's. In the table, a chosen sub-item opens its parents.
 - **A sub-item does not drag.**
 
 ## The View panel

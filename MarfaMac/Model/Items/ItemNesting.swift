@@ -133,10 +133,4 @@ nonisolated struct ItemNesting: Equatable, Sendable {
         }
         return found
     }
-
-    /// Where `id` is drawn, counting from the first item drawn, with `expanded` open. Nil where it is not drawn.
-    func position(of id: ItemID, expanded: Set<ItemID>) -> Int? {
-        guard isShown(id, expanded: expanded) else { return nil }
-        return drawn(expanded: expanded).places.firstIndex { $0.id == id }
-    }
 }

@@ -50,8 +50,6 @@ struct ItemNestingTests {
         #expect(Self.drawn(nesting, open: ["c"]) == ["p"], "an open child under a closed parent stays hidden")
         #expect(nesting.drawnCount(expanded: [Self.id("c")]) == 1)
         #expect(Self.drawn(nesting, open: ["p", "c"]) == ["p", "-c", "--g"])
-        #expect(nesting.position(of: Self.id("g"), expanded: [Self.id("p"), Self.id("c")]) == 2)
-        #expect(nesting.position(of: Self.id("g"), expanded: [Self.id("p")]) == nil)
     }
 
     @Test func drawingStopsAtTheLimitAndStillCountsEveryRow() {
