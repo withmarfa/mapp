@@ -161,7 +161,7 @@ final class Browser {
     }
 
     private func fieldsKey(in library: any ItemLibrary) -> (key: FieldsKey, items: [Item]?) {
-        let listed = isSearching || isViewPlace ? items(in: library) : nil
+        let listed = isSearching || isViewPlace ? requestPlaceItems(in: library) : nil
         let key = FieldsKey(
             library: ObjectIdentifier(library), membership: library.membershipRevision, place: shown, listing: listing,
             ids: listed?.map(\.id))
