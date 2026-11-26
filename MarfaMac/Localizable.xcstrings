@@ -8702,7 +8702,7 @@
     "Run requested" : {
 
     },
-    "Run “marfa apps list” with the command line signed in to %@ as the owner. Use the approval date to identify the earlier “Marfa for Mac” approval. If you can identify it, run “marfa apps revoke <id>” with that entry’s ID." : {
+    "Run “marfa apps list” with the command line signed in to %@ as the owner. Use the app name and approval date to identify this Mac’s earlier approval. If you can identify it, run “marfa apps revoke <id>” with that entry’s ID." : {
 
     },
     "Running" : {
@@ -11314,7 +11314,7 @@
     "To a folder you choose." : {
 
     },
-    "To end it, run “marfa apps list” with the command line signed in to %@ as the owner, find the “Marfa for Mac” entry, then run “marfa apps revoke <id>”." : {
+    "Run “marfa apps list” with the command line signed in to %@ as the owner. Identify this Mac’s Marfa for Mac approval by its name and approval date. If you can identify it, run “marfa apps revoke <id>” with that entry’s ID." : {
 
     },
     "To keep what you wrote, copy it before you discard this change." : {

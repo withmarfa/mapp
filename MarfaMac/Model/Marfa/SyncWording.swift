@@ -228,7 +228,7 @@ nonisolated enum Words {
     /// How the owner ends an approval the server at `address` may still hold: only they can, with the command line
     /// signed in to that address.
     private static func endApproval(at address: String) -> String {
-        String(localized: "To end it, run “marfa apps list” with the command line signed in to \(address) as the owner, find the “Marfa for Mac” entry, then run “marfa apps revoke <id>”.")
+        String(localized: "Run “marfa apps list” with the command line signed in to \(address) as the owner. Identify this Mac’s Marfa for Mac approval by its name and approval date. If you can identify it, run “marfa apps revoke <id>” with that entry’s ID.")
     }
 
     /// A sign-in that replaced another on the same server, where the app could not confirm the older approval ended.
@@ -237,7 +237,7 @@ nonisolated enum Words {
     }
 
     static func replacedApproval(address: String) -> String {
-        String(localized: "The app couldn’t confirm that \(address) ended its earlier approval.") + " " + String(localized: "Run “marfa apps list” with the command line signed in to \(address) as the owner. Use the approval date to identify the earlier “Marfa for Mac” approval. If you can identify it, run “marfa apps revoke <id>” with that entry’s ID.")
+        String(localized: "The app couldn’t confirm that \(address) ended its earlier approval.") + " " + String(localized: "Run “marfa apps list” with the command line signed in to \(address) as the owner. Use the app name and approval date to identify this Mac’s earlier approval. If you can identify it, run “marfa apps revoke <id>” with that entry’s ID.")
     }
 
     /// What the app is no longer allowed to do after a sign-in the owner approved with fewer permissions than it held.
