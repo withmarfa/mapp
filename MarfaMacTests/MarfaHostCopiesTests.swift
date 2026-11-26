@@ -129,6 +129,34 @@ import Testing
         #expect(try Data(contentsOf: damaged) == Data("not a store".utf8))
     }
 
+    @Test func aCopyThatCannotBeReadNowIsNotTakenForTheInstanceTheServerClaims() async throws {
+        let bench = HostBench()
+        let folder = bench.location.directory(for: bare)
+        let store = try await makeCopy(bench, in: folder, unsent: 1)
+        let holder = try await WorkingCopy.open(store: store)
+        bench.servers.instances.withLock { $0 = [bare: "instance-y"] }
+        let host = bench.host()
+        try await host.connect(address: bare.address.absoluteString, key: "k")
+        await holder.close()
+        #expect(bench.location.copies.instance(ofFolder: folder.lastPathComponent) == nil)
+        #expect(try await unsent(store) == 1)
+    }
+
+    @Test func anotherSpellingsCopyOfAnotherInstanceIsNotSentToThisOne() async throws {
+        let bench = HostBench()
+        let mine = bench.location.directory(for: bare)
+        _ = try await makeCopy(bench, in: mine, unsent: 0)
+        let otherFolder = Self.folder(of: withPort)
+        let otherStore = try await makeCopy(bench, in: bench.location.directory(named: otherFolder), unsent: 1)
+        try bench.location.copies.change {
+            $0.instances[mine.lastPathComponent] = "instance-y"
+            $0.instances[otherFolder] = "instance-x"
+        }
+        let host = bench.host()
+        #expect(host.otherCopies(of: bare).isEmpty)
+        #expect(try await unsent(otherStore) == 1)
+    }
+
     @Test func aMarkUnderOneSpellingIsTheMarkOfTheOther() async throws {
         let bench = HostBench()
         _ = try await makeCopy(bench, in: bench.location.directory(for: bare), unsent: 0)

@@ -27,14 +27,16 @@ extension MarfaHost {
         return location.newDirectory(for: connection, instance: instance).lastPathComponent
     }
 
-    /// Records that `connection` opens `folder`, which holds `instance` where that is known, and gives back the
-    /// record as it was, so a step that does not finish puts it back.
+    /// Records that `connection` opens `folder`, and gives back the record as it was, so a step that does not finish
+    /// puts it back. Only a new folder takes the instance the server said: one already there is known by what its
+    /// copy says.
     func place(_ connection: MarfaConnection, in folder: String, instance: String?) throws(Problem) -> MarfaCopies.Record {
         let earlier = location.copies.current
+        let isNew = !FileManager.default.fileExists(atPath: location.directory(named: folder).path)
         do {
             try location.copies.change { record in
                 record.origins[MarfaCopies.origin(of: connection)] = folder
-                if let instance, record.instances[folder] == nil { record.instances[folder] = instance }
+                if let instance, isNew, record.instances[folder] == nil { record.instances[folder] = instance }
             }
         } catch {
             throw .unavailable(message: Words.copyCouldNotBeOpened)
@@ -95,8 +97,13 @@ extension MarfaHost {
     func otherCopies(of connection: MarfaConnection) -> [String] {
         let primary = location.directory(for: connection).lastPathComponent
         let present = Set(location.folders())
-        var others = location.otherSpellings(of: connection)
-        if let instance = location.copies.instance(ofFolder: primary) {
+        let instance = location.copies.instance(ofFolder: primary)
+        // A spelling's copy known to hold another instance is that instance's, never sent to this one.
+        var others = location.otherSpellings(of: connection).filter { folder in
+            guard let instance, let held = location.copies.instance(ofFolder: folder) else { return true }
+            return held == instance
+        }
+        if let instance {
             others += location.copies.folders(holding: instance).filter { $0 != primary && present.contains($0) }
         }
         let discardedFolders = Set(discarded.keys.compactMap { try? MarfaConnection(address: $0, completing: false) }
