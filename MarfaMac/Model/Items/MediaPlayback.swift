@@ -158,8 +158,10 @@ nonisolated enum FileMedia {
         }
     }
 
+    /// Where the file is: where the latest move is going, or where the last tick found it. The player is never asked
+    /// directly, because its answer can wait on the audio system and the page would wait with it.
     private func currentPosition() -> Double {
-        pendingTarget ?? clamped(player.currentTime().seconds)
+        pendingTarget ?? position
     }
 
     /// Ends a drag at `time`, which the player lands on exactly.
@@ -213,8 +215,8 @@ nonisolated enum FileMedia {
     // MARK: Watching the player
 
     private func observe() {
-        timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.25, preferredTimescale: 600), queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.tick() }
+        timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.25, preferredTimescale: 600), queue: .main) { [weak self] time in
+            MainActor.assumeIsolated { self?.tick(at: time.seconds) }
         }
         guard let current = player.currentItem else { return }
         let center = NotificationCenter.default
@@ -228,7 +230,7 @@ nonisolated enum FileMedia {
         ]
     }
 
-    private func tick() {
+    private func tick(at time: Double) {
         guard state == .ready, !isLeft else { return }
         let stillPlaying = player.timeControlStatus != .paused
         // Something outside the page paused the player: the place is kept as a pause keeps it.
@@ -237,7 +239,7 @@ nonisolated enum FileMedia {
             position = currentPosition()
             keepPlace()
         } else if isPlaying, !isScrubbing, pendingTarget == nil {
-            position = clamped(player.currentTime().seconds)
+            position = clamped(time)
         }
     }
 
