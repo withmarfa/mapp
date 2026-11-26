@@ -42,7 +42,9 @@ enum ItemTableFit {
             let content = widest > 0 ? widest + (chrome + room) * scale : 0
             // A column with no words to measure (links, tags) keeps its style's width.
             let ideal = content > 0 ? min(max(content, headed, limits.min), limits.max) : limits.ideal
-            fitted[column.id] = Width(minimum: min(limits.min, ideal), ideal: ideal)
+            // Words that fit under the style's widest keep their whole width: the column is hidden before they are cut.
+            let whole = content > 0 && content <= limits.max
+            fitted[column.id] = Width(minimum: whole ? ideal : min(limits.min, ideal), ideal: ideal)
         }
         return fitted
     }
