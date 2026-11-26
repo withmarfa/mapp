@@ -173,22 +173,22 @@ nonisolated extension ViewLayouts: RawRepresentable {
 nonisolated extension ViewLayouts {
     /// The stored settings; text that cannot be read is no settings, never a failure.
     static func stored(in defaults: UserDefaults = .standard) -> ViewLayouts {
-        defaults.string(forKey: key).flatMap(ViewLayouts.init(rawValue:)) ?? ViewLayouts()
+        StoredBytes.text(defaults, key).flatMap(ViewLayouts.init(rawValue:)) ?? ViewLayouts()
     }
 
     /// Changes the stored settings. A view's settings this version cannot read stay as stored until the change replaces
     /// them, and are set aside first; stored text that is no object of views is set aside whole.
     static func update(in defaults: UserDefaults = .standard, _ change: (inout ViewLayouts) -> Void) {
-        let whole = defaults.string(forKey: key).flatMap { !$0.isEmpty && ViewLayouts(rawValue: $0) == nil ? $0 : nil }
+        let whole = StoredBytes.text(defaults, key).flatMap { !$0.isEmpty && ViewLayouts(rawValue: $0) == nil ? $0 : nil }
         var value = stored(in: defaults)
         let unread = value.unread
         change(&value)
-        let replaced = unread.filter { value.unread[$0.key] == nil }.sorted { $0.key < $1.key }.map(\.value.text)
-        if !replaced.isEmpty { defaults.set((defaults.stringArray(forKey: setAsideKey) ?? []) + replaced, forKey: setAsideKey) }
-        defaults.set(value.rawValue, forKey: key)
+        let replaced = unread.filter { value.unread[$0.key] == nil }.sorted { $0.key < $1.key }
+        for (name, entry) in replaced { StoredBytes.setAside(StoredJSON.object([name: entry]).text, under: setAsideKey, in: defaults) }
+        if defaults.object(forKey: key) as? String != value.rawValue { defaults.set(value.rawValue, forKey: key) }
         if let whole {
             PreferenceHolds.setAside(
-                whole, under: setAsideKey, of: key, keys: PreferenceHolds.keys(of: Data(whole.utf8)), kept: Array(value.views.keys),
+                whole, under: setAsideKey, of: key, keys: nil, kept: Array(value.views.keys),
                 in: defaults)
         }
     }

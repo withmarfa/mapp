@@ -438,7 +438,7 @@ import Testing
     }
 
     /// A setting a store dropped is tried again by another app build, which may read it.
-    @Test func aDroppedSettingIsTriedAgainByAnotherBuild() async throws {
+    @Test func aValueNoStoreHereReadsIsSetAsideOnceAcrossBuilds() async throws {
         let look = PreferenceUnit.row(.types, setting: "look", key: "core.note")
         let copy = FakePreferencesCopy()
         let item = await copy.add([look: #""later""#])
@@ -446,13 +446,15 @@ import Testing
         let first = PreferencesSync(defaults: defaults, domain: suite, enabled: true, coalescing: .milliseconds(50), build: "1") { looks.reload() }
         first.attach(copy, library: "marfa:https://one", name: { nil })
         await first.flush()
-        #expect(defaults.data(forKey: TypeLooks.defaultsKey).map { String(decoding: $0, as: UTF8.self) }?.contains("later") != true)
+        #expect(defaults.data(forKey: TypeLooks.defaultsKey) == nil)
+        #expect(setAside(TypeLooks.setAsideKey) == [#"{"core.note":"later"}"#])
         first.detach()
-        // A build whose store reads the value keeps it.
         let second = PreferencesSync(defaults: defaults, domain: suite, enabled: true, coalescing: .milliseconds(50), build: "2") {}
         second.attach(copy, library: "marfa:https://one", name: { nil })
         await second.flush()
-        #expect(defaults.data(forKey: TypeLooks.defaultsKey).map { String(decoding: $0, as: UTF8.self) }?.contains("later") == true)
+        await second.flush()
+        #expect(defaults.data(forKey: TypeLooks.defaultsKey) == nil)
+        #expect(setAside(TypeLooks.setAsideKey) == [#"{"core.note":"later"}"#])
         #expect(await copy.unitsHeld(item)[look] == #""later""#)
     }
 
@@ -491,11 +493,11 @@ import Testing
         let sync = await sync(copy)
         let item = try #require(await copy.activeIDs.first)
         await copy.change(item, [theme: #""light""#])
-        await copy.whileReading { [defaults] in defaults.set("green", forKey: AppearanceKey.theme) }
+        await copy.whileReading { [defaults] in defaults.set("system", forKey: AppearanceKey.theme) }
         await sync.flush()
         await sync.flush()
-        #expect(defaults.string(forKey: AppearanceKey.theme) == "green")
-        #expect(await copy.unitsHeld(item)[theme] == #""green""#)
+        #expect(defaults.string(forKey: AppearanceKey.theme) == "system")
+        #expect(await copy.unitsHeld(item)[theme] == #""system""#)
     }
 
     /// An item that went without passing through the bin, as a discarded offline create or a restored server leaves
@@ -805,7 +807,7 @@ import Testing
         // A value that is no map of shortcuts is set aside whole at the next launch.
         defaults.set(Data("[1]".utf8), forKey: ShortcutBindings.defaultsKey)
         _ = ShortcutBindings(defaults: defaults)
-        #expect(setAside(ShortcutBindings.setAsideKey) == ["[1]"])
+        #expect(setAside(ShortcutBindings.setAsideKey).last == "[1]")
         await sync.flush()
         await sync.flush()
         #expect(await copy.unitsHeld(item)[shortcut] == later)
@@ -863,13 +865,9 @@ import Testing
     @Test func resetBeforeTheNextStepKeepsARowAStoreSetAsideSinceTheLast() async throws {
         let library = density(.library)
         let favorites = density(.favorites)
-        defaults.set(
-            Data(#"{"\#(PlaceView.favorites.storageKey)":"spacious","\#(PlaceView.library.storageKey)":"compact"}"#.utf8),
-            forKey: PlaceDensities.key)
         let copy = FakePreferencesCopy()
+        let item = await copy.add([library: #""compact""#, favorites: #""spacious""#])
         let sync = await sync(copy)
-        let item = try #require(await copy.activeIDs.first)
-        #expect(await copy.unitsHeld(item)[favorites] == #""spacious""#)
         PlaceDensities.update(in: defaults) { $0.set(.standard, for: .library) }
         MacSettings.reset(in: defaults)
         sync.replaced(PreferencesMap.synced)
@@ -1009,7 +1007,7 @@ import Testing
         await sync.flush()
         #expect(await copy.unitsHeld(item)[gone] == nil)
         #expect(await copy.unitsHeld(item)[later] == #""a shape a later version of the app writes""#)
-        #expect(setAside(ViewLayouts.setAsideKey).isEmpty)
+        #expect(setAside(ViewLayouts.setAsideKey) == [#"{"view-later":"a shape a later version of the app writes"}"#])
     }
 }
 

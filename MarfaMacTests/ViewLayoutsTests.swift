@@ -52,7 +52,7 @@ struct ViewLayoutsTests {
         #expect(ViewLayouts.stored(in: defaults).settings(for: ItemID("view-a"))?.layout == .board)
         #expect(defaults.stringArray(forKey: ViewLayouts.setAsideKey) == nil)
         ViewLayouts.update(in: defaults) { $0.set(ViewMacSettings(layout: .list), for: ItemID("view-later")) }
-        #expect(defaults.stringArray(forKey: ViewLayouts.setAsideKey) == [#""a later shape""#])
+        #expect(defaults.stringArray(forKey: ViewLayouts.setAsideKey) == [#"{"view-later":"a later shape"}"#])
         #expect(ViewLayouts.stored(in: defaults).settings(for: ItemID("view-later"))?.layout == .list)
     }
 

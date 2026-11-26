@@ -105,7 +105,7 @@ extension PreferencesSync {
                 }
                 setAside = aside
             }
-            let accepted = mine.values.count(where: setting.accepts)
+            let accepted = mine.count(where: { setting.accepts($0.key, $0.value) })
             result.applied += accepted
             result.skipped += mine.count - accepted
             writes.append((setting, mine, setAside))
@@ -116,12 +116,12 @@ extension PreferencesSync {
         }
         let written = writes.filter { write in PreferencesMap.synced.contains { $0.key == write.setting.key } }
         replaced(written.map(\.setting), except: Dictionary(written.map { write in
-            (write.setting.key, Set(write.units.filter { !write.setting.accepts($0.value) }.keys))
+            (write.setting.key, Set(write.units.filter { !write.setting.accepts($0.key, $0.value) }.keys))
         }) { first, second in first.union(second) })
         let refused = refusedShortcuts()
         let unregistered = units.count { unit, text in
             guard sections.contains(PreferencesMap.anyAppShortcuts.section), PreferencesMap.anyAppShortcuts.owns(unit),
-                  PreferencesMap.anyAppShortcuts.accepts(text), case .row(_, _, let command) = unit else { return false }
+                  PreferencesMap.anyAppShortcuts.accepts(unit, text), case .row(_, _, let command) = unit else { return false }
             return refused.contains(command)
         }
         result.applied -= unregistered

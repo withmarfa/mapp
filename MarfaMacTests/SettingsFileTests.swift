@@ -34,11 +34,21 @@ import Testing
     /// A value for every setting a file carries, each one its store keeps, and the stores read them.
     private func fillEverySetting(_ libraries: Libraries) {
         let library = libraries.libraryKey
+        // Each member takes a value its store reads: a word for one that names words, else text or a number.
+        let words = [DateFormat(date: .long).rawValue, StartWith.leftOff.rawValue, "system", TypeChipTint.gray.rawValue]
+            + AppTheme.allCases.map(\.rawValue) + HighlightChoice.allCases.map(\.rawValue) + SidebarColor.allCases.map(\.rawValue)
+            + ValuePanelStyle.allCases.map(\.rawValue) + PaletteMaterial.allCases.map(\.rawValue) + LinkLook.allCases.map(\.rawValue)
+            + LineSpacing.allCases.map(\.rawValue) + ParagraphSpacing.allCases.map(\.rawValue) + IndentWith.allCases.map(\.rawValue)
+            + PasteAs.allCases.map(\.rawValue) + EditingMode.allCases.map(\.rawValue) + SourceViewMode.allCases.map(\.rawValue)
+            + Density.allCases.map(\.rawValue) + ItemOpening.allCases.map(\.rawValue) + NewOpens.allCases.map(\.rawValue)
+            + RemotePictureSetting.allCases.map(\.rawValue) + ListScope.allCases.map(\.rawValue) + ItemSort.allCases.map(\.rawValue)
+            + SearchOptions.Order.allCases.map(\.rawValue)
+        let candidates = [#""chosen""#, "true"] + words.compactMap { PreferenceJSON.text($0) }
         for setting in PreferencesMap.inFiles {
             guard case .member(let field) = setting.place else { continue }
-            // A member whose store reads only its own words takes one of them.
-            let value = setting.key == DateFormat.key ? PreferenceJSON.text(DateFormat(date: .long).rawValue) ?? "" : #""chosen""#
-            setting.write([.member(field, setting.key): value], to: defaults, library: library)
+            let unit = PreferenceUnit.member(field, setting.key)
+            let value = candidates.first { setting.accepts(unit, $0) } ?? ""
+            setting.write([unit: value], to: defaults, library: library)
         }
         libraries.shortcuts.set(refresh, for: .refresh)
         #expect(libraries.anyAppShortcuts.set(hotKey, for: .commandPalette) == nil)
@@ -151,13 +161,14 @@ import Testing
         #expect(defaults.array(forKey: TypeLooks.setAsideKey) as? [Data] == [unreadable])
     }
 
-    @Test func textWhereTheStoreKeepsDataIsSetAsideByItsSectionsImport() async throws {
-        let text = #"{"marfa:https://one":{}}"#
-        defaults.set(text, forKey: TypeLooks.defaultsKey)
+    /// A value restored as text where its store keeps data is read as the same value, by the store and the file alike.
+    @Test func textWhereTheStoreKeepsDataIsReadAsTheSameValue() async throws {
         let sync = sync()
-        try await sync.importSettings(SettingsFile(units: [:], build: "", date: .now), sections: [.layouts])
-        #expect(defaults.array(forKey: TypeLooks.setAsideKey) as? [Data] == [Data(text.utf8)])
-        #expect(defaults.object(forKey: TypeLooks.defaultsKey) == nil)
+        defaults.set(#"{"\#(sync.settingsLibrary)":{"core.note":{"date":"created"}}}"#, forKey: TypeLooks.defaultsKey)
+        let look = PreferenceUnit.row(.types, setting: "look", key: "core.note")
+        #expect(sync.settingsFile().units(in: [.layouts])[look] == #"{"date":"created"}"#)
+        #expect(TypeLooks(defaults: defaults).hasChoice(for: TypeID("core.note"), in: sync.settingsLibrary))
+        #expect(defaults.object(forKey: TypeLooks.setAsideKey) == nil)
     }
 
     @Test func anAnyAppShortcutTheSystemRefusesIsCountedAsSkipped() async throws {

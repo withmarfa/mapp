@@ -49,7 +49,7 @@ final class ShortcutBindings {
 
     /// Reads the stored value again, as when another Mac's change has reached the defaults (`PreferencesSync`).
     func reload() {
-        guard let saved = defaults.data(forKey: Self.defaultsKey) else {
+        guard let saved = StoredBytes.read(defaults, Self.defaultsKey) else {
             chosen = [:]
             unread = [:]
             return
@@ -124,7 +124,7 @@ final class ShortcutBindings {
     /// Sets aside the stored shortcut of `command` this version cannot read, which the person's choice replaces.
     private func displace(_ command: String) {
         guard let kept = unread.removeValue(forKey: command) else { return }
-        defaults.set((defaults.array(forKey: Self.setAsideKey) as? [Data] ?? []) + [Data(kept.text.utf8)], forKey: Self.setAsideKey)
+        StoredBytes.setAside(Data(StoredJSON.object([command: kept]).text.utf8), under: Self.setAsideKey, in: defaults)
     }
 
     private func save() {

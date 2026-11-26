@@ -24,14 +24,14 @@ final class SearchLeaveOuts {
 
     /// Reads the stored value again, as when another Mac's change has reached the defaults (`PreferencesSync`).
     func reload() {
-        guard let saved = defaults.data(forKey: Self.defaultsKey) else {
+        guard let saved = StoredBytes.read(defaults, Self.defaultsKey) else {
             held = [:]
             return
         }
         let (readable, unreadable) = Self.read(saved)
         held = readable
         guard let unreadable else { return }
-        defaults.set((defaults.array(forKey: Self.setAsideKey) as? [Data] ?? []) + [unreadable], forKey: Self.setAsideKey)
+        StoredBytes.setAside(unreadable, under: Self.setAsideKey, in: defaults)
         save()
         PreferenceHolds.recordByLibrary(unreadable, of: Self.defaultsKey, from: saved, in: defaults)
     }

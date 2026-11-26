@@ -299,8 +299,8 @@ final class PreferencesSync {
         for waiter in done { waiter.resume() }
     }
 
-    /// This Mac's settings as a step read them, the settings it cannot read, and the members whose value their reader
-    /// rejects (`SyncedSetting.Reader`), which are left out of `units`.
+    /// This Mac's settings as a step read them, the settings it cannot read, and the units whose value their store cannot
+    /// read (`PreferencesMap.reads`), which are left out of `units`.
     typealias Local = (units: PreferenceUnits, frozen: [SyncedSetting], rejected: Set<PreferenceUnit>)
 
     /// The person changed a setting a step was about to write, after the step read it: the step stops and runs again.
@@ -370,7 +370,7 @@ final class PreferencesSync {
             let marked = (Record.read(defaults).winning ?? [:]).filter { key, units in read[key] != units }
             record.winning = marked.isEmpty ? nil : marked
             record.save(defaults)
-            took(holds)
+            took(holds.filter { hold in !local.frozen.contains { $0.key == hold.setting } })
             answered = answered.filter { id, _ in record.marfas.values.contains { $0.awaiting[id] != nil } }
             // What an earlier copy on another Mac kept for a place reaches this Mac only through the Marfa.
             EarlierPlace.readIn(in: defaults, synced: record.marfas[instance]?.base ?? [:])
@@ -400,14 +400,10 @@ final class PreferencesSync {
                 continue
             }
             switch setting.read(defaults, library: library) {
-            case .units(var held):
-                if let reader = setting.reader {
-                    let refused = held.filter { !reader.reads($0.value) }
-                    if !refused.isEmpty { reader.setAside(defaults) }
-                    rejected.formUnion(refused.keys)
-                    held = held.filter { refused[$0.key] == nil }
-                }
-                units.merge(held) { first, _ in first }
+            case .units(let held):
+                let refused = held.filter { !PreferencesMap.reads($0.key, $0.value) }
+                rejected.formUnion(refused.keys)
+                units.merge(held.filter { refused[$0.key] == nil }) { first, _ in first }
             case .unreadable: frozen.append(setting)
             }
         }
@@ -538,8 +534,11 @@ final class PreferencesSync {
                 adopted.frozen[unit] = nil
             }
         }
-        // A member value its reader rejects is no change of the person's: the Marfa's value, or none, is written over it.
+        // A value this Mac's store cannot read is no change of the person's, so it is never sent.
         for unit in local.rejected where !switched { mine[unit] = base[unit] }
+        // Nor is the absence of a row whose value this Mac cannot read, which it could never have held: only the person's
+        // own value here replaces it.
+        for (unit, held) in base where !switched && mine[unit] == nil && !PreferencesMap.reads(unit, held) { mine[unit] = held }
         // This Mac holds nothing of a row no setting here owns, which is no deletion of the person's.
         for unit in Set(remote.keys).union(base.keys) where !PreferencesMap.synced.contains(where: { $0.owns(unit) }) {
             mine[unit] = base[unit]
@@ -561,21 +560,27 @@ final class PreferencesSync {
         var before = PreferencesMerge.base(base, reclaiming: lost, local: mine, remote: seen)
         let won = switched ? [] : PreferencesMap.synced.filter { winning[$0.key] != nil }
         if !won.isEmpty {
-            // What Reset, Import or Restore wrote wins, but never over a value this Mac holds back or does not read.
+            // What Reset, Import or Restore wrote wins only over values this Mac reads, the Marfa's and what it last held,
+            // and never where this Mac holds its value back.
             let heldBack = Set(adopted.frozen.keys).union(local.rejected)
+            let known = { (unit: PreferenceUnit) in
+                [seen[unit], base[unit]].allSatisfy { value in value.map { PreferencesMap.reads(unit, $0) } ?? true }
+            }
             before = PreferencesMerge.base(before, winning: { unit in
-                !heldBack.contains(unit) && won.contains { $0.owns(unit) && winning[$0.key]?.contains(unit) == false }
+                !heldBack.contains(unit) && known(unit) && won.contains { $0.owns(unit) && winning[$0.key]?.contains(unit) == false }
             }, local: mine, remote: seen)
         }
         var outcome = PreferencesMerge.reconcile(
             local: mine, remote: seen, base: before, frozen: { unit in unreadable.contains { $0.owns(unit) } })
         outcome.toLocal.formUnion(retrying)
         if !switched {
-            outcome.toLocal.formUnion(local.rejected.filter { unit in outcome.merged[unit].map { PreferencesMap.reads(unit, $0) } ?? true })
+            // The Marfa's readable value replaces one this Mac cannot read, which is set aside first (`SyncedSetting.write`).
+            outcome.toLocal.formUnion(local.rejected.filter { unit in outcome.merged[unit].map { PreferencesMap.reads(unit, $0) } == true })
         }
-        // What this Mac lacks of such a setting comes here.
+        // What this Mac lacks of such a setting comes here, but for a row it holds back or holds and cannot read.
         outcome.toLocal.formUnion(outcome.merged.keys.filter { unit in
-            local.units[unit] == nil && isKeptAbsent(unit) && !unreadable.contains { $0.owns(unit) }
+            local.units[unit] == nil && isKeptAbsent(unit) && !unreadable.contains { $0.owns(unit) } && adopted.frozen[unit] == nil
+                && !local.rejected.contains(unit)
         })
         if switched {
             outcome.toLocal.formUnion(Set(local.units.keys).union(outcome.merged.keys).filter { unit in !unreadable.contains { $0.owns(unit) } })
@@ -615,8 +620,9 @@ final class PreferencesSync {
         }
     }
 
-    /// Clears the holds a finished step read, now that its record keeps what they named. A hold of every library's entry
-    /// of a setting kept for each server stays for the libraries not yet followed.
+    /// Clears the holds a finished step used, now that its record keeps what they named: only those of a setting the step
+    /// read, so a hold waits while its setting is unsettled or unreadable here. A hold of every library's entry of a
+    /// setting kept for each server stays for the libraries not yet followed, and names each library once.
     private func took(_ holds: [PreferenceHold]) {
         guard !holds.isEmpty else { return }
         var left = PreferenceHolds.read(defaults)
@@ -625,7 +631,7 @@ final class PreferencesSync {
             let perServer = PreferencesMap.synced.first { $0.key == hold.setting }?.isPerServer ?? false
             if !perServer || hold.library == library {
                 left.remove(at: index)
-            } else if hold.library == nil {
+            } else if hold.library == nil, !(hold.taken ?? []).contains(library) {
                 left[index].taken = (hold.taken ?? []) + [library]
             }
         }

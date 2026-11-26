@@ -31,14 +31,14 @@ final class TypeLooks {
 
     /// Reads the stored value again, as when another Mac's change has reached the defaults (`PreferencesSync`).
     func reload() {
-        guard let saved = defaults.data(forKey: Self.defaultsKey) else {
+        guard let saved = StoredBytes.read(defaults, Self.defaultsKey) else {
             chosen = [:]
             return
         }
         let (readable, unreadable) = Self.read(saved)
         chosen = readable
         guard let unreadable else { return }
-        defaults.set((defaults.array(forKey: Self.setAsideKey) as? [Data] ?? []) + [unreadable], forKey: Self.setAsideKey)
+        StoredBytes.setAside(unreadable, under: Self.setAsideKey, in: defaults)
         // Only what was set aside leaves the stored value, and the sync keeps it in the Marfa.
         if var libraries = Self.stored(saved) {
             for (library, entry) in Self.stored(unreadable) ?? [:] {
@@ -211,7 +211,7 @@ final class TypeLooks {
     /// Writes `library`'s choices over what is stored, so the other servers' looks and a later version's members of a
     /// look are kept as they were. A look with no choice left keeps those members.
     private func save(_ library: String) {
-        var all = defaults.data(forKey: Self.defaultsKey).flatMap(Self.stored) ?? [:]
+        var all = StoredBytes.read(defaults, Self.defaultsKey).flatMap(Self.stored) ?? [:]
         var stored = all[library] as? [String: Any] ?? [:]
         let types = chosen[library] ?? [:]
         for (type, value) in stored where types[type] == nil && Self.choice(value) != nil {

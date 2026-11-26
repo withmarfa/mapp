@@ -239,8 +239,8 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
 /// through the Marfa (`PreferencesMap`) as a row of the app's own settings, since no record of Marfa models a place's default. A place's default cannot be renamed or
 /// deleted; Reset View empties it.
 ///
-/// Stored text that cannot be read, or one entry that cannot, is moved aside under a key of its own, kept and never
-/// removed; the other places' entries go on working.
+/// An entry this version cannot read stays as stored beside the others; stored data that is no map is moved aside under
+/// a key of its own, kept and never removed.
 nonisolated struct PlaceDefaults: Equatable, Sendable {
     static let key = "placeDefaults"
     /// Each entry is stored data that could not be read, in the order it was found.
@@ -267,58 +267,38 @@ nonisolated struct PlaceDefaults: Equatable, Sendable {
 
     // MARK: Keeping
 
-    private static func encode(_ value: some Encodable) throws -> Data {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = .sortedKeys
-        return try encoder.encode(value)
+    /// A stored entry as a place's defaults, or nil where this version cannot read it.
+    private static func decode(_ entry: Any) -> PlaceDefault? {
+        guard JSONSerialization.isValidJSONObject(entry), let raw = try? JSONSerialization.data(withJSONObject: entry) else { return nil }
+        return try? JSONDecoder().decode(PlaceDefault.self, from: raw)
     }
 
-    /// The stored defaults, and the stored data that could not be read: the whole of it where it is not an object of
-    /// places, otherwise an object of the entries that could not be read, so one bad entry leaves the other places' alone.
-    private static func read(_ data: Data) -> (readable: PlaceDefaults, unreadable: Data?) {
-        guard let entries = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return (PlaceDefaults(), data) }
-        var readable: [String: PlaceDefault] = [:]
-        var unreadable: [String: Any] = [:]
-        for (place, entry) in entries {
-            guard JSONSerialization.isValidJSONObject(entry),
-                  let raw = try? JSONSerialization.data(withJSONObject: entry),
-                  let value = try? JSONDecoder().decode(PlaceDefault.self, from: raw)
-            else {
-                unreadable[place] = entry
-                continue
-            }
-            readable[place] = value
-        }
-        let aside = unreadable.isEmpty ? nil : try? JSONSerialization.data(withJSONObject: unreadable, options: .sortedKeys)
-        return (PlaceDefaults(readable), aside)
+    private static func encode(_ value: PlaceDefault) -> Any {
+        (try? JSONEncoder().encode(value)).flatMap { try? JSONSerialization.jsonObject(with: $0) } ?? [String: Any]()
+    }
+
+    private static func load(_ defaults: UserDefaults) -> StoredMap<PlaceDefault> {
+        StoredMap(defaults, key: key, decode: decode)
     }
 
     /// The stored defaults; data that cannot be read is no defaults, never a failure.
     static func stored(in defaults: UserDefaults = .standard) -> PlaceDefaults {
-        defaults.data(forKey: key).map { read($0).readable } ?? PlaceDefaults()
+        PlaceDefaults(load(defaults).readable)
     }
 
     /// The From the Favorites view lists, as stored in `data`: the person's choice, else the Library, whatever Settings
     /// says (`Browser.listing(in:)`).
     static func favoritesScope(in data: Data?) -> ListScope {
-        data.flatMap { read($0).readable.default(for: .favorites)?.scope } ?? .library
+        let entries = data.flatMap { (try? JSONSerialization.jsonObject(with: $0)) as? [String: Any] }
+        return entries?[PlaceView.favorites.storageKey].flatMap(decode)?.scope ?? .library
     }
 
-    /// Changes the stored defaults. What this write would replace and cannot read is kept aside first.
+    /// Changes the stored defaults. A place's entry this version cannot read stays as stored until the change sets that
+    /// place; stored data that is no map is set aside whole first (`StoredMap`).
     static func update(in defaults: UserDefaults = .standard, _ change: (inout PlaceDefaults) -> Void) {
-        var value = PlaceDefaults()
-        var unreadable: Data?
-        if let saved = defaults.data(forKey: key) { (value, unreadable) = read(saved) }
+        let stored = load(defaults)
+        var value = PlaceDefaults(stored.readable)
         change(&value)
-        if value.places.isEmpty {
-            defaults.removeObject(forKey: key)
-        } else if let data = try? encode(value.places) {
-            defaults.set(data, forKey: key)
-        }
-        if let unreadable {
-            PreferenceHolds.setAside(
-                unreadable, under: setAsideKey, of: key, keys: PreferenceHolds.keys(of: unreadable), kept: Array(value.places.keys),
-                in: defaults)
-        }
+        stored.save(value.places, encode: encode, to: key, setAside: setAsideKey, in: defaults)
     }
 }

@@ -86,53 +86,23 @@ nonisolated struct ViewOrders: Equatable, Sendable {
 
     // MARK: Keeping
 
-    /// The stored entries of `Value`, and the stored data that could not be read: the whole of it where it is not an
-    /// object, otherwise an object of the entries that are not of `Value`.
-    private static func read<Value>(_ data: Data, as _: Value.Type) -> (readable: [String: Value], unreadable: Data?) {
-        guard let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return ([:], data) }
-        var readable: [String: Value] = [:]
-        var unreadable: [String: Any] = [:]
-        for (entry, value) in object {
-            if let value = value as? Value { readable[entry] = value } else { unreadable[entry] = value }
-        }
-        let aside = unreadable.isEmpty ? nil : try? JSONSerialization.data(withJSONObject: unreadable, options: .sortedKeys)
-        return (readable, aside)
+    private static func load<Value>(_ key: String, as _: Value.Type, in defaults: UserDefaults) -> StoredMap<Value> {
+        StoredMap(defaults, key: key) { $0 as? Value }
     }
 
     /// The stored orders and hidden views; data that cannot be read is none, never a failure.
     static func stored(in defaults: UserDefaults = .standard) -> ViewOrders {
-        ViewOrders(
-            defaults.data(forKey: key).map { read($0, as: [String].self).readable } ?? [:],
-            hidden: defaults.data(forKey: hiddenKey).map { read($0, as: Bool.self).readable } ?? [:])
+        ViewOrders(load(key, as: [String].self, in: defaults).readable, hidden: load(hiddenKey, as: Bool.self, in: defaults).readable)
     }
 
-    /// Changes the stored orders and hidden views, writing only the setting that changed. What a write would replace
-    /// and cannot read is kept aside first.
+    /// Changes the stored orders and hidden views, writing only what changed. An entry this version cannot read stays as
+    /// stored until the change sets it; stored data that is no map is set aside whole first (`StoredMap`).
     static func update(in defaults: UserDefaults = .standard, _ change: (inout ViewOrders) -> Void) {
-        var setAside: [String: (data: Data, list: String)] = [:]
-        func load<Value>(_ key: String, as type: Value.Type, setAside aside: String) -> [String: Value] {
-            guard let saved = defaults.data(forKey: key) else { return [:] }
-            let (readable, unreadable) = read(saved, as: type)
-            if let unreadable { setAside[key] = (unreadable, aside) }
-            return readable
-        }
-        func save(_ entries: [String: Any], to key: String) {
-            if entries.isEmpty {
-                defaults.removeObject(forKey: key)
-            } else if let data = try? JSONSerialization.data(withJSONObject: entries, options: .sortedKeys) {
-                defaults.set(data, forKey: key)
-            }
-        }
-        let before = ViewOrders(
-            load(key, as: [String].self, setAside: setAsideKey), hidden: load(hiddenKey, as: Bool.self, setAside: hiddenSetAsideKey))
-        var value = before
+        let orders = load(key, as: [String].self, in: defaults)
+        let hidden = load(hiddenKey, as: Bool.self, in: defaults)
+        var value = ViewOrders(orders.readable, hidden: hidden.readable)
         change(&value)
-        if value.places != before.places || setAside[key] != nil { save(value.places, to: key) }
-        if value.hiddenViews != before.hiddenViews || setAside[hiddenKey] != nil { save(value.hiddenViews, to: hiddenKey) }
-        for (setting, aside) in setAside {
-            let kept = setting == key ? Array(value.places.keys) : Array(value.hiddenViews.keys)
-            PreferenceHolds.setAside(
-                aside.data, under: aside.list, of: setting, keys: PreferenceHolds.keys(of: aside.data), kept: kept, in: defaults)
-        }
+        orders.save(value.places, encode: { $0 }, to: key, setAside: setAsideKey, in: defaults)
+        hidden.save(value.hiddenViews, encode: { $0 }, to: hiddenKey, setAside: hiddenSetAsideKey, in: defaults)
     }
 }

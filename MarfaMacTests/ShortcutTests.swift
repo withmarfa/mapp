@@ -154,7 +154,7 @@ struct ShortcutTests {
         #expect(text.contains(#""newItem":"a later shape""#))
         #expect(store.array(forKey: ShortcutBindings.setAsideKey) == nil)
         bindings.set(key("j", [.command, .option]), for: .newItem)
-        #expect(store.array(forKey: ShortcutBindings.setAsideKey) as? [Data] == [Data(#""a later shape""#.utf8)])
+        #expect(store.array(forKey: ShortcutBindings.setAsideKey) as? [Data] == [Data(#"{"newItem":"a later shape"}"#.utf8)])
         #expect(ShortcutBindings(defaults: store).shortcut(for: .newItem) == key("j", [.command, .option]))
     }
 

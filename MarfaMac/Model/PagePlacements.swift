@@ -242,22 +242,22 @@ nonisolated extension PagePlacements: RawRepresentable {
 
 nonisolated extension PagePlacements {
     static func stored(in defaults: UserDefaults = .standard) -> PagePlacements {
-        defaults.string(forKey: key).flatMap(PagePlacements.init(rawValue:)) ?? PagePlacements()
+        StoredBytes.text(defaults, key).flatMap(PagePlacements.init(rawValue:)) ?? PagePlacements()
     }
 
     /// Changes the stored choices. A type's choice this version cannot read stays as stored until the change replaces it,
     /// and is set aside first; stored text that is no object of types is set aside whole.
     static func update(in defaults: UserDefaults = .standard, _ change: (inout PagePlacements) -> Void) {
-        let whole = defaults.string(forKey: key).flatMap { PagePlacements(rawValue: $0) == nil ? $0 : nil }
+        let whole = StoredBytes.text(defaults, key).flatMap { PagePlacements(rawValue: $0) == nil ? $0 : nil }
         var value = stored(in: defaults)
         let unread = value.unread
         change(&value)
-        let replaced = unread.filter { value.unread[$0.key] == nil }.sorted { $0.key < $1.key }.map(\.value.text)
-        if !replaced.isEmpty { defaults.set((defaults.stringArray(forKey: setAsideKey) ?? []) + replaced, forKey: setAsideKey) }
-        defaults.set(value.rawValue, forKey: key)
+        let replaced = unread.filter { value.unread[$0.key] == nil }.sorted { $0.key < $1.key }
+        for (name, entry) in replaced { StoredBytes.setAside(StoredJSON.object([name: entry]).text, under: setAsideKey, in: defaults) }
+        if defaults.object(forKey: key) as? String != value.rawValue { defaults.set(value.rawValue, forKey: key) }
         if let whole {
             PreferenceHolds.setAside(
-                whole, under: setAsideKey, of: key, keys: PreferenceHolds.keys(of: Data(whole.utf8)), kept: Array(value.choices.keys),
+                whole, under: setAsideKey, of: key, keys: nil, kept: Array(value.choices.keys),
                 in: defaults)
         }
     }

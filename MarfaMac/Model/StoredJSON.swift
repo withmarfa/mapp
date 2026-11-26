@@ -110,3 +110,82 @@ nonisolated enum StoredEntries {
         return data
     }
 }
+
+/// What a store or the sync reads of a stored setting: the bytes of its JSON, whether the defaults keep it as data or as
+/// text, so both read the same value the same way. Another kind of value gives bytes that no store reads, so it is set aside
+/// whole rather than written over.
+nonisolated enum StoredBytes {
+    static func read(_ defaults: UserDefaults, _ key: String) -> Data? {
+        guard let stored = defaults.object(forKey: key) else { return nil }
+        if let data = stored as? Data { return data }
+        if let text = stored as? String { return Data(text.utf8) }
+        return Data(String(describing: stored).utf8)
+    }
+
+    static func text(_ defaults: UserDefaults, _ key: String) -> String? {
+        read(defaults, key).map { String(decoding: $0, as: UTF8.self) }
+    }
+
+    /// Appends `entry` to the set-aside list `list`, unless it already holds it.
+    static func setAside(_ entry: Data, under list: String, in defaults: UserDefaults) {
+        let kept = defaults.array(forKey: list) as? [Data] ?? []
+        guard !kept.contains(entry) else { return }
+        defaults.set(kept + [entry], forKey: list)
+    }
+
+    /// Appends `entry` to the set-aside list of text `list`, unless it already holds it.
+    static func setAside(_ entry: String, under list: String, in defaults: UserDefaults) {
+        let kept = defaults.stringArray(forKey: list) ?? []
+        guard !kept.contains(entry) else { return }
+        defaults.set(kept + [entry], forKey: list)
+    }
+
+    /// `entry` as the object `{name: entry}`, so a copy set aside says which entry it was.
+    static func keyed(_ name: String, _ entry: Any) -> Data {
+        (try? JSONSerialization.data(withJSONObject: [name: entry], options: [.sortedKeys, .fragmentsAllowed])) ?? Data()
+    }
+}
+
+/// A synced map a store keeps as data, read entry by entry. An entry this version cannot read stays as stored until the
+/// person's change replaces it, and is then set aside with its key. A stored value that is no map is set aside whole, and
+/// the rows the store's write no longer holds are held in the Marfa (`PreferenceHolds`).
+nonisolated struct StoredMap<Value> {
+    private(set) var readable: [String: Value] = [:]
+    private var unread: [String: Any] = [:]
+    /// The stored bytes, where they are no map.
+    private var whole: Data?
+
+    init(_ defaults: UserDefaults, key: String, decode: (Any) -> Value?) {
+        guard let bytes = StoredBytes.read(defaults, key) else { return }
+        guard let entries = (try? JSONSerialization.jsonObject(with: bytes)) as? [String: Any] else {
+            whole = bytes
+            return
+        }
+        for (name, entry) in entries {
+            if let value = decode(entry) { readable[name] = value } else { unread[name] = entry }
+        }
+    }
+
+    /// Stores `entries`, the readable ones after the person's change, beside each unread entry they leave alone; writes
+    /// nothing where that is what is stored.
+    func save(_ entries: [String: Value], encode: (Value) -> Any, to key: String, setAside list: String, in defaults: UserDefaults) {
+        var object = entries.mapValues(encode)
+        for (name, entry) in unread.sorted(by: { $0.key < $1.key }) {
+            if object[name] == nil {
+                object[name] = entry
+            } else {
+                StoredBytes.setAside(StoredBytes.keyed(name, entry), under: list, in: defaults)
+            }
+        }
+        if object.isEmpty {
+            if defaults.object(forKey: key) != nil { defaults.removeObject(forKey: key) }
+        } else if let data = try? JSONSerialization.data(withJSONObject: object, options: .sortedKeys),
+                  defaults.object(forKey: key) as? Data != data
+        {
+            defaults.set(data, forKey: key)
+        }
+        if let whole {
+            PreferenceHolds.setAside(whole, under: list, of: key, keys: nil, kept: Array(entries.keys), in: defaults)
+        }
+    }
+}

@@ -21,8 +21,8 @@ nonisolated enum Density: String, Codable, CaseIterable, Identifiable, Hashable,
 /// through the Marfa (`PreferencesMap`). A saved view's density is in
 /// its Mac settings (`ViewMacSettings.density`). A place with no entry follows Settings.
 ///
-/// Stored text that cannot be read, or an entry a later version wrote with a density this one does not know, is moved
-/// aside under a key of its own, kept and never removed; what can be read is kept.
+/// An entry a later version wrote with a density this one does not know stays as stored beside the others; stored data
+/// that cannot be read is moved aside under a key of its own, kept and never removed.
 nonisolated struct PlaceDensities: Equatable, Sendable {
     static let key = "placeDensities"
     /// Each entry is stored data that could not be read, in the order it was found.
@@ -44,44 +44,21 @@ nonisolated struct PlaceDensities: Equatable, Sendable {
 
     // MARK: Keeping
 
-    /// The stored densities, and the stored data that could not be read: the whole of it where it is not an object of words,
-    /// otherwise an object of the entries whose word is not a density.
-    private static func read(_ data: Data) -> (readable: PlaceDensities, unreadable: Data?) {
-        guard let words = try? JSONDecoder().decode([String: String].self, from: data) else { return (PlaceDensities(), data) }
-        var readable: [String: Density] = [:]
-        var unreadable: [String: String] = [:]
-        for (place, word) in words {
-            if let density = Density(rawValue: word) { readable[place] = density } else { unreadable[place] = word }
-        }
-        return (PlaceDensities(readable), unreadable.isEmpty ? nil : try? encode(unreadable))
-    }
-
-    private static func encode(_ value: some Encodable) throws -> Data {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = .sortedKeys
-        return try encoder.encode(value)
+    private static func load(_ defaults: UserDefaults) -> StoredMap<Density> {
+        StoredMap(defaults, key: key) { ($0 as? String).flatMap(Density.init(rawValue:)) }
     }
 
     /// The stored densities; data that cannot be read is no densities, never a failure.
     static func stored(in defaults: UserDefaults = .standard) -> PlaceDensities {
-        defaults.data(forKey: key).map { read($0).readable } ?? PlaceDensities()
+        PlaceDensities(load(defaults).readable)
     }
 
-    /// Changes the stored densities. What this write would replace and cannot read is kept aside first.
+    /// Changes the stored densities. A place's density this version cannot read stays as stored until the change sets
+    /// that place; stored data that is no map is set aside whole first (`StoredMap`).
     static func update(in defaults: UserDefaults = .standard, _ change: (inout PlaceDensities) -> Void) {
-        var value = PlaceDensities()
-        var unreadable: Data?
-        if let saved = defaults.data(forKey: key) { (value, unreadable) = read(saved) }
+        let stored = load(defaults)
+        var value = PlaceDensities(stored.readable)
         change(&value)
-        if value.places.isEmpty {
-            defaults.removeObject(forKey: key)
-        } else if let data = try? encode(value.places.mapValues(\.rawValue)) {
-            defaults.set(data, forKey: key)
-        }
-        if let unreadable {
-            PreferenceHolds.setAside(
-                unreadable, under: setAsideKey, of: key, keys: PreferenceHolds.keys(of: unreadable), kept: Array(value.places.keys),
-                in: defaults)
-        }
+        stored.save(value.places, encode: \.rawValue, to: key, setAside: setAsideKey, in: defaults)
     }
 }

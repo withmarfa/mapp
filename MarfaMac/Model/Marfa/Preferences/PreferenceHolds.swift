@@ -48,14 +48,16 @@ nonisolated enum PreferenceHolds {
     static func record(_ setting: String, library: String? = nil, keys: [String]?, kept: [String] = [], in defaults: UserDefaults) {
         guard keys.map({ !$0.isEmpty }) ?? true else { return }
         let hold = PreferenceHold(setting: setting, library: library, keys: keys?.sorted(), kept: keys == nil ? kept.sorted() : nil)
-        write(read(defaults) + [hold], to: defaults)
+        let holds = read(defaults)
+        guard !holds.contains(hold) else { return }
+        write(holds + [hold], to: defaults)
     }
 
     /// Appends `data` to the set-aside list `list`, and records the hold.
     static func setAside(_ data: Data, under list: String, of setting: String, library: String? = nil, keys: [String]?,
                          kept: [String] = [], in defaults: UserDefaults)
     {
-        defaults.set((defaults.array(forKey: list) as? [Data] ?? []) + [data], forKey: list)
+        StoredBytes.setAside(data, under: list, in: defaults)
         record(setting, library: library, keys: keys, kept: kept, in: defaults)
     }
 
@@ -63,7 +65,7 @@ nonisolated enum PreferenceHolds {
     static func setAside(_ text: String, under list: String, of setting: String, keys: [String]?, kept: [String] = [],
                          in defaults: UserDefaults)
     {
-        defaults.set((defaults.stringArray(forKey: list) ?? []) + [text], forKey: list)
+        StoredBytes.setAside(text, under: list, in: defaults)
         record(setting, keys: keys, kept: kept, in: defaults)
     }
 
