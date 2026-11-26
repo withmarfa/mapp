@@ -38,6 +38,8 @@ struct SettingsControlTests {
         let pattern = "*.sample"
         editor.insertText(pattern, replacementRange: editor.selectedRange())
         #expect(editor.string == pattern)
+        // Let SwiftUI finish its focus update after AppKit installs the field editor.
+        try await Task.sleep(for: .milliseconds(200))
         switch finish {
         case .escape:
             try sendKey("\u{1b}", code: 53, in: window)
