@@ -12,6 +12,8 @@ private actor SliceServer: MarfaRefreshing {
     var refusal: MarfaError?
     private(set) var hydrated: [[String]] = []
     private(set) var declared = 0
+    /// Each step in the order it was asked.
+    private(set) var steps: [String] = []
 
     init(evidence: PreferencesReach.Evidence?, holds: [String] = MarfaSync.slice, refusal: MarfaError? = nil) {
         self.evidence = evidence
@@ -25,6 +27,7 @@ private actor SliceServer: MarfaRefreshing {
 
     func hydrate(types: [String], tier: SliceTier, edgeTypes: [String]) throws -> HydrateReport {
         hydrated.append(types)
+        steps.append("hydrate")
         if types.contains(PreferencesType.id), let refusal { throw refusal }
         holds = types
         return HydrateReport(types: types, tier: tier, edgeTypes: edgeTypes, items: 0, edges: 0, pages: 1, cursor: "done")
@@ -33,6 +36,7 @@ private actor SliceServer: MarfaRefreshing {
     func catchUp() {}
     func fetchKept() -> KeptFetch { KeptFetch(fetched: 0, fetchedBytes: 0, attachments: nil) }
     func declarePreferences() { declared += 1 }
+    func choosePreferencesTables() { steps.append("tables") }
     func preferencesEvidence() -> PreferencesReach.Evidence? { evidence }
 }
 
@@ -64,10 +68,30 @@ private actor SliceServer: MarfaRefreshing {
         #expect(await server.declared == 1)
     }
 
+    /// A table chosen once the copy is whole is filled under the copy's stream, and the core refuses the follow that
+    /// starts meanwhile, which then misses another Mac's changes. A copy that never synced takes the choice before.
+    @Test func theSettingsTablesAreChosenBeforeTheHydrationThatTakesThem() async throws {
+        let server = SliceServer(evidence: .init(typeHeld: true, scopes: [PreferencesType.vendorScope]))
+        try await hydrating(server)
+        #expect(await server.steps == ["tables", "hydrate"])
+
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let copy = try await WorkingCopy.open(store: directory.appending(path: "copy.sqlite"))
+        let refresh = MarfaRefresh(copy: copy)
+        try await refresh.declarePreferences()
+        await refresh.choosePreferencesTables()
+        let chosen = try await copy.tables.held().choices.filter { $0.type == PreferencesType.id }.map(\.table)
+        await copy.close()
+        #expect(Set(chosen) == Set(PreferencesTable.allCases.map(\.rawValue)))
+    }
+
     @Test func aSignInWithoutTheVendorKeepsTheSliceItHad() async throws {
         let server = SliceServer(evidence: .init(typeHeld: true, scopes: ["*:write"]))
         try await hydrating(server)
         #expect(await server.hydrated == [MarfaSync.slice])
+        #expect(await server.steps == ["hydrate"])
     }
 
     @Test func theFirstMacTakesTheTypeWhereItMayRegisterIt() async throws {
