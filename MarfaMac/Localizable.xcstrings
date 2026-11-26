@@ -3462,6 +3462,9 @@
     "Changed the settings" : {
 
     },
+    "Changes Are Waiting" : {
+
+    },
     "Changes Haven’t Been Sent" : {
       "extractionState" : "manual"
     },
@@ -3473,6 +3476,9 @@
     },
     "Changes to “%@” weren’t sent" : {
       "extractionState" : "manual"
+    },
+    "Changes you made in %@ are kept on this Mac. They’re sent when you switch back to it." : {
+
     },
     "Change…" : {
 
@@ -8761,6 +8767,9 @@
     "Run requested" : {
 
     },
+    "Run “marfa apps list” with the command line signed in to %@ as the owner. Identify this Mac’s Marfa for Mac approval by its name and approval date. If you can identify it, run “marfa apps revoke <id>” with that entry’s ID." : {
+
+    },
     "Run “marfa apps list” with the command line signed in to %@ as the owner. Use the app name and approval date to identify this Mac’s earlier approval. If you can identify it, run “marfa apps revoke <id>” with that entry’s ID." : {
 
     },
@@ -9959,13 +9968,13 @@
     "The app couldn’t drop a sign-in it didn’t use, so the sign-in may still be kept on this Mac and the approval may stand at %@." : {
 
     },
+    "The app couldn’t find the server by name. Check the address and your connection, then try again." : {
+
+    },
     "The app couldn’t finish removing them from %@, so you’re still connected. Disconnect anyway and they may stay there." : {
 
     },
     "The app couldn’t finish signing in. Check your connection and try again, or sign in with a code." : {
-
-    },
-    "The app couldn’t find the server by name. Check the address and your connection, then try again." : {
 
     },
     "The app couldn’t get the file from the server. Check your connection, then try again." : {
@@ -10566,9 +10575,6 @@
 
     },
     "The previous server’s copy is still on this Mac. The app removes it before it connects to that server again." : {
-      "extractionState" : "manual"
-    },
-    "The previous server’s sign-in is still in your Keychain, and its copy is still on this Mac. Remove the sign-in in Keychain Access. The app removes the copy before it connects to that server again." : {
       "extractionState" : "manual"
     },
     "The previous server’s sign-in is still in your Keychain. Remove it in Keychain Access." : {
@@ -11389,9 +11395,6 @@
 
     },
     "To a folder you choose." : {
-
-    },
-    "Run “marfa apps list” with the command line signed in to %@ as the owner. Identify this Mac’s Marfa for Mac approval by its name and approval date. If you can identify it, run “marfa apps revoke <id>” with that entry’s ID." : {
 
     },
     "To keep what you wrote, copy it before you discard this change." : {
