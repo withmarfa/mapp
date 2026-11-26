@@ -106,27 +106,41 @@ extension MarfaHost {
         return approvalAt.map { .notRevoked(address: $0) }
     }
 
+    /// The mark of each copy the person discarded but which could not be removed, by the copy's folder.
     var discarded: [String: Agreed] {
         (defaults.dictionary(forKey: Self.discardedKey) ?? [:]).mapValues(Agreed.init(stored:))
     }
 
-    /// The mark of the copy `connection` opens, under whichever address marked it.
+    /// The mark of the copy `connection` opens now.
     func discardMark(for connection: MarfaConnection) -> Agreed? {
-        let folder = location.directory(for: connection)
-        return discarded.first { address, _ in markedFolder(address) == folder }?.value
+        discarded[location.directory(for: connection).lastPathComponent]
     }
 
-    private func markedFolder(_ address: String) -> URL? {
-        (try? MarfaConnection(address: address, completing: false)).map(location.directory(for:))
-    }
-
-    /// Marks the copy `connection` opens, replacing a mark made under any other address for it.
+    /// Marks the copy `connection` opens now. A mark names the copy's folder, never the address, so the address
+    /// opening another Marfa's copy later neither takes the mark nor leaves this copy unmarked.
     func markDiscarded(_ connection: MarfaConnection, agreed: Agreed?) {
         var marks = defaults.dictionary(forKey: Self.discardedKey) ?? [:]
-        let folder = location.directory(for: connection)
-        for address in marks.keys where markedFolder(address) == folder { marks[address] = nil }
-        marks[connection.address.absoluteString] = agreed?.stored
+        marks[location.directory(for: connection).lastPathComponent] = agreed?.stored
         defaults.set(marks, forKey: Self.discardedKey)
+    }
+
+    /// Binds each mark an older build made under an address to the folder that address opens, before anything can
+    /// change which folder that is. Two marks for one folder agree to lose what either listed. A key that is no
+    /// address stays as it is.
+    func bindDiscardMarks() {
+        guard let marks = defaults.dictionary(forKey: Self.discardedKey) else { return }
+        var bound: [String: Any] = [:]
+        for (key, stored) in marks {
+            guard key.contains("://"), let connection = try? MarfaConnection(address: key, completing: false) else {
+                bound[key] = stored
+                continue
+            }
+            let folder = location.directory(for: connection).lastPathComponent
+            let earlier = bound[folder].map(Agreed.init(stored:))?.ids ?? []
+            bound[folder] = Agreed(ids: earlier.union(Agreed(stored: stored).ids)).stored
+        }
+        guard !NSDictionary(dictionary: bound).isEqual(to: marks) else { return }
+        defaults.set(bound, forKey: Self.discardedKey)
     }
 
     /// A copy the person discarded is removed before its address is opened again, or not opened at all.

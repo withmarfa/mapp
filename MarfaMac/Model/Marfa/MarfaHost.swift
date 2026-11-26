@@ -116,7 +116,7 @@ import os
     static let addressKey = "MarfaAddress"
     /// The address of the sign-in kept for a question, so a launch ends one the app quit with.
     private static let pendingSignInKey = "MarfaPendingSignIn"
-    /// The address of each copy the person discarded but which could not be removed, with the ids of the changes
+    /// The folder of each copy the person discarded but which could not be removed, with the ids of the changes
     /// they agreed to lose with it.
     static let discardedKey = "MarfaDiscardedCopies"
     /// The last name each server gave itself, by its copy's folder, so a launch and an offline window show it.
@@ -216,6 +216,7 @@ import os
         self.sourceNamer = sourceNamer
         self.linkReader = linkReader
         instanceNames = defaults.dictionary(forKey: Self.namesKey) as? [String: String] ?? [:]
+        bindDiscardMarks()
     }
 
     /// The name the server at `connection` last gave itself, nil until one has been read.

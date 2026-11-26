@@ -106,8 +106,7 @@ extension MarfaHost {
         if let instance {
             others += location.copies.folders(holding: instance).filter { $0 != primary && present.contains($0) }
         }
-        let discardedFolders = Set(discarded.keys.compactMap { try? MarfaConnection(address: $0, completing: false) }
-            .map { location.directory(for: $0).lastPathComponent })
+        let discardedFolders = Set(discarded.keys)
         var seen = Set<String>()
         return others.filter { !discardedFolders.contains($0) && seen.insert($0).inserted }
     }
