@@ -42,20 +42,24 @@ private struct TopRowOverList: ViewModifier {
         // Except in a list column beside a page: there the traffic lights, the sidebar's button and Back and Forward leave
         // the first line no room for the title, so it, the scope and the views have the row below, which scrolls away. So
         // too at the smallest window over a layout with the page beside it, which leaves the layout no wider than a list.
-        let isCompact = opensPlaces && (isBesidePage || (isSmall && browser.showsBesidePage(opening: browser.itemOpening(settings: opening))))
+        let isCompact = opensPlaces && isBesidePage
+            || TopRowMetrics.collectionLead(browser: browser, settings: opening, opensPlaces: opensPlaces, isSmall: isSmall) == TopRowMetrics.listLead
         let beside = !isCompact && (isAlwaysBeside || browser.isSearchExpanded || browser.isSearching || opensPlaces || isSmall)
         let restHeight = (row.hasViews || isCompact) && !beside
             ? TopRowMetrics.restHeight(scale: InterfaceStyle.scale(for: textSize)) : 0
         content
             .modifier(
-                TopRowFrame(scroll: scroll, restHeight: restHeight, bands: true, signal: signal) { room, isAway in
+                TopRowFrame(
+                    scroll: scroll, restHeight: restHeight, bands: true, signal: signal,
+                    titleLead: { isCompact ? TopRowMetrics.listLead : $0.titleLead(base: isBesidePage ? TopRowMetrics.listLead : TopRowMetrics.lead) }
+                ) { lead, room, isAway in
                     if isCompact {
                         Color.clear
                     } else {
                         TopRowTitleLine(
                             browser: browser, content: row, showsViews: row.hasViews && isAway, opensPlaces: opensPlaces, isSmall: isSmall,
                             isCovered: isBesidePage && browser.isSearchExpanded)
-                            .padding(.leading, room.titleLead(base: isBesidePage ? TopRowMetrics.listLead : TopRowMetrics.lead))
+                            .padding(.leading, lead)
                             .padding(.trailing, room.titleTrail)
                     }
                 } rest: {
@@ -80,14 +84,14 @@ private struct TopRowOverPage: ViewModifier {
 
     func body(content: Content) -> some View {
         content.modifier(
-            TopRowFrame(scroll: nil, restHeight: 0, bands: false, signal: signal, dragClearance: TopRowMetrics.pageLift) { room, _ in
+            TopRowFrame(scroll: nil, restHeight: 0, bands: false, signal: signal, dragClearance: TopRowMetrics.pageLift) { lead, room, _ in
                 HStack(spacing: 0) {
                     if showsScrolledTitle || tools.isFocused, let head = tools.scrolledPageTitle {
                         ScrolledItemTitle(title: head.title, icon: head.icon, showsIcon: true, subtitle: head.subtitle)
                     }
                     Spacer(minLength: 0)
                 }
-                .padding(.leading, room.titleLead())
+                .padding(.leading, lead)
                 .padding(.trailing, room.titleTrail)
             } rest: {
                 EmptyView()

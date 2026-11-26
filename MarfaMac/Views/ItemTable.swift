@@ -13,8 +13,9 @@ struct ItemTable: View {
     let browser: Browser
     let order: ItemOrder
     var pane: FocusState<Browser.Pane?>.Binding
-    /// Where the title stands (`TopRowMetrics.collectionLead`), which the first column starts at.
-    var titleLead = TopRowMetrics.lead
+    /// Where the title stands, past the traffic lights while the sidebar is closed (`TopRowSpace.titleLead`), which the
+    /// first column starts at.
+    @Environment(\.topRowSpace.titleLead) private var titleLead
     /// Each place's column widths, as the person dragged them. The columns shown and their order are the Properties list's.
     @AppStorage(ItemTableColumnLayouts.key) private var storedColumns = Data()
     /// What this Mac keeps for each saved view, whose column widths the table records (`Browser.keepWidths`).

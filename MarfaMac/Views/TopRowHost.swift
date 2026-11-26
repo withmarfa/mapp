@@ -28,6 +28,9 @@ struct TopRowSpace {
     /// How much of the line the column's own top inset does not already cover, which is all of it while the toolbar is
     /// hidden.
     var uncovered: CGFloat = 0
+    /// Where the title stands from the column's edge, past the traffic lights, the sidebar's button and Back and Forward
+    /// where they stand over the column, which a table's first column follows.
+    var titleLead: CGFloat = TopRowMetrics.lead
 }
 
 extension EnvironmentValues {
@@ -60,29 +63,35 @@ struct TopRowFrame<Line: View, Rest: View>: ViewModifier {
     let signal: AnyHashable
     /// How much of the line's lower edge does not move the window, where a page's first line stands under it.
     let dragClearance: CGFloat
-    /// The line, told whether the rows have scrolled past the row of views at rest.
-    let line: (_ room: TopRowRoom, _ isAway: Bool) -> Line
+    /// Where the title stands for the room the toolbar's items take, which the line pads it to and the column reads
+    /// (`TopRowSpace.titleLead`).
+    let titleLead: (TopRowRoom) -> CGFloat
+    /// The line, told where the title stands and whether the rows have scrolled past the row of views at rest.
+    let line: (_ lead: CGFloat, _ room: TopRowRoom, _ isAway: Bool) -> Line
     let rest: Rest
 
     init(
         scroll: TopRowScroll?, restHeight: CGFloat, bands: Bool, signal: AnyHashable, dragClearance: CGFloat = 0,
-        @ViewBuilder line: @escaping (_ room: TopRowRoom, _ isAway: Bool) -> Line, @ViewBuilder rest: () -> Rest
+        titleLead: @escaping (TopRowRoom) -> CGFloat = { $0.titleLead() },
+        @ViewBuilder line: @escaping (_ lead: CGFloat, _ room: TopRowRoom, _ isAway: Bool) -> Line, @ViewBuilder rest: () -> Rest
     ) {
         self.scroll = scroll
         self.restHeight = restHeight
         self.bands = bands
         self.signal = signal
         self.dragClearance = dragClearance
+        self.titleLead = titleLead
         self.line = line
         self.rest = rest()
     }
 
     func body(content: Content) -> some View {
         let lineHeight = max(insetTop, TopRowMetrics.lineHeight)
+        let lead = titleLead(room)
         content
             .environment(
                 \.topRowSpace,
-                TopRowSpace(scroll: scroll, restHeight: restHeight, lineHeight: lineHeight, uncovered: lineHeight - insetTop)
+                TopRowSpace(scroll: scroll, restHeight: restHeight, lineHeight: lineHeight, uncovered: lineHeight - insetTop, titleLead: lead)
             )
             .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.top } action: { insetTop = $0 }
             .background { ToolbarRoomProbe(room: $room, signal: signal) }
@@ -90,7 +99,7 @@ struct TopRowFrame<Line: View, Rest: View>: ViewModifier {
             .overlay(alignment: .top) {
                 TopRowStack(
                     scroll: scroll, restHeight: restHeight, height: lineHeight, bands: bands && showsBackground, dragClearance: dragClearance, room: room,
-                    reveal: reveal, line: line, rest: rest)
+                    reveal: reveal, line: { line(lead, $0, $1) }, rest: rest)
                 .ignoresSafeArea(.container, edges: .top)
             }
     }
