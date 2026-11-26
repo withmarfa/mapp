@@ -16,7 +16,7 @@ paths:
 | --- | --- |
 | The Marfa's own data | Items, types, views and the sign-in's grants. Never an app setting |
 | This app's settings | Settings that follow the person to another Mac, such as New Opens |
-| This Mac only | Widths, last place, recent kinds, tags and parents for New Item, any-app shortcuts, error-report consent, export plans |
+| This Mac only | Widths, last place, playback places, recent kinds, tags and parents for New Item, any-app shortcuts, error-report consent, export plans |
 
 - **A setting has the narrowest home a person would expect**, and one home only. `PreferencesMap` names it, and a test fails for a key it does not place.
 - **To add a setting:** add its key to `MacSettings.keys` and to `PreferencesMap` in the same change. Reset, export, restore points and the sample library then include it.
