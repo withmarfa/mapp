@@ -27,9 +27,7 @@ final class Browser {
             viewPanelPlaceChanged()
         }
     }
-    /// Whether the sidebar's Types block lists every type rather than the first few. The window mounts its split view
-    /// afresh when the place changes shape (list, gallery, index, Settings), which drops the sidebar's own state, so
-    /// this is kept here, where Show More stays open through that.
+    /// Whether the sidebar's Types block lists every type. Kept here so Show More survives a new split view.
     var sidebarShowsAllTypes = false
     /// Whether this window is arranging its sidebar in place. The layout is shared by every window of the library, but
     /// arranging is this window's: Done ends it only here.

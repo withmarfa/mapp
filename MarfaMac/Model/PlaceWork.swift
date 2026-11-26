@@ -9,13 +9,8 @@ nonisolated enum Outrun {
 /// `Browser.boardLanes`, the calendar's and the timeline's placings). The answer for the key last asked is held, and
 /// stands until the next lands, so a layout never shows nothing while it is worked out again.
 ///
-/// One rule decides what lands: a run's answer carries the key it was worked out for, and is held only if that key is
-/// still the one last asked when it lands. One run works at a time: a newer one waits for the run before it, cancelled
-/// or not, to end.
-///
-/// One exception bounds the wait: under a steady stream of changes every answer is outrun before it lands. An answer
-/// that has been turned away `Outrun.limit` times because the library moved on, with nothing landed since, is held as it
-/// is, and the window asks again for the answer that is current.
+/// One run works at a time so edits cannot pile up work. After the library overtakes `Outrun.limit` runs, the next
+/// overtaken answer can land if it still answers the window's choices.
 @MainActor
 final class PlaceWork<Key: Equatable & Sendable, Value: Sendable> {
     /// Whether the first key is the second's ask apart from what the library holds, so that an answer for it is a

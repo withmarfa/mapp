@@ -509,11 +509,9 @@ extension Browser {
         heldTables = kept
     }
 
-    /// Makes the table for `key` off the main actor, from `update`'s table where one is given, which then makes only the rows
-    /// of the items that changed again, and shows it once it is still the one asked for. The main actor only reads the links
-    /// of the rows it makes, and takes the table as it lands. One arrangement works off the main actor at a time: a newer one
-    /// waits for the one before it to end, ended or not, which it does at its next step, so a steady run of edits never piles
-    /// sorts up. Like `PlaceWork`'s runs, it lands only while `key` is still the table asked for.
+    /// Makes the table off the main actor, reusing rows that did not change. A newer arrangement waits for the one
+    /// before it so edits cannot pile up sorts. A first table can land from an earlier revision after the library
+    /// overtakes `Outrun.limit` attempts.
     private func arrange(
         _ key: TableKey, items: [Item], after earlier: (key: TableKey, content: ItemTableContent)?,
         updating update: (content: ItemTableContent, changed: Set<ItemID>)?, in library: any ItemLibrary
