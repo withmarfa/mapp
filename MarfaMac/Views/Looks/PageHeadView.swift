@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// An item's head drawn in SwiftUI from `PageHead`, for a page the editor does not draw, as the editor's page draws it:
@@ -14,6 +15,8 @@ struct PageHeadView<Title: View>: View {
     let statusField: ItemTypeInfo.Field?
     let drafts: DetailsPresentation
     let open: (ItemID) -> Void
+    /// Opens the editor of a row the item can take an edit for, under the view given. Nil leaves every value read only.
+    var edit: ((PropertyRow, NSView) -> Void)?
     @ViewBuilder let title: Title
     @State private var expanded = false
 
@@ -66,8 +69,10 @@ struct PageHeadView<Title: View>: View {
                                     .lineLimit(1)
                             }
                             .frame(width: size * 150 / 13, alignment: .leading)
-                            value(of: row, step: step)
-                                .help(row.wholeValue)
+                            EditableValue(row: row, edit: edit) {
+                                value(of: row, step: step)
+                                    .help(row.wholeValue)
+                            }
                         }
                         .frame(minHeight: size * 32 / 13)
                         .opacity(row.muted ? 0.45 : 1)
@@ -304,5 +309,25 @@ struct PageKicker: View {
             Text(verbatim: kicker.typeName)
         }
         .foregroundStyle(.secondary)
+    }
+}
+
+/// A row's value, which a click on it opens in its editor where the row can take one. The status keeps its own menu, and a
+/// chip that links keeps its link.
+private struct EditableValue<Content: View>: View {
+    let row: PropertyRow
+    let edit: ((PropertyRow, NSView) -> Void)?
+    @ViewBuilder let content: Content
+    @State private var anchor = ValueEditAnchorBox()
+
+    var body: some View {
+        if let edit, row.editable, row.value != .status {
+            content
+                .background(ValueEditAnchor(box: anchor))
+                .contentShape(.rect)
+                .onTapGesture { if let view = anchor.view { edit(row, view) } }
+        } else {
+            content
+        }
     }
 }

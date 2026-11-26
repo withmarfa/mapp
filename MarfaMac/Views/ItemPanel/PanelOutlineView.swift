@@ -37,6 +37,12 @@ struct PanelOutlineView: View {
                 if let rows = model.pdf?.contents, !rows.isEmpty {
                     PanelHeading(title: String(localized: "Contents"), count: rows.count)
                     outline(rows.map { row in (id: row.index, level: row.level, title: row.title, go: { onPage(row.page) }) }, scale: scale)
+                } else if model.pdf != nil {
+                    Text("This PDF has no contents.")
+                        .interfaceFont(.callout)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 12)
+                        .accessibilityIdentifier("OutlineNoContents")
                 }
             } else if !model.headings.isEmpty {
                 PanelHeading(title: String(localized: "Headings"), count: model.headings.count)

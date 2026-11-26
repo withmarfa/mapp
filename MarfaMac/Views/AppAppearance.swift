@@ -10,7 +10,8 @@ nonisolated enum AppearanceKey {
     static let codeFont = "codeFont"
     static let typeChipTint = TypeChipTint.key
     static let sidebar = SidebarColor.key
-    static let all = [theme, accent, highlights, textFont, codeFont, typeChipTint, sidebar]
+    static let pdfBackground = PDFBackground.key
+    static let all = [theme, accent, highlights, textFont, codeFont, typeChipTint, sidebar, pdfBackground]
 }
 
 /// The main window's sidebar: the system's gray, or white behind a hairline.
@@ -25,6 +26,34 @@ nonisolated enum SidebarColor: String, CaseIterable, Identifiable {
         switch self {
         case .gray: String(localized: "Gray")
         case .white: String(localized: "White")
+        }
+    }
+}
+
+/// What a PDF's pages sit on: the system's gray, or white with only a soft shadow to mark each page. Chosen from the View
+/// menu while a PDF is open; Settings has no row for it yet. Gray is the default, so it is stored only when white.
+nonisolated enum PDFBackground: String, CaseIterable, Identifiable {
+    case gray, white
+
+    static let key = "pdfBackground"
+
+    var id: Self { self }
+
+    var title: LocalizedStringResource {
+        switch self {
+        case .gray: "Gray"
+        case .white: "White"
+        }
+    }
+
+    /// The color behind the pages. The paper itself stays white in both appearances.
+    var ground: NSColor {
+        switch self {
+        case .gray:
+            NSColor(name: nil) { appearance in
+                appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(white: 0.17, alpha: 1) : NSColor(white: 0.945, alpha: 1)
+            }
+        case .white: .windowBackgroundColor
         }
     }
 }
