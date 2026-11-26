@@ -139,6 +139,25 @@ extension LiveMarfaTests {
                 libraries.preferences.detach()
                 await source.close()
 
+                // Opened again, the copy says its instance, and the library takes that name before it syncs.
+                let again = MarfaHost(defaults: older.defaults, signIns: signIns, location: MarfaStoreLocation(root: root))
+                let reopened = Libraries(
+                    host: again, defaults: older.defaults, handOverPages: { $0(true) }, syncsPreferences: true,
+                    defaultsDomain: older.sync.domain)
+                await reopened.launch()
+                let second = try #require(again.source as? MarfaSource)
+                second.refresh()
+                try #require(await LiveMarfa.until {
+                    await reopened.preferences.flush()
+                    return reopened.preferences.standing == .syncing
+                }, "the settings never synced again: \(reopened.preferences.standing)")
+                #expect(reopened.libraryKey == "marfa:" + (try #require(ProcessInfo.processInfo.environment["MARFA_TEST_INSTANCE_ID"])), "\(reopened.libraryKey)")
+                #expect(reopened.typeLooks.choices(for: reopened.libraryKey).count == 3)
+                await reopened.preferences.flush()
+                await second.flush()
+                reopened.preferences.detach()
+                await second.close()
+
                 let reader = try await mac()
                 reader.source.refresh()
                 let copy = WorkingCopyPreferences(copy: reader.source.copy, answers: reader.source.preferenceAnswers)
