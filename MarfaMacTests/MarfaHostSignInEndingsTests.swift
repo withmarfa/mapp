@@ -398,7 +398,7 @@ import Testing
     @Test func aReplacedApprovalIsToldHowToFindTheEarlierOne() {
         let words = Words.replacedApproval(address: "https://marfa.test")
         #expect(words.contains("Run “marfa apps list” with the command line signed in to https://marfa.test as the owner."))
-        #expect(words.contains("Use the approval date to identify the earlier “Marfa for Mac” approval."))
+        #expect(words.contains("Use the app name and approval date to identify this Mac’s earlier approval."))
         #expect(words.contains("If you can identify it, run “marfa apps revoke <id>” with that entry’s ID."))
     }
 }

@@ -2,6 +2,7 @@ import AppKit
 import AuthenticationServices
 import Foundation
 import Marfa
+import SystemConfiguration
 import os
 
 /// The sign-ins the app keeps, one for each server, and the steps that make and end one. The package's
@@ -164,8 +165,7 @@ extension Keychain.Failure: KeychainRefusal {}
 /// The package's sign-in, kept in the Keychain under a service of the app's own, so a Debug build never reads or
 /// replaces the installed app's sign-ins.
 nonisolated struct SystemSignIns: SignIns {
-    /// The name the app signs in under, which the server shows for what the app makes, such as a webhook.
-    static let clientName = "Marfa for Mac"
+    private static let clientName = "Marfa for Mac"
 
     /// What the app asks the owner to approve: every item to read and write, and every edge (relationships, links
     /// and attachments), which the server grants apart from items (`edge.*`). Full Access grants every owner permission
@@ -204,17 +204,20 @@ nonisolated struct SystemSignIns: SignIns {
     /// The scheme the browser returns the approval to: the bundle identifier, which the app claims in its
     /// `Info.plist` and which differs between Debug and Release.
     let scheme: String
+    private let computerName: @Sendable () -> String?
     /// The window the browser's pages are shown over.
     let anchor: @MainActor @Sendable () -> NSWindow?
 
     init(
         bundleIdentifier: String = AppPaths.bundleIdentifier,
+        computerName: @escaping @Sendable () -> String? = { SCDynamicStoreCopyComputerName(nil, nil) as String? },
         anchor: @escaping @MainActor @Sendable () -> NSWindow? = {
             NSApp.keyWindow ?? NSApp.mainWindow ?? NSApp.windows.first { $0.isVisible }
         }
     ) {
         service = bundleIdentifier + ".marfa-sign-in"
         scheme = bundleIdentifier
+        self.computerName = computerName
         self.anchor = anchor
     }
 
@@ -223,8 +226,23 @@ nonisolated struct SystemSignIns: SignIns {
     var redirectAddress: String { scheme + ":/signed-in" }
 
     func authorization(for connection: MarfaConnection) throws -> Authorization {
-        let client = Authorization.Client(name: Self.clientName, redirect: URL(string: redirectAddress), scopes: Self.scopes)
+        let client = Authorization.Client(name: registrationName, redirect: URL(string: redirectAddress), scopes: Self.scopes)
         return try Authorization(server: connection.address, client: client, service: service)
+    }
+
+    private var registrationName: String {
+        guard let name = computerName()?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty else {
+            return Self.clientName
+        }
+        let prefix = Self.clientName + " on "
+        // The server counts Unicode scalars. Keep any character we include whole.
+        var remaining = 100 - prefix.unicodeScalars.count
+        let fitting = name.prefix { character in
+            remaining -= character.unicodeScalars.count
+            return remaining >= 0
+        }
+        let suffix = fitting.trimmingCharacters(in: .whitespacesAndNewlines)
+        return suffix.isEmpty ? Self.clientName : prefix + suffix
     }
 
     func grants(for connection: MarfaConnection) throws -> Set<InstancePermission>? {
