@@ -81,11 +81,33 @@ struct TypeLooksTests {
         #expect(kept == [one: ["a": ["date": "bogus"]], two: "not an object"] as NSDictionary)
         #expect(sink.errors.map(\.type) == ["type_looks_unreadable"])
 
-        // What was readable was saved again, so the next launch sets nothing more aside.
+        // What could not be read left the stored value, so the next launch sets nothing more aside.
         let next = RecordingSink()
         #expect(reopen(defaults, sink: next).choices(for: one)[TypeID("b")] == TypeLookChoice(date: .created))
         #expect((defaults.array(forKey: TypeLooks.setAsideKey) as? [Data])?.count == 1)
         #expect(next.errors.isEmpty)
+    }
+
+    /// A later version's members of a look this Mac reads stay as stored, through a reload that sets another look aside
+    /// and through a change to another look.
+    @Test func membersThisMacDoesNotKnowSurviveAReloadAndAnotherLooksChange() throws {
+        let defaults = ThrowawayDefaults.make("TypeLooksTests.unknownMembers")
+        let later: NSDictionary = ["date": "created", "glow": true]
+        let stored: [String: Any] = [one: ["core.note": later, "b": ["date": "bogus"]], two: ["core.task": later]]
+        defaults.set(try JSONSerialization.data(withJSONObject: stored), forKey: TypeLooks.defaultsKey)
+        let looks = { () throws -> NSDictionary in
+            let saved = try #require(defaults.data(forKey: TypeLooks.defaultsKey))
+            return try #require(JSONSerialization.jsonObject(with: saved) as? NSDictionary)
+        }
+        let store = reopen(defaults)
+        #expect(try looks() == [one: ["core.note": later], two: ["core.task": later]] as NSDictionary)
+        store.change(TypeID("core.task"), in: one, catalogue: catalogue) { $0.date = .off }
+        let held = try #require(try looks()[one] as? NSDictionary)
+        #expect(held["core.note"] as? NSDictionary == later)
+        #expect(held["core.task"] != nil)
+        #expect(try looks()[two] as? NSDictionary == ["core.task": later] as NSDictionary)
+        store.change(TypeID("core.note"), in: one, catalogue: catalogue) { $0.date = .occurred }
+        #expect((try looks()[one] as? NSDictionary)?["core.note"] as? NSDictionary == ["date": "occurred", "glow": true] as NSDictionary)
     }
 
     @Test func storedTextThatIsNotLooksAtAllIsSetAsideWholeAfterEarlierOnes() throws {
