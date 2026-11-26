@@ -246,6 +246,7 @@ private struct GalleryCell: View {
         .accessibilityAction(named: Text("Open")) {
             browser.open([item.id])
         }
+        .hoverQuickActions(for: item.id, actions: browser.quickActions(for: item), alignment: .topTrailing)
         .contextMenu {
             ItemRowMenu(browser: browser, ids: browser.selection.contains(item.id) ? browser.selection : [item.id], undoManager: undoManager)
         }

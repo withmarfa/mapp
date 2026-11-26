@@ -46,7 +46,7 @@ struct ItemRow: View {
         HStack(spacing: 8) {
             if content.mixesTypes { TonedGlyph(id: content.typeIcon) }
             Text(content.title)
-                .interfaceFont(.body)
+                .interfaceFont(InterfaceStyle.primaryFont)
                 .lineLimit(1)
             if content.inFeed { FeedMark() }
             Spacer(minLength: 8)
@@ -60,7 +60,7 @@ struct ItemRow: View {
                 Group {
                     if let titleExcerpt { Text(titleExcerpt.attributed()) } else { Text(content.title) }
                 }
-                .interfaceFont(.body.weight(.semibold))
+                .interfaceFont(InterfaceStyle.primaryFont.weight(.semibold))
                 .lineLimit(1)
                 if content.inFeed { FeedMark() }
                 Spacer(minLength: 8)
@@ -88,17 +88,17 @@ struct ItemRow: View {
         VStack(alignment: .leading, spacing: 3) {
             if let excerpt, titleExcerpt == nil {
                 Text(excerpt.attributed())
-                    .interfaceFont(.subheadline)
+                    .interfaceFont(InterfaceStyle.captionFont)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
             } else if excerpt == nil, let secondary = content.secondary {
                 Text(secondary)
-                    .interfaceFont(.subheadline)
+                    .interfaceFont(InterfaceStyle.captionFont)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
             if !content.chips.isEmpty || content.more > 0 {
-                ChipLine(content: content, statusItem: itemID)
+                ChipLine(content: content, statusItem: itemID, typeFont: InterfaceStyle.captionFont)
                     .padding(.top, 1)
             }
         }
@@ -115,7 +115,7 @@ struct ItemRow: View {
     @ViewBuilder private var dateText: some View {
         if let date = content.date {
             Text(date)
-                .interfaceFont(.subheadline)
+                .interfaceFont(InterfaceStyle.captionFont)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .layoutPriority(1)

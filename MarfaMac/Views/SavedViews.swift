@@ -74,10 +74,10 @@ enum SavedViews {
         switch mode {
         case .table:
             return .table
-        case .list, .gallery:
+        case .list, .gallery, .digest:
             // The sort and group the person set, or the view's, are what the list and the gallery show.
             guard let order, browser.listShape?.arranged != true else { return .table }
-            return .list(order)
+            return .list(mode == .digest ? DigestLayout.order : order)
         case .board:
             return .board
         case .calendar:
@@ -98,6 +98,7 @@ enum SavedViews {
     static func newViewSettings(_ browser: Browser, in library: any ItemLibrary) -> ViewMacSettings {
         var settings = browser.shown.savedView.map { browser.macSettings(for: $0) } ?? ViewMacSettings()
         if browser.shown.savedView == nil { settings.map = browser.placeMaps[browser.shown] }
+        if browser.shown.savedView == nil { settings.digest = browser.placeDigests[browser.shown] }
         settings.layout = browser.viewPanelLayout
         settings.cards = browser.cards
         settings.density = browser.density
@@ -132,7 +133,7 @@ enum SavedViews {
     /// Whether the table's sort and grouping order the layout: always, except in a list or gallery that is neither
     /// sorted nor grouped by a column.
     static func isArranged(_ browser: Browser, layout: ItemViewMode) -> Bool {
-        guard layout == .list || layout == .gallery else { return true }
+        guard layout == .list || layout == .gallery || layout == .digest else { return true }
         return browser.listShape?.arranged == true
     }
 
@@ -147,7 +148,7 @@ enum SavedViews {
             }
             return Arrangement(sort: content.sort, isDated: false)
         }
-        return datedArrangement(order)
+        return datedArrangement(mode == .digest ? DigestLayout.order : order)
     }
 
     /// What the list shows while nothing arranges it: its own order, in sections by date where it has them.

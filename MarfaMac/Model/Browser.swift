@@ -17,6 +17,7 @@ final class Browser {
             guard !(showing.map { $0.isSame(oldValue) } ?? (oldValue == nil)) else { return }
             modalItem = nil
             listMemory.scrollOffset = nil
+            expandedDigestPiles.removeAll()
             laterPlace = nil
             if openedView.map({ showing?.savedView != $0.id }) == true { openedView = nil }
             viewPanelPlaceChanged()
@@ -39,6 +40,7 @@ final class Browser {
     @ObservationIgnored var laterPlace: [String: String]?
     var selection: Set<ItemID> = [] {
         didSet {
+            if viewMode == .digest { revealDigestSelection() }
             // The modal shows the one item it was opened on, so any other selection, whoever made it, is the end of it.
             if let open = modalItem, selection != [open] { modalItem = nil }
             guard !isMovingThroughHistory, !isSelectingAutomatically || history.entries.isEmpty else { return }
@@ -57,6 +59,11 @@ final class Browser {
             if viewMode != oldValue {
                 showsCalendarMonth = false
                 listMemory.scrollOffset = nil
+                if viewMode == .digest || oldValue == .digest { listPagingState = nil }
+                if oldValue == .digest {
+                    digestDisplay = nil
+                    expandedDigestPiles.removeAll()
+                }
                 recordLayout(from: oldValue)
             }
             isCollectionItemPresented = false
@@ -201,6 +208,7 @@ final class Browser {
     @ObservationIgnored var indexRowsMemo: (key: IndexRowsKey, rows: [IndexRow])?
     /// The list's sections, worked out off the main actor for a large place (`sections(in:order:now:)`).
     @ObservationIgnored var sectionsWork = PlaceWork<SectionsKey, ListArrangement>()
+    @ObservationIgnored var digestWork = PlaceWork<SectionsKey, ListArrangement>()
     /// Counts what landed from work off the main actor besides the table, which a layout reads to draw it.
     var placeWorkLanded = 0
     /// How often the window worked a place's table or list out whole, and how often it updated one, which tests read.
@@ -490,6 +498,7 @@ final class Browser {
         offerMemo = nil
         parentMemo = nil
         sectionsWork.reset()
+        digestWork.reset()
         boardWork.reset()
         calendarWork.reset()
         timelineWork.reset()
@@ -514,6 +523,9 @@ final class Browser {
         placeQuickActions = [:]
         placeOpenings = [:]
         placeMaps = [:]
+        placeDigests = [:]
+        digestDisplay = nil
+        expandedDigestPiles.removeAll()
         openedView = nil
         placeProperties = [:]
         placeCalendarScales = [:]
@@ -699,6 +711,11 @@ final class Browser {
     var placeOpenings: PlaceMemory<ItemOpening> = [:]
     /// The map's choices of each place that is not a saved view, as its default view keeps them (`mapChoices`).
     var placeMaps: PlaceMemory<MapChoices> = [:]
+    var placeDigests: PlaceMemory<DigestChoices> = [:]
+    var digestDisplay: DigestLayout.Display? {
+        didSet { revealDigestSelection() }
+    }
+    var expandedDigestPiles: Set<DigestLayout.Pile.ID> = []
     /// The Properties list of each place that is not a saved view, as its default view keeps it (`properties`).
     var placeProperties: PlaceMemory<ViewProperties> = [:]
     /// A day in the week or month the calendar shows, or nil for the one that holds today. Kept for the window.

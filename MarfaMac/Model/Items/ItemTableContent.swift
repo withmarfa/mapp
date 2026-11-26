@@ -252,7 +252,7 @@ final class ItemTableContent {
             browser: browser, library: library, made: made, wants: wants, options: browser.tableOptions[browser.shown] ?? ItemTableOptions(),
             hidesEmptyGroups: browser.hidesEmptyGroups)
         let ordered = content.ordering.updated(from: earlier.earlier, changed: update.remade)
-        content.land(ordered, rows: ordered.rows)
+        content.land(ordered)
         return content
     }
 
@@ -376,18 +376,19 @@ final class ItemTableContent {
     /// Takes what `ordering` made, with `rows` in the order to show. The groups were made of the rows as sorted, so they
     /// stand only where the rows are shown as sorted; where the chosen row was kept in its place the groups are made
     /// when first read, as ever.
-    func land(_ ordered: Ordering.Ordered, rows: [ItemTableRow]) {
+    func land(_ ordered: Ordering.Ordered, rows: [ItemTableRow]? = nil) {
         landed = ordered
         filterOffer = ordered.offer
         kept = ordered.kept
         keptItems = ordered.keptItems
         sortChoices = ordered.sortChoices
-        if rows.elementsEqual(ordered.rows, by: { $0.id == $1.id }) { allGroups = ordered.groups }
-        self.rows = rows
+        if rows?.elementsEqual(ordered.rows, by: { $0.id == $1.id }) != false { allGroups = ordered.groups }
+        self.rows = rows ?? ordered.rows
     }
 
     /// What the table landed with, its rows as sorted, before the chosen row was kept in its place.
     private var landed: Ordering.Ordered?
+    var hasOrdered: Bool { landed != nil }
 
     /// What an update of this table starts from: what it landed with, or, for a table worked out in place, its rows as
     /// they are read, which a small place sorts and groups on the main actor anyway.

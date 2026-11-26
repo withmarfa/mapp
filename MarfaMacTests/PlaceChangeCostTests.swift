@@ -76,6 +76,11 @@ struct PlaceChangeCostTests {
         (Layout(name: "list", mode: .list), { _ in }),
         (Layout(name: "list by name", mode: .list), { sortByName($0) }),
         (Layout(name: "gallery", mode: .gallery), { _ in }),
+        (Layout(name: "digest", mode: .digest), { _ in }),
+        (Layout(name: "digest by name", mode: .digest), { sortByName($0) }),
+        (Layout(name: "digest grouped by status", mode: .digest), {
+            $0.tableOptions[.library, default: ItemTableOptions()].grouping = .column("field.status")
+        }),
         (Layout(name: "board", mode: .board), { _ in }),
         (Layout(name: "calendar", mode: .calendar), { _ in }),
         (Layout(name: "timeline", mode: .timeline), { _ in }),
@@ -158,11 +163,17 @@ struct PlaceChangeCostTests {
         case .list, .gallery:
             let order = try #require(browser.sectionsWork.held?.key.choices.order)
             _ = fresh.arrangement(in: copy, order: order, now: copy.now())
+        case .digest:
+            try #require(await eventually(within: .seconds(60)) {
+                fresh.digestDisplay = fresh.digestArrangement(in: copy, now: copy.now())
+                return fresh.currentDigest != nil
+            })
         case .timeline:
             let field = try #require(browser.timelineWork.held?.key.choice).field
             _ = fresh.timelinePlacing(in: copy, field: field, now: copy.now())
         case .board: _ = fresh.boardLanes(in: copy)
         case .calendar: _ = fresh.calendarPlacing(in: copy, calendar: Calendar.chosenWeekStart)
+        case .map: break
         }
         return try #require(drawn(in: fresh, mode: mode, library: copy))
     }
@@ -183,6 +194,9 @@ struct PlaceChangeCostTests {
         case .list, .gallery:
             guard let held = browser.sectionsWork.held?.value else { return nil }
             return items(held.drawn(browser.listDrawn, countsFolded: mode == .gallery).flatMap(\.section.items))
+        case .digest:
+            guard let digest = browser.currentDigest else { return nil }
+            return items(digest.drawn(browser.listDrawn).flatMap { $0.piles.map(\.newest) })
         case .timeline:
             guard let held = browser.timelineWork.held?.value else { return nil }
             return items(held.drawn(browser.listDrawn).flatMap { $0.group.rows.map(\.item) })
@@ -197,6 +211,7 @@ struct PlaceChangeCostTests {
             let days = CalendarLayout.drawn(browser.calendarScale, firstShown: first, anchor: browser.calendarDay ?? now, calendar: calendar)
             let ids = CalendarLayout.ids(in: held.entries, within: days)
             return held.entries.filter { ids.contains($0.id) }.map { DrawnItem(id: $0.id, title: $0.title) }
+        case .map: return nil
         }
     }
 

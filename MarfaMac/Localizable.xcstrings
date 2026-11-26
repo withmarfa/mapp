@@ -1043,6 +1043,12 @@
     "%lld days ago" : {
 
     },
+    "%lld earlier highlights" : {
+
+    },
+    "%lld earlier messages" : {
+
+    },
     "%lld edge types" : {
 
     },
@@ -1503,6 +1509,16 @@
         }
       }
     },
+    "%lld more from %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld more from %2$@"
+          }
+        }
+      }
+    },
     "%lld more in %@, left out of search." : {
 
     },
@@ -1814,6 +1830,12 @@
 
     },
     "1 day" : {
+
+    },
+    "1 earlier highlight" : {
+
+    },
+    "1 earlier message" : {
 
     },
     "1 event." : {
@@ -2906,6 +2928,9 @@
     "Back to Calendar" : {
 
     },
+    "Back to Digest" : {
+
+    },
     "Back to Gallery" : {
 
     },
@@ -3689,6 +3714,9 @@
     "Collapse Group" : {
 
     },
+    "Collapse Stack" : {
+
+    },
     "Collapsed" : {
 
     },
@@ -4335,6 +4363,9 @@
     "Diagram unavailable:" : {
 
     },
+    "Digest" : {
+
+    },
     "Dimensions" : {
 
     },
@@ -4766,6 +4797,9 @@
 
     },
     "Expand Group" : {
+
+    },
+    "Expand Stack" : {
 
     },
     "Expanded" : {
@@ -6296,6 +6330,9 @@
 
     },
     "Line Spacing" : {
+
+    },
+    "Lines of Text" : {
 
     },
     "Link" : {
@@ -7966,6 +8003,9 @@
     "Picture or Text" : {
       "extractionState" : "manual"
     },
+    "Pictures" : {
+
+    },
     "Pictures from Websites" : {
 
     },
@@ -9468,6 +9508,9 @@
 
     },
     "Square" : {
+
+    },
+    "Stack Related Items" : {
 
     },
     "Stamped on what it writes." : {
@@ -11800,6 +11843,9 @@
     },
     "View as Calendar" : {
       "extractionState" : "manual"
+    },
+    "View as Digest" : {
+
     },
     "View as Gallery" : {
 

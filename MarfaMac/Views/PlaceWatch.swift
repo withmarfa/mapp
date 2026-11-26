@@ -21,6 +21,9 @@ private struct PlaceWatch: View {
             .frame(width: 0, height: 0)
             .allowsHitTesting(false)
             .accessibilityHidden(true)
+            .background {
+                if browser.viewMode == .digest { DigestWatch(browser: browser) }
+            }
             .onChange(of: browser.placeFallback(in: library)) { browser.placeRemoved(in: library, order: order) }
             // The gallery or table disappears while an item is open; selection must still follow deletes and moves.
             .onChange(of: browser.collectionItemIDs(in: library, order: order)) { old, new in

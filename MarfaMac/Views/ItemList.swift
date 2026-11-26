@@ -105,7 +105,7 @@ struct ItemList: View, Equatable {
             // line alone; set inside `ListLineRow`, they would have SwiftUI run every row's body to find them.
             ForEach(lines) { line in
                 let row = ListLineRow(
-                    line: line, content: contents[line.id], density: density, excerpt: excerpts[line.id],
+                    line: line, content: contents[line.id], density: density, excerpt: excerpts[line.id], browser: browser,
                     fold: browser.listShape?.arranged == true ? { browser.toggleGroup($0, in: library) } : nil)
                 .selectionDisabled(line.itemID == nil)
                 .listRowSeparator(line.itemID == nil ? .hidden : .automatic, edges: .top)
@@ -157,6 +157,7 @@ private struct ListLineRow: View {
     let content: RowContent?
     let density: Density
     let excerpt: SearchExcerpt?
+    let browser: Browser
     /// Folds or opens a section by its key, where the list's groups fold.
     var fold: ((String) -> Void)?
 
@@ -186,10 +187,11 @@ private struct ListLineRow: View {
         case .more:
             // Drawn only to come into view, which draws the next page.
             Color.clear.frame(height: 1).accessibilityHidden(true)
-        case .item:
+        case .item(let item, _, _):
             if let content {
                 ItemRow(content: content, density: density, excerpt: excerpt, itemID: line.id)
                     .wantsCounts(of: line.id, content.countQueries, in: library.counts)
+                    .hoverQuickActions(for: line.id, actions: browser.quickActions(for: item))
             }
         }
     }

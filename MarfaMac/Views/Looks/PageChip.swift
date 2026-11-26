@@ -85,6 +85,7 @@ struct MarkedName: View {
     let icon: String?
     var size: ChipSize = .page
     var underlinesOnHover = false
+    var textFont: Font?
 
     @Environment(\.colorScheme) private var scheme
     @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
@@ -100,7 +101,7 @@ struct MarkedName: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
         }
-        .font(looks.factFont(for: size, textSize: CGFloat(textSize)))
+        .font(textFont?.scaled(by: scale) ?? looks.factFont(for: size, textSize: CGFloat(textSize)))
         .foregroundStyle(size == .page ? Color.primary : looks.chipText(for: scheme))
         .frame(height: looks.height(for: size) * scale)
         .background { if underlinesOnHover { Color.clear.onHover { isHovering = $0 } } }

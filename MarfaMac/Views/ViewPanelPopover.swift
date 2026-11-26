@@ -400,6 +400,7 @@ extension ItemViewMode {
         case .board: String(localized: "Board")
         case .timeline: String(localized: "Timeline")
         case .calendar: String(localized: "Calendar")
+        case .digest: String(localized: "Digest")
         case .map: String(localized: "Map")
         }
     }

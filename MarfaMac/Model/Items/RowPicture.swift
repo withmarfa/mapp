@@ -15,7 +15,12 @@ nonisolated struct RowPicture: Hashable, Sendable {
     /// Nil unless the list shows pictures and `CardPicture` has a source for the item. `attachments` are the items
     /// attached to it, in any state.
     static func of(_ item: Item, attachments: [Item], in list: RowList) -> RowPicture? {
-        guard list.showsPictures, !CardPicture.sources(of: item, attachments: attachments).isEmpty else { return nil }
+        guard list.showsPictures else { return nil }
+        return of(item, attachments: attachments)
+    }
+
+    static func of(_ item: Item, attachments: [Item]) -> RowPicture? {
+        guard !CardPicture.sources(of: item, attachments: attachments).isEmpty else { return nil }
         return RowPicture(item: item, attachments: Array(CardPicture.attachedImages(of: attachments).prefix(attachedLimit)))
     }
 }
