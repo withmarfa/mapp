@@ -104,6 +104,16 @@ nonisolated enum CalendarLayout {
         }.map(\.id))
     }
 
+    /// How many items among `entries` have time inside `drawn` and only on a Saturday or a Sunday, which the week without
+    /// weekends leaves out. One pass, working out days only for the few entries inside `drawn`.
+    static func weekendOnlyCount(in entries: [CalendarEntry], within drawn: DateInterval, calendar: Calendar) -> Int {
+        var count = 0
+        for entry in entries where entry.start < drawn.end && entry.end > drawn.start {
+            if !hasWeekdayTime(entry, within: drawn, calendar: calendar) { count += 1 }
+        }
+        return count
+    }
+
     /// Whether `entry` has time on a day of `interval` that is not part of a weekend.
     static func hasWeekdayTime(_ entry: CalendarEntry, within interval: DateInterval, calendar: Calendar) -> Bool {
         var day = calendar.startOfDay(for: max(entry.start, interval.start))
@@ -402,11 +412,15 @@ nonisolated enum CalendarNavigation {
     }
 
     /// The day of the chosen event to move from: `day` where the event is on it, else its first day in `visible`, else
-    /// its own first day. Nil where the event is not on the calendar.
-    static func spot(of id: ItemID, near day: Date?, in entries: [CalendarEntry], visible: DateInterval, calendar: Calendar) -> Spot? {
+    /// its own first day. A weekend the week does not draw is no day to stand on, so the event's first drawn day is its
+    /// place. Nil where the event is not on the calendar.
+    static func spot(
+        of id: ItemID, near day: Date?, in entries: [CalendarEntry], visible: DateInterval, calendar: Calendar, skipsWeekends: Bool = false
+    ) -> Spot? {
         guard let entry = entries.first(where: { $0.id == id }) else { return nil }
-        if let day, CalendarLayout.covers(entry, day: day, calendar: calendar) { return Spot(id: id, day: day) }
-        let first = CalendarLayout.days(in: visible, calendar: calendar).first { CalendarLayout.covers(entry, day: $0, calendar: calendar) }
+        let drawn = { (day: Date) in !skipsWeekends || !calendar.isDateInWeekend(day) }
+        if let day, drawn(day), CalendarLayout.covers(entry, day: day, calendar: calendar) { return Spot(id: id, day: day) }
+        let first = CalendarLayout.days(in: visible, calendar: calendar).first { drawn($0) && CalendarLayout.covers(entry, day: $0, calendar: calendar) }
         return Spot(id: id, day: first ?? calendar.startOfDay(for: entry.start))
     }
 

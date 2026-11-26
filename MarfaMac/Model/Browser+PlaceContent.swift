@@ -672,6 +672,8 @@ extension Browser {
 
     /// The calendar's entries, and the items that have no date to stand on.
     nonisolated struct CalendarPlacing: Sendable {
+        /// Names this placing, so what is worked out from its entries is worked out again only when they are made again.
+        let serial = UUID()
         let entries: [CalendarEntry]
         let leftOut: [ItemID]
         var isEmpty: Bool { entries.isEmpty && leftOut.isEmpty }

@@ -10,6 +10,8 @@ struct ItemCalendar: View {
     var pane: FocusState<Browser.Pane?>.Binding
     @State private var daysSeen = 0
     @State private var keyboard = CalendarKeyboard()
+    /// What the week leaves out with its weekend, counted off the main actor (`CalendarLayout.weekendOnlyCount`).
+    @State private var hiddenOnWeekend = 0
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
     @AppStorage(WeekStart.key) private var weekStart = 0
     @Environment(\.topRowSpace) private var topRow
@@ -39,10 +41,6 @@ struct ItemCalendar: View {
         let drawn = CalendarLayout.drawn(scale, firstShown: firstShown, anchor: anchor, calendar: calendar)
         // Only a week can hide its weekend: the month keeps all seven days, so an item on one stays reachable there.
         let skipsWeekends = scale == .week && !browser.calendarChoices.showsWeekends
-        let hiddenOnWeekend = skipsWeekends
-            ? CalendarLayout.ids(in: placed.entries, within: drawn).count
-                - CalendarLayout.ids(in: placed.entries, within: drawn, weekends: false, calendar: calendar).count
-            : 0
 
         return Group {
             switch scale {
@@ -71,7 +69,8 @@ struct ItemCalendar: View {
                 press.key == .upArrow ? .up : press.key == .downArrow ? .down : press.key == .leftArrow ? .left : .right
             let current = browser.selection.count == 1 ? browser.selection.first : nil
             let from = current.flatMap {
-                CalendarNavigation.spot(of: $0, near: keyboard.day, in: placed.entries, visible: visible, calendar: calendar)
+                CalendarNavigation.spot(
+                    of: $0, near: keyboard.day, in: placed.entries, visible: visible, calendar: calendar, skipsWeekends: skipsWeekends)
             }
             guard let next = CalendarNavigation.move(
                 from: from, direction, in: placed.entries, visible: visible, calendar: calendar, skipsWeekends: skipsWeekends)
@@ -86,19 +85,21 @@ struct ItemCalendar: View {
             keyboard.day = nil
             return .handled
         }
-        // The menu and the capsule act on the whole choice, so a choice never holds an event the calendar has left behind.
-        .onChange(of: drawn) {
-            let kept = browser.selection.intersection(
-                CalendarLayout.ids(in: placed.entries, within: drawn, weekends: !skipsWeekends, calendar: calendar))
-            if kept != browser.selection { browser.selection = kept }
-        }
-        .onChange(of: skipsWeekends) {
-            let kept = browser.selection.intersection(
-                CalendarLayout.ids(in: placed.entries, within: drawn, weekends: !skipsWeekends, calendar: calendar))
-            if kept != browser.selection { browser.selection = kept }
+        // The menu and the capsule act on the whole choice, so a choice never holds an event the calendar has left behind: by
+        // a move to other days, by hiding the weekend, or by a Date field the event has no value in.
+        .onChange(of: drawn) { keepShown(placed, within: drawn, skipsWeekends: skipsWeekends, calendar: calendar) }
+        .onChange(of: skipsWeekends) { keepShown(placed, within: drawn, skipsWeekends: skipsWeekends, calendar: calendar) }
+        .onChange(of: placed.leftOut) { keepShown(placed, within: drawn, skipsWeekends: skipsWeekends, calendar: calendar) }
+        .task(id: WeekendCount(serial: placed.serial, drawn: drawn, skipsWeekends: skipsWeekends)) {
+            guard skipsWeekends else { return hiddenOnWeekend = 0 }
+            let entries = placed.entries
+            let count = await Task.detached(priority: .userInitiated) {
+                CalendarLayout.weekendOnlyCount(in: entries, within: drawn, calendar: calendar)
+            }.value
+            if !Task.isCancelled { hiddenOnWeekend = count }
         }
         .searchStatus(browser)
-        .overlay(alignment: .bottom) { footer(placed, hiddenOnWeekend: hiddenOnWeekend) }
+        .overlay(alignment: .bottom) { footer(placed, hiddenOnWeekend: skipsWeekends ? hiddenOnWeekend : 0) }
         .overlay {
             if placed.isEmpty {
                 if browser.narrowsBySearch {
@@ -131,6 +132,18 @@ struct ItemCalendar: View {
             .padding(.leading, wide ? 0 : WindowCorner<EmptyView, EmptyView>.inset)
         }
         .allowsHitTesting(true)
+    }
+
+    private struct WeekendCount: Equatable {
+        let serial: UUID
+        let drawn: DateInterval
+        let skipsWeekends: Bool
+    }
+
+    private func keepShown(_ placed: Browser.CalendarPlacing, within drawn: DateInterval, skipsWeekends: Bool, calendar: Calendar) {
+        let kept = browser.selection.intersection(
+            CalendarLayout.ids(in: placed.entries, within: drawn, weekends: !skipsWeekends, calendar: calendar))
+        if kept != browser.selection { browser.selection = kept }
     }
 
     /// Chooses an event on one of its days, which is where the arrow keys go on from.

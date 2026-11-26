@@ -61,7 +61,7 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **Several chosen items show a command capsule** (`SelectionCapsule`), a pile beside a list (`SelectionPile`). Escape clears them.
 - **⌘⌫ deletes chosen items** on a board, timeline, Digest or map (`ChosenItemDeletion`). Changing the calendar span clears selections outside it.
 - **Calendar and Timeline use each type's date** (`ItemPlacement`) or a chosen field.
-- **Calendar Date and Weekends are per view** (`CalendarChoices`). A lost date field falls back to the first; none means No Date.
+- **Calendar Date and Weekends are per view** (`CalendarChoices`). A lost date field falls back to the first; none means No Date; a dragged new item takes its time there.
 - **Weekends off hides the week's two columns only;** the month keeps seven days, and a note counts what the week hides.
 - **Timeline is a full-width agenda by day.** The type leads where types mix.
 - **An event's span is one rule** (`EventSpan`); all-day events ignore the Mac's zone.
