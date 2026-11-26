@@ -7,10 +7,10 @@
 - **A write refused before it is queued is in no queue,** and neither is one that reaches a closed source. The typed text goes back through `Notices.notKept` (`MarfaLibrary.unqueuedText`).
 - **Leaving a copy reads its queue in the step that closes it.** While writes wait, the person keeps or discards it. A discard names exactly the writes shown, so one that lands after keeps the copy.
 - **A copy is removed only by `WorkingCopy.remove(store:confirming:)`,** against a fresh `unsentWrites(in:)`, all of it shown to the person (`MarfaHost.removeStore`). One that cannot be read stays.
-- **A copy another version made opens with `ifRefused: .replace`,** which replaces it only with nothing unsent. Otherwise it is refused and the person sees what waits (`MarfaHost.unsentChanges(in:)`). Pass no `fileBudget` to `open`.
+- **A copy another version made opens with `ifRefused: .replace`,** which replaces it only with nothing unsent; otherwise the person sees what waits. Pass no `fileBudget` to `open`.
 - **A copy is marked as discarded before it closes or anything waits** (`markBeforeLeaving`), on a disconnect and on a switch. A refused close takes the mark off again.
 - **An ended sign-in parks the queue** until Settings signs in again, which hands the editors over and then gives the open copy the sign-in (`WorkingCopy.use(_:)`). The library stays, unless the store could not open again (`SourceUseFailure.closed`).
-- **A switch that finds more writes after its sign-in keeps the approval** for the person's answer (`pendingSignIn`). A failed answer, a dropped question or a launch ends it.
+- **A switch that finds more writes after its sign-in keeps an approval it made** for the answer (`pendingSignIn`).
 - **An error the package classifies is never a fault** (`isOffline`, `isTransient`, `isKeyRefusal`): the package reports it through the connection and retries. A canceled call is not shown. Any other error shows the library unavailable, told once, with Refresh.
 - **The copy drains its queue itself.** The sync drains once more when the connection follows again, never on a timer.
 - **Answers are taken only by the queue's take-answered call** (`MarfaEngine+Answers.swift`), which clears what was answered and lists what was refused with its verdict, each told once.
@@ -55,6 +55,7 @@
 - **`MarfaHost` owns the connection:** the address in defaults, the sign-in in the Keychain. A Marfa has one copy, found by its origin (`MarfaStoreLocation`, `MarfaCopies`).
 - **A Marfa is known by the instance it says it is,** read unsigned (`MarfaHost+Copies.swift`). Another origin opens its copy only then, with its own sign-in; another instance gets a new copy.
 - **Another copy of the open Marfa is sent from its own store,** never merged, and removed once its queue is empty (`sendOtherCopies`).
+- **A switch keeps the Marfa left signed in.** Steps end only sign-ins they made (`signInUnlessHeld`).
 - **A discard mark names its copy's folder,** not the address (`bindDiscardMarks`).
 - **Plain http to another machine is told once a run** (`Server.plainHTTPOrigin`). No App Transport Security exception.
 - **`SignIns` keeps the sign-in** (`ScriptedSignIns` in tests) and asks for what `SystemSignIns.scopes` lists. An `http_<n>` refusal means there is no Marfa server.

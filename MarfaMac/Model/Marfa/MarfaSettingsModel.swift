@@ -502,13 +502,12 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         }
     }
 
+    /// A switch ends no sign-in and a move to another address of the same Marfa removes no copy, so a step leaves one
+    /// or the other behind, never both.
     private static func previousRemovalMessage(signIn: String?, copy: String?) -> String {
-        switch (signIn != nil, copy != nil) {
-        case (true, true):
-            String(localized: "The previous server’s sign-in is still in your Keychain, and its copy is still on this Mac. Remove the sign-in in Keychain Access. The app removes the copy before it connects to that server again.")
-        case (true, false):
+        if signIn != nil {
             String(localized: "The previous server’s sign-in is still in your Keychain. Remove it in Keychain Access.")
-        default:
+        } else {
             String(localized: "The previous server’s copy is still on this Mac. The app removes it before it connects to that server again.")
         }
     }
