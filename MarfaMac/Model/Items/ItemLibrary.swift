@@ -224,6 +224,9 @@ protocol ItemLibrary: AnyObject, Observable {
     /// where one is given. The file is read where it is while this runs. Nil when it could not be added, and the
     /// library tells the person why.
     func addFile(_ file: URL, title: String?, parentID: ItemID?, tier: Tier, tags: [String]) async -> ItemID?
+    /// For each of `files`, the items already in Marfa that hold the same bytes, which every add of a file asks
+    /// first (`AlreadyInMarfa`). A file the library can't answer for is `noAnswer`, never "no match".
+    func itemsWithSameBytes(as files: [URL]) async -> FileMatches
     /// Registers the step that undoes adding the item `id`, named and run as a created item's is, for a file added
     /// where a person would undo it.
     func registerNewItemUndo(_ id: ItemID, undoManager: UndoManager?)

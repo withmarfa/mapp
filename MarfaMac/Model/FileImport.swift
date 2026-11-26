@@ -11,7 +11,9 @@ extension Browser {
     /// Undo, the items it holds are still joined to the collection, and the person is told. The files are written to `library` whatever the window does meanwhile, since a write there is
     /// safe and a drop cut short would lose the rest; only the window's own steps (selecting what was added,
     /// revealing it) stop once the window has changed library, and once the person has moved to another place their
-    /// selection is left alone. Returns the items made.
+    /// selection is left alone. Before anything is added, the files already in Marfa are asked about once
+    /// (`AlreadyInMarfa`): Cancel adds nothing, and Open adds the rest and opens the items that matched in place of
+    /// selecting what was added. Returns the items made.
     @discardableResult
     func importFiles(
         _ urls: [URL], unreadable: Int = 0, to target: FileDropTarget? = nil,
@@ -29,11 +31,17 @@ extension Browser {
             }
         }
         QuickAdd.File.tellUnreadable(notRead, unreadable: unreadable, to: library.notices)
+        let plan = await AlreadyInMarfa.check(files.map(\.url), in: library, asking: alreadyInMarfa)
+        guard !plan.isCancelled else { return [] }
+        files.removeAll { !plan.add.contains($0.url) }
         var added: [ItemID] = []
         for file in files {
             if let id = await library.addFile(file.url, title: nil, parentID: nil, tier: QuickAdd.startingTier(in: target.place), tags: []) { added.append(id) }
         }
-        guard !added.isEmpty else { return [] }
+        guard !added.isEmpty else {
+            if isShowing(library) { openFound(plan.open, in: library, order: order) }
+            return []
+        }
         // A drop is told, joined and given its Undo only for what the library holds: a source that has not shown an
         // item cannot move it to Recently Deleted or give it an edge.
         let holdsAll = await library.waitUntilHolding(added, within: waiting)
@@ -57,6 +65,10 @@ extension Browser {
         let leftOut = target.collection == nil ? 0 : added.count - (joined ? held.count : 0)
         say(addedMessage(added.count, of: asked, to: target.isOnCollection ? target.name : nil, leftOut: leftOut, from: target.name),
             symbol: "arrow.down.doc", step: step, toasts: toasts)
+        if !plan.open.isEmpty {
+            if isShowing(library) { openFound(plan.open, in: library, order: order) }
+            return added
+        }
         guard isShowing(library), shown.isSame(target.shown), let first = held.first else { return added }
         let listed = Set(placeItems(in: library).map(\.id))
         if (joined && target.collection == shownCollection) || held.allSatisfy(listed.contains) {

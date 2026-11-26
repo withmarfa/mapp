@@ -8,6 +8,8 @@ paths:
   - MarfaMac/Model/Items/TypeChange*.swift
   - MarfaMac/Model/Items/ItemWrite*.swift
   - MarfaMac/Model/FileImport.swift
+  - MarfaMac/Model/AlreadyInMarfa.swift
+  - MarfaMac/Views/AlreadyInMarfaAlert.swift
   - MarfaMac/Views/WindowFiles.swift
   - MarfaMac/Model/InPlaceRow.swift
   - MarfaMac/Model/Browser+InPlace.swift
@@ -16,7 +18,7 @@ paths:
 
 # Making and editing
 
-Item changes go through `ItemLibrary` as `ItemWrite` values. See `docs/value-panels.md` for value editing and `MarfaMac/Model/AGENTS.md` for write storage.
+Item changes go through `ItemLibrary` as `ItemWrite` values (`docs/value-panels.md`, `MarfaMac/Model/AGENTS.md`).
 
 ## What an item allows
 
@@ -57,13 +59,14 @@ Every editor asks `Item.allows(_:)` for the `ItemChange` it writes (`ValueEditKi
 
 ### Typed text is never lost
 
-`NewItemDrafts` keeps drafts by slot and instance through window closure, quit or refusal. `make` and `take` start and resume drafts. `update` and `escape` save edits immediately. `sending` and `sendingFile` freeze a draft. Further edits start another. `settle` checks the copy, `giveBack` restores refused text, and `release` and `drop` end drafts. An interrupted draft returns if its item is absent. Adding again asks first (`mayBeInMarfa`).
+`NewItemDrafts` keeps drafts by slot and instance through a closed window, quit or refusal; its doc comments name each step. A draft being sent is frozen; edits start another. An interrupted draft returns if its item is absent. Adding again asks first (`mayBeInMarfa`).
 
 ### Dropping
 
 - **Files dropped on a list join the place in view** (`Browser.fileDropTarget`): a collection, the Feed, else the Library.
 - **A collection's row, card or sidebar row takes items and files** (`dropsInto`).
 - **A drop is one undo step and one toast;** Undo unlinks, then moves them to Recently Deleted.
+- **Every add of a file first asks about files already in Marfa** (`AlreadyInMarfa`), in one alert. Open, the default, adds the rest and opens matches; no answer adds all.
 
 ## Changing type
 

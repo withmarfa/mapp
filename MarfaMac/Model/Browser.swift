@@ -98,6 +98,8 @@ final class Browser {
     }
     /// Opens items in windows of their own, which only a view can do. The window wires it where it makes its editor.
     @ObservationIgnored var windowOpener: ((Set<ItemID>) -> Void)?
+    /// Asks, in this window, about files dropped or imported that are already in Marfa (`AlreadyInMarfa`).
+    @ObservationIgnored let alreadyInMarfa = AlreadyInMarfa.Asking()
 
     /// The layouts the current place can show. Search is left out, so a search with no results keeps the layout.
     /// A type's own place counts the type even while it holds no items. The last answer stands until the library's

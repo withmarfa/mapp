@@ -295,6 +295,8 @@ final class QuickAdd {
     var mayBeInMarfa = false
     /// Whether the window asks the person to add again a draft that may be in Marfa already.
     var asksAgain = false
+    /// Asks, in the panel, about the draft's files that are already in Marfa (`AlreadyInMarfa`).
+    @ObservationIgnored let alreadyInMarfa = AlreadyInMarfa.Asking()
     /// What the line and the text form say of a draft that may be in Marfa already.
     static var mayBeInMarfaNotice: String {
         String(localized: "This may already be in Marfa. The app quit while it was being added, so check the library before you add it again.")
@@ -421,10 +423,10 @@ final class QuickAdd {
     private var sendingEntry: UUID?
     /// The window let go of what it held while the file was on its way.
     private var leftWhileSending = false
-    /// While the core is asked about the parent, before anything is sent. The draft is still the window's to hand
-    /// off, since nothing is on its way, so this only stops a second Add.
-    private var checkingParent = false
-    var isSaving: Bool { sending != nil || checkingParent }
+    /// While the core is asked about the parent, or Marfa and the person about the files, before anything is sent.
+    /// The draft is still the window's to hand off, since nothing is on its way, so this only stops a second Add.
+    private var checkingFirst = false
+    var isSaving: Bool { sending != nil || checkingFirst }
 
     /// Why a draft leaves the window before it is added.
     enum Departure {
@@ -518,7 +520,7 @@ final class QuickAdd {
     fileprivate func notCreated() {
         if let entry { drafts.notSent(entry) }
     }
-    fileprivate func checking(parent: Bool) { checkingParent = parent }
+    fileprivate func checking(_ isChecking: Bool) { checkingFirst = isChecking }
 
     /// Tells the person what an added draft held for fields or a parent its kind lacks, which was not sent, with it
     /// on the clipboard.
@@ -881,10 +883,14 @@ extension Browser {
     /// it again. A file no longer where it was is taken out of the draft and named, and nothing is added until the
     /// person has seen that. Nothing empty is ever written. `toasts` hears the line's Added, with an Undo that takes
     /// back the add alone. A draft that may be in Marfa already (`QuickAdd.mayBeInMarfa`) is added only `again`.
+    /// The draft's files already in Marfa are asked about after the parent (`AlreadyInMarfa`): Cancel adds nothing
+    /// and keeps the draft as typed; Open takes the matched files out of the draft, adds nothing yet and opens the
+    /// items that matched, since the files are parts of one item the person may still want without them.
     @discardableResult
     func saveQuickAdd(
         in library: any ItemLibrary, undoManager: UndoManager?, opening: Bool = true, toasts: ToastPresenter? = nil,
-        again: Bool = false, now: Date = .now, calendar: Calendar = .current, locale: Locale = .current
+        again: Bool = false, order: ItemOrder = ItemOrder(), now: Date = .now, calendar: Calendar = .current,
+        locale: Locale = .current
     ) async -> ItemID? {
         // The line's words stay as typed until the item is made; only what is sent has the read words taken out.
         guard let typed = quickAdd.draft else { return nil }
@@ -925,9 +931,9 @@ extension Browser {
         // meanwhile. Nothing is on its way yet, so a window that closes or changes library meanwhile still keeps the
         // whole draft, and the draft no longer matching below stops the create.
         if let parent = draft.parentID {
-            quickAdd.checking(parent: true)
+            quickAdd.checking(true)
             let verdict = await library.newChildVerdict(under: parent)
-            quickAdd.checking(parent: false)
+            quickAdd.checking(false)
             // Text typed while the core was asked stays as typed; nothing is made from the draft as it was. A draft
             // that left the window is kept already.
             guard quickAdd.draft == typed else {
@@ -940,6 +946,25 @@ extension Browser {
             }
             if case .refused(let reason) = verdict {
                 library.notices.tell(String(localized: "Can’t Create Item"), reason)
+                return nil
+            }
+        }
+        if !draft.files.isEmpty {
+            quickAdd.checking(true)
+            let plan = await AlreadyInMarfa.check(draft.files.map(\.url), in: library, asking: quickAdd.alreadyInMarfa)
+            quickAdd.checking(false)
+            guard quickAdd.draft == typed else {
+                if quickAdd.draft != nil {
+                    library.notices.tell(
+                        String(localized: "Item Not Added"),
+                        String(localized: "The new item changed while its files were being checked, so nothing was added. Add it again."))
+                }
+                return nil
+            }
+            if plan.isCancelled { return nil }
+            if !plan.open.isEmpty {
+                quickAdd.draft?.files.removeAll { !plan.add.contains($0.url) }
+                if isShowing(library) { openFound(plan.open, in: library, order: order) }
                 return nil
             }
         }

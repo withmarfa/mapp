@@ -744,6 +744,9 @@
     "%lld Days" : {
 
     },
+    "%lld Files Are Already in Marfa" : {
+
+    },
     "%lld Files Are Held Back" : {
 
     },
@@ -1524,6 +1527,16 @@
     "%lld of %lld" : {
       "extractionState" : "manual"
     },
+    "%lld of %lld Files Are Already in Marfa" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld of %2$lld Files Are Already in Marfa"
+          }
+        }
+      }
+    },
     "%lld of %lld characters." : {
       "localizations" : {
         "en" : {
@@ -2263,6 +2276,9 @@
     "Add Again" : {
 
     },
+    "Add Anyway" : {
+
+    },
     "Add Attachment…" : {
 
     },
@@ -2657,6 +2673,9 @@
           }
         }
       }
+    },
+    "And ^[%lld more file](inflect: true)." : {
+
     },
     "And webhook deliveries." : {
 
@@ -5586,6 +5605,9 @@
     "Images Weren’t Added to the Item" : {
       "extractionState" : "manual"
     },
+    "Images Weren’t Attached" : {
+
+    },
     "Import" : {
 
     },
@@ -5795,6 +5817,22 @@
 
     },
     "It gave no reason." : {
+
+    },
+    "It has the same contents as “%@” and ^[%lld other item](inflect: true)." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "It has the same contents as “%1$@” and ^[%2$lld other item](inflect: true)."
+          }
+        }
+      }
+    },
+    "It has the same contents as “%@” and other items." : {
+
+    },
+    "It has the same contents as “%@”." : {
 
     },
     "It has trouble syncing." : {
@@ -10553,6 +10591,9 @@
     "The item was changed somewhere else while you were editing it. The server kept that version, and yours is the copy." : {
       "extractionState" : "manual"
     },
+    "The item was no longer open for editing, so nothing was attached. Add the images again." : {
+
+    },
     "The item wasn’t added, so its files weren’t attached." : {
       "extractionState" : "manual"
     },
@@ -10668,6 +10709,9 @@
 
     },
     "The new item" : {
+
+    },
+    "The new item changed while its files were being checked, so nothing was added. Add it again." : {
 
     },
     "The new item changed while its parent was being checked, so nothing was added. Add it again." : {
@@ -13116,6 +13160,9 @@
     "“%@”" : {
 
     },
+    "“%@” Is Already in Marfa" : {
+
+    },
     "“%@” already holds this link to “%@”. Remove it there first." : {
       "extractionState" : "manual"
     },
@@ -13145,6 +13192,36 @@
     },
     "“%@” has changed since, so that can’t be put back here. Earlier versions are in Version History." : {
       "extractionState" : "manual"
+    },
+    "“%@” has the same contents as “%@” and ^[%lld other item](inflect: true)." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "“%1$@” has the same contents as “%2$@” and ^[%3$lld other item](inflect: true)."
+          }
+        }
+      }
+    },
+    "“%@” has the same contents as “%@” and other items." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "“%1$@” has the same contents as “%2$@” and other items."
+          }
+        }
+      }
+    },
+    "“%@” has the same contents as “%@”." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "“%1$@” has the same contents as “%2$@”."
+          }
+        }
+      }
     },
     "“%@” holds no settings. No settings were changed." : {
 

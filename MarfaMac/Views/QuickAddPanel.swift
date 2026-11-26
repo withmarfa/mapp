@@ -9,6 +9,7 @@ import UniformTypeIdentifiers
 /// kind of item and, from the plus menu, adds a file or a detail. ⌘Return adds it and opens it the way General’s Open items in setting says. Escape, Cancel or a click outside puts it away, keeping what was typed and given on this Mac (`NewItemDrafts`); an empty panel also goes when the window stops being in front.
 struct QuickAddPanel: View {
     @CurrentLibrary private var library
+    @StoredOrder private var order
     @Environment(Libraries.self) private var libraries
     @Environment(\.undoManager) private var undoManager
     let browser: Browser
@@ -112,6 +113,7 @@ struct QuickAddPanel: View {
         }
         .onAppear { returnFocus = editor.isFocused ? .page : .list }
         .asksToAddAgain($quickAdd.asksAgain, isFile: isFile) { save(again: true) }
+        .asksAboutFilesInMarfa(quickAdd.alreadyInMarfa)
         .defaultFocus($focus, .title)
         .task {
             let handed = quickAdd.draft?.title
@@ -637,7 +639,7 @@ struct QuickAddPanel: View {
     }
 
     private func save(again: Bool = false) {
-        Task { await browser.saveQuickAdd(in: library, undoManager: undoManager, again: again) }
+        Task { await browser.saveQuickAdd(in: library, undoManager: undoManager, again: again, order: order) }
     }
 
     private func putAway() {

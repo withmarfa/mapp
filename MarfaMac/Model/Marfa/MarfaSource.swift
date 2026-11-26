@@ -180,6 +180,13 @@ nonisolated final class MarfaSource: ItemSource {
         }
     }
 
+    /// Not wired yet: marfa-swift's call that hashes local files off the main actor and asks `POST /items/blobs`
+    /// fills this, mapping a failure or a hash left unanswered to `noAnswer`. Until then every add goes ahead
+    /// unasked, as it always has.
+    func itemsWithSameBytes(as files: [URL]) async -> FileMatches {
+        .noAnswer
+    }
+
     func instanceID() async -> String? {
         try? await engine.reading.status().instanceId
     }

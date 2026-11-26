@@ -410,7 +410,7 @@ struct QuickAddTests {
         browser.quickAdd.draft?.files = [try disk.file("photo.png")]
         browser.quickAdd.draft?.title = "Holiday"
         let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
-        #expect(await eventually { browser.quickAdd.isSaving })
+        #expect(await eventually { library.filesStarted == 1 })
         let drafts = browser.quickAdd.drafts
         browser.quickAdd.leave(because: .closed, telling: library.notices)
         #expect(!drafts.holdsDraft(.line, in: library.serverKey), "the file and its title are being added, so nothing is kept")
@@ -429,7 +429,7 @@ struct QuickAddTests {
         browser.quickAdd.draft?.files = [photo]
         browser.quickAdd.draft?.title = "Holiday"
         let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
-        #expect(await eventually { browser.quickAdd.isSaving })
+        #expect(await eventually { library.filesStarted == 1 })
         let drafts = browser.quickAdd.drafts
         browser.quickAdd.leave(because: .closed, telling: library.notices)
         library.refusesFiles = true
@@ -453,7 +453,7 @@ struct QuickAddTests {
         browser.quickAdd.draft?.files = [try disk.file("photo.png")]
         browser.quickAdd.draft?.title = "Holiday"
         let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
-        #expect(await eventually { browser.quickAdd.isSaving })
+        #expect(await eventually { library.filesStarted == 1 })
         browser.quickAdd.draft = QuickAdd.Draft(typeID: TypeID.file.rawValue)
         library.refusesFiles = true
         released.yield()
@@ -502,7 +502,7 @@ struct QuickAddTests {
         browser.quickAdd.draft?.files = [try disk.file("photo.png")]
         browser.quickAdd.draft?.title = "Holiday"
         let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
-        #expect(await eventually { browser.quickAdd.isSaving })
+        #expect(await eventually { library.filesStarted == 1 })
         let drafts = browser.quickAdd.drafts
         browser.quickAdd.leave(because: .closed, telling: library.notices)
         released.yield()
@@ -525,7 +525,7 @@ struct QuickAddTests {
         browser.quickAdd.draft?.files = [photo]
         browser.quickAdd.draft?.title = "Holiday"
         let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
-        #expect(await eventually { browser.quickAdd.isSaving })
+        #expect(await eventually { library.filesStarted == 1 })
         browser.quickAdd.draft?.title = ""
         browser.quickAdd.draft?.files = []
         library.refusesFiles = true
@@ -560,7 +560,7 @@ struct QuickAddTests {
         browser.openNewItem(kind: TypeID.file.rawValue, form: .text, in: library)
         browser.quickAdd.draft?.files = [try disk.file("photo.png")]
         let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
-        #expect(await eventually { browser.quickAdd.isSaving })
+        #expect(await eventually { library.filesStarted == 1 })
         browser.quickAdd.draft?.title = "Typed meanwhile"
         let drafts = browser.quickAdd.drafts
         browser.quickAdd.leave(because: .closed, telling: library.notices)
@@ -1060,7 +1060,7 @@ struct QuickAddTests {
         browser.quickAdd.draft?.files = [try disk.file("photo.png")]
         browser.quickAdd.draft?.setParent(project.id)
         let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
-        #expect(await eventually { browser.quickAdd.isSaving })
+        #expect(await eventually { library.filesStarted == 1 })
         let drafts = browser.quickAdd.drafts
         browser.quickAdd.leave(because: .closed, telling: library.notices)
         #expect(!drafts.holdsDraft(.line, in: library.serverKey), "the file and its parent are being added")

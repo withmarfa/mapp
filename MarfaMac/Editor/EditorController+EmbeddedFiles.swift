@@ -5,14 +5,32 @@ import WebKit
 /// Images put into the item, and the files it embeds opened or shown.
 extension EditorController {
     /// Takes images for the item that is open now and tries to place their links at the drop point or caret.
-    /// Reports each image that could not be attached or placed in the text.
+    /// Reports each image that could not be attached or placed in the text. Image files already in Marfa are asked
+    /// about first (`AlreadyInMarfa`): Cancel attaches nothing, and Open attaches the rest and opens the items that
+    /// matched. Pasted bytes have no file to check, so they are attached unasked.
     @discardableResult
     func insertImages(_ sources: [PastedImages.Source], at point: CGPoint? = nil) -> Bool {
-        guard isEditable, let pageItemID, let library, !sources.isEmpty else { return false }
+        guard isEditable, let pageItemID, let asked = library, !sources.isEmpty else { return false }
         let height = webView.bounds.height
         Task {
+            let fileURLs = sources.compactMap { source -> URL? in if case .file(let url) = source { url } else { nil } }
+            let plan = await AlreadyInMarfa.check(fileURLs, in: asked, asking: alreadyInMarfa)
+            guard !plan.isCancelled else { return }
+            let sources = sources.filter { source in
+                if case .file(let url) = source { plan.add.contains(url) } else { true }
+            }
+            // Opened only once the rest are placed, since opening an item takes the page from this one.
+            defer { if !plan.open.isEmpty { openFound(plan.open) } }
+            guard !sources.isEmpty else { return }
+            guard self.pageItemID == pageItemID, isEditable else {
+                asked.notices.tell(
+                    String(localized: "Images Weren’t Attached"),
+                    String(localized: "The item was no longer open for editing, so nothing was attached. Add the images again."))
+                return
+            }
             let (files, skipped) = await PastedImages.read(sources)
-            let report = files.isEmpty ? AttachReport() : await library.attach(files, to: pageItemID)
+            // The page may have moved on while the files were read. They still belong to the item that was open.
+            let report = files.isEmpty ? AttachReport() : await asked.attach(files, to: pageItemID)
             let placed = self.pageItemID == pageItemID && isEditable && acceptsInsertion
             let embeds = report.embeds
             var notPlaced: [String] = []
@@ -23,10 +41,15 @@ extension EditorController {
             Self.reportUnplaced(
                 skipped: skipped, failed: report.failed, kept: report.kept, attached: embeds.count,
                 unplaced: placed ? [] : embeds.map(\.name), refused: notPlaced,
-                in: library.item(pageItemID)?.title ?? "", to: library
+                in: asked.item(pageItemID)?.title ?? "", to: asked
             )
         }
         return true
+    }
+
+    /// Opens items the person chose to see in place of the images they matched.
+    private func openFound(_ ids: [ItemID]) {
+        if let onOpenFound { onOpenFound(ids) } else if let first = ids.first { follow(first) }
     }
 
     /// Asks the page to put the images in, and again after the next paint while it refuses them for folded text,

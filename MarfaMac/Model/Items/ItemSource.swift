@@ -132,6 +132,10 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
     /// queued delete.
     func moreItemsTaken(with ids: [ItemID]) async -> Int?
 
+    /// For each of `files`, the items the person can read in Marfa whose file holds the same bytes, read from the
+    /// server; a file it can't answer for, for any reason, is `noAnswer`. Reads only, and never stops an add.
+    func itemsWithSameBytes(as files: [URL]) async -> FileMatches
+
     /// The instance id of the Marfa the copy holds, as its `GET /` names it; nil until the copy has read it, or where
     /// it can't be read. Reads only the copy.
     func instanceID() async -> String?
@@ -195,6 +199,8 @@ nonisolated extension ItemSource {
     func counts(of ids: [ItemID], _ query: CountQuery) async throws -> [ItemID: ItemCountAnswer] { throw ItemCountUnavailable() }
 
     func moreItemsTaken(with ids: [ItemID]) async -> Int? { nil }
+
+    func itemsWithSameBytes(as files: [URL]) async -> FileMatches { .noAnswer }
 
     func instanceID() async -> String? { nil }
 

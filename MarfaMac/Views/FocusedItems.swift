@@ -86,17 +86,9 @@ final class DetailsPresentation {
         latestAsk += 1
         let mine = latestAsk
         let alsoTaking = selection.count <= DeletionWords.previewLimit
-            ? await Self.firstAnswer(within: deadline) { await library.moreItemsTaken(with: moving) } : nil
+            ? await FirstAnswer.within(deadline, otherwise: nil) { await library.moreItemsTaken(with: moving) } : nil
         guard mine == latestAsk else { return }
         deletion = DeleteRequest(ids: moving, alsoTaking: alsoTaking, undoManager: undoManager)
-    }
-
-    /// `read`'s answer, or nil once `deadline` passes, whichever comes first. A read that never answers is left behind.
-    private static func firstAnswer(within deadline: Duration, of read: @escaping @MainActor () async -> Int?) async -> Int? {
-        let race = FirstAnswerRace()
-        return await withCheckedContinuation { continuation in
-            race.start(continuation, deadline: deadline, read: read)
-        }
     }
 
     /// The window's toast, which lives here with the rest of what the window presents, above its split view.
@@ -315,28 +307,6 @@ final class ItemPropertyDraft {
 
     /// Whether the draft is for a list that holds text not yet written.
     var holdsUnsavedList: Bool { listStorage?.holdsUnsavedWork == true }
-}
-
-/// One answer from two racers: the read and the timer. The first to finish resumes the caller; the other is ignored.
-@MainActor
-private final class FirstAnswerRace {
-    private var continuation: CheckedContinuation<Int?, Never>?
-    private var timer: Task<Void, Never>?
-
-    func start(_ continuation: CheckedContinuation<Int?, Never>, deadline: Duration, read: @escaping @MainActor () async -> Int?) {
-        self.continuation = continuation
-        timer = Task {
-            try? await Task.sleep(for: deadline)
-            finish(nil)
-        }
-        Task { finish(await read()) }
-    }
-
-    private func finish(_ answer: Int?) {
-        continuation?.resume(returning: answer)
-        continuation = nil
-        timer?.cancel()
-    }
 }
 
 /// What the toolbar shows of an item whose page has scrolled its head out of sight: its title as the head shows it, and

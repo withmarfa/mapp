@@ -115,6 +115,11 @@ extension MarfaLibrary {
         return try await source.embeds.attach(file, to: id)
     }
 
+    func itemsWithSameBytes(as files: [URL]) async -> FileMatches {
+        guard reachesServer, !files.isEmpty else { return .noAnswer }
+        return await source.itemsWithSameBytes(as: files)
+    }
+
     func addFile(_ file: URL, title: String?, parentID: ItemID?, tier: Tier, tags: [String]) async -> ItemID? {
         let cantAdd = String(localized: "Can’t Add File")
         do {

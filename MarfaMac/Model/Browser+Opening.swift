@@ -23,6 +23,23 @@ extension Browser {
         return true
     }
 
+    /// Opens items already in Marfa that the person asked to see in place of the files they were adding
+    /// (`AlreadyInMarfa`): one as a link to it opens, several in windows where Open Items says so, and otherwise
+    /// chosen together where the window lists the first. An item the library does not hold is left out.
+    func openFound(_ ids: [ItemID], in library: any ItemLibrary, order: ItemOrder, defaults: UserDefaults = .standard) {
+        let held = ids.compactMap { library.item($0) }
+        guard let first = held.first else { return }
+        if held.count == 1 {
+            follow(link: first, in: library, order: order, defaults: defaults)
+        } else if itemOpening(defaults: defaults) == .newWindow {
+            open(Set(held.map(\.id)), as: .newWindow, defaults: defaults)
+        } else {
+            reveal(first, in: library, order: order)
+            let listed = Set(placeItems(in: library).map(\.id))
+            selection = Set(held.map(\.id).filter { $0 == first.id || listed.contains($0) })
+        }
+    }
+
     /// Opens the selection, which is what Return opens.
     @discardableResult
     func openSelection(as way: ItemOpening? = nil) -> Bool { open(selection, as: way) }

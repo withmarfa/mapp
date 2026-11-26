@@ -126,6 +126,7 @@ struct ItemPage: View {
             editor.focus(item.id)
             editor.insertImages(urls.map(PastedImages.Source.file))
         }
+        .asksAboutFilesInMarfa(editor.alreadyInMarfa)
         .onChange(of: style, initial: true) { _, style in editor.setStyle(style) }
         .onChange(of: formatShortcuts, initial: true) { _, shortcuts in editor.setFormatShortcuts(shortcuts) }
         .onChange(of: item.id, initial: true) { old, id in
