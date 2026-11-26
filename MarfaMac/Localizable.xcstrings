@@ -10571,9 +10571,6 @@
     "The previous server’s copy is still on this Mac. The app removes it before it connects to that server again." : {
       "extractionState" : "manual"
     },
-    "The previous server’s sign-in is still in your Keychain. Remove it in Keychain Access." : {
-      "extractionState" : "manual"
-    },
     "The release changed since it was read, so the app used none of it. Try again to read it." : {
 
     },
