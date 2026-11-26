@@ -218,9 +218,13 @@ body:has(> #item-header:not([hidden])) {
 /* A page whose text leads (a highlight's passage): the passage is drawn at the title's size where a title would be, and
    the rows follow it at the start of the footer. It is the same text, edited as text. */
 body[data-lead='on'] {
+  --inkkit-padding-top: 0px;
+}
+
+/* On the text's own element, since the page's line spacing setting is set on the body and would otherwise win. */
+body[data-lead='on'] #editor {
   --inkkit-font-size: var(--page-title-size);
   --inkkit-line-height: calc(30 / 24.7);
-  --inkkit-padding-top: 0px;
 }
 
 body[data-lead='on'] #editor .ProseMirror {
@@ -237,7 +241,7 @@ body[data-lead='on'] #item-footer {
 }
 
 body[data-lead='on'] #item-footer > .item-rows {
-  margin-top: calc(var(--step) * 4);
+  margin-top: calc(var(--step) * 2);
 }
 
 body[data-lead='on'] #item-footer > .item-rows + .item-foot-lists {

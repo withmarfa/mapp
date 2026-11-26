@@ -22,6 +22,8 @@ paths:
   - editor/src/card.ts
   - MarfaMac/Model/Items/PageFoot.swift
   - MarfaMac/Model/Items/LinkCard.swift
+  - MarfaMac/Model/Items/PersonAddress.swift
+  - MarfaMac/Views/PlaceMapImages.swift
   - MarfaMac/Views/LinkCard/*.swift
   - MarfaMac/Views/PageNoticeView.swift
 ---
@@ -37,7 +39,9 @@ An item's page is its head (a kicker, the title and rows) and its text. One page
 - **Rows show what has a value, six at most, then Show N More,** which lists every property in the type's order, Empty where unset, hidden ones grey. It is offered on every page; on read-only and deleted ones nothing opens.
 - **A type that keeps no text shows its first six rows,** empty or not.
 - **A row is dragged by its name.** A drag or Move Up or Down moves only that row in the type's one order.
-- **An event's time is one row, When,** always first, with how far off it is or All Day in grey.
+- **An event's time is one row, When,** always first, with how far off it is or All Day in grey. A list of people draws each as a person and, in grey after the name, what the entry answers (an attendee's response).
+- **A highlight's passage leads.** The passage is the item's text, drawn at the title's size where a title would be, and its rows follow it at the start of the foot (`PageHeaderKind.highlight`, `PageHeader.textLeads`). It is the same text, edited as text; Focus hides the rows with the head. A highlight has no title.
+- **A message has no title either, and its text follows its rows.** From and To are people: the name, then the address in grey (`PersonAddress`), as `Name <address>` is written.
 - **Long text stops after two lines;** an email, a phone and a number to call open.
 - **A value is cut, never reworded,** and a linked item that cannot be read, is gone or is in the bin shows nothing, never an id.
 - **Once the head is out of sight** the page says so with the item, title and mark (`DetailsPresentation.scrolledHead`).
@@ -45,6 +49,8 @@ An item's page is its head (a kicker, the title and rows) and its text. One page
 ## The foot
 
 `PageFoot` lists Sub-Items (nested, counting everything beneath) on any item that has them, and a person's or a place's mentions as a Timeline, newest first. Other items' mentions are Linked From, where Settings › Layouts puts it on the page. A list shows 30 rows and Show More adds 30, each nested list by itself.
+
+A place with a point has a map between its rows and its Timeline: a still picture of Apple's map with the point marked, one for each appearance (`PlaceMapImages`). It cannot be moved or clicked; the corner's Open takes the person to Maps. A place with no point, or only one number of it, has no map and no empty box.
 
 ## The card
 

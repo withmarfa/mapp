@@ -453,7 +453,7 @@ export class ItemHeader {
     document.body.dataset.lead = follows ? 'on' : 'off'
     if (follows) {
       if (this.rowsBox.parentElement !== this.footer)
-        this.footer.insertBefore(this.rowsBox, this.footLists)
+        this.footer.insertBefore(this.rowsBox, this.mapBox)
     } else if (this.rowsBox.parentElement !== this.root) {
       this.root.append(this.rowsBox)
     }

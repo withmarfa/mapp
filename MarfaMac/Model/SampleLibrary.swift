@@ -19,12 +19,13 @@ nonisolated enum SampleLibrary {
     /// Also asks for the tasks and events a board and a timeline show.
     static var withCollections: Bool { ProcessInfo.processInfo.arguments.contains("-MarfaMacCollectionSample") }
 
-    /// With the sample flag, `-MarfaMacOpenPlace` takes a type ID, `items` or `feed`, and `-MarfaMacLayout` a layout.
+    /// With the sample flag, `-MarfaMacOpenPlace` takes a type ID, `collection:<id>`, `items` or `feed`, and `-MarfaMacLayout` a layout.
     static var launchPlace: PlaceView? {
         argument(after: "-MarfaMacOpenPlace").map {
             switch $0 {
             case "items": .library
             case "feed": .feed
+            case let word where word.hasPrefix("collection:"): .collection(ItemID(String(word.dropFirst("collection:".count))))
             default: .type(TypeID($0))
             }
         }
