@@ -45,7 +45,18 @@ extension Browser {
     }
 }
 
+/// An ask to zoom the map: `factor` is the share of the span left, so 0.5 is In and 2 is Out. `count` tells one ask from the next.
+struct MapZoomRequest: Equatable {
+    var count: Int
+    var factor: Double
+}
+
 extension Browser {
+    /// Asks the map to zoom in (the span halves) or out (it doubles). The map answers by watching `mapZoomRequest`.
+    func requestMapZoom(in zoomsIn: Bool) {
+        mapZoomRequest = MapZoomRequest(count: mapZoomRequest.count + 1, factor: zoomsIn ? 0.5 : 2)
+    }
+
     /// Asks the map to show every marker. The map answers by watching `mapFitRequests`.
     func requestMapFit() {
         mapFitRequests += 1

@@ -252,13 +252,13 @@ struct ItemTableColumnsTests {
         // The state that failed: the columns fit the window, so the table does not scroll.
         try #require(tableView.tableColumns.reduce(0) { $0 + $1.width } <= scrollView.contentView.bounds.width)
 
-        // A person drags the status column wider and the name column narrower.
+        // A person drags the status column wider and the name column narrower, leaving room for the column shown next.
         let status = try #require(shown.first { $0.id != shown[0].id && $0.widths.max - $0.widths.ideal > 40 })
         let dragged = shownTableColumns()[try #require(shown.firstIndex { $0.id == status.id })]
         let name = try #require(shownTableColumns().first)
-        let set = (status: dragged.width + 20, name: name.width - 60)
+        let set = (status: dragged.width + 20, name: name.width - 250)
         try Self.drag(dividerAfter: dragged, by: 20, in: opened)
-        try Self.drag(dividerAfter: name, by: -60, in: opened)
+        try Self.drag(dividerAfter: name, by: -250, in: opened)
         try #require(await eventually { !opened.stored.isEmpty })
         let before = widths()
         #expect(before[status.id] == set.status.rounded())

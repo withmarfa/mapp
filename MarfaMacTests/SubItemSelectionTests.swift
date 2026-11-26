@@ -121,3 +121,32 @@ struct SubItemSelectionTests {
         #expect(content.groupNestings.values.contains { !$0.isFlat })
     }
 }
+
+/// Share and Copy Links take the chosen items in the order the table draws them (`Browser.inListOrder`).
+@MainActor
+struct ChosenItemOrderTests {
+    @Test func aGroupedTableGivesTheChosenItemsGroupByGroupNotInTheSortsOrder() {
+        let now = Date(timeIntervalSinceReferenceDate: 800_000_000)
+        func task(_ title: String, _ status: String) -> Item {
+            var item = FakeItemLibrary.note(title, modified: now)
+            item.type = TypeID("core.task")
+            item.properties = [Property(key: "status", value: .string(status))]
+            return item
+        }
+        let first = task("A first", "todo")
+        let second = task("B second", "done")
+        let third = task("C third", "todo")
+        let library = FakeItemLibrary(items: [second, first, third], now: now)
+        let browser = Browser()
+        browser.defaults = ThrowawayDefaults.make("ChosenItemOrderTests")
+        browser.adopt(library)
+        browser.showing = .type(TypeID("core.task"))
+        browser.viewMode = .table
+        browser.tableOptions[browser.shown] = ItemTableOptions(
+            grouping: .column("field.status"), sort: [ItemTableComparator(column: .title, order: .forward)])
+        // The window draws the table before anything is shared.
+        let drawn = browser.tableContent(in: library).drawnIDs(expanded: [])
+        #expect(drawn != [first.id, second.id, third.id], "the groups, not the sort, decide where the second item stands")
+        #expect(browser.inListOrder([third.id, second.id, first.id], in: library) == drawn)
+    }
+}

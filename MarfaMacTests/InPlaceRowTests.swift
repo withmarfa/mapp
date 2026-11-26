@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 @testable import MarfaMac
 
@@ -279,5 +280,46 @@ struct InPlaceRowTests {
         let wasMoved = hold.releaseAdded()
         #expect(wasMoved)
         #expect(hold.added.isEmpty)
+    }
+}
+
+/// The row's Add against the real library, so a regression in what its undo writes fails here.
+@MainActor
+@Suite(.hangLimit)
+struct InPlaceUndoTests {
+    @Test func undoingARowThatWasAddedTrashesTheItemAndKeepsItsTypedText() async throws {
+        let source = FakeItemSource()
+        source.heldInstanceID.withLock { $0 = "in-place-undo" }
+        let library = MarfaLibrary(source: source, notices: Notices())
+        source.send(.loaded(SourceSnapshot(items: [], catalogue: FakeItemLibrary.testCatalogue)))
+        try #require(await eventually { library.isLoaded && !library.serverKey.isEmpty })
+        let browser = Browser()
+        browser.adopt(library)
+        let drafts = NewItemDrafts(file: nil)
+        browser.inPlace.drafts = drafts
+        browser.quickAdd.drafts = drafts
+        browser.showing = .type(TypeID("core.task"))
+        #expect(browser.beginInPlace(.table(group: nil), in: library))
+        browser.inPlace.change { $0.title = "Typed words" }
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+
+        let id = try #require(await browser.addInPlace(in: library, undoManager: undo, next: false))
+        guard case .create(let created, let draft) = try #require(source.writes.last) else {
+            Issue.record("Expected a create")
+            return
+        }
+        #expect(created == id)
+        #expect(draft.title == "Typed words")
+
+        // The copy holds the item once the server has taken the create; undo before then is a known gap (`docs/model.md`).
+        var held = FakeItemLibrary.note("Typed words", modified: .now, id: id)
+        held.type = TypeID("core.task")
+        source.send(.changed(ItemChanges(upserted: [held])))
+        try #require(await eventually { library.item(id) != nil })
+        #expect(undo.canUndo)
+        undo.undo()
+        #expect(source.writes.last == .transition(id, .trashed, from: .active), "Undo moves the item to Recently Deleted, never erases it")
+        #expect(!undo.canUndo, "one step for the row")
     }
 }

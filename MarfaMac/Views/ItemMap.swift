@@ -56,6 +56,7 @@ struct ItemMap: View {
             .filteredEmptyState(browser)
             .background(ChosenRowOpensSidebar(browser: browser))
             .onChange(of: browser.mapFitRequests) { controller.fitAll() }
+            .onChange(of: browser.mapZoomRequest) { controller.zoom(by: browser.mapZoomRequest.factor) }
             .accessibilityLabel("Map")
     }
 }
@@ -74,27 +75,41 @@ private struct NothingOnMap: View {
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 12)
-        .glassEffect(.regular, in: .rect(cornerRadius: 14, style: .continuous))
+        .windowGlass(in: .rect(cornerRadius: 14, style: .continuous))
         .accessibilityElement(children: .combine)
     }
 }
 
-/// The system's zoom stepper and the button that fits every marker, in the map's corner above Apple's Legal link.
+/// The map controls sit above Apple's Legal link.
 private struct MapControls: View {
     let controller: MapController
     let browser: Browser
     @Environment(SelectionSummary.self) private var summary: SelectionSummary?
     @Environment(\.interfaceTextSize) private var textSize
 
+    private func zoomButton(_ title: LocalizedStringKey, symbol: String, factor: Double) -> some View {
+        Button { controller.zoom(by: factor) } label: {
+            Image(systemName: symbol).frame(width: 36, height: 36).contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .help(title)
+        .accessibilityLabel(title)
+        .accessibilityIdentifier("Map" + (factor < 1 ? "ZoomIn" : "ZoomOut"))
+    }
+
     var body: some View {
         HStack(spacing: 8) {
-            MapZoomControl(controller: controller)
-                .frame(width: 64, height: 28)
+            HStack(spacing: 0) {
+                zoomButton("Zoom Out", symbol: "minus", factor: 2)
+                zoomButton("Zoom In", symbol: "plus", factor: 0.5)
+            }
+            .windowGlass(in: .capsule)
+            .accessibilityElement(children: .contain)
             Button { browser.requestMapFit() } label: {
-                Image(systemName: "scope").frame(width: 28, height: 28)
+                Image(systemName: "scope").frame(width: 36, height: 36)
             }
             .buttonStyle(.plain)
-            .glassEffect(.regular.interactive(), in: .circle)
+            .windowGlass(.regular.interactive(), in: .circle)
             .help("Fit All Items")
             .accessibilityLabel("Fit All Items")
             .accessibilityIdentifier("MapFit")
@@ -126,7 +141,7 @@ private struct NoLocationPill: View {
             .frame(height: 28)
         }
         .buttonStyle(.plain)
-        .glassEffect(.regular.interactive(), in: .capsule)
+        .windowGlass(.regular.interactive(), in: .capsule)
         .padding(.bottom, summary?.isCapsuleShown == true ? SelectionSummary.capsuleRoom(scale: InterfaceStyle.scale(for: textSize)) : 14)
         .popover(isPresented: $isOpen, arrowEdge: .top) { UnplacedList(ids: ids, browser: browser, isOpen: $isOpen) }
         .accessibilityLabel(Text("No Location, \(ids.count) items"))

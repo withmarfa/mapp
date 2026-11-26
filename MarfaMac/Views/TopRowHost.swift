@@ -68,12 +68,13 @@ struct TopRowFrame<Line: View, Rest: View>: ViewModifier {
     let titleLead: (TopRowRoom) -> CGFloat
     /// The line, told where the title stands and whether the rows have scrolled past the row of views at rest.
     let line: (_ lead: CGFloat, _ room: TopRowRoom, _ isAway: Bool) -> Line
-    let rest: Rest
+    let rest: (_ lead: CGFloat) -> Rest
 
     init(
         scroll: TopRowScroll?, restHeight: CGFloat, bands: Bool, signal: AnyHashable, dragClearance: CGFloat = 0,
         titleLead: @escaping (TopRowRoom) -> CGFloat = { $0.titleLead() },
-        @ViewBuilder line: @escaping (_ lead: CGFloat, _ room: TopRowRoom, _ isAway: Bool) -> Line, @ViewBuilder rest: () -> Rest
+        @ViewBuilder line: @escaping (_ lead: CGFloat, _ room: TopRowRoom, _ isAway: Bool) -> Line,
+        @ViewBuilder rest: @escaping (_ lead: CGFloat) -> Rest
     ) {
         self.scroll = scroll
         self.restHeight = restHeight
@@ -82,7 +83,7 @@ struct TopRowFrame<Line: View, Rest: View>: ViewModifier {
         self.dragClearance = dragClearance
         self.titleLead = titleLead
         self.line = line
-        self.rest = rest()
+        self.rest = rest
     }
 
     func body(content: Content) -> some View {
@@ -99,7 +100,7 @@ struct TopRowFrame<Line: View, Rest: View>: ViewModifier {
             .overlay(alignment: .top) {
                 TopRowStack(
                     scroll: scroll, restHeight: restHeight, height: lineHeight, bands: bands && showsBackground, dragClearance: dragClearance, room: room,
-                    reveal: reveal, line: { line(lead, $0, $1) }, rest: rest)
+                    reveal: reveal, line: { line(lead, $0, $1) }, rest: { rest(lead) })
                 .ignoresSafeArea(.container, edges: .top)
             }
     }
@@ -116,7 +117,7 @@ private struct TopRowStack<Line: View, Rest: View>: View {
     /// How far the toolbar has slid down to show the menu bar, which the line follows.
     let reveal: CGFloat
     let line: (TopRowRoom, Bool) -> Line
-    let rest: Rest
+    let rest: () -> Rest
 
     var body: some View {
         let offset = scroll?.offset ?? 0
@@ -132,7 +133,7 @@ private struct TopRowStack<Line: View, Rest: View>: View {
                     .frame(height: height)
                     .background { TopRowDragArea().padding(.bottom, dragClearance) }
                 if restHeight > 0, !isAway {
-                    rest
+                    rest()
                         .frame(height: restHeight, alignment: .top)
                         .offset(y: -min(offset, restHeight))
                         .frame(height: restHeight, alignment: .top)

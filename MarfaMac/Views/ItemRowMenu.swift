@@ -44,9 +44,18 @@ struct ItemRowMenu<LayoutActions: View>: View {
                 Task { await browser.quickLookSelection(in: library) }
             }
         case .share:
-            ItemShareLink(item: single, fileURL: single.flatMap { browser.fileURL(of: $0.id) }, library: library)
+            ItemShareLink(
+                item: single, fileURL: single.flatMap { browser.fileURL(of: $0.id) }, library: library, chosen: ids.count > 1 ? ids : [],
+                browser: browser)
         case .copyLink:
-            if let single { Button("Copy Link", systemImage: "link") { Task { await library.copyLink(of: single.id) } } }
+            if let single {
+                Button("Copy Link", systemImage: "link") { Task { await library.copyLink(of: single.id) } }
+            } else if ids.count > 1 {
+                Button("Copy Links", systemImage: "link") {
+                    let ordered = browser.inListOrder(ids, in: library)
+                    Task { await library.copyLinks(of: ordered) }
+                }
+            }
         case .favorite: FavoriteButton(ids: ids, undoManager: undoManager, inMenu: true)
         case .tag: AddTagButton(ids: ids, details: details, undoManager: undoManager)
         case .collection: CollectionActions(selection: ids, details: details, undoManager: undoManager)

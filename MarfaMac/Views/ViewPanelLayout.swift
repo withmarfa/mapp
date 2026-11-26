@@ -209,6 +209,8 @@ struct CurrentLayoutCommands: View {
             Button("Expand All Groups") { browser.expandAllGroups() }
                 .disabled(!grouped)
         case .map:
+            Button("Zoom In", systemImage: "plus") { browser.requestMapZoom(in: true) }
+            Button("Zoom Out", systemImage: "minus") { browser.requestMapZoom(in: false) }
             Button("Fit All Items", systemImage: "scope") { browser.requestMapFit() }
         case .board, .gallery, .digest:
             EmptyView()

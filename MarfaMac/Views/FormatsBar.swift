@@ -19,7 +19,7 @@ struct FormatsBar: View {
                 .scrollIndicators(.hidden)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .glassEffect(.regular, in: .capsule)
+        .windowGlass(in: .capsule)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Formats")
         .accessibilityIdentifier("FormatsBar")
@@ -90,7 +90,7 @@ struct FormatsBar: View {
                 .contentShape(.rect(cornerRadius: 7))
         }
         .buttonStyle(.plain)
-        .foregroundStyle(isEnabled ? .primary : .tertiary)
+        .controlForeground(isEnabled: isEnabled)
         .disabled(!isEnabled)
         .help(Text(format.title))
         .accessibilityLabel(Text(format.title))

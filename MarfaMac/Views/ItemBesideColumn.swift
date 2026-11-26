@@ -22,13 +22,16 @@ struct BesideColumn: ViewModifier {
 
     /// The column's widest, in points.
     static let width: CGFloat = 372
-    /// What the layout keeps before the page gives way: about a table's Name column.
-    static let layoutKeeps: CGFloat = 320
+    /// What the layout keeps before the page gives way: a table's Name column and its next three at their least.
+    static let layoutKeeps: CGFloat = 600
+    /// The page's narrowest, held until there is less than twice of it to share.
+    static let narrowest: CGFloat = 300
 
-    /// The page's width in `shared`: it gives way first, so the layout keeps `layoutKeeps`, but keeps a third of the two.
+    /// The page's width in `shared`: it gives way first, so the layout keeps `layoutKeeps`, down to `narrowest`. Past that
+    /// the layout's own columns give way (`ItemTableRoom`).
     static func pageWidth(in shared: CGFloat) -> CGFloat {
         guard shared > 0 else { return width }
-        return min(width, max(shared - layoutKeeps, shared / 3))
+        return min(width, max(shared - layoutKeeps, min(narrowest, shared / 2)))
     }
 
     func body(content: Content) -> some View {
@@ -42,7 +45,9 @@ struct BesideColumn: ViewModifier {
             // comes from the width measured instead.
             content.frame(minWidth: 0, maxWidth: .infinity)
             if isShown {
-                Divider()
+                // The line runs up through the toolbar's height as the boards draw it, as the right panel's does
+                // (`panelEdgeThroughToolbar`); the layout and the page keep their own tops under the toolbar.
+                Divider().ignoresSafeArea(.container, edges: .top)
                 // One container, so the column's frame, its corner and its accessibility element each apply once, to the
                 // column and not to each branch. The corner is pinned to the column's foot whatever the page's height.
                 ZStack {

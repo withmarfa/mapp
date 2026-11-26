@@ -3,7 +3,7 @@ import Marfa
 
 /// How wide each column of the table starts, from what its cells say: the widest of the first rows' words, with a cell's
 /// room and the chip or mark it draws, and not less than its heading with the sort mark. The name is the table's flexible
-/// column and has none (`ColumnResizing`). A width the person dragged is kept apart and wins (`ItemTable.setStartingWidths`).
+/// column and has none (`ColumnResizing`). A width the person dragged takes precedence (`ItemTable.fitting`).
 @MainActor
 enum ItemTableFit {
     /// How many rows are read: the page's first, which are the ones a person sees.
@@ -42,7 +42,9 @@ enum ItemTableFit {
             let content = widest > 0 ? widest + (chrome + room) * scale : 0
             // A column with no words to measure (links, tags) keeps its style's width.
             let ideal = content > 0 ? min(max(content, headed, limits.min), limits.max) : limits.ideal
-            fitted[column.id] = Width(minimum: min(limits.min, ideal), ideal: ideal)
+            // A column with words keeps the width they fit, up to the style's widest, whatever one long value needs: it is
+            // hidden before its words are cut.
+            fitted[column.id] = Width(minimum: content > 0 ? ideal : min(limits.min, ideal), ideal: ideal)
         }
         return fitted
     }
@@ -83,5 +85,43 @@ enum ItemTableFit {
 
     private static func width(of words: String, in font: NSFont) -> CGFloat {
         ceil((words as NSString).size(withAttributes: [.font: font]).width)
+    }
+}
+
+/// Which columns fit the table's width, and how wide each is. The name keeps its least width and the other columns give way
+/// in two steps: each shrinks from its ideal toward its least, in proportion, and only then does the last of them go,
+/// whole, until the rest fit. A column the person dragged to a width keeps it and does not shrink.
+nonisolated enum ItemTableRoom {
+    struct Column: Equatable {
+        let id: String
+        let isName: Bool
+        let minimum: CGFloat
+        let ideal: CGFloat
+        /// Whether the person set the width.
+        let isKept: Bool
+    }
+
+    /// The columns that stay, with their starting widths, in order. The name's own width is the table's to fill, so its
+    /// entry is its least. `gap` is the room each column that stays takes beside its width, so a column that is hidden
+    /// takes none. A width of 0 or less is an unmeasured table, which hides nothing.
+    static func plan(_ columns: [Column], available: CGFloat, gap: CGFloat = 0) -> [(id: String, width: CGFloat)] {
+        guard available > 0 else { return columns.map { ($0.id, $0.ideal) } }
+        var kept = columns
+        while true {
+            let others = kept.filter { !$0.isName }
+            let room = available - gap * CGFloat(kept.count) - (kept.first { $0.isName }?.minimum ?? 0)
+            let leastNeeded = others.reduce(0) { $0 + ($1.isKept ? $1.ideal : $1.minimum) }
+            if leastNeeded <= room || others.isEmpty {
+                let idealNeeded = others.reduce(0) { $0 + $1.ideal }
+                let slack = others.reduce(0) { $0 + ($1.isKept ? 0 : $1.ideal - $1.minimum) }
+                let squeeze = idealNeeded > room && slack > 0 ? min(1, (idealNeeded - room) / slack) : 0
+                return kept.map { column in
+                    if column.isName || column.isKept { return (column.id, column.ideal) }
+                    return (column.id, floor(column.ideal - (column.ideal - column.minimum) * squeeze))
+                }
+            }
+            guard let last = kept.lastIndex(where: { !$0.isName }) else { return kept.map { ($0.id, $0.ideal) } }
+            kept.remove(at: last)
+        }
     }
 }

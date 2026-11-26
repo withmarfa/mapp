@@ -132,7 +132,7 @@ private struct CornerButtonLabel<Label: View>: View {
         let height = CornerMetrics.height * InterfaceStyle.scale(for: textSize)
         label
             .font(.system(size: 13 * InterfaceStyle.scale(for: textSize)))
-            .foregroundStyle(.primary)
+            .controlForeground()
             .padding(.horizontal, 12)
             .frame(minWidth: height, minHeight: height)
             .background { if isPressed && !isOn { Capsule().fill(.primary.opacity(0.08)).padding(3) } }
@@ -168,7 +168,7 @@ struct CornerButtonGroup<Content: View>: View {
             .buttonStyle(CornerSegmentStyle())
             .padding(.horizontal, 3)
             .frame(height: height)
-            .glassEffect(.regular, in: .capsule)
+            .windowGlass(in: .capsule)
     }
 }
 
@@ -187,7 +187,7 @@ private struct CornerSegmentStyle: ButtonStyle {
             let scale = InterfaceStyle.scale(for: textSize)
             configuration.label
                 .font(.system(size: 13 * scale, weight: .medium))
-                .foregroundStyle(isEnabled ? .primary : .tertiary)
+                .controlForeground(isEnabled: isEnabled)
                 .frame(minWidth: 34 * scale)
                 .frame(maxHeight: .infinity)
                 .background(.primary.opacity(configuration.isPressed ? 0.16 : isHovered ? 0.1 : 0), in: .capsule)
@@ -240,7 +240,7 @@ struct CornerSegmented<Value: Hashable>: View {
         }
         .padding(.horizontal, CornerMetrics.segmentInset)
         .frame(height: height)
-        .glassEffect(.regular, in: .capsule)
+        .windowGlass(in: .capsule)
         .fixedSize()
         .accessibilityRepresentation {
             Picker(label, selection: $selection) {
@@ -268,7 +268,7 @@ private struct CornerChoiceStyle: ButtonStyle {
             let scale = InterfaceStyle.scale(for: textSize)
             configuration.label
                 .font(.system(size: 13 * scale, weight: isChosen ? .semibold : .medium))
-                .foregroundStyle(.primary)
+                .controlForeground()
                 .padding(.horizontal, 12 * scale)
                 .frame(maxHeight: .infinity)
                 .background(fill, in: .capsule)

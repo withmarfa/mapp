@@ -24,6 +24,7 @@ The menu bar and palette include every toolbar, corner and row command. See `doc
 - **Never change a command's `id`,** because stored and exported shortcuts name it.
 - **Only the menu bar binds a shortcut** (`shortcut(_:_:)` with its bindings). A row's or toolbar's button passes nil, so a key is never registered twice.
 - **A Format command's shortcut is the page's too** (`Format.pageKey`), because the page takes keys before the menu.
+- **Share and Copy Links take the chosen items as the window draws them, up to 100 at once** (`ItemLinkLimit`). Copy Links writes one link per line; Share hands the picker each link as its own address, so the destination decides how they read.
 - **Put the test beside the rule:** `ItemOpeningTests` for the row menu's order, `ShortcutTests` for the catalogue.
 
 ## Tier and state
@@ -40,9 +41,9 @@ The `ItemLibrary` calls take the whole selection and return a `CommandOutcome` w
 - **An item menu lists what `ItemMove.inMenu` gives of `selectionCommands`:** each tier move that would change an item, then Archive if any item can be archived, else Unarchive. They end the menu before Delete, with ⌃⌘K, ⌃⌘A and ⌘⌫ beside them. The menu bar and More keep all three, dimmed.
 - **Only the row menu draws ⌘⌫.** A real one in the menu bar or More would take it from the editor, where it deletes a line.
 - **Archive and Unarchive are one command, ⌃⌘A,** which toggles by state and archives a mixed selection.
-- **A toast follows each move** (`Browser.move`): "Kept “x” in the Library", "Moved “x” to the Feed", "Archived “x”" or "Unarchived “x”", or the count. It shows only what the copy queued. Its Undo is the step the move registered, and the library says so if it puts the step back.
-- **Archive asks when items are under the selection:** Archive All, Archive Only This Item or Cancel, with the count `archivePlan` puts beneath (`ArchiveRequest`).
-- **Move to Feed and Unarchive ask when the Feed would let the items go** (`FeedLimitRequest`, worked out by `feedLimitQuestion` from the type's `feedDays` and each item's `created`). It counts only the items the move would leave active in the Feed past their window, and names the type and days where they share one type.
+- **A toast follows each move** (`Browser.move`), naming the item or giving the count, and shows only what the copy queued. Its Undo is the step the move registered.
+- **Archive asks when items are under the selection:** Archive All, Archive Only This Item or Cancel (`ArchiveRequest`).
+- **Move to Feed and Unarchive ask when the Feed would let the items go** (`FeedLimitRequest`, from the type's `feedDays` and each item's `created`). It counts only the items the move would leave in the Feed past their window.
 - **A collection can be archived and is never moved to the Feed.** A table is not yet kept out of the Feed: the package now says which types hold one, and the app does not use that yet.
 - **These queue offline,** so none waits on `reachesServer`.
 
@@ -69,8 +70,8 @@ The `ItemLibrary` calls take the whole selection and return a `CommandOutcome` w
 | File | Keep in Library | ⌃⌘K | Yes |
 | File | Archive, Unarchive | ⌃⌘A | Yes |
 | File | Print… | ⌘P | Yes |
-| File | Open, Open Beside the List, Open as Modal, Open as Full Page, Quick Look, Open in Default App, Share…, Add to Favorites, Add Tag…, Change Type…, Add to Collection…, Version History…, Move to Feed, Delete, Recover, Rename Source…, Choose Source Mark…, Delete Collection…, Export Layouts…, Import Layouts…, Export as PDF… | – | Yes |
-| Edit | Copy Link | ⇧⌘C | Yes |
+| File | Open, Open Beside the List, Open as Modal, Open as Full Page, Quick Look, Open in Default App, Share… (links for multiple items), Add to Favorites, Add Tag…, Change Type…, Add to Collection…, Version History…, Move to Feed, Delete, Recover, Rename Source…, Choose Source Mark…, Delete Collection…, Export Layouts…, Import Layouts…, Export as PDF… | – | Yes |
+| Edit | Copy Link (Copy Links for several, one per line in list order) | ⇧⌘C | Yes |
 | Edit | Add Attachment… | ⇧⌘A | Yes |
 | Edit | Search Items… | ⇧⌘P | Yes |
 | Edit | Command Palette | ⌘K | Yes |
@@ -93,7 +94,7 @@ The `ItemLibrary` calls take the whole selection and return a `CommandOutcome` w
 | View | Make Text Bigger, Smaller | ⌘+, ⌘- | Yes |
 | View | Actual Size | ⌘0 | Yes |
 | View | Show Markdown Source or Formatted Text, Show Reader or Original, Show or Hide Formats, Clear Filters, View…, New View…, Revert View, Reset View, Save View, Duplicate View, Delete View…, Collapse All Groups, Expand All Groups, Standard Width, Full Width, Customize Sidebar…, Close Modal, Zoom to Fit, Next Page, Previous Page | – | Yes |
-| View | Fit All Items | – | Yes |
+| View | Zoom In, Zoom Out, Fit All Items (the Map) | – | Yes |
 | View | Show All Items, Show Library, Show Feed | – | Agreed |
 | Format | Heading 1, 2, 3 | ⇧⌘T, ⇧⌘H, ⇧⌘J | Yes |
 | Format | Body | ⇧⌘B | Yes |

@@ -32,9 +32,9 @@ Every editor asks `Item.allows(_:)` for the `ItemChange` it writes (`ValueEditKi
 
 ## Making an item
 
-- **`Browser.openNewItem` opens each New command.** In a window, New Opens (`NewOpens`) chooses the line or the text form. The any-app shortcut requests the line. A kind that the line cannot make opens in the text form (`QuickAdd.lineOffers`).
+- **`Browser.openNewItem` opens each New command.** In a window, New Opens (`NewOpens`) chooses line or text form. The any-app shortcut requests the line; a kind it cannot make opens the text form (`QuickAdd.lineOffers`).
 - **The kind to start with:** a type's own place starts with that type; anywhere else, New Items Are, then the last kind used, then a note (`QuickAdd.startingType`).
-- **One create holds the properties, tags and tier** (`Browser.saveQuickAdd`). The parent is a second write; a refusal or unanswered loss is told by name (`ParentLinkStore`). The In row sets the tier, starting from the place.
+- **One create holds properties, tags and tier** (`Browser.saveQuickAdd`). In starts at the place's tier. The parent is a second write, with refusals or loss reported by name (`ParentLinkStore`).
 - **A type gives a new item only its first status that has not started** (`QuickAdd.prefill`).
 - **A required field the form cannot set is named at once** (`QuickAdd.unsettableRequired`). The line hands a draft missing a required value to the text form.
 - **The title may be left out** where the kind does not require it and the draft holds something else.
@@ -52,12 +52,12 @@ Every editor asks `Item.allows(_:)` for the `ItemChange` it writes (`ValueEditKi
 - **Words stay in the title until Add or ⇧↩ take out what was read** (`QuickAdd.finishLine`); chips show it (`QuickAdd.lineChips`).
 - **Delete on a chip stops it being read** (`QuickAdd.Draft.decline`).
 - **A tag is `#` and a letter at a word's start** (`NewItemText.tags`); reserved tags are never read.
-- **A day becomes the due day, else the start day** (`QuickAdd.dayField`), in the person's locale.
+- **A date in the person's locale sets the due day,** or the start day (`QuickAdd.dayField`).
 - **A kind change keeps the title and sets aside values it cannot hold** (`QuickAdd.tellSetAside`).
 
 ### Typed text is never lost
 
-`NewItemDrafts` keeps each unadded new item through a closed window, quit or refusal (kept at once), by slot (`NewItemDrafts.Slot`) and instance (`serverKey`). A sent draft is frozen; edits make a new one. One cut off by a quit returns unless its item is in the copy; its Add asks first (`QuickAdd.mayBeInMarfa`).
+`NewItemDrafts` keeps drafts by slot and instance through window closure, quit or refusal. `make` and `take` start and resume drafts. `update` and `escape` save edits immediately. `sending` and `sendingFile` freeze a draft. Further edits start another. `settle` checks the copy, `giveBack` restores refused text, and `release` and `drop` end drafts. An interrupted draft returns if its item is absent. Adding again asks first (`mayBeInMarfa`).
 
 ### Dropping
 
