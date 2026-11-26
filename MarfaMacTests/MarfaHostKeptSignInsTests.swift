@@ -224,11 +224,11 @@ import Testing
     }
 
     /// A host whose opener records the address and the key each open was given, read as the package reads it.
-    private func recordingHost(_ bench: HostBench, keys used: Mutex<[String]>) -> MarfaHost {
+    private func recordingHost(_ bench: HostBench, record: @escaping @Sendable (String) -> Void) -> MarfaHost {
         let opener = bench.servers.opener
         return bench.host(opener: { connection, signIns, location in
             let key = (try? signIns.server(for: connection))??.key ?? "none"
-            used.withLock { $0.append("\(connection.address.absoluteString) \(key)") }
+            record("\(connection.address.absoluteString) \(key)")
             return try await opener(connection, signIns, location)
         })
     }
@@ -242,7 +242,7 @@ import Testing
     @Test func anotherAddressOfTheSameMarfaKeepsEachOriginsApprovalThereAndBack() async throws {
         let bench = aliasBench()
         let used = Mutex<[String]>([])
-        let host = recordingHost(bench, keys: used)
+        let host = recordingHost(bench) { line in used.withLock { $0.append(line) } }
         try await host.connect(address: first.address.absoluteString, key: "a")
         let store = bench.location.store(for: first)
         #expect(try await unsent(store) == 1)
@@ -273,7 +273,7 @@ import Testing
     @Test func disconnectingAtOneAddressOfTheSameMarfaKeepsTheOtherOriginsApprovalAndTheQueue() async throws {
         let bench = aliasBench()
         let used = Mutex<[String]>([])
-        let host = recordingHost(bench, keys: used)
+        let host = recordingHost(bench) { line in used.withLock { $0.append(line) } }
         try await host.connect(address: first.address.absoluteString, key: "a")
         let store = bench.location.store(for: first)
         try await host.changeAddress(to: alias.address.absoluteString, key: "b")
