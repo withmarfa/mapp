@@ -178,6 +178,12 @@ final class QuickAdd {
             if !chips.contains(chip) { chips.append(chip) }
         }
 
+        /// Gives the draft a value the place implies, which is not the person's work, as a kind's own is not.
+        mutating func imply(_ key: String, _ value: PropertyValue) {
+            properties[key] = value
+            prefilled[key] = value
+        }
+
         /// Puts the item under `parent` and shows the chip for it.
         mutating func setParent(_ parent: ItemID) {
             parentID = parent
@@ -746,6 +752,8 @@ extension Browser {
     func openNewItem(kind: String? = nil, title: String = "", form: QuickAdd.Form? = nil, in library: any ItemLibrary) {
         // A draft is kept for one instance, so none is begun before the library knows which it reads.
         guard QuickAdd.isAvailable(in: library) else { return }
+        // A table or a board has a row to type in, which plain New puts the caret in; elsewhere New opens the line.
+        if kind == nil, title.isEmpty, form == nil, !quickAdd.isPresented, beginInPlace(in: library) { return }
         let interval = Telemetry.begin(.navigation, "quickAdd.open")
         defer { interval.end() }
         palette = nil

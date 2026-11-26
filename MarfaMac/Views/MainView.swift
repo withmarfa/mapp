@@ -384,6 +384,7 @@ struct MainView: View {
             let changed = libraries.current.map { ObjectIdentifier($0) != ObjectIdentifier(library) } ?? true
             browser.quickAdd.leave(because: changed ? .libraryChanged : .closed, telling: library.notices)
             browser.giveUpNewItems(because: .windowLeft)
+            browser.leaveInPlace()
             browser.viewPanel?.handOff(because: changed ? .libraryChanged : .closed)
         }
         .onAppear {

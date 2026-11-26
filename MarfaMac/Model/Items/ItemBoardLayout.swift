@@ -194,8 +194,11 @@ nonisolated enum ItemBoardLayout {
         }
     }
 
-    /// The lanes in a view's or a place's order, less the hidden ones and, where Hide Empty Groups is on, the empty ones.
-    static func arranged(_ lanes: [ItemBoardLane], order: [String]?, hidden: Set<String>?, hidesEmpty: Bool) -> [ItemBoardLane] {
+    /// The lanes in a view's or a place's order, less the hidden ones and, where Hide Empty Groups is on, the empty ones
+    /// but `kept`.
+    static func arranged(
+        _ lanes: [ItemBoardLane], order: [String]?, hidden: Set<String>?, hidesEmpty: Bool, keeping kept: ItemBoardLane.ID? = nil
+    ) -> [ItemBoardLane] {
         var arranged = lanes
         if let order, !order.isEmpty {
             let named = order.compactMap { key in lanes.first { $0.groupKey == key } }
@@ -203,7 +206,7 @@ nonisolated enum ItemBoardLayout {
             arranged = named + lanes.filter { !keys.contains($0.groupKey) }
         }
         let hidden = hidden ?? []
-        return arranged.filter { !hidden.contains($0.groupKey) && !(hidesEmpty && $0.items.isEmpty) }
+        return arranged.filter { !hidden.contains($0.groupKey) && !(hidesEmpty && $0.items.isEmpty && $0.id != kept) }
     }
 
     enum Move: Equatable, Sendable {

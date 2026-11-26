@@ -11253,6 +11253,9 @@
     "This may already be in Marfa. The app quit while it was being added, so check the library before you add it again." : {
 
     },
+    "This may already be in Marfa. The app quit while it was being added. Press Return again to add it." : {
+
+    },
     "This may remove %@ sooner than the server’s current setting." : {
 
     },

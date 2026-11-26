@@ -73,6 +73,7 @@ extension Browser {
         }
         quickAdd.drafts.settle(in: library)
         if quickAdd.isPresented { quickAdd.takeBackRefused(in: library) }
+        inPlace.takeBackRefused(in: library)
     }
 
     /// Files the item in the collection shown, attaches its files, and opens it where it was added to be opened.

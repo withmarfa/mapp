@@ -68,6 +68,9 @@ final class ItemTableContent {
         let hidden = options.hiddenGroups ?? []
         return allGroups.filter { !hidden.contains($0.id) && !(hidesEmptyGroups && $0.rows.isEmpty) }
     }()
+    /// The row of `id` before the filters, where the place lists it.
+    func row(_ id: ItemID) -> ItemTableRow? { made.positions[id].map { allRows[$0] } }
+
     /// The rows under their parents (`ItemNesting`), in the order of `rows`, where the table is not grouped and its types
     /// offer sub-items.
     lazy var nesting = grouping == nil && nests ? ItemNesting(rows: rows) : .flat

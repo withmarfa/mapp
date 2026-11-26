@@ -20,6 +20,8 @@ final class Browser {
             modalItem = nil
             listMemory.scrollOffset = nil
             expandedDigestPiles.removeAll()
+            // A row typed in place keeps its draft for the place it was typed in.
+            leaveInPlace()
             laterPlace = nil
             if openedView.map({ showing?.savedView != $0.id }) == true { openedView = nil }
             viewPanelPlaceChanged()
@@ -286,6 +288,13 @@ final class Browser {
     var panelIsOut: Bool { palette != nil || (quickAdd.isPresented && quickAdd.draft != nil) || isModalPresented }
     /// The window's new item, in the line or the text form, and what is typed in it.
     let quickAdd = QuickAdd()
+    /// The new item typed in place in the table, a board or the calendar (`Browser+InPlace`).
+    let inPlace = InPlaceRow()
+    /// The rows kept where the person saw them until they are left (`RowHold`). Read by a layout as it draws, never
+    /// observed, so a pointer that moves draws nothing; letting a moved row go counts in `rowHoldReleases`.
+    @ObservationIgnored var rowHold = RowHold()
+    /// Counts the held rows let go that a drawing had moved, which a layout reads to draw them where they belong.
+    var rowHoldReleases = 0
     /// Whether the list's search is out as a field, rather than a button beside the View button.
     var isSearchExpanded = false
     /// Counts each request for the list's search, so a field already out takes the keyboard again.
@@ -566,6 +575,7 @@ final class Browser {
         palette = nil
         fetchedFile = nil
         giveUpNewItems(because: .windowLeft)
+        leaveInPlace()
         focusCaret = nil
         newEmbeds = nil
     }

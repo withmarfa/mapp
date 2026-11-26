@@ -133,6 +133,11 @@ nonisolated struct ItemTableColumn: Identifiable, Hashable, Sendable {
     static let title = ItemTableColumn(id: "title", label: String(localized: "Name"), content: .title, style: .title)
     static let type = ItemTableColumn(id: "type", label: String(localized: "Type"), content: .type, style: .text)
     static let parent = ItemTableColumn(id: "parent", label: "", content: .parent, style: .link)
+
+    /// The field key a field's column, or a filter on it, is named by (`field.<key>`), or nil for any other column.
+    static func fieldKey(of id: String) -> String? {
+        id.hasPrefix("field.") ? String(id.dropFirst("field.".count)) : nil
+    }
     static let children = ItemTableColumn(
         id: "children", label: "", content: .children, style: .links, isShownByDefault: false)
     static let collections = ItemTableColumn(

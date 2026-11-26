@@ -257,7 +257,9 @@ extension Browser {
     /// The lanes the board shows: less the hidden ones, and the empty ones where Hide Empty Groups is on.
     func shownBoardLanes(_ lanes: BoardLanes) -> [ItemBoardLane] {
         let hidden = lanes.isOwn ? tableOptions[shown]?.hiddenGroups : nil
-        return ItemBoardLayout.arranged(lanes.all, order: nil, hidden: hidden, hidesEmpty: hidesEmptyGroups)
+        // The lane a card is typed into stays while the card is open, though Hide Empty Groups would leave it out.
+        let typing: ItemBoardLane.ID? = if inPlace.place == shown, case .lane(let id)? = inPlace.spot { id } else { nil }
+        return ItemBoardLayout.arranged(lanes.all, order: nil, hidden: hidden, hidesEmpty: hidesEmptyGroups, keeping: typing)
     }
 
     /// A board showing a grouping the place does not hold (`boardGrouping`'s fallback) takes it as the place's own before
