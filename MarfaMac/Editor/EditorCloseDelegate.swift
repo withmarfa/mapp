@@ -1,23 +1,15 @@
 import AppKit
 
-/// SwiftUI owns the window delegate; forward its other callbacks while awaiting a safe editor flush. A window's typed
-/// titles are saved first, with or without an editor (`WindowTitleDrafts`).
+/// SwiftUI owns the window delegate; forward its other callbacks while awaiting a safe editor flush.
 final class EditorCloseDelegate: NSObject, NSWindowDelegate {
     nonisolated(unsafe) private weak var previous: (any NSWindowDelegate)?
     private weak var editor: EditorController?
-    /// Whether every title typed in the window is saved; a refused one has been told.
-    private let saveTitles: () -> Bool
     private(set) weak var window: NSWindow?
     private(set) var awaiting = false
     private var approved = false
 
-    convenience init(editor: EditorController, window: NSWindow) {
-        self.init(window: window) { [weak editor] in editor?.saveTitles(tellingRefusal: true) != false }
+    init(editor: EditorController, window: NSWindow) {
         self.editor = editor
-    }
-
-    init(window: NSWindow, saveTitles: @escaping () -> Bool) {
-        self.saveTitles = saveTitles
         self.window = window
         previous = window.delegate
         super.init()
@@ -37,7 +29,7 @@ final class EditorCloseDelegate: NSObject, NSWindowDelegate {
         }
         guard previous?.windowShouldClose?(sender) != false else { return false }
         // A title typed in this window and refused would be lost with it.
-        guard saveTitles() else { return false }
+        guard editor?.saveTitles(tellingRefusal: true) != false else { return false }
         // A hand-over still under way, as just after the item was left, holds the last edit of an item no longer
         // on the page; once the window goes, a quit no longer waits on its editor.
         guard let editor, editor.hasItem || editor.isFlushing else { return true }

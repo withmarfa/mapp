@@ -247,78 +247,15 @@ final class DetailsPresentation {
         drafts.filter { $0.value["title"]?.isDirty == true }.map(\.key).sorted { $0.rawValue < $1.rawValue }
     }
 
-    /// The person typed `text` as the item's title. The first keystroke of a draft notes the version the item was on,
-    /// which the save is sent on, so a title another device set meanwhile is merged against it, never written over.
-    func typeTitle(_ text: String, of id: ItemID, in library: any ItemLibrary) {
-        let draft = draft(for: id, key: "title")
-        if !draft.isDirty { draft.readAt = library.item(id)?.version }
-        draft.text = text
-        draft.isDirty = true
-        draft.rejected = false
-    }
-
-    /// Drops the title typed for the item, as Escape does.
-    func discardTitle(of id: ItemID) {
-        let draft = draft(for: id, key: "title")
-        draft.isDirty = false
-        draft.rejected = false
-        draft.readAt = nil
-    }
-
-    /// Saves the title typed for the item, if there is one, on the version it was typed on; whether the title the page
-    /// shows is saved.
+    /// Saves the title typed for the item, if there is one; whether the title the page shows is saved.
     @discardableResult
     func saveTitle(of id: ItemID, in library: any ItemLibrary, undoManager: UndoManager?) -> Bool {
         let draft = draft(for: id, key: "title")
         guard draft.isDirty, let item = library.item(id), library.canSetTitle(of: item) else { return !draft.rejected }
         let title = draft.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        draft.rejected = !library.setItemProperty(id, key: "title", value: .string(title), readAt: draft.readAt, undoManager: undoManager)
-        if !draft.rejected {
-            draft.isDirty = false
-            draft.readAt = nil
-        }
+        draft.rejected = !library.setItemProperty(id, key: "title", value: .string(title), undoManager: undoManager)
+        if !draft.rejected { draft.isDirty = false }
         return !draft.rejected
-    }
-
-    /// Tries every title the window holds unsaved, since a name taken before may be free now. A title whose item is
-    /// gone or can no longer take one goes back to the person through `Notices.notKept`. Whether all are saved; if not,
-    /// and asked to, says which is not and calls `showRefused` with its item.
-    func saveTitles(
-        in library: any ItemLibrary, undoManager: UndoManager?, tellingRefusal: Bool, showRefused: (ItemID) -> Void
-    ) -> Bool {
-        var refused: (id: ItemID, draft: String, item: String)?
-        for id in unsavedTitles {
-            guard let item = library.item(id), library.canSetTitle(of: item) else {
-                handBackTitle(of: id, in: library)
-                continue
-            }
-            if !saveTitle(of: id, in: library, undoManager: undoManager), refused == nil {
-                refused = (id, draft(for: id, key: "title").text, item.title)
-            }
-        }
-        guard let refused else { return true }
-        if tellingRefusal {
-            let message = refused.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                ? String(localized: "The title for “\(refused.item)” is empty. Open the item to enter a title or discard your changes.")
-                : String(localized: "The title “\(refused.draft)” for “\(refused.item)” couldn’t be saved. Open the item to change the title or discard your changes.")
-            library.notices.tell(String(localized: "Couldn’t Save Title"), message)
-            showRefused(refused.id)
-        }
-        return false
-    }
-
-    /// Hands every title still unsaved back to the person, as when the window goes without saving them.
-    func handBackTitles(in library: any ItemLibrary) {
-        for id in unsavedTitles { handBackTitle(of: id, in: library) }
-    }
-
-    private func handBackTitle(of id: ItemID, in library: any ItemLibrary) {
-        let text = draft(for: id, key: "title").text.trimmingCharacters(in: .whitespacesAndNewlines)
-        discardTitle(of: id)
-        guard !text.isEmpty else { return }
-        library.notices.notKept(
-            String(localized: "Couldn’t Save Title"), text: text,
-            reason: String(localized: "The item was deleted or can no longer be changed, so the title you typed wasn’t saved."))
     }
 }
 
@@ -363,8 +300,6 @@ final class ItemPropertyDraft {
     var rejected = false
     /// The stored text the draft started from, to tell whether the item changed under it.
     var base: String?
-    /// The version of the item a typed title started on, which its save is sent on.
-    var readAt: ItemVersion?
     /// The property the draft is for, set by its row, so a draft left behind can be written or handed back without
     /// the row.
     var field: ItemTypeInfo.Field?

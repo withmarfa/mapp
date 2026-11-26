@@ -16,9 +16,9 @@ struct FileHeadSpace {
     var top: CGFloat { toolbar + head }
 }
 
-/// A file's head, as every item's: the kicker, the title, then the rows that have a value. The title and the rows the
-/// item can take an edit for are edited here, and a file's own facts (its size, its type) are not rows, since the server
-/// owns them.
+/// A file's head, as every item's: the kicker, the title, then the rows that have a value. The rows the item can take an
+/// edit for open their editor here; the title is shown, not typed. A file's own facts (its size, its type) are not rows,
+/// since the server owns them.
 struct FilePageHead: View {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
@@ -42,7 +42,7 @@ struct FilePageHead: View {
         let statusField = library.catalogue.itemTypes[item.type]?.statusField
         VStack(alignment: .leading, spacing: 0) {
             PageHeadView(item: item, head: head, statusField: statusField, drafts: drafts, open: open, edit: edit) {
-                FileTitle(item: item, drafts: drafts, size: style.titleSize, lines: TitleLines.resolved(titleLines))
+                FileTitle(item: item, size: style.titleSize, lines: TitleLines.resolved(titleLines))
             }
             if let statusField, drafts.draft(for: item.id, key: statusField.key).rejected {
                 Text("The value could not be saved.")
@@ -71,83 +71,21 @@ struct FilePageHead: View {
     }
 }
 
-/// The title, typed where the item's title can be set, and kept as the page's own is: on Return, on leaving the field,
-/// and when the page goes (`FileTitleSaving`). A refused title stays typed, with the reason under it.
+/// The title, as text: a file is renamed with Rename, as before, and its title is not typed in the head.
 private struct FileTitle: View {
-    @CurrentLibrary private var library
-    @Environment(\.undoManager) private var undoManager
-    @AppStorage(InterfaceKey.textSize) private var interfaceTextSize = InterfaceStyle.defaultTextSize
     let item: Item
-    let drafts: DetailsPresentation
     let size: CGFloat
     let lines: Int
-    @FocusState private var isFocused: Bool
 
     var body: some View {
-        let draft = drafts.draft(for: item.id, key: "title")
-        let font = Font.system(size: size, weight: .semibold)
-        VStack(alignment: .leading, spacing: 4) {
-            if library.canSetTitle(of: item) {
-                TextField(
-                    "Title",
-                    text: Binding {
-                        draft.isDirty ? draft.text : item.title
-                    } set: { text in
-                        drafts.typeTitle(text, of: item.id, in: library)
-                    },
-                    axis: .vertical
-                )
-                .textFieldStyle(.plain)
-                .lineLimit(1...8)
-                .focused($isFocused)
-                .onKeyPress(.return) {
-                    save()
-                    isFocused = false
-                    return .handled
-                }
-                .onKeyPress(.escape) {
-                    drafts.discardTitle(of: item.id)
-                    isFocused = false
-                    return .handled
-                }
-                .onChange(of: isFocused) { _, focused in if !focused { save() } }
-                .accessibilityIdentifier("FileTitle")
-            } else {
-                Text(verbatim: item.displayTitle)
-                    .lineLimit(lines)
-                    .truncationMode(.tail)
-                    .textSelection(.enabled)
-                    .accessibilityIdentifier("FileTitle")
-            }
-            if draft.rejected {
-                Text(verbatim: library.titleRefusal)
-                    .font(InterfaceStyle.captionFont.scaled(by: InterfaceStyle.scale(for: interfaceTextSize)))
-                    .foregroundStyle(.red)
-                    .accessibilityAddTraits(.updatesFrequently)
-            }
-        }
-        .font(font)
-        .tracking(size * Typography.titleTracking)
-        .fixedSize(horizontal: false, vertical: true)
-        .accessibilityAddTraits(.isHeader)
-        .modifier(FileTitleSaving(item: item.id, drafts: drafts))
-    }
-
-    private func save() {
-        drafts.saveTitle(of: item.id, in: library, undoManager: undoManager)
-    }
-}
-
-/// Tries to save the title for the item the page is leaving.
-private struct FileTitleSaving: ViewModifier {
-    @CurrentLibrary private var library
-    @Environment(\.undoManager) private var undoManager
-    let item: ItemID
-    let drafts: DetailsPresentation
-
-    func body(content: Content) -> some View {
-        content
-            .onChange(of: item) { old, _ in drafts.saveTitle(of: old, in: library, undoManager: undoManager) }
-            .onDisappear { drafts.saveTitle(of: item, in: library, undoManager: undoManager) }
+        Text(verbatim: item.displayTitle)
+            .lineLimit(lines)
+            .truncationMode(.tail)
+            .textSelection(.enabled)
+            .font(.system(size: size, weight: .semibold))
+            .tracking(size * Typography.titleTracking)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityAddTraits(.isHeader)
+            .accessibilityIdentifier("FileTitle")
     }
 }

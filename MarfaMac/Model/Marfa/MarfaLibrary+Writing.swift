@@ -51,7 +51,7 @@ extension MarfaLibrary {
 
     /// A title is the property the type keeps it in, which the views name `title` whatever it is.
     @discardableResult
-    func setItemProperty(_ id: ItemID, key: String, value: PropertyValue?, readAt: ItemVersion?, undoManager: UndoManager?) -> Bool {
+    func setItemProperty(_ id: ItemID, key: String, value: PropertyValue?, undoManager: UndoManager?) -> Bool {
         guard let item = item(id) else { return false }
         let cantEdit = String(localized: "Can’t Edit This Property")
         var key = key
@@ -64,7 +64,7 @@ extension MarfaLibrary {
             // A file's title can be a fact Marfa sets, such as its extracted text.
             guard item.obstacle(toField: field) == nil, let title = value?.string.map(NameText.trimmed), !title.isEmpty else { return false }
             key = field
-            return editProperty(id, key: key, to: .string(title), readAt: readAt, undoManager: undoManager)
+            return editProperty(id, key: key, to: .string(title), undoManager: undoManager)
         }
         // The text is the page's to write, never a property's.
         guard item.obstacle(toField: key) == nil, let type = catalogue.itemTypes[item.type], key != MarfaMapping.bodyField(of: type),
@@ -76,15 +76,15 @@ extension MarfaLibrary {
             )
             return false
         }
-        return editProperty(id, key: key, to: value, readAt: readAt, undoManager: undoManager)
+        return editProperty(id, key: key, to: value, undoManager: undoManager)
     }
 
-    private func editProperty(_ id: ItemID, key: String, to value: PropertyValue?, readAt: ItemVersion?, undoManager: UndoManager?) -> Bool {
+    private func editProperty(_ id: ItemID, key: String, to value: PropertyValue?, undoManager: UndoManager?) -> Bool {
         guard let item = item(id) else { return false }
         // A value equal to the stored one still goes while an edit of the item is on its way, since it reverses that
         // edit: skipping it would leave the edit in flight as the value stored.
         if item.value(of: key) != value || isWritingProperties(of: id) {
-            editProperties(id, to: [key: value], readAt: readAt, actionName: String(localized: "Edit Property"), undoManager: undoManager)
+            editProperties(id, to: [key: value], actionName: String(localized: "Edit Property"), undoManager: undoManager)
         }
         return true
     }
@@ -107,12 +107,9 @@ extension MarfaLibrary {
         return true
     }
 
-    /// Made at `readAt`, the version the person saw, or else at the version held when it runs, so an undo goes on top
-    /// of whatever came after the edit.
-    private func editProperties(
-        _ id: ItemID, to changes: [String: PropertyValue?], readAt: ItemVersion? = nil, actionName: String, undoManager: UndoManager?
-    ) {
-        guard let version = readAt ?? item(id)?.version,
+    /// Made at the version held when it runs, so an undo goes on top of whatever came after the edit.
+    private func editProperties(_ id: ItemID, to changes: [String: PropertyValue?], actionName: String, undoManager: UndoManager?) {
+        guard let version = item(id)?.version,
             let edit = submitPropertyEdit(id, changes, base: version, failing: String(localized: "Can’t Edit This Property"))
         else { return }
         registerUndo(of: edit, name: actionName, undoManager: undoManager)
