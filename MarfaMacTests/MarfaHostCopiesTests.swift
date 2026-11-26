@@ -169,6 +169,90 @@ import Testing
         #expect(host.discarded.isEmpty)
     }
 
+    // MARK: A discard that could not finish
+
+    /// The copy of instance A is discarded while another program holds it, so it stays, marked. The address then serves
+    /// instance B: B's new copy is not taken for A's mark. Back on A, A's copy is removed by its mark, and nothing it
+    /// held is opened or sent; B's copy stays.
+    @Test func aDiscardThatCouldNotFinishStaysWithItsCopyWhileTheAddressServesAnotherMarfa() async throws {
+        let bench = HostBench()
+        bench.servers.instances.withLock { $0 = [bare: "instance-a"] }
+        bench.servers.storedWrites.withLock { $0 = 2 }
+        let busy = Mutex(true)
+        let host = bench.host(remover: { store, agreed in
+            if busy.withLock({ $0 }) { throw MarfaError.storeBusy(message: "Another program holds it.") }
+            try await MarfaHost.removeStore(store, agreedToLose: agreed)
+        })
+        try await host.connect(address: bare.address.absoluteString, key: "a")
+        let first = try #require(bench.servers.last)
+        let storeA = try #require(first.store.withLock { $0 })
+        let folderA = storeA.deletingLastPathComponent().lastPathComponent
+        first.report.set(SyncReport(waiting: 2, queueRead: true))
+        #expect(await eventually { host.waitingChanges == 2 })
+        bench.servers.storedWrites.withLock { $0 = 0 }
+
+        do {
+            try await discardEverything(host)
+            Issue.record("a copy another program holds was removed")
+        } catch {
+            guard case .notRemoved? = error as? MarfaHost.Problem else { throw error }
+        }
+        busy.withLock { $0 = false }
+        #expect(Array(host.discarded.keys) == [folderA])
+        #expect(try await unsent(storeA) == 2)
+
+        bench.servers.instances.withLock { $0 = [bare: "instance-b"] }
+        try await host.connect(address: bare.address.absoluteString, key: "b")
+        let storeB = try #require(bench.servers.last?.store.withLock { $0 })
+        #expect(storeB.deletingLastPathComponent().lastPathComponent != folderA)
+        #expect(Array(host.discarded.keys) == [folderA], "B's copy is not the copy discarded")
+        #expect(try await unsent(storeA) == 2)
+        try await host.disconnect(.keepCopy)
+
+        bench.servers.instances.withLock { $0 = [bare: "instance-a"] }
+        try await host.connect(address: bare.address.absoluteString, key: "a")
+        let again = try #require(bench.servers.last)
+        #expect(again.store.withLock { $0 } == storeA)
+        #expect(try await again.storeWrites.isEmpty, "the discarded writes were removed, never opened to be sent")
+        #expect(host.discarded.isEmpty)
+        #expect(FileManager.default.fileExists(atPath: storeB.deletingLastPathComponent().path), "B's copy stays")
+    }
+
+    /// A mark an older build made under the address is bound to the copy that address opened then, before the address
+    /// is opened for another Marfa.
+    @Test func anOlderBuildsMarkIsBoundToItsCopyBeforeTheAddressOpensAnotherMarfa() async throws {
+        let bench = HostBench()
+        let folderA = bench.location.directory(for: bare)
+        let storeA = try await makeCopy(bench, in: folderA, unsent: 1)
+        let shown = try await WorkingCopy.unsentWrites(in: storeA).writes.map(\.id)
+        bench.defaults.set([bare.address.absoluteString: shown], forKey: MarfaHost.discardedKey)
+        bench.servers.instances.withLock { $0 = [bare: "instance-b"] }
+        try bench.location.copies.change { $0.instances[folderA.lastPathComponent] = "instance-a" }
+        let host = bench.host()
+        #expect(host.discarded.keys.sorted() == [folderA.lastPathComponent])
+
+        try await host.connect(address: bare.address.absoluteString, key: "b")
+        #expect(bench.location.directory(for: bare) != folderA)
+        #expect(host.discardMark(for: bare) == nil)
+        #expect(host.discarded.keys.sorted() == [folderA.lastPathComponent])
+        #expect(try await unsent(storeA) == 1)
+        try await host.disconnect(.keepCopy)
+
+        bench.servers.instances.withLock { $0 = [bare: "instance-a"] }
+        try await host.connect(address: bare.address.absoluteString, key: "a")
+        #expect(try await #require(bench.servers.last).storeWrites.isEmpty)
+        #expect(host.discarded.isEmpty)
+    }
+
+    /// A mark whose address cannot be read is never dropped.
+    @Test func aMarkThatNamesNoCopyIsKept() async throws {
+        let bench = HostBench()
+        bench.defaults.set(["not an address": ["w1"]], forKey: MarfaHost.discardedKey)
+        let host = bench.host()
+        try await host.connect(address: bare.address.absoluteString, key: "k")
+        #expect(bench.defaults.dictionary(forKey: MarfaHost.discardedKey)?["not an address"] as? [String] == ["w1"])
+    }
+
     @Test func aStepThatDoesNotOpenTheCopyPutsTheRecordBack() async throws {
         let bench = HostBench()
         bench.servers.instances.withLock { $0 = [bare: "instance-x"] }
