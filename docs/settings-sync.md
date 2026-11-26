@@ -33,7 +33,7 @@ paths:
 - **A set is written sorted**, so saving it again is not a change.
 - **A hidden view is its own row, kept when shown again:** a row this Mac lacks of a `PreferencesMap.keptWhereAbsent` setting is taken, not deleted.
 - **What is kept for a place is keyed by its word** (`PlaceView.storageKey`), and for a saved view by its id, as its place can change; an earlier copy's keys are never removed (`EarlierPlace`).
-- **An earlier copy drops unknown members** from a row it rewrites, but for a look; for example, `digest` from `viewLayout`. It reads an unknown layout as List.
+- **Rewriting a view layout can drop unknown members** such as `digest`. An unknown layout opens as List. Looks, page placements, and panel parts preserve unknown members in readable rows.
 - **A sign-in asks for `app.*:write`, never the app's own vendor scope**, because discovery lists no vendor scope before its first type exists (withmarfa/marfa#3522).
 
 ## The first launch against a Marfa
@@ -58,7 +58,7 @@ paths:
 
 - **A row leaves the Marfa only when the person removes it here.** The Marfa keeps rows a store sets aside (`PreferenceHolds`).
 - **An unreadable entry stays in place or goes under its store's `...SetAside` key.**
-- **A value this Mac cannot read is never sent, deleted or overwritten** but by the person (`SyncedSetting.Reader`).
+- **Sync checks each row for valid JSON.** Local date formats also pass through `SyncedSetting.Reader`.
 - **Reset keeps every value that was set aside.**
 
 ## Removing and disconnecting
