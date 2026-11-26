@@ -12,7 +12,8 @@ import os
 /// holds wins, else the first by name, and it is logged; until the library's Marfa is known, such a part does not move.
 /// Every value that does not win is first saved in a file beside the restore points that the app never removes; where
 /// it cannot be saved, nothing moves. A name whose setting cannot be read keeps it as stored, and the sync changes
-/// nothing of that setting (`unsettled`) until it moves.
+/// nothing of that setting (`unsettled`) until it moves. What a store set aside from a name, as it could not read it,
+/// is no removal: the Marfa's rows stand in for it once the Marfa is known, and its stored bytes go in the file.
 @MainActor final class LibrarySettings {
     /// The order each part of each library's settings was last written in. Bookkeeping, not a setting.
     nonisolated static let orderKey = "librarySettingsOrder"
@@ -29,6 +30,11 @@ import os
         var asides: [String: String] = [:]
         /// The settings whose store set something aside that the setting's own value has not yet been seen to lose.
         var settingAside: Set<String> = []
+        /// What each setting's store set aside from a library because it could not read it, by library then setting
+        /// key, which the move stands in for with the Marfa's rows (`settle`).
+        var lost: [String: [String: Lost]] = [:]
+        /// Each setting's stored bytes when last seen holding a library that could not be read, by setting key.
+        var unreadBytes: [String: Data] = [:]
 
         static func read(_ defaults: UserDefaults) -> Book? {
             defaults.data(forKey: orderKey).flatMap { try? JSONDecoder().decode(Book.self, from: $0) }
@@ -46,6 +52,16 @@ import os
         /// The write that last changed the part; 0 for the library open when the order began to be kept, and nil for
         /// any other value held then.
         var order: Int?
+    }
+
+    /// What a store set aside from one library's setting.
+    nonisolated struct Lost: Codable, Equatable, Sendable {
+        /// The parts set aside, by name; nil where the library's whole entry was, so it may have held any part.
+        var parts: Set<String>?
+        /// The setting's stored bytes before the store set them aside.
+        var stored: Data?
+
+        func covers(_ name: String) -> Bool { parts?.contains(name) ?? true }
     }
 
     enum Failure: Error, Equatable {
@@ -89,7 +105,6 @@ import os
                 }
             }
             book.save(defaults)
-            seen = raw()
         }
         note()
         observer = NotificationCenter.default.addObserver(
@@ -129,8 +144,9 @@ import os
     /// Stamps each part changed since the last look with the next write's order, and each part seen gone with a
     /// removal of that order. A part is seen gone only from a library whose setting was read before and now: one that
     /// could not be read, or whose store set something aside, loses its stamps instead, since that is no removal of the
-    /// person's. `carrying` gives each part a move wrote or removed the order of the value that won; `moving` names, by
-    /// setting key, the libraries a move took that setting from, whose stamps of it go.
+    /// person's, and is kept as lost (`Book.lost`) with the bytes it was stored in. `carrying` gives each part a move
+    /// wrote or removed the order of the value that won; `moving` names, by setting key, the libraries a move took that
+    /// setting from, whose stamps and losses of it go.
     private func note(carrying: [String: [String: Int?]] = [:], moving: [String: Set<String>] = [:]) {
         let now = raw()
         guard now != seen || !carrying.isEmpty || !moving.isEmpty else { return }
@@ -141,6 +157,8 @@ import os
         var wrote = false
         var stamps: [String: [String: Stamp]] = [:]
         var unread: [String: Set<String>] = [:]
+        var lost: [String: [String: Lost]] = [:]
+        var unreadBytes: [String: Data] = [:]
         for (index, setting) in Self.settings.enumerated() {
             let aside = asideHash(of: setting)
             let valueChanged = before.map { $0[index * 2] != now[index * 2] } ?? true
@@ -149,15 +167,20 @@ import os
             let forgiving = book.settingAside.contains(setting.key)
             if valueChanged { book.settingAside.remove(setting.key) }
             let moved = moving[setting.key] ?? []
+            let storedBefore = before.flatMap { Self.storedBytes($0[index * 2]) }
             for library in libraries(of: setting, in: book) {
                 let earlier = (book.stamps[library] ?? [:]).filter { Self.unit(named: $0.key).map(setting.owns) == true }
+                var losing = book.lost[library]?[setting.key]
                 guard case .units(let units) = setting.read(defaults, library: library) else {
                     unread[library, default: []].insert(setting.key)
                     stamps[library, default: [:]].merge(earlier) { _, kept in kept }
+                    if let losing { lost[library, default: [:]][setting.key] = losing }
+                    unreadBytes[setting.key] = defaults.data(forKey: setting.key)
                     continue
                 }
                 guard !moved.contains(library) else { continue }
                 let wasUnread = book.unread[library]?.contains(setting.key) == true
+                if wasUnread, forgiving { losing = Lost(parts: nil, stored: book.unreadBytes[setting.key] ?? storedBefore) }
                 var parts: [String: Stamp] = [:]
                 for (unit, text) in units {
                     let name = Self.name(unit)
@@ -179,24 +202,39 @@ import os
                     } else if !wasUnread, !forgiving {
                         parts[name] = Stamp(hash: nil, order: order)
                         wrote = true
+                    } else if !wasUnread, losing == nil || losing?.parts != nil {
+                        losing = Lost(parts: (losing?.parts ?? []).union([name]), stored: losing?.stored ?? storedBefore)
                     }
                 }
+                // A part written or removed since is the person's choice, which stands in for nothing.
+                if let set = losing?.parts { losing?.parts = set.subtracting(parts.keys) }
+                if let losing, losing.parts?.isEmpty != true { lost[library, default: [:]][setting.key] = losing }
                 if !parts.isEmpty { stamps[library, default: [:]].merge(parts) { _, kept in kept } }
             }
         }
         if wrote { book.next += 1 }
         book.stamps = stamps
         book.unread = unread
+        book.lost = lost
+        book.unreadBytes = unreadBytes
         book.save(defaults)
     }
 
-    /// The libraries `setting` holds a value for, and those with a stamp of one of its parts.
+    /// The libraries `setting` holds a value for, those with a stamp of one of its parts, and those it could not read
+    /// or that its store set something aside from.
     private func libraries(of setting: SyncedSetting, in book: Book) -> [String] {
         var libraries = Set(storedLibraries(of: setting))
         for (library, parts) in book.stamps where parts.keys.contains(where: { Self.unit(named: $0).map(setting.owns) == true }) {
             libraries.insert(library)
         }
+        for (library, keys) in book.unread where keys.contains(setting.key) { libraries.insert(library) }
+        for (library, settings) in book.lost where settings[setting.key] != nil { libraries.insert(library) }
         return libraries.sorted()
+    }
+
+    /// The data a setting's defaults value holds, from the property list `raw` kept of it.
+    private nonisolated static func storedBytes(_ plist: Data?) -> Data? {
+        plist.flatMap { try? PropertyListSerialization.propertyList(from: $0, format: nil) }.flatMap { $0 as? Data }
     }
 
     private func storedLibraries(of setting: SyncedSetting) -> [String] {
@@ -234,11 +272,22 @@ import os
         var why: Reason
     }
 
+    /// What a store set aside from a name a move took, as the file keeps it.
+    nonisolated struct Unreadable: Codable, Equatable, Sendable {
+        var library: String
+        var setting: String
+        /// The parts set aside; none where the whole entry was.
+        var parts: [String]?
+        /// The setting's bytes as stored before the store set them aside.
+        var stored: Data?
+    }
+
     private nonisolated struct File: Codable {
         var about: String
         var date: Date
         var build: String
         var settings: [SetAside]
+        var unreadable: [Unreadable]
     }
 
     nonisolated struct Moved: Equatable, Sendable {
@@ -247,26 +296,29 @@ import os
         /// The file the values that did not win were saved in, if any.
         var file: URL?
         var setAside: [SetAside] = []
+        var unreadable: [Unreadable] = []
     }
 
     /// Moves what each library kept under an earlier name to the name `rename` gives it, nil for a name that stays. A
     /// setting the new name holds that cannot be read moves from no name; one an earlier name holds that cannot be read
     /// stays under it as stored, while the names that can be read move. A part held differently with nothing to say
-    /// which is later moves only once the new name is the library's Marfa, so the Marfa's value can win. What does not
-    /// move is tried again at the next move, and is `unsettled` meanwhile.
+    /// which is later moves only once the new name is the library's Marfa, so the Marfa's value can win. Where a store set
+    /// aside what an earlier name held (`Book.lost`), that name holds the Marfa's rows in its place, so the setting moves
+    /// only once the Marfa is known, and a value written or removed since still wins. What does not move is tried again
+    /// at the next move, and is `unsettled` meanwhile. A name with only removals or losses left moves as one with values.
     @discardableResult
     func settle(rename: (String) -> String?) throws(Failure) -> Moved {
         note()
+        let book = Book.read(defaults) ?? Book()
         var groups: [String: [String]] = [:]
         for setting in Self.settings {
-            for library in storedLibraries(of: setting) {
+            for library in libraries(of: setting, in: book) {
                 guard let target = rename(library), target != library else { continue }
                 if !(groups[target]?.contains(library) ?? false) { groups[target, default: []].append(library) }
             }
         }
         unsettled = [:]
         guard !groups.isEmpty else { return Moved() }
-        let book = Book.read(defaults) ?? Book()
         let record = PreferencesSync.Record.read(defaults)
 
         var moved = Moved()
@@ -279,6 +331,11 @@ import os
             let base = instance.flatMap { record.marfas[$0]?.base } ?? [:]
             settings: for setting in Self.settings {
                 guard case .units(let own) = setting.read(defaults, library: target) else {
+                    unsettled[target, default: []].insert(setting.key)
+                    continue
+                }
+                let lost = sources.reduce(into: [String: Lost]()) { $0[$1] = book.lost[$1]?[setting.key] }
+                if instance == nil, !lost.isEmpty {
                     unsettled[target, default: []].insert(setting.key)
                     continue
                 }
@@ -297,6 +354,9 @@ import os
                         if let unit = Self.unit(named: name), setting.owns(unit) { parts.insert(unit) }
                     }
                 }
+                for (unit, _) in base where setting.owns(unit) && lost.values.contains(where: { $0.covers(Self.name(unit)) }) {
+                    parts.insert(unit)
+                }
                 var merged: PreferenceUnits = [:]
                 var entries: [SetAside] = []
                 var carried: [String: Int?] = [:]
@@ -306,6 +366,8 @@ import os
                         let stamp = book.stamps[reading.library]?[name]
                         if let text = reading.units[unit] { return (reading.library, text, stamp?.order) }
                         if let stamp, stamp.hash == nil { return (reading.library, nil, stamp.order) }
+                        // What the store set aside is unknown, so the Marfa's row stands in for it, as no later value.
+                        if lost[reading.library]?.covers(name) == true, let text = base[unit] { return (reading.library, text, nil) }
                         return nil
                     }
                     let dated = holders.filter { $0.order != nil }
@@ -333,6 +395,12 @@ import os
                         setAside: losers.map { .init(library: $0.library, value: $0.text) }, why: why))
                 }
                 moved.setAside += entries
+                for reading in readings.dropFirst() {
+                    guard let losing = lost[reading.library] else { continue }
+                    moved.unreadable.append(Unreadable(
+                        library: reading.library, setting: setting.key,
+                        parts: losing.parts.map { $0.compactMap { Self.unit(named: $0).map(Self.describe) }.sorted() }, stored: losing.stored))
+                }
                 carrying[target, default: [:]].merge(carried) { _, later in later }
                 writes.append((setting, target, merged))
                 for reading in readings.dropFirst() {
@@ -349,9 +417,9 @@ import os
             Telemetry.logger(.sync).error("Settings kept for a library under an earlier name could not be read or decided, so they stay there for now")
         }
         guard !writes.isEmpty else { return Moved() }
-        if !moved.setAside.isEmpty {
+        if !moved.setAside.isEmpty || !moved.unreadable.isEmpty {
             do {
-                moved.file = try saveAside(moved.setAside)
+                moved.file = try saveAside(moved.setAside, moved.unreadable)
             } catch {
                 // Nothing moved, so none of it syncs until it does.
                 for (setting, library, _) in writes where moving[setting.key]?.contains(library) != true {
@@ -368,7 +436,7 @@ import os
         return moved
     }
 
-    private func saveAside(_ entries: [SetAside]) throws(Failure) -> URL {
+    private func saveAside(_ entries: [SetAside], _ unreadable: [Unreadable]) throws(Failure) -> URL {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd HH.mm.ss"
@@ -377,8 +445,9 @@ import os
         let file = File(
             about: "Settings this Mac kept for one library under more than one name, which the app joined. For each part, "
                 + "\"kept\" is the value used now and \"setAside\" the values it replaced, as JSON text. To use one, "
-                + "choose it again in the app. The app never removes this file.",
-            date: date, build: build, settings: entries)
+                + "choose it again in the app. \"unreadable\" holds, as they were stored, the settings a name held that "
+                + "the app could not read and set aside, for which the Marfa's values were kept. The app never removes this file.",
+            date: date, build: build, settings: entries, unreadable: unreadable)
         do {
             try FileManager.default.createDirectory(at: aside, withIntermediateDirectories: true)
             let encoder = JSONEncoder()

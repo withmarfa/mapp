@@ -84,14 +84,15 @@ import MarfaTesting
         self.valuePanels = valuePanels
         self.handOverPages = handOverPages.map { injected in { _, done in injected(done) } }
             ?? { trace, done in EditorController.flushAll(trace: trace, then: done) }
+        // Before the stores, which set aside what they cannot read as they start, so the move knows what went.
+        librarySettings = LibrarySettings(
+            defaults: defaults, aside: restorePoints.folder.appending(path: LibrarySettings.asideFolderName, directoryHint: .isDirectory),
+            lastOpen: host.configuredConnection.map { "marfa:" + $0.address.absoluteString })
         sidebarLayouts = SidebarLayouts(defaults: defaults)
         typeLooks = TypeLooks(defaults: defaults)
         searchLeaveOuts = SearchLeaveOuts(defaults: defaults)
         shortcuts = ShortcutBindings(defaults: defaults)
         anyAppShortcuts = AnyAppShortcuts(defaults: defaults, registrar: hotKeys)
-        librarySettings = LibrarySettings(
-            defaults: defaults, aside: restorePoints.folder.appending(path: LibrarySettings.asideFolderName, directoryHint: .isDirectory),
-            lastOpen: host.configuredConnection.map { "marfa:" + $0.address.absoluteString })
         automaticExport = AutomaticExport(
             defaults: defaults,
             marfa: { [host] in

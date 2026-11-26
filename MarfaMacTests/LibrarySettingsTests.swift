@@ -428,6 +428,35 @@ import Testing
         #expect((unreadable.first?["stored"] as? String).flatMap { Data(base64Encoded: $0) } == original)
     }
 
+    /// The Marfa's row stands in for what a store set aside only as a value held before: a look written since under
+    /// the other name, or removed there, still wins.
+    @Test(arguments: [false, true])
+    func aLaterChoiceWinsOverTheMarfasRowForWhatWasSetAside(removed: Bool) throws {
+        let bench = HostBench()
+        try FileManager.default.createDirectory(at: bench.location.directory(for: bare), withIntermediateDirectories: true)
+        let looks = #"{"\#(bareKey)":"broken","\#(portKey)":{"core.note":{"date":"edited"},"core.task":{"date":"created"}}}"#
+        bench.defaults.set(Data(looks.utf8), forKey: TypeLooks.defaultsKey)
+        let host = bench.host()
+        host.bindOrigin(of: bare)
+        let folder = bench.location.directory(for: bare).lastPathComponent
+        try bench.location.copies.change { $0.instances[folder] = "instance-x" }
+        var record = PreferencesSync.Record()
+        let look = { (type: String) in PreferenceUnit.row(.types, setting: "look", key: type) }
+        record.marfas["instance-x"] = .init(item: "settings", base: [look("core.note"): #"{"date":"created"}"#, look("core.task"): #"{"date":"edited"}"#])
+        record.save(bench.defaults)
+        let settings = LibrarySettings(defaults: bench.defaults, aside: aside, lastOpen: nil)
+        let store = TypeLooks(defaults: bench.defaults)
+        if removed {
+            store.restore(TypeID("core.note"), in: portKey)
+        } else {
+            try writeLook(bench, portKey, "core.note", "occurred")
+        }
+        try settings.settle(rename: { host.currentLibraryKey(forStored: $0) })
+        let choices = TypeLooks(defaults: bench.defaults).choices(for: "marfa:instance-x")
+        #expect(choices[TypeID("core.note")]?.date == (removed ? nil : .occurred), "written or removed since")
+        #expect(choices[TypeID("core.task")]?.date == .edited, "held before: the Marfa's row")
+    }
+
     /// A removal later than the other name's value wins even where it took the last part its name held, so the name
     /// holds nothing any more.
     @Test func aRemovalOfANamesLastPartStillWins() throws {
