@@ -36,11 +36,11 @@ One item page serves every type. The type determines which fields appear and whe
 
 - **One head, built once.** `PageHead` decides the kicker, pins and rows; `editor/src/header.ts` draws them on a page with text, `PageHeadView` on a saved web page, which has no menu or drag. A rule added in one drawing must be added in the other.
 - **The kicker** is the type's mark and name, then Read Only, Feed or Archived where true. Its name opens Change Type where the item can change type.
-- **Rows show what has a value, six at most, then Show N More,** which lists every property in the type's order, Empty where unset, hidden ones grey. It is offered on every page; on read-only and deleted ones nothing opens.
-- **A type that keeps no text shows its first six rows,** empty or not.
+- **Rows show what has a value, six at most, then Show N More,** which lists every property in the type's order, Empty where unset, hidden ones grey. On read-only and deleted pages nothing opens.
+- **A type with no text shows its first six rows,** empty or not.
 - **A row is dragged by its name.** A drag or Move Up or Down moves only that row in the type's one order.
 - **An event's When row comes first.** It shows how far away the event is or says All Day. Each attendee's response appears in gray after their name.
-- **A message has no title.** Its text follows the rows. From and To show each name with its address in gray when both are present (`PersonAddress`).
+- **A message has no title.** Its text follows the rows. In the message family (`PageHeaderKind.message`) From and To show each name, its address in gray (`PersonAddress`).
 - **A highlight's passage leads,** at the title's size, with its rows after it (`PageHeader.textLeads`).
 - **Long text stops after two lines;** an email, a phone and a number to call open.
 - **A value is cut, never reworded,** and a linked item that cannot be read, is gone or is in the bin shows nothing, never an id.
@@ -50,7 +50,7 @@ One item page serves every type. The type determines which fields appear and whe
 
 `PageFoot` lists nested Sub-Items with a count of all descendants. Incoming links appear newest first in Timeline for people and places, or in Linked From where Settings › Layouts puts it on the page. Collection membership does not count as an incoming mention. Show More adds 30 rows to each list independently, starting from 30.
 
-A place with a point has a still map above its Timeline (`PlaceMapImages`).
+A place with a point has a still map above its Timeline (`PlaceMapImages`). The page draws Apple Maps and a Legal link over it, and no box where MapKit gives no map.
 
 ## The card
 

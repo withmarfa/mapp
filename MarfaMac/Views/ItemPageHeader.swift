@@ -117,15 +117,23 @@ struct ItemPageHeader: ViewModifier {
         )
     }
 
-    /// A place's map: its pictures, or none yet, for the point the place holds. Nil for an item that is no place or has no
-    /// point, which draws nothing, not an empty box. Without a way to be told when the pictures are made, none is asked of
-    /// MapKit.
+    /// A place's map: its pictures, or none yet, for the point the place holds. Nil for an item that is no place, has no
+    /// point or whose map MapKit cannot give, which draws nothing, not an empty box. Without a way to be told when the
+    /// pictures are made, none is asked of MapKit.
     private static func map(of item: Item, in library: any ItemLibrary, refresh: (@MainActor () -> Void)?) -> PageHeader.Map? {
         guard PageHeaderKind.of(item.type, in: library.catalogue) == .place,
               let location = ItemLocation.of(library.catalogue.itemTypes[item.type]),
-              case .point(let point) = location.reading(of: item) else { return nil }
-        let pictures = refresh.flatMap { PlaceMapImages.shared.pictures(for: point, whenMade: $0) }
-        return PageHeader.Map(light: pictures?.light, dark: pictures?.dark, label: item.displayTitle)
+              case .point(let point) = location.reading(of: item), let refresh else { return nil }
+        let answer = PlaceMapImages.shared.pictures(for: point, whenMade: refresh)
+        var pictures: PlaceMapImages.Pictures?
+        switch answer {
+        case .unavailable: return nil
+        case .made(let made): pictures = made
+        case .waiting: break
+        }
+        return PageHeader.Map(
+            light: pictures?.light, dark: pictures?.dark, label: item.displayTitle, attribution: String(localized: "Apple Maps"),
+            legal: String(localized: "Legal"), legalAddress: "https://www.apple.com/legal/internet-services/maps/")
     }
 
     /// Carries out what the page asks, for the item it names, which may be one the page has just left: a title draft

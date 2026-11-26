@@ -171,10 +171,12 @@ nonisolated extension SampleCastell.Maker {
              body: "All three are thin coats wiped back after twenty minutes. Linseed yellows, tung takes a week to cure, and Danish oil is mostly varnish, which is why it is the one that survives a kitchen.")
         make("feed-dovetails", Kind.bookmark, "A sharper way to cut dovetails", rss, 0, "08:30", tier: .feed,
              body: "Saw to the waste side of the line and stop paring so early. Most gaps in a dovetail come from the chisel, and the saw is blamed for them.")
-        make("feed-van", Kind.message, "Re: van hire for the print fair", studio, 1, "15:27", tier: .feed,
-             body: "The long wheelbase is free that weekend and takes both tables flat. They want it back by nine on Monday, and the deposit comes off the card when the keys go back.\n\nCollection is from the yard on Davey's Lane, any time after eight on the Friday.")
-        make("feed-van-first", Kind.message, "Van hire for the print fair", studio, 2, "14:00", tier: .feed,
-             body: "Can we fit both tables flat in the long wheelbase?")
+        make("feed-van", Kind.message, nil, studio, 1, "15:27", tier: .feed,
+             body: "The long wheelbase is free that weekend and takes both tables flat. They want it back by nine on Monday, and the deposit comes off the card when the keys go back.\n\nCollection is from the yard on Davey's Lane, any time after eight on the Friday.",
+             props: ["from": "Dan Okafor <dan@harbourvans.example>", "to": ["Mira Castell <mira@castell.studio>"]])
+        make("feed-van-first", Kind.message, nil, studio, 2, "14:00", tier: .feed,
+             body: "Can we fit both tables flat in the long wheelbase?",
+             props: ["from": "Mira Castell <mira@castell.studio>", "to": ["Dan Okafor <dan@harbourvans.example>"]])
         link("feed-van", "note-fair-layout", MarfaMapping.threadEdge)
         link("feed-van-first", "note-fair-layout", MarfaMapping.threadEdge)
         make("feed-fold", Kind.highlight, nil, readwise, 1, "11:00", tier: .feed, body: "Paper remembers every fold, so make the first one the one you meant.")
@@ -211,7 +213,8 @@ nonisolated extension SampleCastell.Maker {
         make("old-open-studio", Kind.event, "Open studio weekend, September", mfm, 54, state: .archived)
         make("old-sketches", Kind.image, "Harbour Joinery: first sketches", mfm, 54, state: .archived)
         make("old-post", Kind.bookmark, "A cheaper way to post zines abroad", rss, 62, tier: .feed, state: .archived)
-        make("old-quote", Kind.message, "Re: quote for last year's report", studio, 75, tier: .feed, state: .archived)
+        make("old-quote", Kind.message, nil, studio, 75, tier: .feed, state: .archived,
+             body: "Re: quote for last year's report", props: ["from": "Ruth Hart <ruth@lewes-trust.example>"])
         make("old-cards-xmas", Kind.task, "Post the Christmas cards", raycast, 82, state: .archived, props: ["priority": "low", "status": "completed"])
         make("old-business", Kind.task, "Order business cards from Calverts", mfm, 82, state: .archived, props: ["priority": "low", "status": "completed"])
         make("old-riso", Kind.event, "Risograph workshop at Kiln House", mfm, 91, state: .archived)

@@ -5,6 +5,8 @@ struct PersonAddressTests {
     @Test(arguments: [
         ("Ines Barros <ines@barroslima.example>", "Ines Barros", "ines@barroslima.example"),
         ("\"Barros, Ines\" <ines@barroslima.example>", "Barros, Ines", "ines@barroslima.example"),
+        ("Pat \"PJ\" <pj@example.org>", "Pat \"PJ\"", "pj@example.org"),
+        ("  \" Barros, Ines \"  <ines@barroslima.example>", "Barros, Ines", "ines@barroslima.example"),
         ("<ines@barroslima.example>", "ines@barroslima.example", nil),
         ("ines@barroslima.example", "ines@barroslima.example", nil),
         ("Calverts Deliveries", "Calverts Deliveries", nil),

@@ -96,6 +96,11 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
         var light: String?
         var dark: String?
         var label: String
+        /// Apple Maps' attribution and its legal link, which a snapshot carries none of: the page draws both on the picture,
+        /// whatever its width.
+        var attribution: String
+        var legal: String
+        var legalAddress: String
     }
 
     var item: String

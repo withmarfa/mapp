@@ -86,7 +86,8 @@ nonisolated struct PageHead: Equatable, Sendable {
         let candidates = PropertyRow.candidates(
             of: item, type: type, hidden: library.hiddenPropertyKeys(of: item).union(event == nil ? [] : EventHeader.keys),
             links: library.relationFields(of: item.id), format: dateFormat, tags: library.tags(of: item),
-            showsCoordinates: showsCoordinates, isPriority: { catalogue.isPriority($0, of: $0.declaredBy) },
+            showsCoordinates: showsCoordinates, isMessage: PageHeaderKind.of(item.type, in: catalogue) == .message,
+            isPriority: { catalogue.isPriority($0, of: $0.declaredBy) },
             icon: { PageHead.typeIcon(of: $0, in: library) }, isPerson: { PageHead.isPerson($0, in: library) },
             label: { catalogue.label(ofField: $0, for: item.type) })
         let when = event.map {

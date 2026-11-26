@@ -134,7 +134,7 @@ nonisolated enum SampleCastell {
             id: Kind.event, label: "Event", description: "Something that happens at a time.",
             fields: [
                 TypeField(name: "title", type: "string", required: true, declaredBy: Kind.event),
-                TypeField(name: "body", type: "string", declaredBy: Kind.event),
+                TypeField(name: "description", type: "string", declaredBy: Kind.event),
                 TypeField(name: "starts_at", type: "datetime", declaredBy: Kind.event),
                 TypeField(name: "ends_at", type: "datetime", declaredBy: Kind.event),
                 TypeField(name: "all_day", type: "boolean", declaredBy: Kind.event),
@@ -142,18 +142,15 @@ nonisolated enum SampleCastell {
                 TypeField(name: "place", type: "string", declaredBy: Kind.event),
                 TypeField(name: "url", type: "string", declaredBy: Kind.event),
                 TypeField(
-                    name: "status", type: "status", declaredBy: Kind.event,
-                    definition: ["status_values": [
-                        ["value": "tentative", "group": "not_started"], ["value": "confirmed", "group": "in_progress"],
-                        ["value": "cancelled", "group": "canceled"],
-                    ]]),
+                    name: "status", type: "enum", declaredBy: Kind.event,
+                    definition: ["enum_values": ["tentative", "confirmed", "canceled"]]),
                 TypeField(
                     name: "attendees", type: "array", declaredBy: Kind.event,
                     definition: ["items_type": "object", "items_fields": [
                         "name": ["type": "string"], "email": ["type": "email"],
                         "response": ["type": "enum", "enum_values": ["needs_action", "accepted", "declined", "tentative"]],
                     ]]),
-            ], titleField: "title", bodyField: "body", icon: "lucide:calendar"),
+            ], titleField: "title", bodyField: "description", icon: "lucide:calendar"),
         ItemType(
             id: Kind.person, label: "Person", plural: "People", description: "Someone you know.", parent: "core.entity",
             fields: [
@@ -311,7 +308,14 @@ nonisolated extension SampleCastell {
         mutating func add(_ spec: Spec) {
             var properties = spec.props
             if let title = spec.title { properties["title"] = .string(title) }
-            if !spec.body.isEmpty { properties[spec.type == Kind.highlight ? "text" : "body"] = .string(spec.body) }
+            if !spec.body.isEmpty {
+                let key = switch spec.type {
+                case Kind.highlight: "text"
+                case Kind.event: "description"
+                default: "body"
+                }
+                properties[key] = .string(spec.body)
+            }
             if let due = spec.due { properties["due_at"] = .string(Self.stamp(start + due * 86_400 + 16 * 3600)) }
             let created = Self.stamp(epoch(day: spec.day, time: spec.time))
             items.append(Marfa.Item(

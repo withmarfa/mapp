@@ -128,6 +128,10 @@ export interface HeaderMap {
   light?: string
   dark?: string
   label: string
+  /** Apple Maps' attribution and legal link, which the picture has none of: drawn over it at every width. */
+  attribution: string
+  legal: string
+  legalAddress: string
 }
 
 /** What the app says the head shows for the item on the page. */
@@ -560,7 +564,8 @@ export class ItemHeader {
     for (const node of [this.root, this.footer]) {
       for (const [name, value] of Object.entries(looks)) node.style.setProperty(name, value)
     }
-    this.root.style.setProperty('--chip-scale', String(model.interfaceTextSize / 13))
+    for (const node of [this.root, this.footer])
+      node.style.setProperty('--chip-scale', String(model.interfaceTextSize / 13))
   }
 
   setIcons(icons: HeaderIcons) {
@@ -832,29 +837,31 @@ export class ItemHeader {
     this.foot.draw(model.item, model.foot, this.symbols)
   }
 
-  /** A place's map: its picture in the appearance the page is in, or a quiet box of the same size while the app makes it. */
+  /** A place's map: its picture in the appearance the page is in, or a quiet box of the same size while the app makes
+   *  it. Apple Maps' attribution and its legal link are drawn over the picture's foot, as page elements so that no
+   *  width crops them. */
   private drawMap(map: HeaderMap | undefined) {
     this.mapBox.hidden = !map
-    if (!map) {
-      this.mapBox.replaceChildren()
-      return
-    }
-    this.mapBox.setAttribute('role', 'img')
-    this.mapBox.setAttribute('aria-label', map.label)
-    this.mapBox.classList.toggle('waiting', !map.light || !map.dark)
-    if (!map.light || !map.dark) {
-      this.mapBox.replaceChildren()
-      return
-    }
-    const picture = document.createElement('picture')
+    this.mapBox.replaceChildren()
+    if (!map) return
+    const waiting = !map.light || !map.dark
+    this.mapBox.classList.toggle('waiting', waiting)
+    if (waiting) return
+    const picture = element('div', 'item-map-picture', this.mapBox)
+    picture.setAttribute('role', 'img')
+    picture.setAttribute('aria-label', map.label)
+    const sources = document.createElement('picture')
     const dark = document.createElement('source')
     dark.media = '(prefers-color-scheme: dark)'
-    dark.srcset = map.dark
+    dark.srcset = map.dark!
     const image = document.createElement('img')
-    image.src = map.light
+    image.src = map.light!
     image.alt = ''
-    picture.append(dark, image)
-    this.mapBox.replaceChildren(picture)
+    sources.append(dark, image)
+    picture.append(sources)
+    const credit = element('div', 'item-map-credit', this.mapBox)
+    element('span', 'item-map-attribution', credit).textContent = map.attribution
+    this.link(credit, map.legal, () => openLink(map.legalAddress), map.legalAddress)
   }
 
   /** The rows under a heading, each heading once with its rows below it, in the order the app sent them. */
@@ -966,7 +973,9 @@ export class ItemHeader {
       case 'items':
         return (row.items ?? []).map((item) => item.title).join(', ')
       case 'people':
-        return (row.people ?? []).map((person) => person.title).join(', ')
+        return (row.people ?? [])
+          .map((person) => (person.note ? `${person.title} (${person.note})` : person.title))
+          .join(', ')
       case 'options':
         return (row.options ?? []).map((option) => option.label).join(', ')
       case 'tags':

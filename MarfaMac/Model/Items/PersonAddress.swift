@@ -12,7 +12,7 @@ nonisolated struct PersonAddress: Equatable, Sendable {
         if trimmed.hasSuffix(">"), let open = trimmed.lastIndex(of: "<") {
             let address = trimmed[trimmed.index(after: open)..<trimmed.index(before: trimmed.endIndex)]
                 .trimmingCharacters(in: .whitespaces)
-            let name = trimmed[..<open].trimmingCharacters(in: CharacterSet.whitespaces.union(CharacterSet(charactersIn: "\"")))
+            let name = Self.unquoted(trimmed[..<open].trimmingCharacters(in: .whitespaces))
             if !name.isEmpty {
                 self.name = name
                 self.address = address.isEmpty ? nil : address
@@ -26,5 +26,11 @@ nonisolated struct PersonAddress: Equatable, Sendable {
         }
         name = trimmed
         address = nil
+    }
+
+    /// A name without the pair of quotes that wraps all of it: `"Pat, PJ"` is `Pat, PJ`, and `Pat "PJ"` keeps its own.
+    private static func unquoted(_ name: String) -> String {
+        guard name.count >= 2, name.first == "\"", name.last == "\"" else { return name }
+        return String(name.dropFirst().dropLast()).trimmingCharacters(in: .whitespaces)
     }
 }

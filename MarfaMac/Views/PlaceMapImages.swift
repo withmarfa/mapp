@@ -4,32 +4,59 @@ import MapKit
 /// A place's map as its page draws it: a still picture of Apple's map at the place's point, with the point marked, made
 /// once for each appearance so a change of appearance needs no new one. The page is a web view, which cannot hold a live
 /// map, and the picture is the map's only use here: nothing on it moves or is clicked, and the corner's Open takes the
-/// person to Maps. A map is asked of MapKit once for a point and kept.
+/// person to Maps. MapKit draws no attribution into a snapshot, so the page draws Apple Maps and a Legal link over it.
+/// The last few points' pictures are kept, and nothing is stored.
 @MainActor
 final class PlaceMapImages {
     static let shared = PlaceMapImages()
 
     /// The two pictures, as the web page reads them.
-    struct Pictures: Equatable, Sendable {
+    final class Pictures: Equatable, Sendable {
         let light: String
         let dark: String
+        init(light: String, dark: String) {
+            self.light = light
+            self.dark = dark
+        }
+        static func == (lhs: Pictures, rhs: Pictures) -> Bool { lhs.light == rhs.light && lhs.dark == rhs.dark }
+    }
+
+    /// What a request for a point gives.
+    enum Answer: Equatable {
+        /// Being made; `whenMade` is called once it is.
+        case waiting
+        case made(Pictures)
+        /// MapKit has no map to give, as offline: the page draws no box.
+        case unavailable
     }
 
     /// The pictures' size in points. The page fits them to its column.
-    static let size = CGSize(width: 680, height: 260)
+    nonisolated static let size = CGSize(width: 680, height: 260)
     /// How much of the world the picture shows, across its width.
-    private static let span: CLLocationDistance = 500
+    private nonisolated static let span: CLLocationDistance = 500
+    /// How many points' pictures are kept; each is about a quarter of a megabyte.
+    private static let kept = 6
 
-    private var held: [LocationPoint: Pictures] = [:]
+    private let held: NSCache<NSString, Pictures> = {
+        let cache = NSCache<NSString, Pictures>()
+        cache.countLimit = PlaceMapImages.kept
+        return cache
+    }()
+    /// When each point's last failure was, so a map is asked for again once the network may be back.
+    private var failed: [LocationPoint: Date] = [:]
+    private static let retryAfter: TimeInterval = 30
     private var waiting: [LocationPoint: [@MainActor () -> Void]] = [:]
 
-    /// The pictures for `point` if they are made. Otherwise nil, and `whenMade` is called once they are, or never if
-    /// MapKit has no map to give.
-    func pictures(for point: LocationPoint, whenMade: @escaping @MainActor () -> Void) -> Pictures? {
-        if let pictures = held[point] { return pictures }
+    private func key(_ point: LocationPoint) -> NSString { "\(point.latitude),\(point.longitude)" as NSString }
+
+    /// The pictures for `point` if they are made. A failure is remembered for a short while, so a page drawn again does
+    /// not ask again at once, and the page draws no box.
+    func pictures(for point: LocationPoint, whenMade: @escaping @MainActor () -> Void) -> Answer {
+        if let pictures = held.object(forKey: key(point)) { return .made(pictures) }
+        if let at = failed[point], Date.now.timeIntervalSince(at) < Self.retryAfter { return .unavailable }
         if waiting[point] != nil {
             waiting[point]?.append(whenMade)
-            return nil
+            return .waiting
         }
         waiting[point] = [whenMade]
         Task {
@@ -37,13 +64,19 @@ final class PlaceMapImages {
             async let dark = Self.render(point, dark: true)
             let made = await (light, dark)
             let callbacks = waiting.removeValue(forKey: point) ?? []
-            guard let light = made.0, let dark = made.1 else { return }
-            held[point] = Pictures(light: light, dark: dark)
+            if let light = made.0, let dark = made.1 {
+                held.setObject(Pictures(light: light, dark: dark), forKey: key(point))
+            } else {
+                failed = failed.filter { Date.now.timeIntervalSince($0.value) < Self.retryAfter }
+                failed[point] = .now
+            }
             for callback in callbacks { callback() }
         }
-        return nil
+        return .waiting
     }
 
+    /// Off the main actor: the snapshot, the drawing and the encoding.
+    @concurrent
     private static func render(_ point: LocationPoint, dark: Bool) async -> String? {
         let options = MKMapSnapshotter.Options()
         options.region = MKCoordinateRegion(

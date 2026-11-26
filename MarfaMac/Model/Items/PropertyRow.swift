@@ -113,7 +113,12 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
         switch value {
         case .status, .parent, .empty: return ""
         case .items(let targets): return targets.map(\.title).joined(separator: ", ")
-        case .people(let words), .options(let words), .tags(let words): return words.joined(separator: ", ")
+        case .people(let names):
+            // Each person with what follows their name on the page: the address, or an attendee's answer.
+            return names.enumerated().map { index, name in
+                answers.indices.contains(index) && !answers[index].isEmpty ? "\(name) (\(answers[index]))" : name
+            }.joined(separator: ", ")
+        case .options(let words), .tags(let words): return words.joined(separator: ", ")
         case .when(let time, let note): return "\(time), \(note)"
         case .date(let text), .text(let text), .url(let text), .email(let text), .phone(let text): return text
         case .boolean(let flag): return flag ? String(localized: "Yes") : String(localized: "No")
@@ -141,10 +146,10 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     /// describes, read only, under their own heading. A field, a link or the tags with no value is a row too, read as Empty, which opens its editor where the
     /// item can take the edit. The keys in `hidden` are what the page shows another way, such as the title and the
     /// text. With `showsCoordinates`, the latitude and longitude are rows of their own beside the Location that stands
-    /// for them.
+    /// for them. A message's `from` and `to` are people (`isMessage`); no other type's field of that name is.
     static func candidates(
         of item: Item, type: ItemTypeInfo?, hidden: Set<String>, links: [RelationField], format: DateFormat, tags: [String],
-        showsCoordinates: Bool = false, isPriority: (ItemTypeInfo.Field) -> Bool = { _ in false }, icon: (ItemID) -> String?,
+        showsCoordinates: Bool = false, isMessage: Bool = false, isPriority: (ItemTypeInfo.Field) -> Bool = { _ in false }, icon: (ItemID) -> String?,
         isPerson: (ItemID) -> Bool, label: (String) -> String? = { _ in nil }
     ) -> [PropertyRow] {
         let parentField = PagePlacement.parent
@@ -172,7 +177,7 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
                     id: field.key, label: field.label, value: value, numberToCall: numberToCall(of: field, in: item), editable: edits,
                     optionTones: optionTones(of: field, in: item, isPriority: isPriority(field)))
                 row.answers = personAnswers(of: field, in: item)
-                if let sender = senders(of: field, in: item) { (row.value, row.answers) = sender }
+                if isMessage, let sender = senders(of: field, in: item) { (row.value, row.answers) = sender }
                 if case .text(let text) = value { row.long = text.count > longestText || text.contains(where: \.isNewline) }
                 // A number to call opens the phone, as an address opens its page.
                 if let number = row.numberToCall { row.value = .phone(number) }

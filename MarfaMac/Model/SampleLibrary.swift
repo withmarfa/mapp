@@ -104,14 +104,21 @@ nonisolated enum SampleLibrary {
     /// cut at 240 characters with an ellipsis (`device/item-preview-text`).
     @Sendable nonisolated static func display(_ input: ItemDisplayInput) -> ItemDisplay {
         let title = input.properties["title"]?.string?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let lines = (input.properties["body"]?.string ?? input.properties["text"]?.string ?? "").split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
+        let rule = bodyRules[input.type]
+        let lines = (input.properties[rule?.field ?? "body"]?.string ?? "").split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
             .map { $0.trimmingCharacters(in: .whitespaces) }
         let first = lines.firstIndex { !$0.isEmpty }
-        let name = title.isEmpty ? first.map { SamplePreview.line(lines[$0]) } ?? "" : title
-        let rest = title.isEmpty ? first.map { Array(lines[($0 + 1)...]) } ?? [] : lines
+        // A type that does not name an item from its text, as a highlight, has no name without a title.
+        let namesFromBody = rule?.namesItem ?? true
+        let name = !title.isEmpty ? title : namesFromBody ? first.map { SamplePreview.line(lines[$0]) } ?? "" : ""
+        let rest = title.isEmpty && namesFromBody ? first.map { Array(lines[($0 + 1)...]) } ?? [] : lines
         let preview = SamplePreview.text(of: rest)
         return ItemDisplay(name: name.isEmpty ? nil : name, preview: preview.isEmpty ? nil : preview)
     }
+
+    /// Each sample type's text field and whether the text names the item, from the type's own definition.
+    private static let bodyRules: [String: (field: String, namesItem: Bool)] = Dictionary(
+        (itemTypes + SampleCastell.itemTypes).map { ($0.id, ($0.bodyField ?? "body", $0.nameFromBody)) }, uniquingKeysWith: { _, last in last })
 
     // MARK: Catalogue
 
