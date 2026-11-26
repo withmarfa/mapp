@@ -174,9 +174,11 @@ private struct PlaybackScrubber: View {
         .frame(minWidth: 40, maxWidth: .infinity, minHeight: 20, maxHeight: 20)
         .opacity(playback.state == .ready ? 1 : 0.35)
         .accessibilityRepresentation {
+            // A step longer than the file is not a step a slider takes.
+            let span = max(playback.duration, 1)
             Slider(
                 value: Binding { playback.position } set: { playback.seek(to: $0) },
-                in: 0...max(playback.duration, 1), step: 5
+                in: 0...span, step: min(5, span / 2)
             ) { Text("Position") }
             .accessibilityValue(Text("\(PlaybackClock.label(playback.position)) of \(PlaybackClock.label(playback.duration))"))
             .disabled(playback.state != .ready)
