@@ -7,7 +7,21 @@ import Observation
 /// `textIsEmpty`, which move only when something the header shows changes. A keystroke that leaves the text
 /// non-empty, or a publish that moves only the version, preview, sync or bound embeds, does not.
 @Observable final class ItemRecord {
-    var item: Item { didSet { noteShown(oldValue) } }
+    var item: Item {
+        get {
+            access(keyPath: \.item)
+            return listedItem
+        }
+        set {
+            withMutation(keyPath: \.item) {
+                let before = listedItem
+                listedItem = newValue
+                noteShown(before)
+            }
+        }
+    }
+    /// Bulk reads already follow the library's content revision.
+    @ObservationIgnored private(set) var listedItem: Item
     /// Nil for an item with no text, and until its text is read.
     var body: ItemBody? { didSet { noteText() } }
     /// False once the source no longer holds the item, which tells the views that read only this record.
@@ -37,7 +51,7 @@ import Observation
     @ObservationIgnored private(set) var embedSnapshot: [BoundEmbed]
 
     init(_ item: Item) {
-        self.item = item
+        listedItem = item
         headerSnapshot = item
         versionSnapshot = item.version
         embedSnapshot = item.boundEmbeds
@@ -155,6 +169,7 @@ import Observation
     @ObservationIgnored var index = MarfaItemIndex()
     @ObservationIgnored var listed: [ListingKey: Listing] = [:]
     @ObservationIgnored var listedDeleted: Listing?
+    @ObservationIgnored var orderedView: (content: Int, hits: [ItemID], items: [Item])?
     @ObservationIgnored var counted: [Place: (revision: Int, counts: ScopeCounts)] = [:]
     @ObservationIgnored var countedAlone: (revision: Int, counts: StandaloneCounts)?
     @ObservationIgnored var searches: [SearchKey: SearchRun] = [:]

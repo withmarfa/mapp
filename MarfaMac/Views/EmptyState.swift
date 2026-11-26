@@ -1,5 +1,14 @@
 import SwiftUI
 
+/// The content area while the first arrangement of a place is worked out.
+struct PlaceProgress: View {
+    var body: some View {
+        ProgressView()
+            .controlSize(.small)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
 /// What a view says when it has nothing to show: a short title and at most one short line, with no icon.
 struct EmptyState<Actions: View>: View {
     let title: Text

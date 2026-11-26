@@ -15,6 +15,8 @@ final class Browser {
         didSet {
             // A saved view that moves to another home is still what the window shows.
             guard !(showing.map { $0.isSame(oldValue) } ?? (oldValue == nil)) else { return }
+            stopPlaceWork()
+            wantsFirstSelection = false
             modalItem = nil
             listMemory.scrollOffset = nil
             expandedDigestPiles.removeAll()
@@ -104,14 +106,21 @@ final class Browser {
         guard library.isLoaded else { return ItemViewMode.allCases }
         let membership = library.membershipRevision
         // A saved view lists what the library reads for it, later, and without a membership change.
-        let viewItems = isViewPlace ? placeItems(in: library) : nil
+        let viewItems: [Item]?
+        if isViewPlace {
+            guard let items = requestPlaceItems(in: library) else { return ItemViewMode.allCases }
+            viewItems = items
+        } else {
+            viewItems = nil
+        }
         let emptyViewLayout = viewItems?.isEmpty == true ? shown.savedView.flatMap { macSettings(for: $0).layout } : nil
         let key = ViewModesKey(
             library: ObjectIdentifier(library), membership: membership, place: shown, listing: listing,
             viewItems: viewItems?.map(\.id), emptyViewLayout: emptyViewLayout)
         if let held = viewModesMemo, held.key == key { return held.modes }
+        guard let items = viewItems ?? requestPlaceItems(in: library) else { return ItemViewMode.allCases }
         let modes = Cost.measure(.viewModes) {
-            var types = Set((viewItems ?? placeItems(in: library)).map(\.type))
+            var types = Set(items.lazy.map(\.type))
             if case .type(let type) = shown.place { types.insert(type) }
             var available = ItemViewMode.available(forTypes: types, catalogue: library.catalogue)
             // A just-created view's items are read asynchronously. It opens in its saved layout while it is empty.
@@ -139,7 +148,8 @@ final class Browser {
     func timelineFieldChoices(in library: any ItemLibrary) -> [ItemTypeInfo.Field] {
         let derived = fieldsKey(in: library)
         if let held = fieldsMemo, held.key == derived.key, let fields = held.timeline { return fields }
-        let fields = ItemTimelineLayout.fields(for: derived.items ?? items(in: library), catalogue: library.catalogue)
+        guard let items = derived.items ?? requestPlaceItems(in: library) else { return [] }
+        let fields = ItemTimelineLayout.fields(for: items, catalogue: library.catalogue)
         fieldsMemo = FieldsMemo(key: derived.key, timeline: fields)
         return fields
     }
@@ -151,7 +161,7 @@ final class Browser {
     }
 
     private func fieldsKey(in library: any ItemLibrary) -> (key: FieldsKey, items: [Item]?) {
-        let listed = isSearching || isViewPlace ? items(in: library) : nil
+        let listed = isSearching || isViewPlace ? requestPlaceItems(in: library) : nil
         let key = FieldsKey(
             library: ObjectIdentifier(library), membership: library.membershipRevision, place: shown, listing: listing,
             ids: listed?.map(\.id))
@@ -211,6 +221,7 @@ final class Browser {
     @ObservationIgnored var indexRowsMemo: (key: IndexRowsKey, rows: [IndexRow])?
     /// The list's sections, worked out off the main actor for a large place (`sections(in:order:now:)`).
     @ObservationIgnored var sectionsWork = PlaceWork<SectionsKey, ListArrangement>()
+    @ObservationIgnored var listingWork = PlaceWork<ListingRequest, [Item]>()
     @ObservationIgnored var digestWork = PlaceWork<SectionsKey, ListArrangement>()
     /// The list's sections as last nested for the parents open, by the sections they were nested from (`arrangement`).
     @ObservationIgnored var nestedListMemo: (made: UUID, expanded: Set<ItemID>, value: ListArrangement)?
@@ -222,6 +233,7 @@ final class Browser {
     @ObservationIgnored var boardWork = PlaceWork<PlacingKey<BoardChoice>, BoardLanes>()
     @ObservationIgnored var calendarWork = PlaceWork<PlacingKey<CalendarChoice>, CalendarPlacing>()
     @ObservationIgnored var timelineWork = PlaceWork<PlacingKey<TimelineChoice>, TimelinePlacing>()
+    @ObservationIgnored var mapWork = PlaceWork<PlacingKey<Catalogue>, MapLayout.Placing>()
     @ObservationIgnored private var viewModesMemo: (key: ViewModesKey, modes: [ItemViewMode])?
     @ObservationIgnored private var fieldsMemo: FieldsMemo?
     /// The last Group by offer, while the table's content and the layout it was made for stand (`Browser+Grouping`).
@@ -473,6 +485,7 @@ final class Browser {
 
     /// The list a search that has not yet answered replaced, for the answer to be compared with.
     @ObservationIgnored var listBeforePendingSearch: [ItemID]?
+    @ObservationIgnored var wantsFirstSelection = false
 
     /// Whether the window still shows `library`, which a long task checks after each wait, since the person may have
     /// changed library meanwhile.
@@ -503,10 +516,12 @@ final class Browser {
         offerMemo = nil
         parentMemo = nil
         sectionsWork.reset()
+        listingWork.reset()
         digestWork.reset()
         boardWork.reset()
         calendarWork.reset()
         timelineWork.reset()
+        mapWork.reset()
         viewModesMemo = nil
         fieldsMemo = nil
         paletteMemo = nil

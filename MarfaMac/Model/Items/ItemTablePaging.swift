@@ -89,17 +89,26 @@ nonisolated struct TablePaging: Hashable, Sendable {
         nestings: [String: ItemNesting] = [:], collapsed: Set<String>, expanded: Set<ItemID> = [], size: TablePageSize
     ) {
         guard !ids.isEmpty else { return }
-        func drawnIDs(_ rows: [ItemTableRow], _ nesting: ItemNesting) -> [ItemID] {
-            nesting.isFlat ? rows.map(\.id) : nesting.drawn(expanded: expanded).places.map(\.id)
+        var remaining = ids
+        var position = 0
+        func reveal(_ rows: [ItemTableRow], _ nesting: ItemNesting) {
+            let drawn = nesting.isFlat ? rows.map(\.id) : nesting.drawnIDs(expanded: expanded)
+            for id in drawn {
+                if remaining.remove(id) != nil {
+                    pages = max(pages, position / size.rawValue + 1)
+                    if remaining.isEmpty { return }
+                }
+                position += 1
+            }
         }
-        let flat = groups.map { listed in
-            listed.filter { !collapsed.contains($0.id) }.flatMap { drawnIDs($0.rows, nestings[$0.id] ?? .flat) }
-        } ?? drawnIDs(rows, nesting)
-        var needed = 1
-        for (index, id) in flat.enumerated() where ids.contains(id) {
-            needed = max(needed, index / size.rawValue + 1)
+        if let groups {
+            for group in groups where !collapsed.contains(group.id) {
+                reveal(group.rows, nestings[group.id] ?? .flat)
+                if remaining.isEmpty { return }
+            }
+        } else {
+            reveal(rows, nesting)
         }
-        pages = max(pages, needed)
     }
 }
 

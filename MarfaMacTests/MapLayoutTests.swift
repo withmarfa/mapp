@@ -56,19 +56,16 @@ struct MapLayoutTests {
     @MainActor @Test func refreshingTheMiddleOfASavedViewReplacesItsPins() {
         let items = (1...4).map { Self.item($0, "core.event", ["latitude": Self.number("51"), "longitude": Self.number("0")]) }
         let library = FakeItemLibrary(items: items)
+        library.catalogue = Self.catalogue
         let view = LibraryView(id: ItemID("view-map"), title: "Places", query: LibraryViewQuery(types: [TypeID("core.event")]))
         library.views = [view]
         library.viewMembers[view.id] = [items[0].id, items[1].id, items[3].id]
         let browser = Browser()
         browser.adopt(library)
         browser.showing = .saved(view.id)
-        let work = MapPlacingWork()
-
-        let first = browser.mapItems(in: library)
-        #expect(work.placing(for: first.key, items: first.items, catalogue: Self.catalogue)?.pins.map(\.id) == library.viewMembers[view.id])
+        #expect(browser.mapPlacing(in: library)?.pins.map(\.id) == library.viewMembers[view.id])
 
         library.viewMembers[view.id] = [items[0].id, items[2].id, items[3].id]
-        let refreshed = browser.mapItems(in: library)
-        #expect(work.placing(for: refreshed.key, items: refreshed.items, catalogue: Self.catalogue)?.pins.map(\.id) == library.viewMembers[view.id])
+        #expect(browser.mapPlacing(in: library)?.pins.map(\.id) == library.viewMembers[view.id])
     }
 }

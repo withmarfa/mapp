@@ -105,7 +105,13 @@ extension Browser {
         }
         showing = place
         let ids = Set(snapshot.selection)
-        selectAutomatically(ids.isEmpty ? [] : Set(items(in: library).lazy.map(\.id).filter(ids.contains)))
+        if ids.isEmpty {
+            selectAutomatically([])
+        } else if isSearching || viewPreview != nil || previewsNothing {
+            selectAutomatically(Set(items(in: library).lazy.map(\.id).filter(ids.contains)))
+        } else {
+            selectAutomatically(library.listed(ids, in: place, listing: listing))
+        }
         let keptSelection = !selection.isEmpty
         if selection.isEmpty { selectFirstItem(in: library, order: order) }
         // Only where the window is back in the place it was left, and not with another item chosen in its stead.

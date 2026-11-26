@@ -96,13 +96,17 @@ struct ItemDigest: View {
             if let anchor, current?.shows(anchor, expanded: browser.expandedDigestPiles) == false { self.anchor = selected }
         }
         .overlay {
-            if let current, current.sections.isEmpty {
+            if current == nil {
+                PlaceProgress()
+            } else if current?.sections.isEmpty == true {
                 if browser.narrowsBySearch { SearchEmptyState(browser: browser) }
                 else if browser.listHidesEveryGroup(in: library) { HiddenGroupsEmptyState() }
                 else { PlaceEmptyState(browser: browser) }
             }
         }
-        .filteredEmptyState(browser)
+        .overlay {
+            if current != nil { FilteredEmptyState(browser: browser) }
+        }
     }
 
     private func select(_ id: ItemID, extending: Bool, toggling: Bool) {
