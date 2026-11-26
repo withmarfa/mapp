@@ -17,6 +17,11 @@ actor PictureCache {
             .appending(path: "Remote Pictures", directoryHint: .isDirectory)
     }
 
+    /// The pictures of the library whose copy is in `folder`, so removing one library's never clears another's.
+    nonisolated static func folder(for library: String) -> URL {
+        standardFolder.appending(path: library, directoryHint: .isDirectory)
+    }
+
     /// How many times each folder has been emptied by `removeAll`. A fetch that began before an emptying must not
     /// store its picture after it, and the lock is held for the emptying and for a store, so neither happens halfway
     /// through the other.

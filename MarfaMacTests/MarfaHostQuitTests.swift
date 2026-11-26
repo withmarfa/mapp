@@ -50,7 +50,7 @@ import Testing
             seen.withLock { $0["remover"] = Self.found(suite) }
             try await MarfaHost.removeStore(store, agreedToLose: agreed)
         }
-        let cleaner: MarfaHost.Cleaner = { seen.withLock { $0["cleaner"] = Self.found(suite) } }
+        let cleaner: MarfaHost.Cleaner = { _ in seen.withLock { $0["cleaner"] = Self.found(suite) } }
         let (host, source, shown) = try await connected(bench, remover: remover, cleaner: cleaner)
         source.onClose.withLock { $0 = { seen.withLock { $0["close"] = Self.found(suite) } } }
         bench.signIns.onSignOut.withLock { $0 = { seen.withLock { $0["signOut"] = Self.found(suite) } } }
@@ -72,7 +72,7 @@ import Testing
         let bench = HostBench()
         let suite = bench.suite
         let seen = Mutex<Found?>(nil)
-        let host = bench.host(cleaner: { seen.withLock { $0 = Self.found(suite) } })
+        let host = bench.host(cleaner: { _ in seen.withLock { $0 = Self.found(suite) } })
         try await host.connect(address: firstAddress, key: "k")
         try await host.disconnect()
         #expect(seen.withLock { $0 } == Found(address: nil, marked: [firstFolder(bench)]))

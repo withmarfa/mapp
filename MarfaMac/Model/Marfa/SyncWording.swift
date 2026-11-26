@@ -290,6 +290,15 @@ nonisolated enum Words {
         return told + " " + endApproval(at: address)
     }
 
+    /// Writes that reached the copy of the Marfa left after the person was last asked, kept in it for their return.
+    static var changesWaitTitle: String {
+        String(localized: "Changes Are Waiting")
+    }
+
+    static func changesWait(_ count: Int, address: String) -> String {
+        String(localized: "\(count) changes for \(address) are kept on this Mac. They’re sent when you switch back to it.")
+    }
+
     /// The copy could not be opened or made, for a reason the package did not name.
     static var copyCouldNotBeOpened: String {
         String(localized: "The app couldn’t make or open the copy of your library on this Mac. Check that the app can change its own files, then try again.")

@@ -17,8 +17,9 @@ import os
     /// Removes the copy at a store, provided every change it holds that the server has not taken is one of the ids
     /// the person agreed to lose. Tests stand in for the package's answers that a real copy can't be made to give.
     typealias Remover = @Sendable (URL, Agreed) async throws -> Void
-    /// Removes what the library fetched to this Mac besides its copy: the files it kept and its cached pictures.
-    typealias Cleaner = @Sendable () async -> Void
+    /// Removes what the library whose copy is in the named folder fetched to this Mac besides its copy: the files it
+    /// kept and its cached pictures. Another library's stay.
+    typealias Cleaner = @Sendable (String) async -> Void
     /// Makes the reader of item histories for a connection, or nil where there is no server to ask, as in the sample.
     typealias Historian = @Sendable (MarfaConnection, any SignIns) -> (any ItemHistorySource)?
     /// Makes the keeper of the owner's type icons for a connection, or nil where there is no server to ask, as in the
@@ -131,7 +132,10 @@ import os
     let remover: Remover
     private let cleaner: Cleaner
     /// Removes what a library kept outside its copy: the files it fetched and the pictures it cached.
-    static let standardCleaner: Cleaner = { await MarfaSource.removeKeptCopies(); await PictureCache.removeAll() }
+    static let standardCleaner: Cleaner = { folder in
+        await MarfaSource.removeKeptCopies(in: MarfaSource.keptFiles(for: folder))
+        await PictureCache.removeAll(in: PictureCache.folder(for: folder))
+    }
     private let historian: Historian
     private let configurer: Configurer
     private let iconKeeper: IconKeeper
@@ -429,10 +433,11 @@ import os
         defaults.removeObject(forKey: Self.addressKey)
         if let agreed { markDiscarded(connection, agreed: agreed) }
         detach()
+        let folder = location.directory(for: connection).lastPathComponent
         forgetName(of: connection)
         self.connection = nil
         standing = .disconnected
-        await cleaner()
+        await cleaner(folder)
         if let problem = await finishLeaving(connection, agreed: agreed) { throw problem }
     }
 

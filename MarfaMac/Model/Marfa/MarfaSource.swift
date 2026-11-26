@@ -290,9 +290,14 @@ nonisolated final class MarfaSource: ItemSource {
         }
     }
 
-    /// Where kept copies are, under this copy's temporary folder so another copy never clears them, and cleared when
-    /// the library is disconnected or its downloads are removed.
+    /// Where kept copies are, under this copy's temporary folder so another copy of the app never clears them.
     nonisolated static let keptFiles = AppPaths.temporary("Marfa Files")
+
+    /// Where the library whose copy is in `folder` keeps its files, cleared when that library is disconnected or its
+    /// downloads are removed, so leaving one Marfa never clears another's.
+    nonisolated static func keptFiles(for folder: String) -> URL {
+        keptFiles.appending(path: folder, directoryHint: .isDirectory)
+    }
 
     /// The file's title as a name on disk, with the extension its type has where the title has none, since the
     /// page, Open and the Finder all tell a file's kind by its extension.
