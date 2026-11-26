@@ -133,7 +133,7 @@ final class FakeTypeCalls: TypeCalls, @unchecked Sendable {
 }
 
 private func record(
-    _ id: String, _ label: String, parent: String? = nil, origin: TypeOrigin = .registered, plural: String? = nil,
+    _ id: String, _ label: String, parent: String? = nil, origin: MarfaMac.TypeOrigin = .registered, plural: String? = nil,
     words: [StatusWordRecord] = []
 ) -> TypeRecord {
     var fields: [String: TypeFieldRecord] = [:]
