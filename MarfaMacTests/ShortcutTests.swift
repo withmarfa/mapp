@@ -141,6 +141,23 @@ struct ShortcutTests {
         #expect(after.shortcuts.keys.sorted() == ["gone"])
     }
 
+    /// One shortcut this version cannot read stays where it is beside the readable ones; choosing that command's
+    /// shortcut sets its stored value aside first.
+    @Test func oneShortcutThisVersionCannotReadStaysBesideTheRest() throws {
+        let store = defaults()
+        store.set(Data(#"{"shortcuts":{"newItem":"a later shape","refresh":{"key":"r","modifiers":10}}}"#.utf8), forKey: ShortcutBindings.defaultsKey)
+        let refresh = try #require(ShortcutBindings(defaults: store).shortcut(for: .refresh))
+        let bindings = ShortcutBindings(defaults: store)
+        #expect(bindings.shortcut(for: .refresh) == refresh)
+        bindings.set(nil, for: .refresh)
+        let text = String(decoding: try #require(store.data(forKey: ShortcutBindings.defaultsKey)), as: UTF8.self)
+        #expect(text.contains(#""newItem":"a later shape""#))
+        #expect(store.array(forKey: ShortcutBindings.setAsideKey) == nil)
+        bindings.set(key("j", [.command, .option]), for: .newItem)
+        #expect(store.array(forKey: ShortcutBindings.setAsideKey) as? [Data] == [Data(#""a later shape""#.utf8)])
+        #expect(ShortcutBindings(defaults: store).shortcut(for: .newItem) == key("j", [.command, .option]))
+    }
+
     @Test func unreadableStoredTextIsSetAsideAndTheDefaultsStand() {
         let store = defaults()
         let garbage = Data("{\"shortcuts\": 3}".utf8)

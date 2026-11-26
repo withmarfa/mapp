@@ -40,6 +40,22 @@ struct ViewLayoutsTests {
         #expect(ViewLayouts.stored(in: defaults).settings(for: Self.view)?.layout == .table)
     }
 
+    /// One view's settings this version cannot read stay where they are, beside the readable ones, through a change to
+    /// another view; a change to that view sets its stored text aside first.
+    @Test func oneViewThisVersionCannotReadStaysBesideTheRest() throws {
+        let defaults = Self.defaults()
+        defaults.set(#"{"view-a":{"layout":"board"},"view-later":"a later shape"}"#, forKey: ViewLayouts.key)
+        #expect(ViewLayouts.stored(in: defaults).settings(for: ItemID("view-a"))?.layout == .board)
+        ViewLayouts.update(in: defaults) { $0.set(ViewMacSettings(layout: .table), for: Self.view) }
+        let text = try #require(defaults.string(forKey: ViewLayouts.key))
+        #expect(text.contains(#""view-later":"a later shape""#))
+        #expect(ViewLayouts.stored(in: defaults).settings(for: ItemID("view-a"))?.layout == .board)
+        #expect(defaults.stringArray(forKey: ViewLayouts.setAsideKey) == nil)
+        ViewLayouts.update(in: defaults) { $0.set(ViewMacSettings(layout: .list), for: ItemID("view-later")) }
+        #expect(defaults.stringArray(forKey: ViewLayouts.setAsideKey) == [#""a later shape""#])
+        #expect(ViewLayouts.stored(in: defaults).settings(for: ItemID("view-later"))?.layout == .list)
+    }
+
     @Test func nothingStoredIsNothingToSetAside() {
         let defaults = Self.defaults()
         ViewLayouts.update(in: defaults) { $0.set(ViewMacSettings(), for: Self.view) }

@@ -737,6 +737,285 @@ import Testing
 @MainActor @Suite(.hangLimit) struct PreferencesWiringTests {
     /// The library's copy is followed as it opens and let go as it closes; a copy whose slice lacks the type, as the
     /// sample's does, changes nothing on this Mac.
+    // MARK: Only the person's own change leaves the Marfa
+
+    /// What a store set aside, as text, in the order it was set aside.
+    private func setAside(_ key: String) -> [String] {
+        defaults.stringArray(forKey: key) ?? (defaults.array(forKey: key) as? [Data] ?? []).map { String(decoding: $0, as: UTF8.self) }
+    }
+
+    private func density(_ place: PlaceView) -> PreferenceUnit {
+        .row(.places, setting: "placeDensity", key: place.storageKey)
+    }
+
+    /// A store that sets aside a synced row it cannot read leaves the row in the Marfa: the person did not remove it.
+    /// Their later edits and removals still sync.
+    @Test func aRowAStoreSetsAsideOnItsOwnStaysInTheMarfa() async throws {
+        let note = PreferenceUnit.row(.types, setting: "look", key: "core.note")
+        let task = PreferenceUnit.row(.types, setting: "look", key: "core.task")
+        let later = #""a shape a later version of the app writes""#
+        let copy = FakePreferencesCopy()
+        let item = await copy.add([note: #"{"date":"created"}"#, task: later])
+        let reading = PreferencesSync(defaults: defaults, domain: suite, enabled: true, coalescing: .milliseconds(50), build: "1") {}
+        reading.attach(copy, library: "marfa:https://one", name: { nil })
+        await reading.flush()
+        reading.detach()
+        let looks = TypeLooks(defaults: defaults)
+        #expect(setAside(TypeLooks.setAsideKey).count == 1)
+        let sync = PreferencesSync(defaults: defaults, domain: suite, enabled: true, coalescing: .milliseconds(50), build: "1") { looks.reload() }
+        sync.attach(copy, library: "marfa:https://one", name: { nil })
+        await sync.flush()
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[task] == later)
+        #expect(setAside(TypeLooks.setAsideKey).count == 1)
+        // Another Mac's later value it cannot read either is set aside once, and the Marfa keeps it.
+        let laterStill = #""another shape""#
+        await copy.change(item, [task: laterStill])
+        await sync.flush()
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[task] == laterStill)
+        #expect(setAside(TypeLooks.setAsideKey).count == 2)
+
+        defaults.set(Data(#"{"marfa:https://one":{}}"#.utf8), forKey: TypeLooks.defaultsKey)
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[note] == nil)
+        #expect(await copy.unitsHeld(item)[task] == laterStill)
+        defaults.set(Data(#"{"marfa:https://one":{"core.task":{"date":"created"}}}"#.utf8), forKey: TypeLooks.defaultsKey)
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[task] == #"{"date":"created"}"#)
+        #expect(setAside(TypeLooks.setAsideKey).count == 2)
+    }
+
+    /// A store that reads its value at launch keeps a shortcut it cannot read where it is, and sets aside a stored value
+    /// that is no map of shortcuts at all; either way the Marfa keeps every row.
+    @Test func shortcutsAStoreCannotReadAtLaunchStayInTheMarfa() async throws {
+        let shortcut = PreferenceUnit.row(.commands, setting: "shortcut", key: "newItem")
+        let other = PreferenceUnit.row(.commands, setting: "shortcut", key: "refresh")
+        let later = #""a shape a later version of the app writes""#
+        let readable = try #require(PreferenceJSON.text(
+            try #require(PreferenceJSON.value(String(decoding: try JSONEncoder().encode(Shortcut(key: "r", modifiers: [.command, .option])), as: UTF8.self)))))
+        let copy = FakePreferencesCopy()
+        let item = await copy.add([shortcut: later, other: readable])
+        let reading = PreferencesSync(defaults: defaults, domain: suite, enabled: true, coalescing: .milliseconds(50), build: "1") {}
+        reading.attach(copy, library: "marfa:https://one", name: { nil })
+        await reading.flush()
+        reading.detach()
+        _ = ShortcutBindings(defaults: defaults)
+        let sync = PreferencesSync(defaults: defaults, domain: suite, enabled: true, coalescing: .milliseconds(50), build: "1") {}
+        sync.attach(copy, library: "marfa:https://one", name: { nil })
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[shortcut] == later)
+        #expect(await copy.unitsHeld(item)[other] == readable)
+        // A value that is no map of shortcuts is set aside whole at the next launch.
+        defaults.set(Data("[1]".utf8), forKey: ShortcutBindings.defaultsKey)
+        _ = ShortcutBindings(defaults: defaults)
+        #expect(setAside(ShortcutBindings.setAsideKey) == ["[1]"])
+        await sync.flush()
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[shortcut] == later)
+        #expect(await copy.unitsHeld(item)[other] == readable)
+    }
+
+    /// One call that clears a density and sets aside another place's density from a later version deletes only the
+    /// one cleared. A later Reset still clears what this Mac reads, and keeps what it cannot.
+    @Test func clearingADensityBesideOneSetAsideDeletesOnlyTheOneCleared() async throws {
+        let compact = density(.library)
+        let later = density(.favorites)
+        let copy = FakePreferencesCopy()
+        let item = await copy.add([compact: #""compact""#, later: #""spacious""#])
+        let sync = await sync(copy)
+        #expect(PlaceDensities.stored(in: defaults).density(for: .library) == .compact)
+        PlaceDensities.update(in: defaults) { $0.set(nil, for: .library) }
+        #expect(setAside(PlaceDensities.setAsideKey).count == 1)
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[compact] == nil)
+        #expect(await copy.unitsHeld(item)[later] == #""spacious""#)
+
+        await copy.change(item, [compact: #""standard""#])
+        await sync.flush()
+        #expect(PlaceDensities.stored(in: defaults).density(for: .library) == .standard)
+        MacSettings.reset(in: defaults)
+        sync.replaced(PreferencesMap.synced)
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[compact] == nil)
+        #expect(await copy.unitsHeld(item)[later] == #""spacious""#)
+    }
+
+    /// A damaged density map set aside whole when the person chooses one place's density leaves every other place's
+    /// row in the Marfa, whatever its value; the person's later clearing of the place they chose still syncs.
+    @Test func aDamagedDensityMapSetAsideOnAChoiceKeepsTheOtherPlacesRows() async throws {
+        let library = density(.library)
+        let favorites = density(.favorites)
+        let copy = FakePreferencesCopy()
+        let item = await copy.add([library: #""compact""#, favorites: #""standard""#])
+        let sync = await sync(copy)
+        defaults.set(Data(#""compact""#.utf8), forKey: PlaceDensities.key)
+        PlaceDensities.update(in: defaults) { $0.set(.compact, for: .library) }
+        #expect(setAside(PlaceDensities.setAsideKey) == [#""compact""#])
+        await sync.flush()
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[library] == #""compact""#)
+        #expect(await copy.unitsHeld(item)[favorites] == #""standard""#)
+        PlaceDensities.update(in: defaults) { $0.set(nil, for: .library) }
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[library] == nil)
+        #expect(await copy.unitsHeld(item)[favorites] == #""standard""#)
+    }
+
+    /// Reset made before the next step keeps a row a store set aside since the last one: Reset clears only what this
+    /// Mac reads.
+    @Test func resetBeforeTheNextStepKeepsARowAStoreSetAsideSinceTheLast() async throws {
+        let library = density(.library)
+        let favorites = density(.favorites)
+        defaults.set(
+            Data(#"{"\#(PlaceView.favorites.storageKey)":"spacious","\#(PlaceView.library.storageKey)":"compact"}"#.utf8),
+            forKey: PlaceDensities.key)
+        let copy = FakePreferencesCopy()
+        let sync = await sync(copy)
+        let item = try #require(await copy.activeIDs.first)
+        #expect(await copy.unitsHeld(item)[favorites] == #""spacious""#)
+        PlaceDensities.update(in: defaults) { $0.set(.standard, for: .library) }
+        MacSettings.reset(in: defaults)
+        sync.replaced(PreferencesMap.synced)
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[library] == nil)
+        #expect(await copy.unitsHeld(item)[favorites] == #""spacious""#)
+    }
+
+    /// A date format this Mac's store cannot read, kept in place so the Marfa's field keeps its member, is never sent
+    /// over the Marfa's readable one, which comes back here.
+    @Test func aDateFormatThisMacCannotReadIsNeverSentOverTheMarfas() async throws {
+        let format = PreferenceUnit.member(.general, DateFormat.key)
+        let long = try #require(PreferenceJSON.text(DateFormat(date: .long).rawValue))
+        let copy = FakePreferencesCopy()
+        let item = await copy.add([format: long])
+        let sync = await sync(copy)
+        #expect(DateFormat.stored(in: defaults) == DateFormat(date: .long))
+        defaults.set("automatic", forKey: DateFormat.key)
+        DateFormat.setAsideUnreadable(in: defaults)
+        await sync.flush()
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[format] == long)
+        #expect(DateFormat.stored(in: defaults) == DateFormat(date: .long))
+        #expect(defaults.stringArray(forKey: DateFormat.setAsideKey) == ["automatic"])
+    }
+
+    /// A date format this Mac cannot read is never sent by the first sync, and a restore that holds one does not win:
+    /// the Marfa keeps another Mac's later choice, and this Mac takes it.
+    @Test func aDateFormatThisMacCannotReadNeitherMakesNorDeletesTheMarfas() async throws {
+        let format = PreferenceUnit.member(.general, DateFormat.key)
+        let long = try #require(PreferenceJSON.text(DateFormat(date: .long).rawValue))
+        defaults.set("automatic", forKey: DateFormat.key)
+        let copy = FakePreferencesCopy()
+        let sync = await sync(copy)
+        let item = try #require(await copy.activeIDs.first)
+        #expect(await copy.unitsHeld(item)[format] == nil)
+        sync.detach()
+        await copy.change(item, [format: long])
+        defaults.set("automatic", forKey: DateFormat.key)
+        sync.replaced(PreferencesMap.synced.filter { $0.key == DateFormat.key })
+        sync.attach(copy, library: "marfa:https://one", name: { nil })
+        await sync.flush()
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[format] == long)
+        #expect(DateFormat.stored(in: defaults) == DateFormat(date: .long))
+    }
+
+    @Test func adoptingAnItemWithoutADateFormatSendsNoneThisMacCannotRead() async throws {
+        let format = PreferenceUnit.member(.general, DateFormat.key)
+        defaults.set("automatic", forKey: DateFormat.key)
+        let copy = FakePreferencesCopy()
+        let item = await copy.add([theme: #""light""#])
+        _ = await sync(copy)
+        #expect(await copy.unitsHeld(item)[format] == nil)
+        #expect(await copy.unitsHeld(item)[theme] == #""light""#)
+    }
+
+    /// A Marfa value that is not JSON is neither deleted nor written over with what this Mac held before it arrived,
+    /// but the person's own later value is written over it.
+    @Test func thePersonsLaterValueIsWrittenOverAMarfaValueThatCannotBeRead() async throws {
+        defaults.set(#"{"core.note":{"pins":[]}}"#, forKey: PagePlacements.key)
+        let copy = FakePreferencesCopy()
+        let sync = await sync(copy)
+        let item = try #require(await copy.activeIDs.first)
+        await copy.change(item, [placement: "{not json"])
+        await sync.flush()
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[placement] == "{not json")
+        defaults.removeObject(forKey: PagePlacements.key)
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[placement] == "{not json")
+        defaults.set(#"{"core.note":{"pins":["due_at"]}}"#, forKey: PagePlacements.key)
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[placement] == #"{"pins":["due_at"]}"#)
+        #expect(defaults.stringArray(forKey: PagePlacements.setAsideKey) == ["{not json"])
+    }
+
+    /// The person's value, changed just after this Mac adopted an item whose row is not JSON, is written over it.
+    @Test func aCorrectionMadeRightAfterAdoptingARowThatIsNotJSONIsSent() async throws {
+        defaults.set(#"{"core.note":{"pins":[]}}"#, forKey: PagePlacements.key)
+        let copy = FakePreferencesCopy()
+        let item = await copy.add([placement: "{not json"])
+        let sync = await sync(copy)
+        #expect(await copy.unitsHeld(item)[placement] == "{not json")
+        defaults.set(#"{"core.note":{"pins":["due_at"]}}"#, forKey: PagePlacements.key)
+        await sync.flush()
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[placement] == #"{"pins":["due_at"]}"#)
+    }
+
+    /// A correction sent beside another Mac's change to the same setting, whose write the copy refuses, is sent again.
+    @Test func aCorrectionWhoseWriteIsRefusedIsSentAgain() async throws {
+        let other = PreferenceUnit.row(.types, setting: "pagePlacements", key: "core.task")
+        defaults.set(#"{"core.note":{"pins":[]}}"#, forKey: PagePlacements.key)
+        let copy = FakePreferencesCopy()
+        let sync = await sync(copy)
+        let item = try #require(await copy.activeIDs.first)
+        await copy.change(item, [placement: "{not json"])
+        await sync.flush()
+        await copy.change(item, [other: #"{"pins":["title"]}"#])
+        await copy.refuseNextWrite(to: .types)
+        defaults.set(#"{"core.note":{"pins":["due_at"]}}"#, forKey: PagePlacements.key)
+        await sync.flush()
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[placement] == #"{"pins":["due_at"]}"#)
+        #expect(await copy.unitsHeld(item)[other] == #"{"pins":["title"]}"#)
+        #expect(defaults.string(forKey: PagePlacements.key)?.contains(#""core.task":{"pins":["title"]}"#) == true)
+    }
+
+    /// While this Mac cannot read its own value of a setting, a Marfa row that is not JSON is not set aside again at
+    /// every step, so the sync does not wake itself.
+    @Test func aMarfaRowThatIsNotJSONBesideAnUnreadableValueHereIsSetAsideOnce() async throws {
+        defaults.set(#"{"core.note":{"pins":[]}}"#, forKey: PagePlacements.key)
+        let copy = FakePreferencesCopy()
+        let sync = await sync(copy)
+        let item = try #require(await copy.activeIDs.first)
+        defaults.set("[not a map", forKey: PagePlacements.key)
+        await copy.change(item, [placement: "{not json"])
+        await sync.flush()
+        let count = setAside(PagePlacements.setAsideKey).count
+        #expect(count <= 1)
+        await sync.flush()
+        await sync.flush()
+        #expect(setAside(PagePlacements.setAsideKey).count == count)
+        #expect(await copy.unitsHeld(item)[placement] == "{not json")
+    }
+
+    /// One view's layout this Mac cannot read stays in place beside the readable ones, and a removal of another view's
+    /// layout in the same change reaches the Marfa.
+    @Test func aRemovalBesideALayoutThisMacCannotReadReachesTheMarfa() async throws {
+        let later = PreferenceUnit.row(.views, setting: "viewLayout", key: "view-later")
+        let gone = PreferenceUnit.row(.views, setting: "viewLayout", key: "view-gone")
+        let copy = FakePreferencesCopy()
+        let item = await copy.add([later: #""a shape a later version of the app writes""#, gone: #"{"layout":"board"}"#])
+        let sync = await sync(copy)
+        ViewLayouts.update(in: defaults) { $0.forget(ItemID("view-gone")) }
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[gone] == nil)
+        #expect(await copy.unitsHeld(item)[later] == #""a shape a later version of the app writes""#)
+        #expect(setAside(ViewLayouts.setAsideKey).isEmpty)
+    }
+
     @Test func theSettingsFollowTheOpenLibrary() async throws {
         let bench = HostBench()
         let host = bench.host(opener: { connection, _, _ in SampleLibrary.open(connection) })

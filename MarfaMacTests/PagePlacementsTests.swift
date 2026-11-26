@@ -102,7 +102,18 @@ struct PagePlacementsTests {
     @Test func textThatIsNotAChoiceIsNotOne() {
         #expect(PagePlacements(rawValue: "not json") == nil)
         #expect(PagePlacements(rawValue: "[]") == nil)
-        #expect(PagePlacements(rawValue: #"{"aic.ticket":{"linkedFrom":"somewhere"}}"#) == nil)
+    }
+
+    /// A type's choice this version cannot read stays in the stored text beside the readable ones, and a reset of that
+    /// type removes it.
+    @Test func oneTypesChoiceThisVersionCannotReadStaysBesideTheRest() throws {
+        let stored = #"{"aic.comment":{"linkedFrom":"somewhere"},"aic.ticket":{"rows":{"repo":false}}}"#
+        var placements = try #require(PagePlacements(rawValue: stored))
+        #expect(placements.placement(of: Self.ticket, in: Self.catalogue).showsOnPage("repo") == false)
+        placements.setShows(.always, row: "repo", of: Self.ticket)
+        #expect(placements.rawValue.contains(#""aic.comment":{"linkedFrom":"somewhere"}"#))
+        placements.reset(Self.comment)
+        #expect(!placements.rawValue.contains("aic.comment"))
     }
 
     @Test func aMemberThisVersionDoesNotReadSurvivesARewrite() throws {

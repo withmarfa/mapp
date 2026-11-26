@@ -81,11 +81,51 @@ struct TypeLooksTests {
         #expect(kept == [one: ["a": ["date": "bogus"]], two: "not an object"] as NSDictionary)
         #expect(sink.errors.map(\.type) == ["type_looks_unreadable"])
 
-        // What was readable was saved again, so the next launch sets nothing more aside.
+        // What could not be read left the stored value, so the next launch sets nothing more aside.
         let next = RecordingSink()
         #expect(reopen(defaults, sink: next).choices(for: one)[TypeID("b")] == TypeLookChoice(date: .created))
         #expect((defaults.array(forKey: TypeLooks.setAsideKey) as? [Data])?.count == 1)
         #expect(next.errors.isEmpty)
+    }
+
+    /// A later version's members of a look this Mac reads stay as stored, through a reload that sets another look aside
+    /// and through a change to another look.
+    @Test func membersThisMacDoesNotKnowSurviveAReloadAndAnotherLooksChange() throws {
+        let defaults = ThrowawayDefaults.make("TypeLooksTests.unknownMembers")
+        let later: NSDictionary = ["date": "created", "glow": true]
+        let stored: [String: Any] = [one: ["core.note": later, "b": ["date": "bogus"]], two: ["core.task": later]]
+        defaults.set(try JSONSerialization.data(withJSONObject: stored), forKey: TypeLooks.defaultsKey)
+        let store = reopen(defaults)
+        #expect(try looks(defaults) == [one: ["core.note": later], two: ["core.task": later]] as NSDictionary)
+        store.change(TypeID("core.task"), in: one, catalogue: catalogue) { $0.date = .off }
+        let held = try #require(try looks(defaults)[one] as? NSDictionary)
+        #expect(held["core.note"] as? NSDictionary == later)
+        #expect(held["core.task"] != nil)
+        #expect(try looks(defaults)[two] as? NSDictionary == ["core.task": later] as NSDictionary)
+        store.change(TypeID("core.note"), in: one, catalogue: catalogue) { $0.date = .occurred }
+        #expect((try looks(defaults)[one] as? NSDictionary)?["core.note"] as? NSDictionary == ["date": "occurred", "glow": true] as NSDictionary)
+    }
+
+    /// A look changed back to what its type shows anyway keeps a later version's members, so its row is not removed.
+    @Test func aLookChangedBackToItsPresetKeepsMembersThisMacDoesNotKnow() throws {
+        let defaults = ThrowawayDefaults.make("TypeLooksTests.backToPreset")
+        let preset = try #require(reopen(ThrowawayDefaults.make("TypeLooksTests.preset")).looks(in: catalogue, library: one)[TypeID("core.note")])
+        var look = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(
+            TypeLookChoice(date: preset.date == .created ? .edited : .created))) as? [String: Any])
+        look["glow"] = true
+        let stored: [String: Any] = [one: ["core.note": look]]
+        defaults.set(try JSONSerialization.data(withJSONObject: stored), forKey: TypeLooks.defaultsKey)
+        let store = reopen(defaults)
+        store.change(TypeID("core.note"), in: one, catalogue: catalogue) { $0.date = preset.date }
+        #expect((try looks(defaults)[one] as? NSDictionary)?["core.note"] as? NSDictionary == ["glow": true] as NSDictionary)
+        #expect(!store.hasChoice(for: TypeID("core.note"), in: one))
+        store.restore(TypeID("core.note"), in: one)
+        #expect((try looks(defaults)[one] as? NSDictionary)?["core.note"] as? NSDictionary == ["glow": true] as NSDictionary)
+    }
+
+    private func looks(_ defaults: UserDefaults) throws -> NSDictionary {
+        let saved = try #require(defaults.data(forKey: TypeLooks.defaultsKey))
+        return try #require(JSONSerialization.jsonObject(with: saved) as? NSDictionary)
     }
 
     @Test func storedTextThatIsNotLooksAtAllIsSetAsideWholeAfterEarlierOnes() throws {
