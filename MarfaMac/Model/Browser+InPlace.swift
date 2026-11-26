@@ -6,9 +6,10 @@ extension Browser {
     // MARK: Starting a row
 
     /// Whether the open layout has a row to type a new item in: a table or a board of a place that lists items, and no
-    /// search, whose results are not where an item is made.
-    var typesInPlace: Bool {
+    /// search, whose results are not where an item is made. A place of files has none, since a file is never typed.
+    func typesInPlace(in library: any ItemLibrary) -> Bool {
         guard showsCollection, !showsPlaceIndex, !isSearching, shown.listsItems else { return false }
+        if shown.view == .own, case .type(let type) = shown.place, library.catalogue.isFileType(type) { return false }
         return viewMode == .table || viewMode == .board
     }
 
@@ -17,7 +18,7 @@ extension Browser {
     /// whether it did, so New opens the line where it did not.
     @discardableResult
     func beginInPlace(in library: any ItemLibrary) -> Bool {
-        guard typesInPlace, QuickAdd.isAvailable(in: library) else { return false }
+        guard typesInPlace(in: library), QuickAdd.isAvailable(in: library) else { return false }
         switch viewMode {
         case .table:
             let content = tableContent(in: library)
@@ -46,7 +47,7 @@ extension Browser {
     /// Brings back the row's typed draft for the layout of the place shown, out of the keyboard's way, as the layout
     /// appears. A board's draft comes back in the lane its value names, or the first.
     func restoreInPlace(_ spot: InPlaceRow.Spot, in library: any ItemLibrary) {
-        guard typesInPlace, inPlace.place != shown else { return }
+        guard typesInPlace(in: library), inPlace.place != shown else { return }
         inPlace.restore(spot, in: shown, library: library)
     }
 
@@ -66,10 +67,12 @@ extension Browser {
 
     /// A new item as the place implies it: the place's own type, else the kind New Items Are names, else the last kind
     /// made, else a note (`QuickAdd.startingType`), going where the place says, with what `spot` and the view's filters
-    /// imply (`inPlaceValues`). A file is never typed in a row, so it is not offered.
+    /// imply (`inPlaceValues`). A file is never typed in a row, so it is not offered, and a block offers only a kind
+    /// whose look has a date it can hold, so its item stands at the time it was drawn; none such, and there is no block.
     func inPlaceDraft(for spot: InPlaceRow.Spot, in library: any ItemLibrary) -> QuickAdd.Draft? {
         let catalogue = library.catalogue
-        let offered = QuickAdd.types(in: library).map(\.id.rawValue).filter { !QuickAdd.isFile($0, in: catalogue) }
+        var offered = QuickAdd.types(in: library).map(\.id.rawValue).filter { !QuickAdd.isFile($0, in: catalogue) }
+        if case .block = spot { offered = offered.filter { blockDateKey(of: $0, in: library) != nil } }
         let recent = NewItemRecents.stored(for: library.serverKey, in: defaults).kinds.first
         guard let type = QuickAdd.startingType(
             asked: nil, place: shown, chosen: NewItemType.stored(in: defaults), remembered: recent, offered: offered, in: catalogue)
@@ -82,17 +85,26 @@ extension Browser {
         return draft
     }
 
-    /// What a row's place implies, written into `draft`: a parent or a field's one value that the view's filters ask for
-    /// with "is", the lane's value, the group's value, and the block's time. A value the draft's kind cannot hold is
-    /// passed over; the item is made anyway, and may then stand outside the view, held where it was typed until left.
+    /// The field a block's time is written to for an item of `typeID`: its look's date, where the kind has that field.
+    private func blockDateKey(of typeID: String, in library: any ItemLibrary) -> String? {
+        guard case .field(let key)? = looks(in: library)[TypeID(typeID)]?.date,
+              QuickAdd.fields(of: typeID, in: library.catalogue).contains(where: { $0.key == key })
+        else { return nil }
+        return key
+    }
+
+    /// What a row's place implies, written into `draft` as values the person did not type (`QuickAdd.Draft.prefilled`),
+    /// so a row holding only them holds nothing: a field's one value that the view's filters ask for with "is", the
+    /// lane's value, the group's value, and the block's time. A parent the filters ask for joins only as the item is
+    /// added or handed on (`withImpliedParent`), since a parent is the person's work in a draft. A value the draft's kind
+    /// cannot hold is passed over; the item is made anyway, and may then stand outside the view, held where it was typed
+    /// until left.
     func inPlaceValues(_ draft: inout QuickAdd.Draft, at spot: InPlaceRow.Spot, in library: any ItemLibrary) {
         let catalogue = library.catalogue
         let keys = Set(QuickAdd.fields(of: draft.typeID, in: catalogue).map(\.key))
         for clause in tableOptions[shown]?.filter.clauses ?? [] where clause.op == .is && clause.values.count == 1 {
             guard let value = clause.values.first, !value.isEmpty else { continue }
-            if clause.field == ItemTableColumn.parent.id {
-                if library.admitsCreationParent(ItemID(value), typeID: draft.typeID) { draft.setParent(ItemID(value)) }
-            } else if let key = ItemTableColumn.fieldKey(of: clause.field), keys.contains(key) {
+            if let key = ItemTableColumn.fieldKey(of: clause.field), keys.contains(key) {
                 if let group = FilterClause.group(of: value) {
                     set(&draft, lane: .group(group), key: key, in: catalogue)
                 } else {
@@ -114,12 +126,25 @@ extension Browser {
         case .lane(let lane):
             set(&draft, lane: lane, key: boardLanes(in: library)?.key ?? "", in: catalogue)
         case .block(let start, let end):
-            guard case .field(let key)? = looks(in: library)[TypeID(draft.typeID)]?.date, keys.contains(key) else { break }
-            draft.properties[key] = .string(ItemDate.instant(start))
+            guard let key = blockDateKey(of: draft.typeID, in: library) else { break }
+            draft.imply(key, .string(ItemDate.instant(start)))
             if key == MarfaMapping.startField, keys.contains(MarfaMapping.endField) {
-                draft.properties[MarfaMapping.endField] = .string(ItemDate.instant(end))
+                draft.imply(MarfaMapping.endField, .string(ItemDate.instant(end)))
             }
         }
+    }
+
+    /// `draft` with the parent the view's filters ask for with "is", where it names none and its kind may have it.
+    func withImpliedParent(_ draft: QuickAdd.Draft, in library: any ItemLibrary) -> QuickAdd.Draft {
+        guard draft.parentID == nil, draft.setAsideParent == nil else { return draft }
+        let clause = tableOptions[shown]?.filter.clauses.first {
+            $0.field == ItemTableColumn.parent.id && $0.op == .is && $0.values.count == 1
+        }
+        guard let value = clause?.values.first, !value.isEmpty, library.admitsCreationParent(ItemID(value), typeID: draft.typeID)
+        else { return draft }
+        var given = draft
+        given.parentID = ItemID(value)
+        return given
     }
 
     /// Writes into `draft` the value a card takes in `lane` (`ItemBoardLayout.move`), as a drop there would.
@@ -134,8 +159,7 @@ extension Browser {
             (key, ItemBoardLayout.move(made, key: key, to: lane, catalogue: catalogue))
         }
         guard case .set(let value) = move else { return }
-        draft.properties[writeKey] = value
-        draft.prefilled[writeKey] = nil
+        if let value { draft.imply(writeKey, value) } else { draft.properties[writeKey] = nil; draft.prefilled[writeKey] = nil }
     }
 
     // MARK: Adding
@@ -147,11 +171,12 @@ extension Browser {
     /// as typed, and the library tells the person why.
     @discardableResult
     func addInPlace(in library: any ItemLibrary, undoManager: UndoManager?, next: Bool, now: Date = .now) async -> ItemID? {
-        guard let typed = inPlace.draft, let spot = inPlace.spot, !inPlace.isSaving else { return nil }
-        guard typed.hasContent else {
+        guard let held = inPlace.draft, let spot = inPlace.spot, !inPlace.isSaving else { return nil }
+        guard held.hasContent else {
             if !next { endInPlace() }
             return nil
         }
+        let typed = withImpliedParent(held, in: library)
         guard QuickAdd.canSave(typed, in: library) else {
             handInPlaceToTextForm(in: library)
             return nil
@@ -161,7 +186,7 @@ extension Browser {
         if let parent = typed.parentID {
             let verdict = await library.newChildVerdict(under: parent)
             // Text typed while the core was asked stays as typed; nothing is made from the draft as it was.
-            guard inPlace.draft == typed else { return nil }
+            guard inPlace.draft == held else { return nil }
             if case .refused(let reason) = verdict {
                 library.notices.tell(String(localized: "Can’t Create Item"), reason)
                 return nil
@@ -210,8 +235,14 @@ extension Browser {
         if case .lane(let lane) = spot { ItemBoardLane.holdKey(lane) } else { nil }
     }
 
-    /// Gives the row's draft to the text form, which asks for what the row cannot hold.
+    /// Gives the row's draft to the text form, which asks for what the row cannot hold. What the place implied is the
+    /// person's to change there, with the parent the view's filters ask for.
     private func handInPlaceToTextForm(in library: any ItemLibrary) {
+        inPlace.change { draft in
+            let kind = QuickAdd.prefill(of: draft.typeID, in: library.catalogue)
+            draft.prefilled = draft.prefilled.filter { kind[$0.key] == $0.value }
+            if let parent = withImpliedParent(draft, in: library).parentID, draft.parentID == nil { draft.setParent(parent) }
+        }
         guard let entry = inPlace.entry else { return }
         inPlace.drafts.release(entry)
         let wasEditing = inPlace.isEditing
@@ -221,7 +252,8 @@ extension Browser {
             inPlace.isEditing = wasEditing
             return
         }
-        inPlace.leave()
+        // The form holds the draft now, so the row lets it go without releasing the form's claim.
+        inPlace.handOff()
         releaseAdded()
     }
 
@@ -252,6 +284,12 @@ extension Browser {
         let moved = rowHold.releasePointer()
         rowHold.pointer = row
         if moved { rowHoldReleases += 1 }
+    }
+
+    /// The pointer went to the row `id` of a table drawn at `anchors`, or left the table's rows: the row it left goes, and
+    /// the one it reached is held.
+    func pointerMoved(to id: ItemID?, anchors: [ItemID: HeldRow]) {
+        holdPointer(id.flatMap { anchors[$0] })
     }
 
     /// Holds the one row the keyboard chose where it is drawn, or lets the last one go.

@@ -119,7 +119,7 @@ struct ItemTable: View {
                 ForEach(pages.slice.rows) { TableRow($0) }
             }
             ForEach(pages.trailing) { TableRow($0) }
-            if browser.typesInPlace {
+            if browser.typesInPlace(in: library) {
                 newRow()
             }
             if pages.remaining > 0 {
@@ -546,9 +546,7 @@ private struct PointerHold: View {
 
     var body: some View {
         Color.clear
-            .onChange(of: hover.row) { _, row in
-                if let row { browser.holdPointer(drawn.anchors[row]) }
-            }
+            .onChange(of: hover.row) { _, row in browser.pointerMoved(to: row, anchors: drawn.anchors) }
     }
 }
 
@@ -614,6 +612,8 @@ private struct Pages {
             remaining = drawn.remaining
             places = Dictionary(drawn.groups.flatMap(\.places).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
             trailing = hold.added.compactMap(content.row)
+            // They stand apart from their groups, so letting them go draws them where they belong.
+            hold.moved.formUnion(trailing.map(\.id))
         }
         self.anchors = anchors
     }

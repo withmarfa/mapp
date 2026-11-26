@@ -137,6 +137,108 @@ struct InPlaceRowTests {
         #expect(browser.inPlace.draft == nil)
     }
 
+    // MARK: What the place implies
+
+    /// A task in To Do, so the tasks' board has its status lanes.
+    private static func board() -> (FakeItemLibrary, Browser) {
+        let task = Item(
+            id: ItemID("task-1"), type: TypeID("core.task"), title: "Existing", titleRule: .property("title"),
+            properties: [Property(key: "status", value: .string("todo"))], version: ItemVersion(1), created: .now, modified: .now)
+        let library = FakeItemLibrary(items: [task])
+        let browser = Self.browser(in: library)
+        browser.viewMode = .board
+        return (library, browser)
+    }
+
+    @Test func anUntouchedLaneRowHoldsNothingAndLeavingItMakesNothing() async throws {
+        let (library, browser) = Self.board()
+        let slot = InPlaceRow.slot(.lane(.option("todo")), in: Self.tasks)
+        #expect(browser.beginInPlace(.lane(.option("todo")), in: library))
+        #expect(browser.inPlace.draft?.properties["status"] == .string("todo"), "the lane gives its value")
+        #expect(!browser.inPlace.holdsContent, "a value the place gives is not typed")
+        #expect(await browser.addInPlace(in: library, undoManager: nil, next: false) == nil)
+        #expect(library.items.count == 1, "nothing is made")
+        #expect(!browser.quickAdd.isPresented, "nothing is handed on")
+        #expect(!browser.inPlace.drafts.holdsDraft(slot, in: library.serverKey))
+
+        browser.beginInPlace(.lane(.option("todo")), in: library)
+        Self.type("Typed", in: browser)
+        Self.type("", in: browser)
+        browser.escapeInPlace()
+        #expect(browser.inPlace.draft == nil, "a row typed and emptied again goes")
+        #expect(!browser.inPlace.drafts.holdsDraft(slot, in: library.serverKey))
+    }
+
+    @Test func aBlockDrawnInAMixedPlaceTakesAKindWithATimeAndAloneHoldsNothing() async throws {
+        let library = FakeItemLibrary()
+        let event = TypeID("core.event")
+        var catalogue = library.catalogue
+        catalogue.itemTypes[event] = ItemTypeInfo(
+            id: event, label: "Event",
+            fields: [
+                .init(key: MarfaMapping.startField, label: "Starts", kind: .date(includesTime: true), declaredBy: event),
+                .init(key: MarfaMapping.endField, label: "Ends", kind: .date(includesTime: true), declaredBy: event),
+            ],
+            titleField: "title", bodyField: "body", parent: nil)
+        library.catalogue = catalogue
+        let browser = Self.browser(in: library)
+        browser.showing = .library
+        browser.viewMode = .calendar
+        let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
+        #expect(browser.beginInPlace(.block(start: start, end: start.addingTimeInterval(1800)), in: library))
+        let draft = try #require(browser.inPlace.draft)
+        #expect(draft.typeID == event.rawValue, "a note has no time to stand at")
+        #expect(draft.properties[MarfaMapping.startField] != nil)
+        #expect(!browser.inPlace.holdsContent)
+        #expect(await browser.addInPlace(in: library, undoManager: nil, next: false) == nil)
+        #expect(library.items.isEmpty)
+        #expect(!browser.quickAdd.isPresented)
+    }
+
+    @Test func aRefusedCreateOnALaneRowComesBack() async throws {
+        let (library, browser) = Self.board()
+        library.holdsCreations = true
+        browser.beginInPlace(.lane(.option("todo")), in: library)
+        Self.type("Refused in the lane", in: browser)
+        let id = try #require(await browser.addInPlace(in: library, undoManager: nil, next: true))
+        #expect(browser.inPlace.draft?.title == "")
+        library.refusedCreations = [id]
+        browser.finishNewItems(in: library)
+        #expect(browser.inPlace.draft?.title == "Refused in the lane", "the next row held only the lane's value")
+    }
+
+    @Test func aHandedOnDraftStaysTheTextFormsAlone() async throws {
+        let library = FakeItemLibrary()
+        let browser = Self.browser(in: library)
+        browser.beginInPlace(.table(group: nil), in: library)
+        browser.inPlace.change {
+            $0.title = "Handed on"
+            $0.setParent(ItemID("gone"))
+        }
+        let entry = try #require(browser.inPlace.entry)
+        #expect(await browser.addInPlace(in: library, undoManager: nil, next: false) == nil)
+        #expect(browser.quickAdd.isPresented)
+        #expect(browser.inPlace.drafts.take(entry, in: library.serverKey) == nil, "the form still holds its claim")
+    }
+
+    @Test func thePointerLeavingTheTableLetsItsRowGo() {
+        let browser = Self.browser(in: FakeItemLibrary())
+        let row = HeldRow(id: ItemID("a"), group: nil, index: 0)
+        browser.pointerMoved(to: ItemID("a"), anchors: [ItemID("a"): row])
+        #expect(browser.rowHold.pointer == row)
+        browser.pointerMoved(to: nil, anchors: [ItemID("a"): row])
+        #expect(browser.rowHold.pointer == nil)
+    }
+
+    @Test func aPlaceOfFilesHasNoRowToType() {
+        let library = FakeItemLibrary()
+        let browser = Self.browser(in: library)
+        browser.viewMode = .table
+        #expect(browser.typesInPlace(in: library), "a place of tasks has one")
+        browser.showing = .type(.file)
+        #expect(!browser.typesInPlace(in: library))
+    }
+
     // MARK: Held rows
 
     private struct Row: Identifiable, Equatable {

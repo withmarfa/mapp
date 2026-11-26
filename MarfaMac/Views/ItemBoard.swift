@@ -160,7 +160,7 @@ struct ItemBoard: View {
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 0)
-                if isDestination(lane), browser.typesInPlace {
+                if isDestination(lane), browser.typesInPlace(in: library) {
                     Button {
                         browser.beginInPlace(.lane(lane.id), in: library)
                     } label: {

@@ -132,6 +132,9 @@ final class InPlaceRow {
         clear()
     }
 
+    /// The row's draft went to another holder, which claimed it: the row lets it go without a word to the store.
+    func handOff() { clear() }
+
     private func clear() {
         entry = nil
         draft = nil
