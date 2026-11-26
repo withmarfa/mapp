@@ -513,6 +513,13 @@ extension Browser {
         let searching = isSearching
         let token = UUID()
         let from = update.map { (made: $0.content.made, wants: $0.content.wants, earlier: $0.content.earlierOffMainActor, changed: $0.changed) }
+        let viewRevision = place.savedView == nil ? nil : library.viewRevision
+        func isCurrent(_ browser: Browser) -> Bool {
+            guard browser.isLive(token, key, place, searching) else { return false }
+            // The first answer must match the copy even if the layout has yet to ask again after a sync.
+            return earlier != nil || (library.contentRevision == key.basis.content
+                && (viewRevision == nil || library.viewRevision == viewRevision))
+        }
         let task = Task { [weak self] in
             if settles { try? await Task.sleep(for: Browser.arrangeSettling) }
             await previous?.value
@@ -529,7 +536,7 @@ extension Browser {
                 }
                 return (wants, plan)
             }.value
-            guard self.isLive(token, key, place, searching) else { return self.endArranging(token) }
+            guard isCurrent(self) else { return self.endArranging(token) }
             var start = ContinuousClock.now
             let reading = plan.map { ItemTableContent.reading(browser: self, library: library, update: $0, items: items) }
                 ?? ItemTableContent.reading(browser: self, library: library, items: items, wants: wants)
@@ -537,7 +544,7 @@ extension Browser {
             let made = await Task.detached(priority: .userInitiated) {
                 if let from, plan != nil { ItemTableContent.Made(reading, updating: from.made, items: items) } else { ItemTableContent.Made(reading) }
             }.value
-            guard self.isLive(token, key, place, searching) else { return self.endArranging(token) }
+            guard isCurrent(self) else { return self.endArranging(token) }
             start = ContinuousClock.now
             // The options the rows and the key were made from, not the window's now.
             let content = ItemTableContent(
@@ -551,7 +558,7 @@ extension Browser {
                     columns: from.earlier.columns, sort: from.earlier.sort, ordered: from.earlier.landed ?? from.earlier.ordering.ordered())
                 return ordering.updated(from: earlier, changed: remade)
             }.value
-            guard self.isLive(token, key, place, searching) else { return self.endArranging(token) }
+            guard isCurrent(self) else { return self.endArranging(token) }
             start = ContinuousClock.now
             // The chosen row is read as the table lands, where the held table shows it now. The held table's rows are
             // read only for that row, since reading them sorts them on the main actor where they were never asked for.

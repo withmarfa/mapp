@@ -403,6 +403,7 @@ import UniformTypeIdentifiers
         _ = try await settledSections(list, in: library, order: order)
         let shown = drawn(list, in: library, order: order, cards: cards)
         let fresh = fresh(like: list, in: library)
+        _ = try await settledSections(fresh, in: library, order: order)
         #expect(shown[item.id]?.title == "Renamed while arranging")
         #expect(shown == drawn(fresh, in: library, order: order, cards: asCards ? CardContents() : nil))
     }

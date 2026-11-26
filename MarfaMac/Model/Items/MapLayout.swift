@@ -67,7 +67,6 @@ nonisolated enum MapLayout {
             mapRect = LocationFrame.covering(pins.map(\.point)).map(MapLayout.rect(of:)) ?? .world
         }
 
-        static let empty = Placing(pins: [], unplaced: [])
     }
 
     private static func rect(of frame: LocationFrame) -> MKMapRect {

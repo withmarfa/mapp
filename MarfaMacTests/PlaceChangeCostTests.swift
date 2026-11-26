@@ -308,13 +308,19 @@ struct PlaceChangeCostTests {
             let start = ContinuousClock.now
             move()
             // The move itself holds the main actor too.
-            var stall = Self.milliseconds(ContinuousClock.now - start)
+            let action = Self.milliseconds(ContinuousClock.now - start)
+            var stall = action
+            var stallAt = 0.0
             var landed: Duration? = expected == nil && !firstOpen ? .zero : nil
             var checked = start
             while ContinuousClock.now - start < Self.watched {
                 let before = ContinuousClock.now
                 try await Task.sleep(for: .milliseconds(5))
-                stall = max(stall, Self.milliseconds(ContinuousClock.now - before - .milliseconds(5)))
+                let gap = Self.milliseconds(ContinuousClock.now - before - .milliseconds(5))
+                if gap > stall {
+                    stall = gap
+                    stallAt = Self.milliseconds(before - start)
+                }
                 // Checked four times a second, so reading what the layout draws costs the main thread little.
                 if landed == nil, ContinuousClock.now - checked >= .milliseconds(250) {
                     checked = ContinuousClock.now
@@ -327,8 +333,8 @@ struct PlaceChangeCostTests {
             let costs = Cost.tallies.sorted { $0.value.milliseconds > $1.value.milliseconds }.prefix(6)
                 .map { "\($0.key.rawValue)=\($0.value.count)x\(String(format: "%.1f", $0.value.milliseconds))ms" }.joined(separator: " ")
             print(String(
-                format: "BUSY|%@|%@|main=%.0fms|busy=%.1f%%|stall=%.0fms|window=%.0fms|landed=%@|%@", layout.name, name, main,
-                main / window * 100, stall, window, landed.map { String(format: "%.0fms", Self.milliseconds($0)) } ?? "never", costs))
+                format: "BUSY|%@|%@|main=%.0fms|busy=%.1f%%|stall=%.0fms|window=%.0fms|landed=%@|action=%.0fms|stall-at=%.0fms|%@", layout.name, name, main,
+                main / window * 100, stall, window, landed.map { String(format: "%.0fms", Self.milliseconds($0)) } ?? "never", action, stallAt, costs))
             #expect(landed != nil, "\(layout.name), \(name): the layout drew the change")
             if firstOpen { #expect(stall < 250, "\(layout.name): first open must keep the main thread responsive") }
         }

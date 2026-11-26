@@ -52,7 +52,6 @@ final class MapController: NSObject, MKMapViewDelegate {
         mapView.showsZoomControls = false
         mapView.isRotateEnabled = false
         mapView.isPitchEnabled = false
-        mapView.setVisibleMapRect(.world, animated: false)
         mapView.onReturn = { [weak self] in _ = self?.browser?.openSelection() }
         mapView.onEscape = { [weak self] in self?.browser?.selection = [] }
         return mapView
@@ -76,7 +75,7 @@ final class MapController: NSObject, MKMapViewDelegate {
     struct Inputs {
         let browser: Browser
         let catalogue: Catalogue
-        let placing: MapLayout.Placing?
+        let placing: MapLayout.Placing
         let style: ItemMapStyle
         let groups: Bool
         let placeToken: AnyHashable
@@ -90,10 +89,7 @@ final class MapController: NSObject, MKMapViewDelegate {
         catalogue = inputs.catalogue
         reduceMotion = inputs.reduceMotion
         let redrawn = artist.reset(scheme: inputs.scheme, textSize: inputs.textSize, backingScale: mapView.window?.backingScaleFactor ?? 2)
-        if style != inputs.style {
-            style = inputs.style
-            mapView.preferredConfiguration = Self.configuration(for: inputs.style)
-        }
+        prepare(style: inputs.style)
         if placeToken != inputs.placeToken {
             placeToken = inputs.placeToken
             pendingFit = true
@@ -101,12 +97,19 @@ final class MapController: NSObject, MKMapViewDelegate {
         shown = inputs.placing
         let regroups = groups != inputs.groups
         groups = inputs.groups
-        // A large place may have no placement yet. Take the last place's markers off the map at once.
-        let placing = inputs.placing ?? .empty
+        let placing = inputs.placing
+        let hadPlacing = servedSerial != nil
+        if pendingFit { fit(placing, animated: false) }
         if placing.serial != servedSerial || regroups { show(placing, rebuilding: regroups) }
-        if redrawn { redrawViews() }
-        if pendingFit, let shown { fit(shown, animated: false) }
+        if redrawn, hadPlacing { redrawViews() }
         syncSelection(inputs.browser.selection)
+    }
+
+    /// Sets up the native view before the first placement asks it to draw.
+    func prepare(style: ItemMapStyle) {
+        guard self.style != style else { return }
+        self.style = style
+        mapView.preferredConfiguration = Self.configuration(for: style)
     }
 
     private static func configuration(for style: ItemMapStyle) -> MKMapConfiguration {
@@ -325,7 +328,7 @@ struct ItemMapCanvas: NSViewRepresentable {
         let place = inputs.browser.shown
         let placing = inputs.placing
         view.onDelete = { [weak browser = inputs.browser] in
-            guard let browser, browser.shown == place, let placing else { return }
+            guard let browser, browser.shown == place else { return }
             delete(browser) { Set(placing.pinsByID.keys) }
         }
     }

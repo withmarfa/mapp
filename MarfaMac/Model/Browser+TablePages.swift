@@ -45,14 +45,23 @@ extension Browser {
         if paging != tablePaging { pagingState = (pagingKey, paging) }
     }
 
-    /// How many items a list or a timeline draws at first, and adds as its end comes into view. SwiftUI goes through every
+    /// How many items a paged layout adds as its end comes into view. SwiftUI goes through every
     /// row it is given at each change, so a place of tens of thousands of items is drawn a page at a time.
     nonisolated static let listPage = 250
 
     /// Which items the list, the gallery or the timeline draws: a page again whenever the place, the search, the order, the
     /// filters or the grouping has changed since more were drawn.
     var listDrawn: ListDrawn {
-        guard let held = listPagingState, held.key == pagingKey else { return ListDrawn() }
+        guard let held = listPagingState, held.key == pagingKey else {
+            // Native lists visit every row they are first given, even below the window.
+            let count: Int
+            switch viewMode {
+            case .list: count = sectionsWork.held?.value.ids.count ?? 0
+            case .timeline: count = timelineWork.held?.value.positions.count ?? 0
+            default: count = 0
+            }
+            return ListDrawn(head: count > Self.arrangesAlongsideAbove ? 80 : Self.listPage)
+        }
         return held.drawn
     }
 
