@@ -70,7 +70,8 @@ struct PlaceChangeCostTests {
         (Layout(name: "list by name", mode: .list), { sortByName($0) }),
         (Layout(name: "gallery", mode: .gallery), { _ in }),
         (Layout(name: "board", mode: .board), { _ in }),
-        (Layout(name: "calendar", mode: .calendar), { _ in }),
+        // On the month the sample's dates fall in, so the calendar draws items.
+        (Layout(name: "calendar", mode: .calendar), { $0.calendarDay = Date(timeIntervalSince1970: 1_780_000_000) }),
         (Layout(name: "timeline", mode: .timeline), { _ in }),
     ]
 
@@ -90,20 +91,34 @@ struct PlaceChangeCostTests {
         }
     }
 
-    /// `changed` new items like `template`, the first item the layout draws, of its type, values, tier, tags and date, made and
-    /// edited after the first two rounds, so the first page drawn in any order, grouping or date shows them.
+    /// `changed` new items like `template`, the first item the layout draws, of its type, values, tier and tags, made and
+    /// edited after the first two rounds, so the first page drawn in any order, grouping or date shows them. Their dates are
+    /// the template's, spread over the four weeks up to it, as a sync's are.
     private static func added(round: Int, like template: Item) -> [Item] {
         (0..<changed).map { index in
             let title = String(format: "0 1 Added %04d", index)
+            let properties = template.properties.filter { $0.key != "title" }.map { property in
+                Property(key: property.key, value: property.value.string.flatMap { earlier($0, by: index % 28) }.map { .string($0) } ?? property.value)
+            }
             var item = LibraryFixture.item(
                 ItemID("added-\(round)-\(index)"), template.type, title, age: index, tier: template.tier, tags: template.tags,
-                properties: template.properties.filter { $0.key != "title" } + [Property(key: "title", value: .string(title))])
+                properties: properties + [Property(key: "title", value: .string(title))])
             item.occurred = template.occurred
             item.source = template.source
             item.created = Date(timeIntervalSince1970: 1_000_000 + Double(changed - index))
             item.modified = Date(timeIntervalSince1970: 1_790_250_000 - Double(index))
             return item
         }
+    }
+
+    /// A day or a moment written as Marfa writes it, `days` earlier, or nil for any other text.
+    private static func earlier(_ text: String, by days: Int) -> String? {
+        let shift = -Double(days) * 86_400
+        if let date = try? Date(text, strategy: .iso8601) { return date.addingTimeInterval(shift).formatted(.iso8601) }
+        if let day = try? Date(text, strategy: .iso8601.year().month().day()) {
+            return day.addingTimeInterval(shift).formatted(.iso8601.year().month().day())
+        }
+        return nil
     }
 
     /// Every item of `library` with `items` in place of those of the same id, and those it lacks added.
@@ -129,6 +144,7 @@ struct PlaceChangeCostTests {
         fresh.adopt(copy)
         fresh.showing = browser.shown
         fresh.tableOptions = browser.tableOptions
+        fresh.calendarDay = browser.calendarDay
         fresh.viewMode = mode
         // Asked as the layout asks, so the fresh window holds what it would draw.
         switch mode {
