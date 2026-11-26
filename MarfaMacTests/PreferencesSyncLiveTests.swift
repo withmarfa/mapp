@@ -122,7 +122,7 @@ extension LiveMarfaTests {
                 let host = MarfaHost(defaults: older.defaults, signIns: signIns, location: MarfaStoreLocation(root: root))
                 let libraries = Libraries(
                     host: host, defaults: older.defaults, handOverPages: { $0(true) }, syncsPreferences: true,
-                    defaultsDomain: older.defaults.suite)
+                    defaultsDomain: older.sync.domain)
                 await libraries.launch()
                 let source = try #require(host.source as? MarfaSource)
                 source.refresh()
