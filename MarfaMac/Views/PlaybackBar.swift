@@ -192,8 +192,9 @@ private struct PlaybackScrubber: View {
     }
 }
 
-/// Puts a bar along the foot of the page's pane, centered on it and clear of the corner's buttons, at the width of the
-/// design's 500 points where there is room, and lifted above a toast as the corner is (`WindowCorner.lift`).
+/// Puts a bar along the foot of the page's pane, centered on it and beside the corner's buttons at the width of the
+/// design's 500 points where there is room. In a pane too narrow to hold the bar beside them it rises above them, as the
+/// formats bar does. It lifts above a toast as the corner does (`WindowCorner.lift`).
 struct PlaybackFoot<Bar: View>: View {
     @ViewBuilder var bar: Bar
     @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
@@ -206,7 +207,10 @@ struct PlaybackFoot<Bar: View>: View {
         // What the corner's buttons take at the trailing edge at the default text size: Open and Focus, with the gap between.
         let cornerRoom: CGFloat = 72 + 8
         let lift = WindowCorner<EmptyView, EmptyView>.lift(summary: summary, details: details, scale: scale)
-        PlaybackFootLayout(leading: inset, trailing: cornerRoom * scale + inset * 2, ideal: 500 * scale) { bar.pointerStyle(.default) }
+        PlaybackFootLayout(
+            leading: inset, trailing: cornerRoom * scale + inset * 2, ideal: 500 * scale, least: 300 * scale,
+            raise: CornerMetrics.height * scale + inset
+        ) { bar.pointerStyle(.default) }
             .padding(.bottom, inset + lift)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
             .animation(.smooth(duration: 0.25), value: lift)
@@ -217,6 +221,10 @@ private struct PlaybackFootLayout: Layout {
     var leading: CGFloat
     var trailing: CGFloat
     var ideal: CGFloat
+    /// The narrowest the bar is drawn beside the buttons.
+    var least: CGFloat
+    /// How far the bar rises when it cannot sit beside the buttons: their height and the gap above them.
+    var raise: CGFloat
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let height = subviews.first?.sizeThatFits(.unspecified).height ?? 0
@@ -225,10 +233,14 @@ private struct PlaybackFootLayout: Layout {
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
         guard let bar = subviews.first else { return }
-        let room = max(bounds.width - leading - trailing, min(bounds.width - leading * 2, 320))
+        let beside = bounds.width - leading - trailing
+        let lifted = beside < least
+        let room = lifted ? max(bounds.width - leading * 2, 1) : beside
         let width = min(ideal, room)
-        let end = max(bounds.maxX - trailing, bounds.minX + leading + width)
+        let end = lifted ? bounds.maxX - leading : bounds.maxX - trailing
         let x = min(max(bounds.midX - width / 2, bounds.minX + leading), end - width)
-        bar.place(at: CGPoint(x: x, y: bounds.maxY), anchor: .bottomLeading, proposal: ProposedViewSize(width: width, height: nil))
+        bar.place(
+            at: CGPoint(x: x, y: bounds.maxY - (lifted ? raise : 0)), anchor: .bottomLeading,
+            proposal: ProposedViewSize(width: width, height: nil))
     }
 }
