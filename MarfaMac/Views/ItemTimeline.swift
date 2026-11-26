@@ -40,7 +40,7 @@ struct ItemTimeline: View {
 
         // Select All chooses every item, those not drawn yet too.
         return timeline(days, contents: contents, now: now) { browser.selection = Set(placing.positions.keys) }
-        .topRowScrolls()
+        .topRowTable()
         .clearsSeveralOnEscape(browser)
         .deletesChosen(browser) { Set(placing.positions.keys) }
         .searchStatus(browser)

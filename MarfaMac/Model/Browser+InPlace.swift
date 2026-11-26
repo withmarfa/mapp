@@ -56,8 +56,8 @@ extension Browser {
         guard viewMode == .calendar, inPlace.place != shown else { return }
         inPlace.restore(.block(start: .distantPast, end: .distantPast), in: shown, library: library)
         guard inPlace.place == shown, let draft = inPlace.draft else { return }
-        let keys = looks(in: library)[TypeID(draft.typeID)]?.date
-        guard case .field(let key)? = keys, let start = draft.properties[key]?.string.flatMap({ ItemDate.parse($0)?.date }) else {
+        guard let key = blockDateKey(of: draft.typeID, in: library),
+              let start = draft.properties[key]?.string.flatMap({ ItemDate.parse($0)?.date }) else {
             // A block whose time is gone is typed again from the line, never lost.
             return handInPlaceToTextForm(in: library)
         }
@@ -85,12 +85,18 @@ extension Browser {
         return draft
     }
 
-    /// The field a block's time is written to for an item of `typeID`: its look's date, where the kind has that field.
+    /// The field a block's time is written to for an item of `typeID`: the date field the calendar places by, else its look's
+    /// date, where the kind has that field.
     private func blockDateKey(of typeID: String, in library: any ItemLibrary) -> String? {
-        guard case .field(let key)? = looks(in: library)[TypeID(typeID)]?.date,
-              QuickAdd.fields(of: typeID, in: library.catalogue).contains(where: { $0.key == key })
-        else { return nil }
-        return key
+        let key: String
+        switch calendarDating(in: library) {
+        case .field(let chosen): key = chosen
+        case .eachType:
+            guard case .field(let usual)? = looks(in: library)[TypeID(typeID)]?.date else { return nil }
+            key = usual
+        case .nothing: return nil
+        }
+        return QuickAdd.fields(of: typeID, in: library.catalogue).contains { $0.key == key } ? key : nil
     }
 
     /// What a row's place implies, written into `draft` as values the person did not type (`QuickAdd.Draft.prefilled`),

@@ -36,18 +36,18 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 ## Two kinds of view
 
 - **The app saves changes to a place's default view immediately** (`PlaceDefaults`). Reset View restores it. Types, Collections and Sources have none.
-- **A saved view is an item in Marfa.** Marfa holds its title, query, sort and group. The app holds the rest, such as layout and properties (`ViewMacSettings` in `ViewLayouts`).
+- **Marfa holds a saved view's title, query, sort and group.** The app holds layout and properties (`ViewMacSettings` in `ViewLayouts`).
 - **Saved view writes name the changed settings and use the current row** (`Browser+ViewWrites`).
-- **A write that Marfa has not taken stays in the window.** Save View resends it (`hasViewChanges`). Offline, it waits by setting (`PendingViewChanges`), through closing and quitting. A refused one goes to the clipboard in words.
+- **Unsaved changes stay in the window.** Save View retries them (`hasViewChanges`). Offline changes wait by setting through closing and quitting (`PendingViewChanges`). Refused offline changes go to the clipboard in words.
 - **Revert View writes back each setting the window changed as it was at opening** (`openedView`), Marfa's whole. One changed elsewhere since stays, and the person is told.
 - **While a change waits, the window lists its preview** (`viewPreview`).
 - **Undo takes back only its own step.**
 - **An entry for a thing that is gone is forgotten only when the copy is whole and current.**
-- **New View… saves what Marfa can hold and names the rest first** (`ViewDraft.Unkept`). A type's place saves the type with its kinds; a Type filter takes its place. The window's From and Archived Items become the view's tier and states, and back (`ViewDraft`).
-- **A draft from a saved view owns the window,** settings and widths (`ViewPanel.mac`). Revert View is off and a returning write leaves it. Cancel writes nothing and shows the original as it is now.
+- **New View… names what it cannot save** (`ViewDraft.Unkept`). A type's place saves the type with its kinds. A Type filter takes its place. From and Archived Items are saved and read as tier and states (`ViewDraft`).
+- **A saved view's draft owns the window, settings and widths** (`ViewPanel.mac`). Returning writes leave it alone. Revert View is off. Cancel shows the live original without writing.
 - **A changed or submitted view draft stays open;** leaving it, or a late refusal, gives it back in words. A rename never replaces another app's; deleting asks.
-- **Starting points preview in the window's layout** (`NewViewStart`). Create View applies the draft's layout. This Search comes first, saving supported tokens and unchanged From. An existing view asks before discarding changes.
-- **A saved view belongs to one place** (`Place.home(of:catalogue:)`). Its sole type, then its sole required collection (by the outbound edge) or source, else the Feed or the Library by its tier.
+- **Starting points preview the window's layout** (`NewViewStart`). Create View applies the draft layout. This Search leads and saves supported tokens and unchanged From. Discarding changes to a saved view asks.
+- **A saved view's home** (`Place.home(of:catalogue:)`) is its sole type, then its sole required outbound collection or source, else Feed or Library by tier.
 - **The Library and the Feed list their own tier.** The Feed's first view is All. A type, a collection and a source choose From (`ListScope`).
 - **Favorites starts on Library.**
 - **Include Kinds defaults on.** A saved view with no state shows archived items (`ArchivedItems`).
@@ -61,6 +61,9 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **Several chosen items show a command capsule** (`SelectionCapsule`), a pile beside a list (`SelectionPile`). Escape clears them.
 - **⌘⌫ deletes chosen items** on a board, timeline, Digest or map (`ChosenItemDeletion`). Changing the calendar span clears selections outside it.
 - **Calendar and Timeline use each type's date** (`ItemPlacement`) or a chosen field.
+- **Calendar Date and Weekends are per view** (`CalendarChoices`). A lost date field falls back to the first; none means No Date; a dragged new item takes its time there.
+- **Weekends off hides the week's two columns only;** the month keeps seven days, and a note counts what the week hides.
+- **Timeline is a full-width agenda by day.** The type leads where types mix.
 - **An event's span is one rule** (`EventSpan`); all-day events ignore the Mac's zone.
 - **Map needs both coordinate fields and valid values** (`MapLayout`). No Location lists the rest.
 - **A board always has lanes,** by status when none is chosen.
@@ -80,7 +83,7 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 ## The View panel
 
 - **Digest choices** are Stack Related Items and Pictures (both on), and Lines of Text (three).
-- **Quick Actions** are on by default in the Feed, Archive, and saved views whose From is Feed. Table, List, Digest, and Gallery offer Keep, Archive or Unarchive, and Delete where applicable, on hover and through VoiceOver.
+- **Quick Actions** default on in the Feed, Archive and views from Feed. Table, List, Digest and Gallery offer Keep, Archive, Unarchive and Delete where applicable, on hover and through VoiceOver.
 
 ## Grouping
 
@@ -106,12 +109,12 @@ A filter is a `FilterClause`: a field, a `FilterOp` and values, shown as a chip.
 
 - **Filter changes reach every part above.** Test that local matching and queries keep the same items (`FilterClauseTests`, `ViewDraftTests`).
 - **Marfa's filter is one list, joined all by and or all by or.** A mix is refused before it is sent (`search-and-filters/filter-mixed-logic`), except that "is" several words of a closed field is written as "is not" the others.
-- **An untouched Type condition stays in the filter,** as does every type in an Any filter, whatever the view's types.
+- **Untouched Type conditions stay,** including every type in an Any filter.
 - **A view takes ten conditions.** Each value and each bound of a date counts.
 - **Marfa has no relative date or filter group,** so the Filter page offers neither. A default view still reads relative dates it already holds (`FilterOp.isRelative`).
-- **Marfa has no "does not include"** for people and tags, and cannot ask about a list of words, so neither is offered.
+- **Marfa offers no "does not include"** for people or tags and no filters on lists of words.
 - **Datetime filters use the Mac's clock and offset.** Date-only filters use UTC (`FilterTarget.isDateOnly`).
-- **A condition the window cannot show is a locked row,** kept whenever the view is written.
+- **Locked rows preserve conditions the window cannot show.**
 - **What a view cannot keep is said on the Filter page** before the person saves.
 - **An unfinished filter hides nothing** and is dropped when its panel closes.
 
@@ -127,11 +130,11 @@ A filter is a `FilterClause`: a field, a `FilterOp` and values, shown as a chip.
 - **Library › Types, Collections, and Sources** (`PlaceIndex`) show places, searched by name, with no View button.
 - **Types nest kinds under their type.**
 - **Above 2,000 items, layouts work off the main actor.** First open shows progress; an update keeps the layout.
-- **A row's count is of what the place lists.** A file attached to an item shows on its page, so no list or count but search takes it. The Feed's row has none.
+- **Counts follow the place's list.** Attached files appear on their item's page and in search. The Feed's row has no count.
 
 ## Search
 
 - **Tokens narrow the query** (`SearchNarrowing`), with unsupported tokens applied locally (`ItemTableContent`). Excess conditions are named and refused.
 - **What a search leaves out is said** (`SearchLeaveOuts`), with a way to include it.
-- **The list's search is tokens and words** (`ColumnSearch`). Return on an offer (`SearchOffers`) makes a token; a change of place clears it. A Type token narrows within the place's types; in Archive it searches archived items.
+- **List search takes tokens and words** (`ColumnSearch`). Return turns an offer (`SearchOffers`) into a token. Changing places clears it. Type tokens narrow the place's types and search archived items in Archive.
 - **A search in the list is sorted by relevance until the person sorts it.** The gallery and the table keep their own sorts until relevance is picked (`Browser.ordersByRelevance`).

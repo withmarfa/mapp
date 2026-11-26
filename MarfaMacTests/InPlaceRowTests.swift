@@ -1,4 +1,5 @@
 import Foundation
+import Marfa
 import Synchronization
 import Testing
 @testable import MarfaMac
@@ -194,6 +195,42 @@ struct InPlaceRowTests {
         #expect(await browser.addInPlace(in: library, undoManager: nil, next: false) == nil)
         #expect(library.items.isEmpty)
         #expect(!browser.quickAdd.isPresented)
+    }
+
+    @Test func aBlockIsDrawnOnTheCalendarsChosenDateFieldAndKeepsWhatWasTyped() async throws {
+        let date = Date(timeIntervalSinceReferenceDate: 800_000_000)
+        let event = TypeID("core.event")
+        let existing = Item(
+            id: ItemID("e0"), type: event, title: "e0", name: "e0", titleRule: .firstLine,
+            properties: [Property(key: "due_at", value: .string(ItemDate.instant(date)))], version: ItemVersion(1), created: date, modified: date)
+        let library = FakeItemLibrary(items: [existing], now: date)
+        var catalogue = library.catalogue
+        catalogue.itemTypes[event] = ItemTypeInfo(
+            id: event, label: "Event",
+            fields: [
+                .init(key: MarfaMapping.startField, label: "Starts", kind: .date(includesTime: true), declaredBy: event),
+                .init(key: "due_at", label: "Due", kind: .date(includesTime: true), declaredBy: event),
+            ],
+            titleField: "title", bodyField: "body", parent: nil)
+        library.catalogue = catalogue
+        let browser = Self.browser(in: library)
+        browser.showing = .library
+        browser.viewMode = .calendar
+        _ = browser.timelineFieldChoices(in: library)
+        browser.changeCalendar { $0.date = "due_at" }
+        let start = date.addingTimeInterval(86_400)
+        #expect(browser.beginInPlace(.block(start: start, end: start.addingTimeInterval(1800)), in: library))
+        var draft = try #require(browser.inPlace.draft)
+        #expect(draft.properties["due_at"] != nil, "the time goes where the calendar places by")
+        #expect(draft.properties[MarfaMapping.startField] == nil)
+        Self.type("Typed on the block", in: browser)
+
+        browser.showing = .type(event)
+        browser.showing = .library
+        browser.restoreCalendarBlock(in: library)
+        draft = try #require(browser.inPlace.draft)
+        #expect(draft.title == "Typed on the block", "restored on the chosen field, never lost")
+        #expect(draft.properties["due_at"] != nil)
     }
 
     @Test func aRefusedCreateOnALaneRowComesBack() async throws {

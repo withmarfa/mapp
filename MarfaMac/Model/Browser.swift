@@ -553,6 +553,7 @@ final class Browser {
         placeOpenings = [:]
         placeMaps = [:]
         placeDigests = [:]
+        placeCalendars = [:]
         digestDisplay = nil
         expandedDigestPiles.removeAll()
         openedView = nil
@@ -742,6 +743,7 @@ final class Browser {
     /// The map's choices of each place that is not a saved view, as its default view keeps them (`mapChoices`).
     var placeMaps: PlaceMemory<MapChoices> = [:]
     var placeDigests: PlaceMemory<DigestChoices> = [:]
+    var placeCalendars: PlaceMemory<CalendarChoices> = [:]
     var digestDisplay: DigestLayout.Display? {
         didSet { revealDigestSelection() }
     }

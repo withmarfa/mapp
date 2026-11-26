@@ -36,16 +36,23 @@ nonisolated enum CalendarLayout {
     /// The shortest a block is taken to be when blocks are set side by side, so a short item does not hide behind its neighbour.
     static let shortestBlock = 30
 
-    /// The items placed on the calendar, and how many had no date to place them by and were left out.
+    /// The calendar entries and the IDs of items that could not be placed.
     static func entries(
-        for items: [Item], looks: [TypeID: TypeLook], catalogue: Catalogue, calendar: Calendar = .current, marksFeed: Bool = false
-    ) -> (entries: [CalendarEntry], leftOut: Int) {
+        for items: [Item], looks: [TypeID: TypeLook], catalogue: Catalogue, calendar: Calendar = .current, marksFeed: Bool = false,
+        placing: CalendarChoices.Placing = .eachType
+    ) -> (entries: [CalendarEntry], leftOut: [ItemID]) {
+        var field: String?
+        switch placing {
+        case .eachType: break
+        case .field(let key): field = key
+        case .nothing: return ([], items.map(\.id))
+        }
         var entries: [CalendarEntry] = []
-        var leftOut = 0
+        var leftOut: [ItemID] = []
         for item in items {
-            let outcome = ItemPlacement.of(item, look: looks[item.type] ?? .empty, field: nil, catalogue: catalogue, calendar: calendar)
+            let outcome = ItemPlacement.of(item, look: looks[item.type] ?? .empty, field: field, catalogue: catalogue, calendar: calendar)
             guard case .placed(let placement) = outcome else {
-                leftOut += 1
+                leftOut.append(item.id)
                 continue
             }
             entries.append(entry(of: item, placement, calendar: calendar, marksFeed: marksFeed))
@@ -88,9 +95,35 @@ nonisolated enum CalendarLayout {
             end: interval(of: .week, containing: last, calendar: calendar).end)
     }
 
-    /// The items among `entries` with any time inside `drawn`: the ones the calendar shows.
-    static func ids(in entries: [CalendarEntry], within drawn: DateInterval) -> Set<ItemID> {
-        Set(entries.lazy.filter { $0.start < drawn.end && $0.end > drawn.start }.map(\.id))
+    /// The items among `entries` with any time inside `drawn`: the ones the calendar shows. With `weekends` false, an item
+    /// that has time only on a Saturday or a Sunday is not shown, though it is inside `drawn`.
+    static func ids(in entries: [CalendarEntry], within drawn: DateInterval, weekends: Bool = true, calendar: Calendar = .current) -> Set<ItemID> {
+        Set(entries.lazy.filter { entry in
+            entry.start < drawn.end && entry.end > drawn.start
+                && (weekends || hasWeekdayTime(entry, within: drawn, calendar: calendar))
+        }.map(\.id))
+    }
+
+    /// How many items among `entries` have time inside `drawn` and only on a Saturday or a Sunday, which the week without
+    /// weekends leaves out. One pass, working out days only for the few entries inside `drawn`.
+    static func weekendOnlyCount(in entries: [CalendarEntry], within drawn: DateInterval, calendar: Calendar) -> Int {
+        var count = 0
+        for entry in entries where entry.start < drawn.end && entry.end > drawn.start {
+            if !hasWeekdayTime(entry, within: drawn, calendar: calendar) { count += 1 }
+        }
+        return count
+    }
+
+    /// Whether `entry` has time on a day of `interval` that is not part of a weekend.
+    static func hasWeekdayTime(_ entry: CalendarEntry, within interval: DateInterval, calendar: Calendar) -> Bool {
+        var day = calendar.startOfDay(for: max(entry.start, interval.start))
+        let last = min(entry.end, interval.end)
+        while day < last {
+            if !calendar.isDateInWeekend(day) { return true }
+            guard let next = calendar.date(byAdding: .day, value: 1, to: day), next > day else { return true }
+            day = next
+        }
+        return false
     }
 
     /// The first day of the week that holds `day`: the calendar's first weekday on or before it.
@@ -213,12 +246,23 @@ nonisolated struct CalendarWeek: Equatable, Sendable {
         shortestBlock: Int = CalendarLayout.shortestBlock
     ) -> CalendarWeek {
         let first = calendar.startOfDay(for: start)
-        let end = calendar.date(byAdding: .day, value: count, to: first) ?? first.addingTimeInterval(TimeInterval(count) * 86_400)
+        let days = (0..<count).map { calendar.date(byAdding: .day, value: $0, to: first) ?? first.addingTimeInterval(TimeInterval($0) * 86_400) }
+        return make(entries: entries, days: days, calendar: calendar, now: now, shortestBlock: shortestBlock)
+    }
+
+    /// The given days, each the start of a day and in order, which need not be next to one another: a week without its
+    /// weekend skips two of them.
+    static func make(
+        entries: [CalendarEntry], days given: [Date], calendar: Calendar, now: Date,
+        shortestBlock: Int = CalendarLayout.shortestBlock
+    ) -> CalendarWeek {
+        let first = given.first ?? calendar.startOfDay(for: now)
+        let last = given.last ?? first
+        let end = calendar.date(byAdding: .day, value: 1, to: last) ?? last.addingTimeInterval(86_400)
         let interval = DateInterval(start: first, end: max(end, first))
         let today = calendar.startOfDay(for: now)
         let inRun = entries.filter { $0.start < interval.end && $0.end > interval.start }
-        let days = (0..<count).map { offset -> Day in
-            let day = calendar.date(byAdding: .day, value: offset, to: first) ?? first.addingTimeInterval(TimeInterval(offset) * 86_400)
+        let days = given.map { day -> Day in
             let next = calendar.date(byAdding: .day, value: 1, to: day) ?? day.addingTimeInterval(86_400)
             let here = inRun.filter { CalendarLayout.covers($0, day: day, calendar: calendar) }
             let whole = here.filter(\.isAllDay).sorted(by: CalendarLayout.precedes)
@@ -368,11 +412,15 @@ nonisolated enum CalendarNavigation {
     }
 
     /// The day of the chosen event to move from: `day` where the event is on it, else its first day in `visible`, else
-    /// its own first day. Nil where the event is not on the calendar.
-    static func spot(of id: ItemID, near day: Date?, in entries: [CalendarEntry], visible: DateInterval, calendar: Calendar) -> Spot? {
+    /// its own first day. A weekend the week does not draw is no day to stand on, so the event's first drawn day is its
+    /// place. Nil where the event is not on the calendar.
+    static func spot(
+        of id: ItemID, near day: Date?, in entries: [CalendarEntry], visible: DateInterval, calendar: Calendar, skipsWeekends: Bool = false
+    ) -> Spot? {
         guard let entry = entries.first(where: { $0.id == id }) else { return nil }
-        if let day, CalendarLayout.covers(entry, day: day, calendar: calendar) { return Spot(id: id, day: day) }
-        let first = CalendarLayout.days(in: visible, calendar: calendar).first { CalendarLayout.covers(entry, day: $0, calendar: calendar) }
+        let drawn = { (day: Date) in !skipsWeekends || !calendar.isDateInWeekend(day) }
+        if let day, drawn(day), CalendarLayout.covers(entry, day: day, calendar: calendar) { return Spot(id: id, day: day) }
+        let first = CalendarLayout.days(in: visible, calendar: calendar).first { drawn($0) && CalendarLayout.covers(entry, day: $0, calendar: calendar) }
         return Spot(id: id, day: first ?? calendar.startOfDay(for: entry.start))
     }
 
@@ -381,9 +429,10 @@ nonisolated enum CalendarNavigation {
     /// whichever week or month. Nil where there is nowhere to go. From no choice, the first event shown, or the last
     /// for up and left.
     static func move(
-        from spot: Spot?, _ direction: Direction, in entries: [CalendarEntry], visible: DateInterval, calendar: Calendar
+        from spot: Spot?, _ direction: Direction, in entries: [CalendarEntry], visible: DateInterval, calendar: Calendar,
+        skipsWeekends: Bool = false
     ) -> Spot? {
-        guard let spot else { return edge(direction, in: entries, visible: visible, calendar: calendar) }
+        guard let spot else { return edge(direction, in: entries, visible: visible, calendar: calendar, skipsWeekends: skipsWeekends) }
         let here = Self.entries(on: spot.day, in: entries, calendar: calendar)
         let index = here.firstIndex { $0.id == spot.id } ?? 0
         switch direction {
@@ -397,6 +446,7 @@ nonisolated enum CalendarNavigation {
             while let next = calendar.date(byAdding: .day, value: step, to: day), next != day {
                 day = next
                 if day >= latest || day < calendar.startOfDay(for: earliest) { return nil }
+                if skipsWeekends, calendar.isDateInWeekend(day) { continue }
                 let there = Self.entries(on: day, in: entries, calendar: calendar)
                 if !there.isEmpty { return Spot(id: there[min(index, there.count - 1)].id, day: day) }
             }
@@ -404,8 +454,10 @@ nonisolated enum CalendarNavigation {
         }
     }
 
-    private static func edge(_ direction: Direction, in entries: [CalendarEntry], visible: DateInterval, calendar: Calendar) -> Spot? {
-        let days = CalendarLayout.days(in: visible, calendar: calendar)
+    private static func edge(
+        _ direction: Direction, in entries: [CalendarEntry], visible: DateInterval, calendar: Calendar, skipsWeekends: Bool
+    ) -> Spot? {
+        let days = CalendarLayout.days(in: visible, calendar: calendar).filter { !skipsWeekends || !calendar.isDateInWeekend($0) }
         let backwards = direction == .up || direction == .left
         for day in backwards ? days.reversed() : days {
             let here = Self.entries(on: day, in: entries, calendar: calendar)
