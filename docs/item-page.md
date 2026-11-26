@@ -30,7 +30,7 @@ paths:
 
 # The item page
 
-An item's page is its head (a kicker, the title and rows) and its text. One page serves every type. A type decides only which properties show and in what order, so no page is built for a type.
+One item page serves every type. The type determines which fields appear and where the text sits.
 
 ## The head
 
@@ -39,7 +39,8 @@ An item's page is its head (a kicker, the title and rows) and its text. One page
 - **Rows show what has a value, six at most, then Show N More,** which lists every property in the type's order, Empty where unset, hidden ones grey. It is offered on every page; on read-only and deleted ones nothing opens.
 - **A type that keeps no text shows its first six rows,** empty or not.
 - **A row is dragged by its name.** A drag or Move Up or Down moves only that row in the type's one order.
-- **An event's time is one row, When,** always first, with how far off it is or All Day in grey. A person in a list can carry a grey answer or address (`PersonAddress`).
+- **An event's When row comes first.** It shows how far away the event is or says All Day. Each attendee's response appears in gray after their name.
+- **A message has no title.** Its text follows the rows. From and To show each name with its address in gray when both are present (`PersonAddress`).
 - **A highlight's passage leads,** at the title's size, with its rows after it (`PageHeader.textLeads`).
 - **Long text stops after two lines;** an email, a phone and a number to call open.
 - **A value is cut, never reworded,** and a linked item that cannot be read, is gone or is in the bin shows nothing, never an id.
@@ -47,7 +48,7 @@ An item's page is its head (a kicker, the title and rows) and its text. One page
 
 ## The foot
 
-`PageFoot` lists Sub-Items (nested, counting everything beneath) on any item that has them, and a person's or a place's mentions as a Timeline, newest first. Other items' mentions are Linked From, where Settings › Layouts puts it on the page. A list shows 30 rows and Show More adds 30, each nested list by itself.
+`PageFoot` lists nested Sub-Items with a count of all descendants. Incoming links appear newest first in Timeline for people and places, or in Linked From where Settings › Layouts puts it on the page. Collection membership does not count as an incoming mention. Show More adds 30 rows to each list independently, starting from 30.
 
 A place with a point has a still map above its Timeline (`PlaceMapImages`).
 
@@ -118,7 +119,7 @@ Quiet lines at the top of the column say what is not ordinary (`PageNotice.all`)
 | An item in the modal | None |
 | The column beside a layout | Open as Page |
 
-- **Every control in the corner is also a command in the View menu**, and the corner's own menus bind no keys, (a key registered twice works for neither).
+- **The View menu has a command for each corner control.** It owns the shortcuts so each key is registered once.
 - **Open leads wherever the page has somewhere outside the app** (`PageOpenTarget`): the browser, a file's app or Maps, named in its help.
 - **A person can turn off formats, text size and Focus** (`PageCornerChoice`). One turned off is in the page's More menu.
 - **Zoom keys size the file or the text, never both** (`FileViewCommands`, `TextZoomCommands`).
