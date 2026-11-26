@@ -179,11 +179,11 @@ extension Browser {
         }
         let key = SectionsKey(choices: choices, table: content?.serial, content: content == nil ? library.contentRevision : nil)
         if let held = work.value(for: key) { return held }
-        // A list of the place's own items that no change touched stands as it is. A nested list hides sub-items, whose
-        // change it would not see, so it is made again.
-        if content == nil, choices.expanded == nil, let held = work.held, held.key.choices == choices, let since = held.value.content,
+        // A list of the place's own items that no change touched stands as it is, sub-items it hides included.
+        if content == nil, let held = work.held, held.key.choices == choices, let since = held.value.content,
            let changed = library.changedItems(since: since),
-           (derived.items ?? items(in: library)).count == held.value.ids.count, !changed.contains(where: { held.value.positions[$0] != nil }) {
+           (derived.items ?? items(in: library)).count == held.value.ids.count + held.value.nestedAway.count,
+           !changed.contains(where: { held.value.positions[$0] != nil || held.value.nestedAway.contains($0) }) {
             let kept = held.value.at(library.contentRevision)
             work.hold(kept, for: key)
             return kept
@@ -788,6 +788,8 @@ nonisolated struct ListArrangement: Sendable {
     private(set) var content: Int?
     /// Where each item drawn stands among its parents, where the list nests them; empty where none nests.
     private(set) var nesting: [ItemID: ItemNesting.Place] = [:]
+    /// The sub-items a closed parent hides, which the list holds without drawing.
+    private(set) var nestedAway: Set<ItemID> = []
 
     init(sections: [ItemSection], sorted: [Item]?, content: Int?, nesting: [ItemID: ItemNesting.Place] = [:]) {
         self.sections = sections
@@ -818,6 +820,7 @@ nonisolated struct ListArrangement: Sendable {
     /// where every parent above it is in `expanded`.
     func nested(expanded: Set<ItemID>) -> ListArrangement {
         var places: [ItemID: ItemNesting.Place] = [:]
+        var away: Set<ItemID> = []
         let sections = sections.map { section in
             let nesting = ItemNesting(items: section.items)
             guard !nesting.isFlat else { return section }
@@ -825,11 +828,16 @@ nonisolated struct ListArrangement: Sendable {
             let drawn = nesting.drawn(expanded: expanded).places
             nested.items = drawn.map { section.items[$0.index] }
             for place in drawn { places[place.id] = place }
+            if drawn.count < section.items.count {
+                let shown = Set(drawn.map(\.id))
+                away.formUnion(section.items.lazy.map(\.id).filter { !shown.contains($0) })
+            }
             return nested
         }
         guard !places.isEmpty else { return self }
         var made = ListArrangement(sections: sections, sorted: sorted, content: content, nesting: places)
         made.digest = digest
+        made.nestedAway = away
         return made
     }
 
