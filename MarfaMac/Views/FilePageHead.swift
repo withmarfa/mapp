@@ -141,7 +141,7 @@ private struct FileTitle: View {
     }
 }
 
-/// Saves a typed title for the item the page had when it moves to another or goes, so a title is never lost to moving on.
+/// Tries to save the title for the item the page is leaving.
 private struct FileTitleSaving: ViewModifier {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
