@@ -8,13 +8,15 @@ nonisolated final class GalleryTests: XCTestCase {
     @MainActor private var back: XCUIElement { window.buttons["SidebarBack"] }
     @MainActor private var gallery: XCUIElement { window.descendants(matching: .any).matching(identifier: "ItemGallery").element(boundBy: 0) }
     @MainActor private var list: XCUIElement { window.outlines["ItemList"] }
+    /// The sample's Library holds more than ten items, so it opens as a table (`Browser.naturalLayout`).
+    @MainActor private var table: XCUIElement { window.descendants(matching: .any).matching(identifier: "ItemTable").element(boundBy: 0) }
     @MainActor private var sidebar: XCUIElement { window.outlines["Sidebar"] }
 
     @MainActor override func setUp() async throws {
         continueAfterFailure = false
         app = XCUIApplication.sample()
         app.launch()
-        XCTAssertTrue(list.waitForExistence(timeout: 5))
+        XCTAssertTrue(table.waitForExistence(timeout: 5))
     }
 
     @MainActor override func tearDown() async throws { app.terminate() }
