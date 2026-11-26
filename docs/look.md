@@ -55,6 +55,7 @@ Neutral washes are white at the same strength, hairlines white at 12%, and a ton
 | Chosen, hover row | Ink 8%, 4.7% | White 8%, 4.7% | Lists, panels, calendars (`SelectionLooks`) |
 | Keycap edge | Ink 20% | White 20% | `KeyCap` |
 | Focus ring | Ink 26% | White 26% | Every keyboard control (`appFocusRing`) |
+| PDF ground | Gray 94.5% | Gray 17% | Behind a PDF's white pages (`PDFBackground`) |
 
 ## Status, priority and empty values
 
