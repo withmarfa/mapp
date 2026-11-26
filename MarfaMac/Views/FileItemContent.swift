@@ -17,7 +17,7 @@ struct FileItemContent: View {
     /// page shown with neither offers nothing.
     var item: ItemID?
     var details: DetailsPresentation?
-    /// The head the viewer starts below, where the page has one (`FileHeadSpace`). Only a picture and a PDF take it.
+    /// The head the viewer starts below, where the page has one (`FileHeadSpace`). Only a picture, a PDF, audio and video take it.
     var head: FileHeadSpace?
     @State private var textPreview: PlainTextFile.Preview?
     @State private var previewURL: URL?
@@ -59,17 +59,25 @@ struct FileItemContent: View {
 
     private var systemPreview: some View {
         VStack(spacing: 0) {
-            switch FileViewKind.of(type) {
-            case .pdf:
-                FilePDFPreview(url: url, item: item, details: details, head: head)
-            case .image:
-                FileImageView(url: url, title: title, item: item, details: details, head: head)
-            case nil:
-                FileQuickLookView(url: url, title: title, type: type)
+            if FileMedia.handles(type) {
+                FileMediaPage(url: url, title: title, type: type, item: item, head: head)
+            } else {
+                viewer
             }
         }
         // The item is part of the identity: two items can hold the same bytes, and each has its own size and page.
         .id("\(url.absoluteString)|\(item?.rawValue ?? "")")
+    }
+
+    @ViewBuilder private var viewer: some View {
+        switch FileViewKind.of(type) {
+        case .pdf:
+            FilePDFPreview(url: url, item: item, details: details, head: head)
+        case .image:
+            FileImageView(url: url, title: title, item: item, details: details, head: head)
+        case nil:
+            FileQuickLookView(url: url, title: title, type: type)
+        }
     }
 }
 

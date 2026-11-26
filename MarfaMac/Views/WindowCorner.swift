@@ -34,12 +34,18 @@ struct WindowCorner<Buttons: View, Card: View>: View {
     /// The gap between the corner and the content's edges, and between its buttons and its card.
     static var inset: CGFloat { 16 }
 
-    var body: some View {
-        let scale = InterfaceStyle.scale(for: textSize)
-        // The capsule's room, then the toast's own height and the space under it (`ToastHost`), and a little between.
+    /// How far what stands at the content's foot rises above it while a toast or the capsule for several chosen items
+    /// shows: the capsule's room, then the toast's own height and the space under it (`ToastHost`), and a little between.
+    @MainActor
+    static func lift(summary: SelectionSummary?, details: DetailsPresentation?, scale: CGFloat) -> CGFloat {
         let capsule = summary?.isCapsuleShown == true
         let room = capsule ? SelectionSummary.capsuleRoom(scale: scale) : 22
-        let lift = details?.toasts.current != nil ? room + 40 * scale + 10 - Self.inset : capsule ? room - Self.inset : 0
+        return details?.toasts.current != nil ? room + 40 * scale + 10 - inset : capsule ? room - inset : 0
+    }
+
+    var body: some View {
+        let scale = InterfaceStyle.scale(for: textSize)
+        let lift = Self.lift(summary: summary, details: details, scale: scale)
         VStack(alignment: .trailing, spacing: 8) {
             if isCardOpen && cardPlacement == .aboveButtons {
                 card

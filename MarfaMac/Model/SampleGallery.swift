@@ -87,6 +87,11 @@ nonisolated enum SampleGallery {
                  data: await video(top: (0.2, 0.35, 0.55), bottom: (0.85, 0.6, 0.35)), favorite: false, daysAgo: 4, attachedTo: nil),
             File(id: "page-vans", title: "Hiring a van for a print fair", type: "core.file.webpage", mime: "text/html",
                  data: webPage, favorite: false, daysAgo: 1, attachedTo: nil),
+            File(id: "audio-memo", title: "voice-memo-2026-11-22.m4a", type: "core.file", mime: "audio/mp4",
+                 data: await sound(seconds: 24), favorite: false, daysAgo: 1, attachedTo: nil),
+            File(id: "video-planing", title: "Planing the oak boards.mp4", type: "core.file", mime: "video/mp4",
+                 data: await video(top: (0.62, 0.45, 0.28), bottom: (0.88, 0.8, 0.62), seconds: 8, sound: true),
+                 favorite: false, daysAgo: 2, attachedTo: nil),
             File(id: "cover-bm", title: "cover.png", type: "core.file.image", mime: "image/png",
                  data: picture(top: (0.35, 0.5, 0.75), bottom: (0.12, 0.2, 0.4)), favorite: false, daysAgo: 4, attachedTo: "bm-desk"),
         ]
@@ -164,8 +169,11 @@ nonisolated enum SampleGallery {
         return bitmap.representation(using: .png, properties: [:]) ?? Data()
     }
 
-    /// A one-second clip of a single gradient, written to a temporary file and read back.
-    private static func video(top: (Double, Double, Double), bottom: (Double, Double, Double)) async -> Data {
+    /// A clip of a single gradient, written to a temporary file and read back: one second with no sound by default, or
+    /// `seconds` long with a tone under it.
+    private static func video(
+        top: (Double, Double, Double), bottom: (Double, Double, Double), seconds: Int = 1, sound: Bool = false
+    ) async -> Data {
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let url = directory.appending(path: "clip-\(UUID().uuidString).mp4")
         defer { try? FileManager.default.removeItem(at: url) }
@@ -191,7 +199,7 @@ nonisolated enum SampleGallery {
         do {
             try writer.start()
             writer.startSession(atSourceTime: .zero)
-            for frame in 0..<30 {
+            for frame in 0..<(30 * seconds) {
                 try await receiver.append(pixels, with: CMTime(value: CMTimeValue(frame), timescale: 30))
             }
         } catch {
@@ -200,7 +208,71 @@ nonisolated enum SampleGallery {
         }
         receiver.finish()
         await writer.finishWriting()
-        return (try? Data(contentsOf: url)) ?? Data()
+        guard sound else { return (try? Data(contentsOf: url)) ?? Data() }
+        return await adding(soundOfSeconds: Double(seconds), to: url)
+    }
+
+    /// Mono 16-bit samples of a voice-like sound: a low tone with overtones, in phrases that swell and fall away with
+    /// pauses between.
+    private static func tone(seconds: Double, rate: Double = 22_050) -> [Int16] {
+        let count = Int(seconds * rate)
+        return (0..<count).map { index in
+            let t = Double(index) / rate
+            let phrase = max(0, sin(t * 0.9)) * (0.55 + 0.45 * sin(t * 7.3))
+            let voice = sin(2 * .pi * 170 * t) + 0.5 * sin(2 * .pi * 340 * t) + 0.25 * sin(2 * .pi * 510 * t)
+            return Int16(max(-1, min(1, voice * phrase * 0.5)) * 30_000)
+        }
+    }
+
+    /// The tone as a WAV file, written to a temporary file the caller removes.
+    private static func toneFile(seconds: Double) -> URL? {
+        let rate: UInt32 = 22_050
+        let samples = tone(seconds: seconds, rate: Double(rate))
+        var data = Data()
+        func put<T: FixedWidthInteger>(_ value: T) { withUnsafeBytes(of: value.littleEndian) { data.append(contentsOf: $0) } }
+        let bytes = UInt32(samples.count * 2)
+        data.append(contentsOf: Array("RIFF".utf8)); put(36 + bytes); data.append(contentsOf: Array("WAVEfmt ".utf8))
+        put(UInt32(16)); put(UInt16(1)); put(UInt16(1)); put(rate); put(rate * 2); put(UInt16(2)); put(UInt16(16))
+        data.append(contentsOf: Array("data".utf8)); put(bytes)
+        for sample in samples { put(sample) }
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory.appending(path: "tone-\(UUID().uuidString).wav")
+        return (try? data.write(to: url)) == nil ? nil : url
+    }
+
+    /// A sound of `seconds`, as an M4A file's bytes.
+    private static func sound(seconds: Double) async -> Data {
+        guard let wav = toneFile(seconds: seconds) else { return Data() }
+        defer { try? FileManager.default.removeItem(at: wav) }
+        let out = directory.appending(path: "sound-\(UUID().uuidString).m4a")
+        defer { try? FileManager.default.removeItem(at: out) }
+        guard let session = AVAssetExportSession(asset: AVURLAsset(url: wav), presetName: AVAssetExportPresetAppleM4A) else { return Data() }
+        do { try await session.export(to: out, as: .m4a) } catch { return Data() }
+        return (try? Data(contentsOf: out)) ?? Data()
+    }
+
+    /// The clip at `url` with a tone laid under it.
+    private static func adding(soundOfSeconds seconds: Double, to url: URL) async -> Data {
+        guard let wav = toneFile(seconds: seconds) else { return Data() }
+        defer { try? FileManager.default.removeItem(at: wav) }
+        let out = directory.appending(path: "mixed-\(UUID().uuidString).mp4")
+        defer { try? FileManager.default.removeItem(at: out) }
+        let composition = AVMutableComposition()
+        do {
+            let picture = AVURLAsset(url: url)
+            let voice = AVURLAsset(url: wav)
+            for (source, kind) in [(picture, AVMediaType.video), (voice, .audio)] {
+                guard let from = try await source.loadTracks(withMediaType: kind).first,
+                      let into = composition.addMutableTrack(withMediaType: kind, preferredTrackID: kCMPersistentTrackID_Invalid)
+                else { return Data() }
+                try into.insertTimeRange(CMTimeRange(start: .zero, duration: CMTime(seconds: seconds, preferredTimescale: 600)), of: from, at: .zero)
+            }
+            guard let session = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else { return Data() }
+            try await session.export(to: out, as: .mp4)
+            return try Data(contentsOf: out)
+        } catch {
+            return Data()
+        }
     }
 
     /// A report of 48 pages with contents, as the boards' long PDF has.
