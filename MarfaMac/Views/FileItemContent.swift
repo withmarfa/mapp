@@ -172,6 +172,8 @@ private struct FilePDFView: NSViewRepresentable {
     final class Coordinator {
         let viewing: FileViewing
         private weak var view: PDFView?
+        /// The document Fit has sized, so a new one opens at its start.
+        private weak var document: PDFDocument?
         private var observers: [any NSObjectProtocol] = []
         /// The size last given to the view, or taken from it. The view is written only when the chosen size differs from
         /// this, so an update that runs between a pinch and its being read never writes the old size back.
@@ -182,6 +184,8 @@ private struct FilePDFView: NSViewRepresentable {
         private var clipObserver: (any NSObjectProtocol)?
         /// The size Fit last gave the view, which the view reports back as Fit rather than as a size of its own.
         private var fitted: CGFloat?
+        /// Whether Fit has sized this document yet; only that first fit goes to the start, with the head above it.
+        private var hasFitted = false
 
         /// The scroller PDFKit keeps inside its view. It is found by type because PDFKit offers no handle to it; a view
         /// without one is left as it is, with no head inset.
@@ -249,13 +253,19 @@ private struct FilePDFView: NSViewRepresentable {
             let width = page.rotation % 180 == 0 ? box.width : box.height
             guard width > 0 else { return }
             let scale = FileZoom.clamped(min(Self.paperWidth / width, view.scaleFactorForSizeToFit))
-            // PDFKit keeps the middle of what shows as the size changes; a file at its start, or not yet fitted, stays
-            // at its start, with the head above it.
+            // A file opened now, or at its start, goes to its start with the head above it. Any other keeps the page
+            // the reader is on, which PDFKit can leave as it keeps the middle of what shows.
             let scroll = scroller(of: view)
-            let atStart = fitted == nil || scroll.map { abs($0.contentView.bounds.origin.y + top) < 1 } == true
+            let atStart = !hasFitted || scroll.map { abs($0.contentView.bounds.origin.y + top) < 1 } == true
+            let reading = atStart ? nil : view.currentPage
+            hasFitted = true
             fitted = scale
             if abs(view.scaleFactor - scale) > 0.0005 { view.scaleFactor = scale }
-            guard atStart, let scroll else { return }
+            if let reading {
+                if view.currentPage !== reading { view.go(to: reading) }
+                return
+            }
+            guard let scroll else { return }
             let start = { [top] in
                 scroll.contentView.scroll(to: NSPoint(x: scroll.contentView.bounds.origin.x, y: -top))
                 scroll.reflectScrolledClipView(scroll.contentView)
@@ -272,6 +282,10 @@ private struct FilePDFView: NSViewRepresentable {
             detach()
             self.view = view
             appliedZoom = nil
+            if view.document !== document {
+                document = view.document
+                hasFitted = false
+            }
             let center = NotificationCenter.default
             observers = [
                 center.addObserver(forName: .PDFViewPageChanged, object: view, queue: .main) { [weak self] _ in

@@ -3,7 +3,6 @@ import AppKit
 import AVFoundation
 import CoreGraphics
 import CoreVideo
-import PDFKit
 import CryptoKit
 import Foundation
 import Marfa
@@ -216,6 +215,8 @@ nonisolated enum SampleGallery {
         guard let consumer = CGDataConsumer(data: data as CFMutableData),
               let context = CGContext(consumer: consumer, mediaBox: &box, nil) else { return Data() }
         let headings = chapters.flatMap { [$0.0] + $0.1 }
+        // Every page after the cover runs under one heading, and the contents go to the first page of each.
+        let heading = { (page: Int) in (page - 1) * headings.count / 47 }
         for page in 0..<48 {
             context.beginPDFPage(nil)
             NSGraphicsContext.saveGraphicsState()
@@ -228,8 +229,7 @@ nonisolated enum SampleGallery {
                 "LEWES TRUST".draw(at: CGPoint(x: 48, y: 380), withAttributes: [.font: NSFont.boldSystemFont(ofSize: 11), .foregroundColor: NSColor.systemGreen])
                 "Annual report 2025".draw(at: CGPoint(x: 48, y: 320), withAttributes: [.font: NSFont(name: "Georgia-Bold", size: 44) ?? NSFont.boldSystemFont(ofSize: 44), .foregroundColor: NSColor.black])
             } else {
-                let heading = headings[(page - 1) * headings.count / 47]
-                heading.draw(at: CGPoint(x: 60, y: 760), withAttributes: [.font: NSFont.boldSystemFont(ofSize: 24), .foregroundColor: NSColor.black])
+                headings[heading(page)].draw(at: CGPoint(x: 60, y: 760), withAttributes: [.font: NSFont.boldSystemFont(ofSize: 24), .foregroundColor: NSColor.black])
                 for line in 0..<14 {
                     "Six projects, four hundred and twelve thousand pounds, and everyone who gave it."
                         .draw(at: CGPoint(x: 60, y: 700 - Double(line) * 40), withAttributes: [.font: NSFont.systemFont(ofSize: 12), .foregroundColor: NSColor.darkGray])
@@ -239,23 +239,18 @@ nonisolated enum SampleGallery {
             NSGraphicsContext.restoreGraphicsState()
             context.endPDFPage()
         }
+        // Written by Core Graphics as the file is made: an outline set through PDFKit is lost when it writes the file.
+        func entry(_ label: String, children: [String] = []) -> [String: Any] {
+            let index = headings.firstIndex(of: label) ?? 0
+            let first = (1..<48).first { heading($0) == index } ?? 1
+            var item: [String: Any] = [kCGPDFOutlineTitle as String: label, kCGPDFOutlineDestination as String: first + 1]
+            if !children.isEmpty { item[kCGPDFOutlineChildren as String] = children.map { entry($0) } }
+            return item
+        }
+        let outline = [kCGPDFOutlineChildren as String: chapters.map { entry($0.0, children: $0.1) }]
+        CGPDFContextSetOutline(context, outline as CFDictionary)
         context.closePDF()
-        guard let pdf = PDFDocument(data: data as Data) else { return data as Data }
-        let root = PDFOutline()
-        func entry(_ label: String) -> PDFOutline {
-            let outline = PDFOutline()
-            outline.label = label
-            let index = 1 + (headings.firstIndex(of: label) ?? 0) * 47 / headings.count
-            if let page = pdf.page(at: index) { outline.destination = PDFDestination(page: page, at: CGPoint(x: 0, y: 842)) }
-            return outline
-        }
-        for (chapter, sections) in chapters {
-            let outline = entry(chapter)
-            for section in sections { outline.insertChild(entry(section), at: outline.numberOfChildren) }
-            root.insertChild(outline, at: root.numberOfChildren)
-        }
-        pdf.outlineRoot = root
-        return pdf.dataRepresentation() ?? data as Data
+        return data as Data
     }
 
     private static func document(title: String, lines: [String]) -> Data {
