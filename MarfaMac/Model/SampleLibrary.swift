@@ -103,7 +103,7 @@ nonisolated enum SampleLibrary {
     /// cut at 240 characters with an ellipsis (`device/item-preview-text`).
     @Sendable nonisolated static func display(_ input: ItemDisplayInput) -> ItemDisplay {
         let title = input.properties["title"]?.string?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let lines = (input.properties["body"]?.string ?? "").split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
+        let lines = (input.properties["body"]?.string ?? input.properties["text"]?.string ?? "").split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
             .map { $0.trimmingCharacters(in: .whitespaces) }
         let first = lines.firstIndex { !$0.isEmpty }
         let name = title.isEmpty ? first.map { SamplePreview.line(lines[$0]) } ?? "" : title
