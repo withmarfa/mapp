@@ -120,6 +120,14 @@ export interface HeaderKicker {
   spoken: string
 }
 
+/** A place's map as the app made it: a still picture for each appearance, absent while it is being made, and what
+ *  VoiceOver reads for it. The page draws it and does nothing with it. */
+export interface HeaderMap {
+  light?: string
+  dark?: string
+  label: string
+}
+
 /** What the app says the head shows for the item on the page. */
 export interface HeaderModel {
   item: string
@@ -137,6 +145,9 @@ export interface HeaderModel {
    *  still show the derived title, and `bottom` and the scrolled-away report do not change. Decided from the title
    *  rule, never from a type. */
   showsTitle?: boolean
+  /** The item's text is its lead: drawn large where a title would be, with the rows after it. The text is the same text
+   *  and is edited as text; only its look and its place against the rows change. */
+  textLeads?: boolean
   kicker: HeaderKicker
   status: HeaderPin | null
   parent: HeaderPin | null
@@ -146,6 +157,8 @@ export interface HeaderModel {
   rows: HeaderRow[]
   /** What the page lists under its text: the sub-items and the items that link to this one. */
   foot: FootSection[]
+  /** A place's map, drawn between the rows and the foot; absent for an item with no point. */
+  map?: HeaderMap
   /** False where the page has no text to write, so the page draws no empty editor (`body[data-text='none']`): a
    *  collection with no text sends it. An empty editor only invites typing that a connector holding the item puts
    *  back. */
@@ -245,6 +258,9 @@ export class ItemHeader {
   private readonly moreProperties: HTMLButtonElement
   private readonly rowsBox: HTMLDivElement
   private readonly foot: Foot
+  /** What the footer holds besides the foot's lists, which a page whose text leads puts the rows before. */
+  private readonly footLists: HTMLDivElement
+  private readonly mapBox: HTMLDivElement
   private symbols: Record<string, HeaderIcon> = {}
   /** What the rows and the foot were last drawn from, so an unchanged head is not drawn again under the
    *  pointer. */
@@ -312,7 +328,10 @@ export class ItemHeader {
       this.redraw()
     })
     const glyph = (name: string, parent: HTMLElement) => this.glyph(name, parent)
-    this.foot = new Foot(footer, () => this.redraw(), glyph)
+    this.mapBox = element('div', 'item-map', footer)
+    this.mapBox.hidden = true
+    this.footLists = element('div', 'item-foot-lists', footer)
+    this.foot = new Foot(this.footLists, () => this.redraw(), glyph)
 
     this.title.addEventListener('focus', () => {
       this.editing = this.model?.item
@@ -415,7 +434,27 @@ export class ItemHeader {
    *  foot follows the text directly (`main.ts` sets `--inkkit-min-height` to zero); the text fills the window only
    *  when it holds nothing. */
   get hasFooterItems(): boolean {
-    return !!this.model && this.model.foot.length > 0
+    return (
+      !!this.model &&
+      (this.model.foot.length > 0 || !!this.model.map || this.rowsFollowText(this.model))
+    )
+  }
+
+  /** Whether the rows come after the text, in the footer, because the text leads the page. */
+  private rowsFollowText(model: HeaderModel): boolean {
+    return model.textLeads === true && model.showsText
+  }
+
+  /** The rows sit with the head, or, where the text leads, at the footer's start: the text is between the two. */
+  private placeRows(model: HeaderModel) {
+    const follows = this.rowsFollowText(model)
+    document.body.dataset.lead = follows ? 'on' : 'off'
+    if (follows) {
+      if (this.rowsBox.parentElement !== this.footer)
+        this.footer.insertBefore(this.rowsBox, this.footLists)
+    } else if (this.rowsBox.parentElement !== this.root) {
+      this.root.append(this.rowsBox)
+    }
   }
 
   get isHidden(): boolean {
@@ -453,13 +492,14 @@ export class ItemHeader {
       this.title.blur()
     }
     this.root.hidden = model.focused === true
-    this.footer.hidden = model.foot.length === 0
+    this.footer.hidden = !this.hasFooterItems
     this.root.style.setProperty('--interface-text-size', `${model.interfaceTextSize}px`)
     this.footer.style.setProperty('--interface-text-size', `${model.interfaceTextSize}px`)
     this.root.style.setProperty('--title-lines', String(model.titleLines))
     this.applyChips()
     document.body.dataset.text = model.showsText ? 'shown' : 'none'
     this.title.hidden = model.showsTitle === false
+    this.placeRows(model)
     this.root.dataset.title = model.showsTitle === false ? 'derived' : 'own'
     const editable = model.editable ? 'plaintext-only' : 'false'
     if (this.title.getAttribute('contenteditable') !== editable) {
@@ -751,6 +791,9 @@ export class ItemHeader {
       model.kicker,
       model.pins,
       model.rows,
+      model.textLeads,
+      model.map,
+      model.focused,
       model.foot,
       model.showMore,
       this.expanded,
@@ -778,10 +821,38 @@ export class ItemHeader {
       ? this.labels.showLess
       : model.showMore
     this.moreProperties.setAttribute('aria-expanded', String(this.expanded.properties))
-    this.rowsBox.hidden = visible.length === 0 && !folded
+    // Focus hides the head only, and the rows that follow a leading text are the head's.
+    this.rowsBox.hidden =
+      (visible.length === 0 && !folded) || (this.rowsFollowText(model) && model.focused)
     this.rowsBox.classList.toggle('bare', visible.length === 0)
 
+    this.drawMap(model.map)
     this.foot.draw(model.item, model.foot, this.symbols)
+  }
+
+  /** A place's map: its picture in the appearance the page is in, or a quiet box of the same size while the app makes it. */
+  private drawMap(map: HeaderMap | undefined) {
+    this.mapBox.hidden = !map
+    if (!map) {
+      this.mapBox.replaceChildren()
+      return
+    }
+    this.mapBox.setAttribute('role', 'img')
+    this.mapBox.setAttribute('aria-label', map.label)
+    this.mapBox.classList.toggle('waiting', !map.light || !map.dark)
+    if (!map.light || !map.dark) {
+      this.mapBox.replaceChildren()
+      return
+    }
+    const picture = document.createElement('picture')
+    const dark = document.createElement('source')
+    dark.media = '(prefers-color-scheme: dark)'
+    dark.srcset = map.dark
+    const image = document.createElement('img')
+    image.src = map.light
+    image.alt = ''
+    picture.append(dark, image)
+    this.mapBox.replaceChildren(picture)
   }
 
   /** The rows under a heading, each heading once with its rows below it, in the order the app sent them. */
@@ -970,7 +1041,7 @@ export class ItemHeader {
   openRowMenuAt(target: EventTarget | null): boolean {
     const entry = (target as Element | null)?.closest?.<HTMLElement>('.item-prop[data-row]')
     const term = entry?.querySelector<HTMLElement>('.item-prop-label')
-    if (!entry?.dataset.row || !term || !this.root.contains(entry)) return false
+    if (!entry?.dataset.row || !term || !this.rowsBox.contains(entry)) return false
     const row = this.model?.rows.find((candidate) => candidate.id === entry.dataset.row)
     const value = entry.querySelector<HTMLElement>('.item-prop-value')
     const holdsLink = !!value?.querySelector('a, button')
@@ -1042,9 +1113,10 @@ export class ItemHeader {
     const open = this.openValue
     if (!model || !open) return
     const row = JSON.stringify(open.row)
-    const value = this.root.querySelector<HTMLElement>(
-      `[data-row=${row}] .item-prop-value, [data-pin=${row}] .item-pin-value`,
-    )
+    const selector = `[data-row=${row}] .item-prop-value, [data-pin=${row}] .item-pin-value`
+    const value =
+      this.root.querySelector<HTMLElement>(selector) ??
+      this.rowsBox.querySelector<HTMLElement>(selector)
     if (!value) return
     const rect = valueFrame(value)
     const key = rectKey(rect)

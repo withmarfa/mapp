@@ -12,4 +12,12 @@ struct PageHeaderKindTests {
         #expect(PageHeaderKind.of(TypeID("aic.meeting"), in: catalogue) == .event)
         #expect(PageHeaderKind.of(TypeID("aic.other"), in: catalogue) == .general)
     }
+
+    @Test func aTypeThatBuildsOnTheHighlightLeadsWithItsPassage() {
+        let catalogue = Catalogue(itemTypes: [
+            ItemTypeInfo(id: TypeID("core.highlight"), label: "Highlight", fields: [], titleField: nil, bodyField: "text", parent: nil),
+            ItemTypeInfo(id: TypeID("aic.quote"), label: "Quote", fields: [], titleField: nil, bodyField: "text", parent: TypeID("core.highlight")),
+        ])
+        #expect(PageHeaderKind.of(TypeID("aic.quote"), in: catalogue) == .highlight)
+    }
 }

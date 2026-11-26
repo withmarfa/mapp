@@ -215,6 +215,63 @@ body:has(> #item-header:not([hidden])) {
   display: none;
 }
 
+/* A page whose text leads (a highlight's passage): the passage is drawn at the title's size where a title would be, and
+   the rows follow it at the start of the footer. It is the same text, edited as text. */
+body[data-lead='on'] {
+  --inkkit-font-size: var(--page-title-size);
+  --inkkit-line-height: calc(30 / 24.7);
+  --inkkit-padding-top: 0px;
+}
+
+body[data-lead='on'] #editor .ProseMirror {
+  font-weight: 600;
+  letter-spacing: -0.022em;
+}
+
+body[data-lead='on'] #item-header {
+  padding-bottom: calc(var(--step) * 2);
+}
+
+body[data-lead='on'] #item-footer {
+  padding-top: 0;
+}
+
+body[data-lead='on'] #item-footer > .item-rows {
+  margin-top: calc(var(--step) * 4);
+}
+
+body[data-lead='on'] #item-footer > .item-rows + .item-foot-lists {
+  margin-top: calc(var(--step) * 6);
+}
+
+/* A place's map: a still picture of the column's width, cropped about its point, with its corners rounded. */
+.item-map {
+  height: calc(var(--interface-text-size) * 260 / 13);
+  border: 1px solid var(--separator);
+  border-radius: calc(var(--interface-text-size) * 10 / 13);
+  overflow: hidden;
+  background: var(--fill-tertiary);
+}
+
+.item-map[hidden] {
+  display: none;
+}
+
+.item-map picture,
+.item-map img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.item-map img {
+  object-fit: cover;
+}
+
+.item-map:not([hidden]) + .item-foot-lists {
+  margin-top: calc(var(--interface-text-size) * 30 / 13);
+}
+
 /* What follows the text: a collection's contents and Linked From, on the header's margins and type. */
 #item-footer {
   --interface-text-size: 13px;
