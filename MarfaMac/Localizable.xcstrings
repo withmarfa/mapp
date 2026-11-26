@@ -8994,6 +8994,9 @@
     "Settings Not Saved" : {
 
     },
+    "Settings Not Synced" : {
+
+    },
     "Settings Read When It Starts" : {
 
     },
@@ -11160,6 +11163,9 @@
     },
     "This library was closed before the change could be kept." : {
       "extractionState" : "manual"
+    },
+    "This library’s settings on this Mac couldn’t be brought together, so they aren’t kept in the Marfa for now. Check that this Mac has free space, then open the library again." : {
+
     },
     "This link can’t be replaced by moving one end, because the item that stays can hold more than one." : {
       "extractionState" : "manual"

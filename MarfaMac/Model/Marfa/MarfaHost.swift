@@ -225,12 +225,49 @@ import os
     }
 
     /// Names the library by the Marfa its copy holds, so its sidebar layout and its type looks are its own however
-    /// its address is typed; by the origin until the copy knows its instance.
+    /// its address is typed; by its copy's folder until the copy knows its instance, never by an address another
+    /// Marfa can answer at later.
     func libraryKey(for connection: MarfaConnection?) -> String {
         _ = copiesRevision
         guard let connection else { return "marfa:" }
+        return libraryKey(ofFolder: location.directory(for: connection).lastPathComponent)
+    }
+
+    /// What a library not yet known by its instance is named by after `marfa:`, before its copy's folder.
+    nonisolated static let copyPrefix = "copy:"
+
+    private func libraryKey(ofFolder folder: String) -> String {
+        "marfa:" + (location.copies.instance(ofFolder: folder) ?? Self.copyPrefix + folder)
+    }
+
+    /// The name the library whose settings are kept under `stored` has now (`LibrarySettings.settle`), or nil where it
+    /// is that name or no library's. An earlier build's name is the address as typed, read as the folder that address
+    /// opens now, so the settings move before anything can give the address another folder; both spellings of its
+    /// origin name the one folder (`bindOrigin`).
+    func currentLibraryKey(forStored stored: String) -> String? {
+        guard stored.hasPrefix("marfa:") else { return nil }
+        let name = String(stored.dropFirst("marfa:".count))
+        let folder: String
+        if name.hasPrefix(Self.copyPrefix) {
+            folder = String(name.dropFirst(Self.copyPrefix.count))
+        } else if name.contains("://"), let connection = try? MarfaConnection(address: name, completing: false) {
+            bindOrigin(of: connection)
+            folder = location.directory(for: connection).lastPathComponent
+        } else {
+            return nil
+        }
+        let now = libraryKey(ofFolder: folder)
+        return now == stored ? nil : now
+    }
+
+    /// Records the folder `connection`'s origin opens where none is recorded yet, so the two spellings an earlier build
+    /// kept apart open one copy and name one library.
+    func bindOrigin(of connection: MarfaConnection) {
+        let origin = MarfaCopies.origin(of: connection)
+        guard location.copies.folder(forOrigin: origin) == nil else { return }
         let folder = location.directory(for: connection).lastPathComponent
-        return "marfa:" + (location.copies.instance(ofFolder: folder) ?? MarfaCopies.origin(of: connection))
+        try? location.copies.change { $0.origins[origin] = folder }
+        copiesRevision += 1
     }
 
     /// The last time the copy of the server connected to finished a pull from it without an error, which is more

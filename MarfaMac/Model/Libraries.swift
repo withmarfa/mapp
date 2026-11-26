@@ -69,6 +69,9 @@ import MarfaTesting
 
     private let defaults: UserDefaults
 
+    /// The order each library's own settings were written in, and their move to the name the library has now.
+    let librarySettings: LibrarySettings
+
     init(
         host: MarfaHost, defaults: UserDefaults = .standard,
         handOverPages: ((@escaping (Bool) -> Void) -> Void)? = nil,
@@ -86,6 +89,9 @@ import MarfaTesting
         searchLeaveOuts = SearchLeaveOuts(defaults: defaults)
         shortcuts = ShortcutBindings(defaults: defaults)
         anyAppShortcuts = AnyAppShortcuts(defaults: defaults, registrar: hotKeys)
+        librarySettings = LibrarySettings(
+            defaults: defaults, aside: restorePoints.folder.appending(path: LibrarySettings.asideFolderName, directoryHint: .isDirectory),
+            lastOpen: host.configuredConnection.map { "marfa:" + $0.address.absoluteString })
         automaticExport = AutomaticExport(
             defaults: defaults,
             marfa: { [host] in
@@ -124,6 +130,10 @@ import MarfaTesting
         host.handOverEdits = { [weak self] in await self?.flushEditors() ?? false }
         newItemDrafts.notices = host.notices
         host.libraryChanged = { [weak self] library in self?.follow(library) }
+        // Before any window reads a library's settings, and before anything can give an address another copy. The
+        // address open last keeps its own copy for its origin.
+        if let connection = host.configuredConnection { host.bindOrigin(of: connection) }
+        settleLibrarySettings()
         LaunchTrace.shared.mark(.librariesInit, note: isLaunching ? "server set" : "no server")
     }
 
@@ -159,10 +169,11 @@ import MarfaTesting
     private func follow(_ library: MarfaLibrary?) {
         refusalsHeard?.cancel()
         refusalsHeard = library.map(newItemDrafts.follow)
-        guard let source = library?.source as? MarfaSource else {
-            preferences.detach()
-            return
-        }
+        // Nothing syncs a library's settings before they are under the name it has now: an empty name would read as
+        // the person having removed them, and remove them from the Marfa.
+        preferences.detach()
+        let settled = library == nil || settleLibrarySettings()
+        guard settled, let source = library?.source as? MarfaSource else { return }
         // The copy's own server, since a switch opens the new copy before the host keeps its address.
         let connection = source.connection
         preferences.attach(
@@ -170,6 +181,26 @@ import MarfaTesting
                 copy: source.copy, answers: source.preferenceAnswers, sendSoon: { [engine = source.engine] in await engine.sync.drain() }),
             library: host.libraryKey(for: connection),
             name: { [host] in host.instanceName(for: connection) })
+    }
+
+    /// Moves each library's settings kept under an earlier name to the name it has now, then has the stores read them
+    /// again. False where the values that would not win could not be saved first, so nothing moved.
+    @discardableResult
+    private func settleLibrarySettings() -> Bool {
+        do {
+            let moved = try librarySettings.settle(rename: { [host] in host.currentLibraryKey(forStored: $0) })
+            guard !moved.libraries.isEmpty else { return true }
+            sidebarLayouts.reload()
+            typeLooks.reload()
+            searchLeaveOuts.reload()
+            return true
+        } catch {
+            Telemetry.logger(.sync).error("Settings kept for one library under two names could not be saved, so they did not move")
+            host.notices.tell(
+                String(localized: "Settings Not Synced"),
+                String(localized: "This library’s settings on this Mac couldn’t be brought together, so they aren’t kept in the Marfa for now. Check that this Mac has free space, then open the library again."))
+            return false
+        }
     }
 
     /// Opens the saved server's copy and paints from it before the network is asked anything.
