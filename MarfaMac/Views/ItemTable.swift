@@ -37,7 +37,16 @@ struct ItemTable: View {
     var body: some View {
         let _ = daysSeen
         let _ = placeTrace.bodyRan(for: browser.shown)
-        let content = tableContent()
+        Group {
+            if let content = tableContent() { contents(content) }
+            else { PlaceProgress() }
+        }
+        // The Archive names each item's source, which the server names after the items are read.
+        .task(id: library.membershipRevision) { if browser.listsByOrigin { await library.refreshSources() } }
+        .onClockChange { daysSeen += 1 }
+    }
+
+    private func contents(_ content: ItemTableContent) -> some View {
         let shown = browser.shownColumns(content.columns)
         let fit = ItemTableFit.widths(
             of: shown, rows: content.rows.prefix(ItemTableFit.sample), library: library, format: dateFormat, now: library.now(),
@@ -46,7 +55,7 @@ struct ItemTable: View {
         let (allRows, rows) = (content.allRows, content.rows)
         let pages = Pages(content: content, paging: browser.tablePaging, size: browser.tablePageSize)
 
-        ItemTableSelection(browser: browser, content: content) { selection in
+        return ItemTableSelection(browser: browser, content: content) { selection in
             table(selection: selection, columns: content.columns, fit: fit, pages: pages, grouping: content.grouping, collapsed: content.collapsed)
         }
             .padding(.horizontal, margin)
@@ -72,17 +81,14 @@ struct ItemTable: View {
                 if !browser.isSearchExpanded { browser.focusRequest = .list }
             }
             .onChange(of: allRows.count) { browser.revealSelectionInTable(content) }
-            // The Archive names each item's source, which the server names after the items are read.
-            .task(id: library.membershipRevision) { if browser.listsByOrigin { await library.refreshSources() } }
-            .onClockChange { daysSeen += 1 }
     }
 
     /// The table's content, with its rows holding the links of the columns the person shows. A link column that was hidden
     /// before needs its rows made again, once.
-    private func tableContent() -> ItemTableContent {
-        let content = browser.tableContent(in: library)
+    private func tableContent() -> ItemTableContent? {
+        guard let content = browser.readyTable(in: library) else { return nil }
         guard browser.showRelations(of: browser.shownColumns(content.columns)) else { return content }
-        return browser.tableContent(in: library)
+        return browser.readyTable(in: library)
     }
 
     private func table(

@@ -11,23 +11,38 @@ extension Browser {
         clearSearch()
         // A saved view is shown at its home, wherever it was asked for.
         showing = item.savedView.map { PlaceView.saved($0, in: library) } ?? item
+        followView(in: library)
+        followPlaceDefault(in: library)
         fallBackToListIfUnavailable(in: library)
         selectFirstItem(in: library, order: order)
     }
 
     func selectFirstItem(in library: any ItemLibrary, order: ItemOrder) {
+        wantsFirstSelection = false
         // An index of places chooses nothing until the person does.
         guard !showsPlaceIndex else { return selectAutomatically([]) }
         // A Digest opens for reading. Choosing a card opens its page beside it if the view uses that opening.
-        guard !opensInDigest(shown) else { return selectAutomatically([]) }
+        guard viewMode != .digest, !opensInDigest(shown) else { return selectAutomatically([]) }
         // A table's first row is its content's, which the table shares, so a large place is not ordered twice.
         if viewMode == .table, usesCollection {
-            let content = tableContent(in: library)
+            guard let content = readyTable(in: library) else { return waitForFirstItem() }
             let first = content.grouping == nil ? content.rows.first : content.groups.first { !$0.rows.isEmpty }?.rows.first
             return selectAutomatically(first.map { [$0.id] } ?? [])
         }
-        let first = sections(in: library, order: order, now: library.now()).first?.items.first
+        guard let arrangement = readyArrangement(in: library, order: order, now: library.now()) else { return waitForFirstItem() }
+        let first = arrangement.sections.first?.items.first
         selectAutomatically(first.map { [$0.id] } ?? [])
+    }
+
+    private func waitForFirstItem() {
+        wantsFirstSelection = true
+        selectAutomatically([])
+    }
+
+    func finishFirstSelection(in library: any ItemLibrary, order: ItemOrder) {
+        guard wantsFirstSelection else { return }
+        wantsFirstSelection = false
+        if selection.isEmpty { selectFirstItem(in: library, order: order) }
     }
 
     /// Moves the selection as the app does, not as the person chose, so Back does not stop there.
@@ -42,37 +57,41 @@ extension Browser {
     var followsCollection: Bool { usesCollection || isCollectionItemPresented }
 
     /// Keeps the selection true as the items the window holds change (`collectionItemIDs`), while it follows them.
-    func collectionItemsChanged(from old: [ItemID], to new: [ItemID]) {
+    func collectionItemsChanged(from old: [ItemID]?, to new: [ItemID]?) {
         guard followsCollection else { return }
-        keepSelection(from: old, to: new)
+        keepSelection(from: old ?? [], to: new ?? [], isPending: new == nil)
     }
 
     /// The items the layout that spans the window holds, which its selection follows as they change (`keepSelection`):
     /// the table's in the order it shows them, then those its filters hide, and the gallery's, the board's and the
     /// timeline's in the list's order, which is also the order of a full page opened from the list. The table's come from
     /// its own content, so a move between its places sorts no list.
-    func collectionItemIDs(in library: any ItemLibrary, order: ItemOrder) -> [ItemID] {
+    func collectionItemIDs(in library: any ItemLibrary, order: ItemOrder) -> [ItemID]? {
         guard followsCollection else { return [] }
         guard !showsPlaceIndex else { return [] }
         // The Digest follows its own order as each arrangement lands, including while its full page is open.
         guard viewMode != .digest else { return [] }
         guard viewMode == .table else {
-            let shown = arrangement(in: library, order: order, now: library.now()).ids
+            guard let shown = readyArrangement(in: library, order: order, now: library.now())?.ids else { return nil }
             // The items the filters and the hidden groups leave out stay in the selection's reach, as the table's do.
             let rest: [ItemID]
             if listShape?.arranged == true, !ordersByRelevance {
-                rest = tableContent(in: library).allRows.map(\.id)
+                guard let content = readyTable(in: library) else { return nil }
+                rest = content.allRows.map(\.id)
             } else if tableOptions[self.shown]?.isFiltering == true {
-                rest = items(in: library).map(\.id)
+                guard let items = isSearching ? items(in: library) : requestPlaceItems(in: library) else { return nil }
+                rest = items.map(\.id)
             } else {
                 return shown
             }
+            if rest.count == shown.count { return shown }
             let isShown = Set(shown)
             return shown + rest.filter { !isShown.contains($0) }
         }
-        let content = tableContent(in: library)
+        guard let content = readyTable(in: library) else { return nil }
         // A grouped table shows its rows group by group, not in the sort's order across groups.
         let shown = (content.grouping == nil ? content.rows : content.groups.flatMap(\.rows)).map(\.id)
+        if shown.count == content.allRows.count { return shown }
         let isShown = Set(shown)
         return shown + content.allRows.map(\.id).filter { !isShown.contains($0) }
     }
@@ -130,6 +149,8 @@ extension Browser {
     /// keeps whichever are still there. If none are, it moves to the item that followed them, or failing that
     /// the one before, as Notes and Mail do.
     static func selection(_ selection: Set<ItemID>, keptFrom old: [ItemID], in new: [ItemID]) -> Set<ItemID> {
+        guard !selection.isEmpty else { return [] }
+        if selection.count == 1, let id = selection.first, new.contains(id) { return selection }
         let visible = Set(new)
         let kept = selection.intersection(visible)
         guard kept.isEmpty, let first = old.firstIndex(where: selection.contains) else { return kept }

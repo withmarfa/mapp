@@ -56,8 +56,8 @@ extension Browser {
     func propertyLooks(in library: any ItemLibrary) -> [TypeID: TypeLook] {
         let base = looks(in: library)
         let properties = properties
-        guard properties.isChanged else { return base }
-        return properties.looks(base, columns: tableContent(in: library).columns, catalogue: library.catalogue)
+        guard properties.isChanged, let content = readyTable(in: library) else { return base }
+        return properties.looks(base, columns: content.columns, catalogue: library.catalogue)
     }
 
     /// The properties the open layout lists: every column in a table, and in another layout those a chip can say, less

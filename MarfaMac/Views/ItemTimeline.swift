@@ -13,13 +13,23 @@ struct ItemTimeline: View {
 
     var body: some View {
         let _ = daysSeen
-        let items = browser.filteredItems(in: library)
-        let fields = browser.timelineFieldChoices(in: library)
         // Chosen in the View panel's Timeline section (`ViewPanelLayoutRows`).
-        let field = ItemTimelineLayout.selectedField(browser.timelineFields[browser.shown], fields: fields)
+        let field = browser.timelineFields[browser.shown].flatMap {
+            ItemTimelineLayout.selectedField($0, fields: browser.timelineFieldChoices(in: library))
+        }
         let now = library.now()
         // Worked out off the main actor for a large place (`Browser.placed`); only a page of it is drawn, as the list's is.
-        let placing = browser.timelinePlacing(in: library, field: field, now: now)
+        Group {
+            if let placing = browser.timelinePlacing(in: library, field: field, now: now) {
+                content(placing, field: field, now: now)
+            } else {
+                PlaceProgress()
+            }
+        }
+        .onClockChange { daysSeen += 1 }
+    }
+
+    private func content(_ placing: Browser.TimelinePlacing, field: String?, now: Date) -> some View {
         let days = placing.drawn(browser.listDrawn)
         let groups = days.map(\.group)
         let list = RowList(
@@ -29,13 +39,13 @@ struct ItemTimeline: View {
             shape: CardShape(leaving: field))
 
         // Select All chooses every item, those not drawn yet too.
-        timeline(days, contents: contents, now: now) { browser.selection = Set(placing.positions.keys) }
+        return timeline(days, contents: contents, now: now) { browser.selection = Set(placing.positions.keys) }
         .topRowScrolls()
         .clearsSeveralOnEscape(browser)
-        .deletesChosen(browser) { Set(items.map(\.id)) }
+        .deletesChosen(browser) { Set(placing.positions.keys) }
         .searchStatus(browser)
         .overlay {
-            if items.isEmpty {
+            if placing.positions.isEmpty {
                 if browser.narrowsBySearch {
                     SearchEmptyState(browser: browser)
                 } else {
@@ -48,7 +58,6 @@ struct ItemTimeline: View {
         .onChange(of: browser.isSearchExpanded) {
             if !browser.isSearchExpanded { browser.focusRequest = .list }
         }
-        .onClockChange { daysSeen += 1 }
         .background(ChosenItemDrawn(browser: browser, positions: placing.positions))
     }
 

@@ -61,18 +61,55 @@ extension MarfaLibrary {
     /// Answers from the copy's own reading of the view, which runs beside the views as a search does: until it
     /// returns, the last list stands, and a change to the items reads it again. The list is what the copy holds.
     func items(inView id: ItemID) -> [Item] {
+        listed(viewHits(id))
+    }
+
+    func count(inView id: ItemID) -> Int {
+        viewHits(id).lazy.filter { self.viewItem($0) != nil }.count
+    }
+
+    func listedIDs(_ ids: Set<ItemID>, inView view: ItemID) -> Set<ItemID> {
+        Set(viewHits(view).lazy.filter { ids.contains($0) && self.viewItem($0) != nil })
+    }
+
+    private func viewHits(_ id: ItemID) -> [ItemID] {
         _ = viewRevision
         let revision = contentRevision
         let held = viewed[id]
         if views.contains(where: { $0.id == id }), held.map({ $0.revision != revision && !$0.running }) ?? true {
             startViewRead(id, at: revision)
         }
-        return listed(held?.hits ?? [])
+        return held?.hits ?? []
     }
 
     private func listed(_ hits: [ItemID]) -> [Item] {
-        Self.ordered(hits.compactMap { id in
-            records[id].flatMap { $0.isHeld && $0.item.state != .trashed ? $0.item : nil }
+        let content = contentRevision
+        if let held = orderedView, held.content == content, held.hits == hits { return held.items }
+        let items = Self.ordered(hits.compactMap(viewItem))
+        orderedView = (content, hits, items)
+        return items
+    }
+
+    private func viewItem(_ id: ItemID) -> Item? {
+        guard let item = records[id]?.listedItem, item.state != .trashed else { return nil }
+        return item
+    }
+
+    func deferredView(_ id: ItemID, preview: LibraryViewQuery?, above limit: Int) -> DeferredListing? {
+        let hits = preview.map { previewHits(ofView: id, query: $0) } ?? viewHits(id)
+        guard hits.count > limit else { return nil }
+        let content = contentRevision
+        let revision = viewRevision
+        if let held = orderedView, held.content == content, held.hits == hits { return nil }
+        let snapshots = index.items
+        return DeferredListing(make: {
+            Self.ordered(hits.compactMap { id in
+                guard let item = snapshots[id], item.state != .trashed else { return nil }
+                return item
+            })
+        }, take: { [weak self] items in
+            guard let self, contentRevision == content, viewRevision == revision else { return }
+            orderedView = (content, hits, items)
         })
     }
 
@@ -80,6 +117,10 @@ extension MarfaLibrary {
     /// the view's last preview stands, or the view's own list where there is none; a change to the items reads it
     /// again. A query the copy refuses lists the view's own list, and says why once.
     func previewItems(ofView id: ItemID, query: LibraryViewQuery) -> [Item] {
+        listed(previewHits(ofView: id, query: query))
+    }
+
+    private func previewHits(ofView id: ItemID, query: LibraryViewQuery) -> [ItemID] {
         _ = viewRevision
         let revision = contentRevision
         let key = PreviewKey(view: id, query: query)
@@ -92,8 +133,7 @@ extension MarfaLibrary {
         if views.contains(where: { $0.id == id }), held.map({ $0.revision != revision && !$0.running }) ?? true {
             startPreviewRead(key, at: revision)
         }
-        guard let hits = held?.hits ?? (held?.refused == true ? nil : lastPreview[id]) else { return items(inView: id) }
-        return listed(hits)
+        return held?.hits ?? (held?.refused == true ? nil : lastPreview[id]) ?? viewHits(id)
     }
 
     private func startPreviewRead(_ key: PreviewKey, at revision: Int) {

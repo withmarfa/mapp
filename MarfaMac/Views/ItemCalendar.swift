@@ -16,20 +16,28 @@ struct ItemCalendar: View {
     var body: some View {
         let _ = daysSeen
         let _ = weekStart
-        let items = browser.filteredItems(in: library)
         let calendar = Calendar.chosenWeekStart
+        Group {
+            if let placing = browser.calendarPlacing(in: library, calendar: calendar) {
+                content(placing, calendar: calendar)
+            } else {
+                PlaceProgress()
+            }
+        }
+        .onClockChange { daysSeen += 1 }
+    }
+
+    private func content(_ placed: Browser.CalendarPlacing, calendar: Calendar) -> some View {
         let now = library.now()
         let anchor = browser.calendarDay ?? now
         let firstShown = CalendarLayout.firstDayShown(browser.calendarDay, now: now, calendar: calendar)
-        // Worked out off the main actor for a large place (`Browser.placed`).
-        let placed = browser.calendarPlacing(in: library, calendar: calendar)
         let scale = browser.calendarScale
         let visible = scale == .week
             ? DateInterval(start: firstShown, end: calendar.date(byAdding: .day, value: 7, to: firstShown) ?? firstShown)
             : CalendarLayout.interval(of: scale, containing: anchor, calendar: calendar)
         let drawn = CalendarLayout.drawn(scale, firstShown: firstShown, anchor: anchor, calendar: calendar)
 
-        Group {
+        return Group {
             switch scale {
             case .week:
                 CalendarWeekView(
@@ -73,7 +81,7 @@ struct ItemCalendar: View {
         }
         .searchStatus(browser)
         .overlay {
-            if items.isEmpty {
+            if placed.isEmpty {
                 if browser.narrowsBySearch {
                     SearchEmptyState(browser: browser)
                 } else {
@@ -87,7 +95,6 @@ struct ItemCalendar: View {
         .onChange(of: browser.isSearchExpanded) {
             if !browser.isSearchExpanded { browser.focusRequest = .list }
         }
-        .onClockChange { daysSeen += 1 }
     }
 
     /// Chooses an event on one of its days, which is where the arrow keys go on from.

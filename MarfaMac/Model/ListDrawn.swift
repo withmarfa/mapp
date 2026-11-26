@@ -5,11 +5,15 @@ import Foundation
 /// everything up to it. Positions count the items in the layout's order, from its first.
 nonisolated struct ListDrawn: Equatable, Sendable {
     /// The items drawn from the first.
-    private(set) var head = Browser.listPage
+    private(set) var head: Int
     /// The items drawn around the chosen one, always after `head` with items between.
     private(set) var around: Range<Int>?
 
     private static var page: Int { Browser.listPage }
+
+    init(head: Int = Browser.listPage) {
+        self.head = head
+    }
 
     /// The runs of items drawn of a layout of `count` items, in order.
     func runs(of count: Int) -> [Range<Int>] {

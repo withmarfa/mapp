@@ -4,13 +4,12 @@ import SwiftUI
 /// The map layout: Apple's map from edge to edge under the top row, with the items that have a place as markers in their
 /// type's tone and groups with a count where markers crowd (`MapController`). A quiet pill at the foot counts the items
 /// the map cannot place and lists them. Choosing a marker is choosing the item (`Browser.selection`), and a double-click
-/// opens it as every layout does. The placing of a large place is worked out off the main actor (`MapPlacingWork`), and
+/// opens it as every layout does. The placing of a large place is worked out off the main actor (`Browser.placed`), and
 /// this body does not read the selection, so choosing a marker redraws the map's own views and no more.
 struct ItemMap: View {
     @CurrentLibrary private var library
     @Bindable var browser: Browser
     var pane: FocusState<Browser.Pane?>.Binding
-    @State private var work = MapPlacingWork()
     @State private var controller = MapController()
     @Environment(\.topRowSpace) private var space
     @Environment(\.colorScheme) private var scheme
@@ -18,13 +17,19 @@ struct ItemMap: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        let (items, key) = browser.mapItems(in: library)
-        let placing = work.placing(for: key, items: items, catalogue: library.catalogue)
+        if let placing = browser.mapPlacing(in: library) {
+            canvas(placing)
+        } else {
+            PlaceProgress()
+        }
+    }
+
+    private func canvas(_ placing: MapLayout.Placing) -> some View {
         ItemMapCanvas(
             controller: controller,
             inputs: MapController.Inputs(
                 browser: browser, catalogue: library.catalogue, placing: placing, style: browser.mapStyle, groups: browser.groupsNearbyItems,
-                placeToken: AnyHashable(MapPlaceToken(library: key.library, place: key.place)), scheme: scheme, textSize: textSize,
+                placeToken: AnyHashable(MapPlaceToken(library: ObjectIdentifier(library), place: browser.shown)), scheme: scheme, textSize: textSize,
                 reduceMotion: reduceMotion))
             .ignoresSafeArea(.container, edges: .top)
             .overlay(alignment: .top) {
@@ -33,13 +38,13 @@ struct ItemMap: View {
             }
             .overlay(alignment: .bottomTrailing) { MapControls(controller: controller, browser: browser) }
             .overlay(alignment: .bottom) {
-                if let placing, !placing.unplaced.isEmpty { NoLocationPill(ids: placing.unplaced, browser: browser) }
+                if !placing.unplaced.isEmpty { NoLocationPill(ids: placing.unplaced, browser: browser) }
             }
             .overlay {
-                if let placing, placing.pins.isEmpty, !items.isEmpty { NothingOnMap() }
+                if placing.pins.isEmpty, !placing.unplaced.isEmpty { NothingOnMap() }
             }
             .overlay {
-                if items.isEmpty {
+                if placing.pins.isEmpty, placing.unplaced.isEmpty {
                     if browser.narrowsBySearch {
                         SearchEmptyState(browser: browser)
                     } else {
@@ -51,7 +56,6 @@ struct ItemMap: View {
             .filteredEmptyState(browser)
             .background(ChosenRowOpensSidebar(browser: browser))
             .onChange(of: browser.mapFitRequests) { controller.fitAll() }
-            .onDisappear { work.cancel() }
             .accessibilityLabel("Map")
     }
 }

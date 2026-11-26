@@ -28,13 +28,14 @@ nonisolated struct MarfaItemIndex {
         }
 
         func ids(in scope: ListScope, _ archived: ArchivedItems) -> Set<ItemID> {
-            var found: Set<ItemID> = []
+            var found: Set<ItemID>?
             for tier in Tier.allCases where scope.includes(tier) {
                 for state in [ItemState.active, .archived] where archived.includes(state) {
-                    found.formUnion(sets[tier]?[state] ?? [])
+                    guard let ids = sets[tier]?[state], !ids.isEmpty else { continue }
+                    if found == nil { found = ids } else { found?.formUnion(ids) }
                 }
             }
-            return found
+            return found ?? []
         }
 
         func count(in scope: ListScope, _ archived: ArchivedItems) -> Int {
@@ -57,6 +58,8 @@ nonisolated struct MarfaItemIndex {
     }
 
     private(set) var byState: [ItemState: Set<ItemID>] = [:]
+    /// Item values that a listing can read off the main actor without observing individual records.
+    private(set) var items: [ItemID: Item] = [:]
     /// Every active and archived item.
     private(set) var listed = Split()
     private(set) var byType: [TypeID: Split] = [:]
@@ -99,6 +102,7 @@ nonisolated struct MarfaItemIndex {
     }
 
     mutating func insert(_ item: Item, catalogue: Catalogue) {
+        items[item.id] = item
         byState[item.state, default: []].insert(item.id)
         if item.state != .trashed {
             listed.insert(item.id, tier: item.tier, state: item.state)
@@ -122,6 +126,7 @@ nonisolated struct MarfaItemIndex {
     }
 
     mutating func remove(_ item: Item) {
+        items[item.id] = nil
         if item.state == .active {
             for tag in item.tags {
                 if tagCounts[tag] == 1 { tagCounts[tag] = nil } else { tagCounts[tag]? -= 1 }

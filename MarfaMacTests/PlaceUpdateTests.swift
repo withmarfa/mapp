@@ -43,8 +43,7 @@ import UniformTypeIdentifiers
 
     private func settledSections(_ browser: Browser, in library: any ItemLibrary, order: ItemOrder) async throws -> [ItemSection] {
         try #require(await eventually(within: .seconds(30)) {
-            _ = browser.sections(in: library, order: order, now: Self.now)
-            return browser.sectionsWork.runningKey == nil
+            browser.readyArrangement(in: library, order: order, now: Self.now) != nil && browser.sectionsWork.runningKey == nil
         })
         return browser.sections(in: library, order: order, now: Self.now)
     }
@@ -190,7 +189,7 @@ import UniformTypeIdentifiers
             try await send(items, to: source, of: library)
             for (list, order) in zip(lists, orders) {
                 let sections = try await settledSections(list, in: library, order: order)
-                let made = fresh(like: list, in: library).sections(in: library, order: order, now: Self.now)
+                let made = try await settledSections(fresh(like: list, in: library), in: library, order: order)
                 #expect(sections == made, "step \(step), \(order.sort)")
             }
         }
@@ -198,6 +197,31 @@ import UniformTypeIdentifiers
     }
 
     // MARK: Runs of changes
+
+    @Test func aPlaceWaitingForItsFirstArrangementDoesNotReportItselfEmpty() async throws {
+        let source = FakeItemSource()
+        let library = MarfaLibrary(source: source, notices: Notices())
+        let list = browser(library)
+        list.viewMode = .list
+        let order = ItemOrder(sort: .title)
+        #expect(list.listDrawsNoItem(in: library, order: order) == nil, "the copy is still opening")
+        source.send(.loaded(SourceSnapshot(items: BigLibrary.items(scale: 4), catalogue: BigLibrary.catalogue)))
+        try #require(await eventually { library.isLoaded })
+        #expect(library.count(in: .library) > Browser.arrangesAlongsideAbove)
+        #expect(list.listDrawsNoItem(in: library, order: order) == nil, "the opening place is waiting")
+        // Leave while the Library's ordering is under way. An empty place must still report that it is empty.
+        list.showing = .feed
+        #expect(list.listDrawsNoItem(in: library, order: order) == true)
+        #expect(list.listingWork.runningKey == nil)
+        list.showing = .library
+        #expect(list.listDrawsNoItem(in: library, order: order) == nil)
+        let item = try #require(library.records.values.first?.item)
+        let edited = Self.with(item, step: 1, Self.title("000 newest title"))
+        try await send([edited], to: source, of: library)
+        let sections = try await settledSections(list, in: library, order: order)
+        #expect(sections.lazy.flatMap(\.items).first { $0.id == edited.id }?.title == edited.title)
+        #expect(list.listDrawsNoItem(in: library, order: order) == false)
+    }
 
     @Test func aChangeDuringAnArrangementIsNeverShownWithoutTheNext() async throws {
         let (library, source) = try await BigLibrary.loaded(scale: 4)
@@ -379,6 +403,7 @@ import UniformTypeIdentifiers
         _ = try await settledSections(list, in: library, order: order)
         let shown = drawn(list, in: library, order: order, cards: cards)
         let fresh = fresh(like: list, in: library)
+        _ = try await settledSections(fresh, in: library, order: order)
         #expect(shown[item.id]?.title == "Renamed while arranging")
         #expect(shown == drawn(fresh, in: library, order: order, cards: asCards ? CardContents() : nil))
     }
@@ -430,9 +455,10 @@ import UniformTypeIdentifiers
 
         let timeline = browser(library)
         timeline.viewMode = .timeline
-        let days = timeline.timelinePlacing(in: library, field: nil, now: Self.now).groups
+        try #require(await eventually { timeline.timelinePlacing(in: library, field: nil, now: Self.now) != nil })
+        let days = try #require(timeline.timelinePlacing(in: library, field: nil, now: Self.now)).groups
         _ = timeline.timelinePlacing(in: library, field: "due_at", now: Self.now)
-        #expect(timeline.timelinePlacing(in: library, field: nil, now: Self.now).groups == days)
+        #expect(timeline.timelinePlacing(in: library, field: nil, now: Self.now)?.groups == days)
 
         // Time enough for an answer under way to land, which it must not.
         try await Task.sleep(for: .seconds(2))
@@ -441,7 +467,7 @@ import UniformTypeIdentifiers
         #expect(list.sectionsWork.held?.key.choices.order == created)
         #expect(list.sections(in: library, order: created, now: Self.now) == sections)
         #expect(timeline.timelineWork.held?.key.choice.field == nil)
-        #expect(timeline.timelinePlacing(in: library, field: nil, now: Self.now).groups == days)
+        #expect(timeline.timelinePlacing(in: library, field: nil, now: Self.now)?.groups == days)
     }
 
     /// A table and a list sorted by Created, then by Title, then by Created again before Title lands, after an edit neither
@@ -517,9 +543,9 @@ import UniformTypeIdentifiers
         board.viewMode = .board
         let timeline = browser(library)
         timeline.viewMode = .timeline
-        func names() -> (table: [String], board: [String]?, timeline: [ItemTimelineGroup]) {
+        func names() -> (table: [String], board: [String]?, timeline: [ItemTimelineGroup]?) {
             (table.tableContent(in: library).allGroups.map(\.title), board.boardLanes(in: library)?.all.map(\.title),
-             timeline.timelinePlacing(in: library, field: nil, now: library.now()).groups)
+             timeline.timelinePlacing(in: library, field: nil, now: library.now())?.groups)
         }
         let before = names()
         #expect(before.table.contains("Today"))
@@ -529,7 +555,7 @@ import UniformTypeIdentifiers
         let opened = (fresh(like: table, in: library), fresh(like: board, in: library), fresh(like: timeline, in: library))
         #expect(after.table == opened.0.tableContent(in: library).allGroups.map(\.title))
         #expect(after.board == opened.1.boardLanes(in: library)?.all.map(\.title))
-        #expect(after.timeline == opened.2.timelinePlacing(in: library, field: nil, now: library.now()).groups)
+        #expect(after.timeline == opened.2.timelinePlacing(in: library, field: nil, now: library.now())?.groups)
         #expect(after.table != before.table, "yesterday is no longer Today")
     }
 

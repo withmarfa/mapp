@@ -7,6 +7,7 @@ struct ItemDetail: View {
     let browser: Browser
     let editor: EditorController
     let details: DetailsPresentation
+    @StoredOrder private var order
     /// Whether the page backs the window's toolbar with glass. The modal draws its own toolbar and has no need.
     var backsToolbar = true
     /// Whether the page has its corner. A modal's page has none.
@@ -36,10 +37,11 @@ struct ItemDetail: View {
             }
         } else {
             Group {
-                if browser.listDrawsNoItem(in: library) {
-                    ListEmptyState(browser: browser)
+                if let isEmpty = browser.listDrawsNoItem(in: library, order: order) {
+                    if isEmpty { ListEmptyState(browser: browser) }
+                    else if !browser.wantsFirstSelection { EmptyState("No Item Selected") }
                 } else {
-                    EmptyState("No Item Selected")
+                    Color.clear
                 }
             }
             // The page no longer shows the item it had, so that item is left.

@@ -77,6 +77,14 @@ protocol ItemLibrary: AnyObject, Observable {
     func items(inView id: ItemID) -> [Item]
     /// The Library's Favorites view: every item tagged favorite, of the tiers `scope` names.
     func favoriteItems(in scope: ListScope, archived: ArchivedItems) -> [Item]
+    /// The whole ordering of a large, uncached listing, prepared from the current copy.
+    func deferredListing(in place: PlaceView, listing: PlaceListing, preview: LibraryViewQuery?, above limit: Int) -> DeferredListing?
+    /// Moves when a saved view or a preview gets a new list, even if the items themselves did not change.
+    var viewRevision: Int { get }
+    func count(inView id: ItemID) -> Int
+    func favoriteCount(in scope: ListScope) -> Int
+    /// Which items belong to the place's listing, independent of their order.
+    func listed(_ ids: Set<ItemID>, in place: PlaceView, listing: PlaceListing) -> Set<ItemID>
     /// What Recently Deleted holds, newest first. It is a page of Settings, not a place, so no window lists it.
     var deletedItems: [Item] { get }
     var deletedCount: Int { get }
@@ -354,6 +362,27 @@ protocol ItemLibrary: AnyObject, Observable {
     func deleteView(_ view: ItemID) async -> Bool
 }
 
+struct DeferredListing {
+    let make: @Sendable () -> [Item]
+    let take: ([Item]) -> Void
+}
+
+extension ItemLibrary {
+    func deferredListing(in place: PlaceView, listing: PlaceListing, preview: LibraryViewQuery?, above limit: Int) -> DeferredListing? { nil }
+    var viewRevision: Int { 0 }
+    func count(inView id: ItemID) -> Int { items(inView: id).count }
+    func favoriteCount(in scope: ListScope) -> Int { favoriteItems(in: scope, archived: .hidden).count }
+    func listed(_ ids: Set<ItemID>, in place: PlaceView, listing: PlaceListing) -> Set<ItemID> {
+        let items: [Item]
+        switch place.view {
+        case .saved(let id): items = self.items(inView: id)
+        case .favorites: items = favoriteItems(in: listing.scope, archived: listing.archived)
+        case .own: items = self.items(in: place.place, scope: listing.scope, archived: listing.archived, includingKinds: listing.includesKinds)
+        }
+        return Set(items.lazy.map(\.id).filter(ids.contains))
+    }
+}
+
 extension ItemLibrary {
     var namesRevision: Int { membershipRevision }
     func changedItems(since revision: Int) -> Set<ItemID>? { nil }
@@ -548,8 +577,8 @@ extension ItemLibrary {
     /// How many active items a window showing `shown` lists, as a sidebar row counts them: a saved view's members, the
     /// favorites of the Favorites view's From (`favoritesScope`), or the place in both tiers.
     func count(in shown: PlaceView, favoritesScope: ListScope) -> Int {
-        if let id = shown.savedView { return items(inView: id).count }
-        if shown.isFavorites { return favoriteItems(in: favoritesScope, archived: .hidden).count }
+        if let id = shown.savedView { return count(inView: id) }
+        if shown.isFavorites { return favoriteCount(in: favoritesScope) }
         return count(in: shown.place)
     }
 
