@@ -56,8 +56,8 @@ paths:
 
 ## Unreadable values
 
-- **An unreadable value is never deleted or written over.** It is set aside under the store's `...SetAside` key, and the store starts from its defaults.
-- **Stored text that this Mac cannot read is not sent**, and a value that the defaults cannot hold is skipped before anything is written.
+- **An unreadable value is never sent, deleted or written over** but by the person's change here. It is set aside under the store's `...SetAside` key, and the store starts from its defaults.
+- **A row a store sets aside stays in the Marfa:** only a row the person removed is deleted.
 - **Reset keeps every value that was set aside.**
 
 ## Removing and disconnecting

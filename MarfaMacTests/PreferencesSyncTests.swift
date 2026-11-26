@@ -498,6 +498,95 @@ import Testing
 
     /// A binned settings item's tables, which the copy never fills, and another type's tables, do not keep the
     /// settings from being judged whole.
+    /// A record written before set-aside counts were kept holds none: what a store set aside before the first step since
+    /// is still no removal of the person's.
+    @Test func aRowSetAsideBeforeTheFirstStepOfAnOlderRecordStaysInTheMarfa() async throws {
+        let shortcut = PreferenceUnit.row(.commands, setting: "shortcut", key: "newItem")
+        let later = #""a shape a later version of the app writes""#
+        let copy = FakePreferencesCopy()
+        let item = await copy.add([shortcut: later])
+        let reading = PreferencesSync(defaults: defaults, domain: suite, enabled: true, coalescing: .milliseconds(50), build: "1") {}
+        reading.attach(copy, library: "marfa:https://one", name: { nil })
+        await reading.flush()
+        reading.detach()
+        var record = PreferencesSync.Record.read(defaults)
+        record.asides = nil
+        record.save(defaults)
+        // The store reads its value at launch and sets aside what it cannot read.
+        _ = ShortcutBindings(defaults: defaults)
+        #expect(defaults.object(forKey: ShortcutBindings.defaultsKey) == nil)
+        let sync = PreferencesSync(defaults: defaults, domain: suite, enabled: true, coalescing: .milliseconds(50), build: "1") {}
+        sync.attach(copy, library: "marfa:https://one", name: { nil })
+        await sync.flush()
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[shortcut] == later)
+    }
+
+    /// One call that clears a density and sets aside another place's density from a later version deletes only the
+    /// one cleared. A later Reset still clears what this Mac reads, and keeps what it cannot.
+    @Test func clearingADensityBesideOneSetAsideDeletesOnlyTheOneCleared() async throws {
+        let compact = PreferenceUnit.row(.places, setting: "placeDensity", key: PlaceView.library.storageKey)
+        let later = PreferenceUnit.row(.places, setting: "placeDensity", key: PlaceView.favorites.storageKey)
+        let copy = FakePreferencesCopy()
+        let item = await copy.add([compact: #""compact""#, later: #""spacious""#])
+        let sync = await sync(copy)
+        #expect(PlaceDensities.stored(in: defaults).density(for: .library) == .compact)
+        PlaceDensities.update(in: defaults) { $0.set(nil, for: .library) }
+        #expect((defaults.array(forKey: PlaceDensities.setAsideKey) as? [Data])?.count == 1)
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[compact] == nil)
+        #expect(await copy.unitsHeld(item)[later] == #""spacious""#)
+
+        await copy.change(item, [compact: #""standard""#])
+        await sync.flush()
+        #expect(PlaceDensities.stored(in: defaults).density(for: .library) == .standard)
+        MacSettings.reset(in: defaults)
+        sync.replaced(PreferencesMap.synced)
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[compact] == nil)
+        #expect(await copy.unitsHeld(item)[later] == #""spacious""#)
+    }
+
+    /// A date format this Mac's store cannot read, kept in place so the Marfa's field keeps its member, is never sent
+    /// over the Marfa's readable one, which comes back here once the damaged value is set aside.
+    @Test func aDateFormatThisMacCannotReadIsNeverSentOverTheMarfas() async throws {
+        let format = PreferenceUnit.member(.general, DateFormat.key)
+        let long = try #require(PreferenceJSON.text(DateFormat(date: .long).rawValue))
+        let copy = FakePreferencesCopy()
+        let item = await copy.add([format: long])
+        let sync = await sync(copy)
+        #expect(DateFormat.stored(in: defaults) == DateFormat(date: .long))
+        defaults.set("automatic", forKey: DateFormat.key)
+        DateFormat.setAsideUnreadable(in: defaults)
+        await sync.flush()
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[format] == long)
+        #expect(DateFormat.stored(in: defaults) == DateFormat(date: .long))
+        #expect(defaults.stringArray(forKey: DateFormat.setAsideKey) == ["automatic"])
+    }
+
+    /// A Marfa value that is not JSON is neither deleted nor written over with what this Mac held before it arrived,
+    /// but the person's own later value is written over it.
+    @Test func thePersonsLaterValueIsWrittenOverAMarfaValueThatCannotBeRead() async throws {
+        defaults.set(#"{"core.note":{"pins":[]}}"#, forKey: PagePlacements.key)
+        let copy = FakePreferencesCopy()
+        let sync = await sync(copy)
+        let item = try #require(await copy.activeIDs.first)
+        await copy.change(item, [placement: "{not json"])
+        await sync.flush()
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[placement] == "{not json")
+        defaults.removeObject(forKey: PagePlacements.key)
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[placement] == "{not json")
+        defaults.set(#"{"core.note":{"pins":["due_at"]}}"#, forKey: PagePlacements.key)
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[placement] == #"{"pins":["due_at"]}"#)
+        #expect(defaults.stringArray(forKey: PagePlacements.setAsideKey) == ["{not json"])
+    }
+
+    /// A binned settings item's tables, which the copy never fills, and another type's tables, do not keep the
+    /// settings from being judged whole.
     @Test func onlyTheTablesOfItemsOutsideTheBinCount() {
         let whole = PreferencesTable.allCases.map { HeldTable(itemId: "kept", table: $0.rawValue, state: .whole, rows: 0) }
         let binned = PreferencesTable.allCases.map { HeldTable(itemId: "binned", table: $0.rawValue, state: .owed, rows: 0) }

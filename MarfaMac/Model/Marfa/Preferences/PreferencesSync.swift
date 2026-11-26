@@ -477,7 +477,9 @@ final class PreferencesSync {
     /// and wrote this one to a conflicted copy, each member it carried that this Mac still holds is written again, so
     /// only the same member's later write wins.
     ///
-    /// If a store set a value aside since the last step, its missing rows may still belong in the Marfa.
+    /// This Mac's side is the person's change only where the person could have made it: a row it lacks is a removal only
+    /// where its store did not set the row aside (`holdSetAside`), and a value this Mac cannot read, the Marfa's or one a
+    /// store keeps in place, is never sent, deleted or written over but by the person's own change here.
     private func follow(_ chosen: PreferencesItem, from adopted: Record.Adopted, of instance: String, local: Local,
                         switched: Bool, winning: [String: Set<PreferenceUnit>], asides: [String: Int]?,
                         siblings: [PreferencesItem], in copy: any PreferencesCopy, generation: Int) async throws
@@ -515,21 +517,40 @@ final class PreferencesSync {
 
         let base = adopted.base
         // A setting the store dropped on reading it stands as the Marfa holds it, until this Mac changes it or an app
-        // that reads it runs here.
-        let retrying = adopted.frozenBuild == build ? [] : Set(adopted.frozen.keys)
+        // that reads it runs here. A Marfa value that is not JSON is no setting an app here could read.
+        let retrying = adopted.frozenBuild == build
+            ? [] : Set(adopted.frozen.keys.filter { unit in base[unit].map { PreferenceJSON.value($0) != nil } ?? true })
         var mine = switched ? base : local.units
-        if !switched, let asides {
-            let setAside = PreferencesMap.synced.filter { setting in
-                guard winning[setting.key] == nil, let before = asides[setting.key] else { return false }
-                return local.asides[setting.key, default: 0] > before
-            }
-            for unit in base.keys where mine[unit] == nil && adopted.frozen[unit] == nil && setAside.contains(where: { $0.owns(unit) }) {
+        if !switched { holdSetAside(base: base, remote: remote, local: local, recorded: asides, winning: winning, mine: mine, adopted: &adopted) }
+        var changedHere: Set<PreferenceUnit> = []
+        for (unit, frozen) in adopted.frozen where !switched {
+            if mine[unit] == frozen.left {
+                mine[unit] = base[unit]
+            } else if mine[unit] == nil, let held = base[unit], PreferenceJSON.value(held) == nil {
+                // A value this Mac cannot read is never deleted.
                 adopted.frozen[unit] = Record.Frozen(left: nil)
+                mine[unit] = held
+            } else {
+                // The person's own change to a dropped setting is theirs to send, so it is no longer held.
+                adopted.frozen[unit] = nil
+                changedHere.insert(unit)
             }
         }
-        for (unit, frozen) in adopted.frozen where !switched {
-            // The person's own change to a dropped setting is theirs to send, so it is no longer held.
-            if mine[unit] == frozen.left { mine[unit] = base[unit] } else { adopted.frozen[unit] = nil }
+        // A Marfa value that is not JSON stands until the person changes what this Mac held when it arrived.
+        for (unit, text) in setAsideUnreadable(remote, base: base)
+        where base[unit] != text || (adopted.frozen[unit] == nil && !changedHere.contains(unit)) {
+            adopted.frozen[unit] = Record.Frozen(left: switched ? nil : local.units[unit])
+            mine[unit] = text
+        }
+        // Nor is a member value its store does not read the person's to send: the Marfa's readable value comes back.
+        var repairing: Set<PreferenceUnit> = []
+        for setting in PreferencesMap.synced where !switched {
+            guard let reader = setting.reader else { continue }
+            for (unit, text) in mine where setting.owns(unit) && !reader.reads(text) {
+                reader.setAside(defaults)
+                mine[unit] = base[unit]
+                if base[unit].map(reader.reads) == true { repairing.insert(unit) }
+            }
         }
         // This Mac holds nothing of a row no setting here owns, which is no deletion of the person's.
         for unit in Set(remote.keys).union(base.keys) where !PreferencesMap.synced.contains(where: { $0.owns(unit) }) {
@@ -546,7 +567,6 @@ final class PreferencesSync {
         for unit in Set(remote.keys).union(base.keys) where mine[unit] == nil && isKeptAbsent(unit) && !winsHere(unit) {
             mine[unit] = base[unit]
         }
-        mine.merge(setAsideUnreadable(remote, base: base)) { _, unreadable in unreadable }
         var seen = remote
         for unit in holding { seen[unit] = base[unit] }
         let unreadable = local.frozen
@@ -560,6 +580,7 @@ final class PreferencesSync {
         var outcome = PreferencesMerge.reconcile(
             local: mine, remote: seen, base: before, frozen: { unit in unreadable.contains { $0.owns(unit) } })
         outcome.toLocal.formUnion(retrying)
+        outcome.toLocal.formUnion(repairing)
         // What this Mac lacks of such a setting comes here.
         outcome.toLocal.formUnion(outcome.merged.keys.filter { unit in
             local.units[unit] == nil && isKeptAbsent(unit) && !unreadable.contains { $0.owns(unit) }
@@ -588,6 +609,29 @@ final class PreferencesSync {
         for sibling in siblings { _ = try await copy.remove(sibling.id) }
         item = chosen
         return adopted
+    }
+
+    /// Holds each row of the Marfa that this Mac lacks because its store set it aside since the last step (`recorded`),
+    /// not because the person removed it, so the Marfa keeps it. A record that counted nothing yet counts every value set
+    /// aside as new. What the sync itself set aside, a Marfa value this Mac could not store, names no row, and a setting
+    /// this Mac's value wins on purpose is written as it stands.
+    private func holdSetAside(base: PreferenceUnits, remote: PreferenceUnits, local: Local, recorded: [String: Int]?,
+                              winning: [String: Set<PreferenceUnit>], mine: PreferenceUnits, adopted: inout Record.Adopted)
+    {
+        for setting in PreferencesMap.synced where winning[setting.key] == nil {
+            guard let kind = setting.setAsideKind else { continue }
+            let held = local.asides[setting.key, default: 0]
+            let before = min(recorded?[setting.key] ?? 0, held)
+            guard held > before else { continue }
+            let missing = base.keys.filter { setting.owns($0) && mine[$0] == nil && adopted.frozen[$0] == nil }
+            guard !missing.isEmpty else { continue }
+            let own = Set(base.merging(remote) { first, _ in first }.filter { setting.owns($0.key) }.values)
+            for entry in SyncedSetting.setAsideEntries(in: kind, defaults).prefix(held).dropFirst(before) where !own.contains(entry) {
+                for unit in setting.units(setAsideIn: entry, among: missing, library: library) {
+                    adopted.frozen[unit] = Record.Frozen(left: nil)
+                }
+            }
+        }
     }
 
     /// Sets aside each row of `remote` whose value is not JSON and that `base` did not already hold, under its store's

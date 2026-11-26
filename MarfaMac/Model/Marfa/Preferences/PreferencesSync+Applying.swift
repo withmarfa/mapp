@@ -14,8 +14,14 @@ extension PreferencesSync {
                retrying: Set<PreferenceUnit>, in copy: any PreferencesCopy,
                progress: ((Record.Adopted, Set<PreferenceUnit>) -> Void)? = nil) async throws
     {
-        // A dropped setting the Marfa has not changed keeps what the store left, so it is not set aside again.
-        let kept = adopted.frozen.filter { unit, _ in !retrying.contains(unit) && outcome.merged[unit] == adopted.base[unit] }
+        // A dropped setting the Marfa has not changed keeps what the store left, so it is not set aside again, and so does
+        // one the Marfa holds as no JSON, which this Mac cannot store.
+        let kept = adopted.frozen.filter { unit, _ in
+            guard let merged = outcome.merged[unit], PreferenceJSON.value(merged) == nil else {
+                return !retrying.contains(unit) && outcome.merged[unit] == adopted.base[unit]
+            }
+            return true
+        }
         var written = outcome.merged.filter { PreferenceJSON.value($0.value) != nil }
         for (unit, frozen) in kept { written[unit] = frozen.left }
         try unchanged(since: local, writing: outcome.toLocal)

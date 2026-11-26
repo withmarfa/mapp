@@ -272,9 +272,41 @@ nonisolated extension SyncedSetting {
     }
 
     static func setAsideCount(in setAside: SetAside, _ defaults: UserDefaults) -> Int {
+        setAsideEntries(in: setAside, defaults).count
+    }
+
+    /// What the store has set aside, as text, in the order it was set aside.
+    static func setAsideEntries(in setAside: SetAside, _ defaults: UserDefaults) -> [String] {
         switch setAside {
-        case .data(let key): (defaults.array(forKey: key) as? [Data])?.count ?? 0
-        case .string(let key): defaults.stringArray(forKey: key)?.count ?? 0
+        case .data(let key): (defaults.array(forKey: key) as? [Data] ?? []).map { String(decoding: $0, as: UTF8.self) }
+        case .string(let key): defaults.stringArray(forKey: key) ?? []
+        }
+    }
+
+    /// Which of `units` a value the store set aside, `entry`, held for `library`: the rows it names by key, or all of
+    /// them where it is not an object the store keys by row or by server, since the store then dropped what it held.
+    func units(setAsideIn entry: String, among units: [PreferenceUnit], library: String) -> [PreferenceUnit] {
+        guard let object = PreferenceJSON.value(entry) as? [String: Any] else { return units }
+        let keys: [String: Any]
+        switch place {
+        case .member, .set:
+            return []
+        case .rows(_, _, _, let wrapper, _, _):
+            guard let wrapper else {
+                keys = object
+                break
+            }
+            guard let inner = object[wrapper] as? [String: Any] else { return units }
+            keys = inner
+        case .serverRows:
+            guard let entry = object[library] else { return [] }
+            guard let inner = entry as? [String: Any] else { return units }
+            keys = inner
+        case .serverMember, .sidebar:
+            return object[library] == nil ? [] : units
+        }
+        return units.filter { unit in
+            if case .row(_, _, let key) = unit { keys[key] != nil } else { false }
         }
     }
 }
