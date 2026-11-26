@@ -81,16 +81,14 @@ extension Browser {
 
     nonisolated enum ModalStep: Sendable { case previous, next }
 
-    /// The items in the order of what is behind the modal: the table's rows, and for every other
-    /// layout the list's sections, which follow the filters and the sort.
+    /// The items in the order of what is behind the modal: the table's rows as drawn, and for every other layout the
+    /// list's sections, which follow the filters and the sort. A sub-item counts only under an open parent.
     func orderBehind(in library: any ItemLibrary, order: ItemOrder) -> [ItemID] {
         if viewMode == .digest {
             return digestOrder
         }
         if viewMode == .table {
-            let content = tableContent(in: library)
-            let rows = content.grouping == nil ? content.rows : content.groups.flatMap(\.rows)
-            return rows.map(\.item.id)
+            return tableContent(in: library).drawnIDs(expanded: expandedHere)
         }
         return arrangement(in: library, order: order, now: library.now()).ids
     }

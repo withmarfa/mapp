@@ -360,6 +360,13 @@ nonisolated struct Catalogue: Hashable, Sendable {
         return field.statusGroup(of: word)
     }
 
+    /// Whether an item of one of `types` may hold sub-items: the type is admitted at the parent end of `parent-of`, so a
+    /// place of none of them is never nested (`ItemNesting`).
+    func offersSubItems(_ types: some Sequence<TypeID>) -> Bool {
+        guard let info = edgeTypes[MarfaMapping.parentEdge] else { return false }
+        return types.contains { admits($0, types: info.fromTypes, roles: info.fromRoles) }
+    }
+
     // MARK: Collections
 
     /// Whether items of `type` are collections: the type plays Marfa's `container` role.

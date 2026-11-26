@@ -22,11 +22,53 @@ extension Browser {
         pagingState = (pagingKey, paging)
     }
 
-    /// How many rows the table holds that are not loaded yet, counting the groups the person has not folded away.
+    /// How many rows the table holds that are not loaded yet, counting the groups the person has not folded away and the
+    /// sub-items of the parents open.
     func tableRowsNotLoaded(in content: ItemTableContent) -> Int {
         let (paging, size) = (tablePaging, tablePageSize)
-        guard content.grouping != nil else { return paging.slice(content.rows, size: size).remaining }
-        return paging.slice(groups: content.groups, collapsed: content.collapsed, size: size).remaining
+        guard content.grouping != nil else {
+            return paging.slice(content.rows, nesting: content.nesting, expanded: expandedHere, size: size).remaining
+        }
+        return paging.slice(
+            groups: content.groups, nestings: content.groupNestings, collapsed: content.collapsed, expanded: expandedHere, size: size
+        ).remaining
+    }
+
+    /// The parents whose sub-items the place shows (`expandedRows`).
+    var expandedHere: Set<ItemID> { expandedRows[shown] ?? [] }
+
+    /// Shows or hides the sub-items of `id` in the place, as the table or the list nests them (`subItemNestings`). A chosen
+    /// item the closing hides leaves the choice, which moves to `id` where nothing else stays chosen, so no command acts on
+    /// an item out of sight.
+    func toggleSubItems(of id: ItemID, in library: any ItemLibrary, order: ItemOrder) {
+        var open = expandedHere
+        if open.remove(id) == nil {
+            open.insert(id)
+        } else {
+            let nestings = subItemNestings(in: library, order: order)
+            let hidden = selection.filter { chosen in nestings.contains { $0.ancestors(of: chosen).contains(id) } }
+            if !hidden.isEmpty {
+                let kept = selection.subtracting(hidden)
+                selectAutomatically(kept.isEmpty ? [id] : kept)
+            }
+        }
+        expandedRows[shown] = open
+    }
+
+    /// The nestings the place's layout draws its items by: the table's, or the list's sections'.
+    func subItemNestings(in library: any ItemLibrary, order: ItemOrder) -> [ItemNesting] {
+        viewMode == .table ? tableContent(in: library).nestings : arrangement(in: library, order: order, now: library.now()).nestings
+    }
+
+    /// Opens every parent above the chosen items in `nestings`, so a sub-item reached by Back, a link or a new item is
+    /// drawn, in the table and the list alike.
+    func openParents(of ids: Set<ItemID>, in nestings: [ItemNesting]) {
+        guard !ids.isEmpty, nestings.contains(where: { !$0.isFlat }) else { return }
+        var open = expandedHere
+        for id in ids {
+            for nesting in nestings where !nesting.isFlat { open.formUnion(nesting.ancestors(of: id)) }
+        }
+        if open != expandedHere { expandedRows[shown] = open }
     }
 
     /// Loads the next page of the place.
@@ -38,10 +80,11 @@ extension Browser {
     /// Loads enough pages to show the selected items the table holds, such as one reached by Back, a link or a new
     /// item. Nothing changes when they are all shown already.
     func revealSelectionInTable(_ content: ItemTableContent) {
+        openParents(of: selection, in: content.nestings)
         var paging = tablePaging
         paging.reveal(
-            selection, rows: content.rows, groups: content.grouping == nil ? nil : content.groups,
-            collapsed: content.collapsed, size: tablePageSize)
+            selection, rows: content.rows, nesting: content.nesting, groups: content.grouping == nil ? nil : content.groups,
+            nestings: content.groupNestings, collapsed: content.collapsed, expanded: expandedHere, size: tablePageSize)
         if paging != tablePaging { pagingState = (pagingKey, paging) }
     }
 

@@ -143,11 +143,11 @@ nonisolated final class SidebarNavigationTests: XCTestCase {
     }
 
     @MainActor func testTheCollectionsIndexListsTheLibrarysCollections() {
-        XCTAssertTrue(sidebarText("Collections").waitForExistence(timeout: 3))
-        XCTAssertLessThan(sidebarText("Sources").frame.maxY, sidebarText("Collections").frame.minY)
-        XCTAssertLessThan(sidebarText("Collections").frame.maxY, sidebarText("Favorites").frame.minY, "the indexes are in the Library group, above Views")
+        // Collections is a page of the Library, reached from its top row, never a row of the sidebar.
+        XCTAssertFalse(sidebarText("Collections").exists, "the default sidebar has no index rows")
         XCTAssertFalse(sidebarText("Home").exists, "collection entries belong in the index")
-        choose("Collections")
+        choose("Library")
+        openLibraryPage("Collections")
         let index = element("PlaceIndexTable")
         XCTAssertTrue(index.waitForExistence(timeout: 3))
         let home = index.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Home")).firstMatch
@@ -158,6 +158,21 @@ nonisolated final class SidebarNavigationTests: XCTestCase {
         XCTAssertTrue(boiler.waitForExistence(timeout: 3))
         XCTAssertLessThan(boiler.frame.maxY, moving.frame.minY, "members keep the collection's order")
         XCTAssertFalse(list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Reading list")).firstMatch.exists)
+    }
+
+    /// Opens one of the Library's pages from its top row: its pill where the row has room, else the Browse menu.
+    @MainActor private func openLibraryPage(_ title: String) {
+        let pill = window.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", title)).firstMatch
+        if pill.waitForExistence(timeout: 3) {
+            pill.click()
+            return
+        }
+        let browse = element("TopRowBrowse")
+        XCTAssertTrue(browse.waitForExistence(timeout: 3), "the Library's pages are in its top row")
+        browse.click()
+        let item = app.menuItems.matching(NSPredicate(format: "title BEGINSWITH %@", title)).firstMatch
+        XCTAssertTrue(item.waitForExistence(timeout: 3))
+        item.click()
     }
 
     @MainActor private func element(_ identifier: String) -> XCUIElement {

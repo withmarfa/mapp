@@ -190,6 +190,9 @@ final class Browser {
     /// How each place's table is grouped, sorted and filtered, as the person left it. A place that is not a saved view
     /// keeps them in its default view too (`Browser+PlaceDefaults`).
     var tableOptions: PlaceMemory<ItemTableOptions> = [:]
+    /// The parents each place shows the sub-items of, in the table and the list (`ItemNesting`). A parent starts closed,
+    /// and the window keeps what was opened while it is open.
+    var expandedRows: PlaceMemory<Set<ItemID>> = [:]
     /// The pages of the table the person has loaded, with what they belong to. Held apart from the table's content,
     /// which a page never makes again, and read as one page once the key has changed (`tablePaging`).
     var pagingState: (key: TablePagingKey, paging: TablePaging)?
@@ -220,6 +223,8 @@ final class Browser {
     @ObservationIgnored var sectionsWork = PlaceWork<SectionsKey, ListArrangement>()
     @ObservationIgnored var listingWork = PlaceWork<ListingRequest, [Item]>()
     @ObservationIgnored var digestWork = PlaceWork<SectionsKey, ListArrangement>()
+    /// The list's sections as last nested for the parents open, by the sections they were nested from (`arrangement`).
+    @ObservationIgnored var nestedListMemo: (made: UUID, expanded: Set<ItemID>, value: ListArrangement)?
     /// Counts what landed from work off the main actor besides the table, which a layout reads to draw it.
     var placeWorkLanded = 0
     /// How often the window worked a place's table or list out whole, and how often it updated one, which tests read.

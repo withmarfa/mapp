@@ -114,6 +114,11 @@ nonisolated struct ItemTableGroup: Identifiable, Hashable, Sendable {
 }
 
 nonisolated enum ItemTableLayout {
+    /// Each group's rows under their parents (`ItemNesting`), by the group's id.
+    static func nestings(of groups: [ItemTableGroup]) -> [String: ItemNesting] {
+        Dictionary(groups.map { ($0.id, ItemNesting(rows: $0.rows)) }, uniquingKeysWith: { first, _ in first })
+    }
+
     /// The links the table reads for its rows: the parent always, one lookup a row, so its filter and grouping are
     /// always offered; then children and collections where the types' looks show them, the person shows their
     /// column, or a group, filter or sort names them. Those none of them asks for cost nothing.

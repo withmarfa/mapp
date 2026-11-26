@@ -195,13 +195,21 @@ extension Browser {
         arrangement(in: library, order: order, now: now).sections
     }
 
-    /// The list's sections with what a layout reads of them, worked out with them (`sections(in:order:now:)`).
+    /// The list's sections with what a layout reads of them, worked out with them (`sections(in:order:now:)`). The list
+    /// draws its sub-items under their parents, with the parents the person opened (`ListArrangement.nested`), which a
+    /// chevron or a change of layout works out from the sections held, without ordering the place again.
     func arrangement(in library: any ItemLibrary, order: ItemOrder, now: Date) -> ListArrangement {
         readyArrangement(in: library, order: order, now: now) ?? .empty
     }
 
     func readyArrangement(in library: any ItemLibrary, order: ItemOrder, now: Date) -> ListArrangement? {
-        listArrangement(in: library, order: order, now: now, work: sectionsWork)
+        guard let held = listArrangement(in: library, order: order, now: now, work: sectionsWork) else { return nil }
+        guard viewMode == .list, !held.nestings.isEmpty else { return held }
+        let expanded = expandedHere
+        if let memo = nestedListMemo, memo.made == held.made, memo.expanded == expanded { return memo.value }
+        let nested = held.nested(expanded: expanded)
+        nestedListMemo = (held.made, expanded, nested)
+        return nested
     }
 
     func digestArrangement(in library: any ItemLibrary, now: Date) -> DigestLayout.Display? {
@@ -248,8 +256,10 @@ extension Browser {
         }
         let count = content?.allRows.count ?? making.count
         let place = self.shown
+        let catalogue = library.catalogue
         let make: @Sendable () -> ListArrangement = {
             var arrangement = making.make()
+            if stacking == nil { arrangement = arrangement.withNestings(in: catalogue) }
             if let stacking {
                 arrangement.digest = DigestLayout.Display(place: place, sections: DigestLayout.sections(arrangement.sections, stacking: stacking))
             }
@@ -862,11 +872,24 @@ nonisolated struct ListArrangement: Sendable {
     let sorted: [Item]?
     /// The library's revision the items were listed at, where they are the place's own.
     private(set) var content: Int?
+    /// Tells these sections from those made at another time, which the same sections nested again share.
+    private(set) var made = UUID()
+    /// Each section's items under their parents (`ItemNesting`), in the order of `sections`; empty where no listed type
+    /// offers sub-items, or none nests.
+    private(set) var nestings: [ItemNesting] = []
+    /// Where each item drawn stands among its parents, where the list nests them; empty where none nests.
+    private(set) var nesting: [ItemID: ItemNesting.Place] = [:]
+    /// The sections' items before a closed parent hid any, where the sections are nested.
+    private var unnested: [ItemID: Int]?
+    /// Where each item of a section not folded away stands, its sub-items under a closed parent too: what the selection
+    /// may keep while the parent opens to show it.
+    var holds: [ItemID: Int] { unnested ?? shownPositions }
 
-    init(sections: [ItemSection], sorted: [Item]?, content: Int?) {
+    init(sections: [ItemSection], sorted: [Item]?, content: Int?, nesting: [ItemID: ItemNesting.Place] = [:]) {
         self.sections = sections
         self.sorted = sorted
         self.content = content
+        self.nesting = nesting
         ids = sections.flatMap { $0.items.map(\.id) }
         shownIDs = sections.flatMap { $0.isCollapsed ? [] : $0.items.map(\.id) }
         positions = Dictionary(ids.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
@@ -885,6 +908,38 @@ nonisolated struct ListArrangement: Sendable {
             if part.items.count < section.items.count { section.items = Array(section.items[part.items]) }
             return DrawnSection(section: section, part: part)
         }
+    }
+
+    /// The same sections with what nests each one's items under their parents (`nested`), where a listed type offers
+    /// sub-items: worked out with the sections, off the main actor for a large place.
+    func withNestings(in catalogue: Catalogue) -> ListArrangement {
+        guard catalogue.offersSubItems(types) else { return self }
+        let nestings = sections.map { ItemNesting(items: $0.items) }
+        guard nestings.contains(where: { !$0.isFlat }) else { return self }
+        var made = self
+        made.nestings = nestings
+        return made
+    }
+
+    /// The same sections with each sub-item under its parent where both are in one section (`withNestings`), and drawn
+    /// only where every parent above it is in `expanded`. Each walks only the items it draws, besides listing them.
+    func nested(expanded: Set<ItemID>) -> ListArrangement {
+        guard nestings.count == sections.count else { return self }
+        var places: [ItemID: ItemNesting.Place] = [:]
+        let nestedSections = zip(sections, nestings).map { section, nesting in
+            guard !nesting.isFlat else { return section }
+            var nested = section
+            let drawn = nesting.drawn(expanded: expanded).places
+            nested.items = drawn.map { section.items[$0.index] }
+            for place in drawn { places[place.id] = place }
+            return nested
+        }
+        var nested = ListArrangement(sections: nestedSections, sorted: sorted, content: content, nesting: places)
+        nested.digest = digest
+        nested.made = made
+        nested.nestings = nestings
+        nested.unnested = shownPositions
+        return nested
     }
 
     /// The same sections, as made at the library's revision `content`, which changed none of their items.

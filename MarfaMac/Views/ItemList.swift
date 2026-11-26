@@ -61,7 +61,9 @@ struct ItemList: View, Equatable {
         // Headings are rows of their own rather than section headers: a list of sections leaves every row at
         // the table's default height, and its first header floats into the toolbar's edge, whose line then runs
         // the list's full width.
-        return listContent(lines: lines, ids: ids, drawnIDs: drawnIDs, contents: contents, density: density, excerpts: excerpts, title: title)
+        return listContent(
+            lines: lines, ids: ids, drawnIDs: drawnIDs, contents: contents, density: density, excerpts: excerpts, title: title,
+            nesting: arrangement.nesting)
         .onDeleteCommand(perform: deleteSelection)
         .clearsSeveralOnEscape(browser)
         .quickLooksOnSpace(browser)
@@ -88,12 +90,13 @@ struct ItemList: View, Equatable {
         .dragContainer(for: ItemReference.self) { ids in ids.map(library.dragReference(of:)) }
         .dragsSelection(of: browser)
         .onChange(of: ids) { old, new in
-            browser.keepSelection(from: old, to: new, isPending: isPending)
+            browser.keepSelection(from: old, to: new, isPending: isPending, holds: arrangement.holds)
         }
         .background(ChosenItemDrawn(browser: browser, positions: arrangement.shownPositions))
+        .background(ChosenParentsOpen(browser: browser, nestings: arrangement.nestings, made: arrangement.made))
         // An answer that lists what the waiting list listed (nothing, most often) changes no ids.
         .onChange(of: isPending) { _, isPending in
-            if !isPending { browser.keepHeldSelection(in: ids) }
+            if !isPending { browser.keepHeldSelection(in: ids, holds: arrangement.holds) }
         }
         .contextMenu(forSelectionType: ItemID.self) { ids in
             ItemRowMenu(browser: browser, ids: ids, undoManager: undoManager)
@@ -105,21 +108,25 @@ struct ItemList: View, Equatable {
     /// The list and its row traits, apart from `body` so that neither is too long for the compiler to check.
     private func listContent(
         lines: [ListLine], ids: [ItemID], drawnIDs: [ItemID], contents: [ItemID: RowContent], density: Density,
-        excerpts: [ItemID: SearchExcerpt], title: String
+        excerpts: [ItemID: SearchExcerpt], title: String, nesting: [ItemID: ItemNesting.Place]
     ) -> some View {
         SelectableList(browser: browser) {
             // The list reads every line's traits (whether it can be selected, its separators, its drag) each time
             // it updates, as it does on every change of selection, out of sight too. Set here, they come from the
             // line alone; set inside `ListLineRow`, they would have SwiftUI run every row's body to find them.
             ForEach(lines) { line in
+                let nest = nesting[line.id]
                 let row = ListLineRow(
                     line: line, content: contents[line.id], density: density, excerpt: excerpts[line.id], browser: browser,
-                    fold: browser.listShape?.arranged == true ? { browser.toggleGroup($0, in: library) } : nil)
+                    fold: browser.listShape?.arranged == true ? { browser.toggleGroup($0, in: library) } : nil, nest: nest, order: order)
                 .selectionDisabled(line.itemID == nil)
                 .listRowSeparator(line.itemID == nil ? .hidden : .automatic, edges: .top)
                 .listRowSeparator(line.endsSection || line.drawsMore != nil ? .hidden : .automatic, edges: .bottom)
                 if let run = line.drawsMore {
                     row.onAppear { browser.drawMoreOfList(after: run) }
+                } else if (nest?.depth ?? 0) > 0 {
+                    // A sub-item stays under its parent.
+                    row
                 } else if !line.isHeading {
                     row.draggable(containerItemID: line.id)
                         .dropsInto(collection: line.collectionID(in: library.catalogue), browser: browser, order: order)
@@ -168,6 +175,9 @@ private struct ListLineRow: View {
     let browser: Browser
     /// Folds or opens a section by its key, where the list's groups fold.
     var fold: ((String) -> Void)?
+    /// Where the item stands among its parents, where the list nests it.
+    var nest: ItemNesting.Place?
+    let order: ItemOrder
 
     var body: some View {
         switch line {
@@ -200,7 +210,24 @@ private struct ListLineRow: View {
                 ItemRow(content: content, density: density, excerpt: excerpt, itemID: line.id)
                     .wantsCounts(of: line.id, content.countQueries, in: library.counts)
                     .hoverQuickActions(for: line.id, actions: browser.quickActions(for: item))
+                    .nested(nest) { browser.toggleSubItems(of: line.id, in: library, order: order) }
             }
+        }
+    }
+}
+
+extension View {
+    /// A list row under its parent: stood in by its depth, with the chevron of a parent before it (`SubItemDisclosure`).
+    /// How many sub-items are done is the type's look's to say, as a progress count, as on a card.
+    @ViewBuilder fileprivate func nested(_ nest: ItemNesting.Place?, toggle: @escaping () -> Void) -> some View {
+        if let nest {
+            HStack(spacing: SubItemDisclosure.gap) {
+                SubItemDisclosure(place: nest, toggle: toggle)
+                self
+            }
+            .padding(.leading, CGFloat(nest.depth) * SubItemDisclosure.indent - SubItemDisclosure.width - SubItemDisclosure.gap)
+        } else {
+            self
         }
     }
 }
@@ -292,6 +319,22 @@ private enum ListLine: Identifiable {
     .listStyle(.inset)
     .interfaceTextStyle()
     .frame(width: 340, height: 460)
+}
+
+/// Opens the parents above the chosen items, as the list nests them, so a sub-item chosen by Back, a link or a new item
+/// is drawn: when the choice changes, and when the sections it was made in are made again. A view of its own, so the
+/// list does not observe the selection.
+private struct ChosenParentsOpen: View {
+    let browser: Browser
+    let nestings: [ItemNesting]
+    /// The sections the nestings were made with (`ListArrangement.made`).
+    let made: UUID
+
+    var body: some View {
+        Color.clear
+            .onChange(of: browser.selection, initial: true) { browser.openParents(of: browser.selection, in: nestings) }
+            .onChange(of: made) { browser.openParents(of: browser.selection, in: nestings) }
+    }
 }
 
 /// Tracks the cursor or selection in a separate view so a selection change can extend the page

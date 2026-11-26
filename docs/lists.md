@@ -9,6 +9,7 @@ paths:
   - MarfaMac/Model/Items/Search*.swift
   - MarfaMac/Model/Items/*Group*.swift
   - MarfaMac/Model/Items/ItemPlacement.swift
+  - MarfaMac/Model/Items/ItemNesting.swift
   - MarfaMac/Views/Filter*.swift
   - MarfaMac/Views/ItemTable*.swift
   - MarfaMac/Views/ItemBoard*.swift
@@ -43,17 +44,16 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **An entry for a thing that is gone is forgotten only when the copy is whole and current.**
 - **New View… saves what Marfa can hold and names the rest first** (`ViewDraft.Unkept`). A type's place saves the type with its kinds; a Type filter takes its place. The window's From and Archived Items become the view's tier and states, and back (`ViewDraft`).
 - **A draft from a saved view owns the window,** settings and widths (`ViewPanel.mac`). Revert View is off and a returning write leaves it. Cancel writes nothing and shows the original as it is now.
-- **Making, renaming and deleting a view needs the server and is never queued.** A changed or submitted draft stays open; leaving it, or a late refusal, gives it back in words. A rename never replaces another app's; deleting asks.
+- **A changed or submitted view draft stays open;** leaving it, or a late refusal, gives it back in words. A rename never replaces another app's; deleting asks.
 - **Starting points preview in the window's layout** (`NewViewStart`). Create View applies the draft's layout. This Search comes first, saving supported tokens and unchanged From. An existing view asks before discarding changes.
 - **A saved view belongs to one place** (`Place.home(of:catalogue:)`). Its sole type, then its sole required collection (by the outbound edge) or source, else the Feed or the Library by its tier.
 - **The Library and the Feed list their own tier.** The Feed's first view is All. A type, a collection and a source choose From (`ListScope`).
 - **Favorites starts on Library,** with the usual From choices.
 - **Include Kinds defaults on.** A saved view with no state shows archived items (`ArchivedItems`).
-- **Earlier place settings fill unset keys once per Mac** (`EarlierPlace.readIn`).
 
 ## Layouts
 
-- **The Library opens as a table, and as a list while it holds ten items or fewer** (`Browser.naturalLayout`). It and the Archive, reached from the Library's row and Go, list Name, Type, Source and Edited, latest first (`listsByOrigin`).
+- **The Library opens as a table, and as a list while it holds ten items or fewer** (`Browser.naturalLayout`). It and the Archive list Name, Type, Source and Edited, latest first (`listsByOrigin`).
 - **The Feed opens in Digest, newest created first.** Every item list offers it. Cards show type, source, title, text and pictures.
 - **Digest stacks messages by `in-thread` and excerpts by `excerpt-of`** (`DigestLayout`). Piles span sources and sit at their newest visible member. Choosing an earlier card opens its pile.
 - **Digest and board lanes draw by page.** Counts and Select All cover all.
@@ -61,11 +61,17 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **⌘⌫ deletes chosen items shown in a board, timeline, Digest, or map** (`ChosenItemDeletion`). Changing the calendar span drops old events.
 - **Calendar and Timeline use each type's date** (`ItemPlacement`) or a field chosen for the view.
 - **An event's span is one rule** (`EventSpan`): all-day events sit on the days they are lived in, whatever the Mac's zone.
-- **Map places items with two valid coordinates** (`MapLayout`). Fit All Items shows every marker. No Location lists the rest. A listed type must declare both fields.
+- **Map places items with two valid coordinates** (`MapLayout`); No Location lists the rest. A listed type declares both fields.
 - **A board always has lanes.** With no grouping chosen it takes the status. Types with different words make the four status groups.
-- **A drop in a lane is one edit.** A drop in Not Set clears the field; Set and date lanes refuse a drop: no single value is meant.
-- **Only divider drags save widths** (`keepWidths`).
-- **Item table text starts where the title does** (`TopRowMetrics.collectionLead`). Unset widths sample 120 rows (`ItemTableFit`). Name fills the remaining space until resized.
+- **A drop in a lane is one edit.** A drop in Not Set clears the field; Set and date lanes refuse one.
+- **Item table text starts where the title does** (`TopRowSpace.titleLead`). Unset widths sample 120 rows (`ItemTableFit`). Name fills the remaining space until resized.
+
+## Sub-items
+
+- **The table and the list nest items under a listed parent** (`ItemNesting`). The table's "1 of 3" counts finished sub-items, from Marfa.
+- **A child whose parent is unlisted or in another group stands at the top,** as does a cycle's first item.
+- **A chosen sub-item opens its parents;** closing one moves the choice off them. Pages and arrows count drawn rows.
+- **A sub-item does not drag.**
 
 ## The View panel
 
@@ -115,10 +121,9 @@ A filter is a `FilterClause`: a field, a `FilterOp` and values, shown as a chip.
 ## Indexes
 
 - **Library › Types, Collections, and Sources** (`PlaceIndex`) show places, searched by name, with no View button.
-- **Types nest kinds under their type.** Made By waits for the package's provenance; a type has no link to copy.
+- **Types nest kinds under their type.** Made By waits for the package's provenance.
 - **Source kind** shows App for `oauth:` codes and Connector for `GET /plugins` sources (`SourceKind`).
-- **Above 2,000 items, layouts work off the main actor.** First open shows progress; updates keep the layout; lists and timelines draw fewer rows first.
-- **Trap:** a table body must not read the choice.
+- **Above 2,000 items, layouts work off the main actor.** First open shows progress; an update keeps the layout.
 - **A row's count is of what the place lists.** A file attached to an item shows on its page, so no list or count but search takes it. The Feed's row has none.
 
 ## Search
