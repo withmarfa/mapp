@@ -390,6 +390,7 @@ actor MarfaSync {
 
     /// The stable slice lets the core resume an interrupted fill and includes types registered later. A hydration that
     /// took this app's settings and was refused for them, before the core changed anything, is made again without them.
+    /// One that takes them chooses their tables first, so the follow fills those in its own turn.
     private func hydrate() async throws {
         hydrationUnderway = true
         publishPhase()
@@ -402,6 +403,7 @@ actor MarfaSync {
             declared = true
         }
         if let status = try? await refreshing.readStatus() { chosenSlice = await choose(for: status) }
+        if chosenSlice.contains(PreferencesType.id) { await refreshing.choosePreferencesTables() }
         #if DEBUG
         hooks.seen.update { $0.hydrations += 1 }
         #endif
