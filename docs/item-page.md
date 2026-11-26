@@ -139,7 +139,7 @@ Quiet lines at the top of the column say what is not ordinary (`PageNotice.all`)
 - **A file's text is never edited here**, and its page is drawn around a viewer (`FileViewing`).
 - **A picture and a PDF keep their own scroller, with the head as its first inset** (`FileHeadSpace`), so the head and its notices scroll away with the file. Any other file has no head.
 - **The head's title and the rows the item may change are edited here** (`FilePageHead`). A file's size and type are Info's, never rows.
-- **Fit shows a picture whole in the page's column, never past its own size.**
+- **Fit shows a picture whole in the page's column, never past its own size.** A PDF's pages are 600 points wide, or as wide as a narrower column.
 - **A PDF's pages sit on gray or on white with a soft shadow** (`PDFBackground`, View › PDF Background; Settings has no row yet). Outline says so when a PDF has no contents.
 - **A saved web page loads nothing from the network by itself.** Its pictures wait until the person asks (`PageNotice`), and asking changes only what is shown, never the file.
 - **A picture larger than the bitmap that the app keeps is softer when enlarged**, because a decoded picture must not take the window's memory.

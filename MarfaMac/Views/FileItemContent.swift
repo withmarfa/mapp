@@ -146,7 +146,6 @@ private struct FilePDFView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> PDFView {
         let view = PDFView()
-        view.autoScales = true
         view.displayMode = .singlePageContinuous
         view.minScaleFactor = FileZoom.range.lowerBound
         view.maxScaleFactor = FileZoom.range.upperBound
@@ -181,6 +180,8 @@ private struct FilePDFView: NSViewRepresentable {
         private var top: CGFloat = 0
         private var toolbar: CGFloat = 0
         private var clipObserver: (any NSObjectProtocol)?
+        /// The size Fit last gave the view, which the view reports back as Fit rather than as a size of its own.
+        private var fitted: CGFloat?
 
         /// The scroller PDFKit keeps inside its view. It is found by type because PDFKit offers no handle to it; a view
         /// without one is left as it is, with no head inset.
@@ -232,14 +233,28 @@ private struct FilePDFView: NSViewRepresentable {
             appliedZoom = zoom
             switch zoom {
             case .fit:
-                if !view.autoScales { view.autoScales = true }
+                fit(view)
             case .scale(let scale):
-                if view.autoScales || abs(view.scaleFactor - scale) > 0.0005 {
-                    view.autoScales = false
-                    view.scaleFactor = scale
-                }
+                fitted = nil
+                if abs(view.scaleFactor - scale) > 0.0005 { view.scaleFactor = scale }
             }
         }
+
+        /// Fit shows a page as wide as the boards' paper where the column has room, and as wide as the column where it
+        /// has not. PDFKit's own fit fills the column, which leaves a wide window with a page far larger than the
+        /// boards'.
+        private func fit(_ view: PDFView) {
+            guard let page = view.document?.page(at: 0) else { return }
+            let box = page.bounds(for: view.displayBox)
+            let width = page.rotation % 180 == 0 ? box.width : box.height
+            guard width > 0 else { return }
+            let scale = FileZoom.clamped(min(Self.paperWidth / width, view.scaleFactorForSizeToFit))
+            fitted = scale
+            if abs(view.scaleFactor - scale) > 0.0005 { view.scaleFactor = scale }
+        }
+
+        /// The width of a page in the boards (`PDF`, `PDF-Full`).
+        static let paperWidth: CGFloat = 600
 
         func attach(to view: PDFView) {
             detach()
@@ -253,7 +268,15 @@ private struct FilePDFView: NSViewRepresentable {
                 center.addObserver(forName: .PDFViewScaleChanged, object: view, queue: .main) { [weak self] _ in
                     MainActor.assumeIsolated { self?.scaleChanged() }
                 },
+                // Fit follows the column as the window or the panes change width.
+                center.addObserver(forName: NSView.frameDidChangeNotification, object: view, queue: .main) { [weak self, weak view] _ in
+                    MainActor.assumeIsolated {
+                        guard let self, let view, self.appliedZoom == .fit else { return }
+                        self.fit(view)
+                    }
+                },
             ]
+            view.postsFrameChangedNotifications = true
             viewing.showPage = { [weak self] number in
                 guard let self, let shown = self.view, let page = shown.document?.page(at: number - 1) else { return number }
                 shown.go(to: page)
@@ -296,9 +319,12 @@ private struct FilePDFView: NSViewRepresentable {
         private func scaleChanged() {
             Task { @MainActor [weak self] in
                 guard let self, let view else { return }
-                if view.autoScales {
-                    viewing.reportFit(FileZoom.clamped(view.scaleFactor))
+                // Fit has not sized a view with no pages yet, so the size it has is not one the person chose.
+                if appliedZoom == .fit, fitted == nil { return }
+                if let fitted, abs(view.scaleFactor - fitted) <= 0.0005 {
+                    viewing.reportFit(fitted)
                 } else {
+                    fitted = nil
                     viewing.adopt(scale: view.scaleFactor)
                     // A size the view took on its own is now the chosen one, so it is not written back.
                     appliedZoom = viewing.zoom
