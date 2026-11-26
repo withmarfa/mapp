@@ -42,6 +42,35 @@ struct ItemLinkCopyTests {
         #expect(library.notices.told == 0)
     }
 
+    @Test func copyLinksPutsEveryChosenLinkOnePerLineInListOrderAndTellsOfAnItemThatIsGone() async throws {
+        let library = FakeItemLibrary()
+        library.heldInstanceID = instance
+        let first = library.add("First\n")
+        let second = library.add("Second\n")
+        let gone = ItemID.mint()
+        let pasteboard = privatePasteboard()
+        defer { pasteboard.releaseGlobally() }
+        await library.copyLinks(of: [second.id, gone, first.id], to: pasteboard)
+        let expected = ["marfa://\(instance)/\(second.id.rawValue)", "marfa://\(instance)/\(first.id.rawValue)"]
+        #expect(pasteboard.string(forType: .string) == expected.joined(separator: "\n"))
+        #expect(library.notices.told == 1)
+    }
+
+    @Test func undoingANewRowKeepsTheTypedTextInRecentlyDeleted() throws {
+        let library = FakeItemLibrary()
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        undo.beginUndoGrouping()
+        let id = try #require(library.createItem(
+            typeID: "core.note", title: "Typed words", body: "More typed words", parentID: nil, tier: .library, undoManager: undo))
+        undo.endUndoGrouping()
+        undo.undo()
+        let item = try #require(library.item(id))
+        #expect(item.state == .trashed)
+        #expect(item.title == "Typed words")
+        #expect(library.bodies[id] == "More typed words")
+    }
+
     @Test func aCopyThatDoesNotKnowItsInstanceYetTellsThePersonAndLeavesThePasteboardAlone() async {
         let library = FakeItemLibrary()
         let note = library.add("A note\n")
