@@ -6,9 +6,16 @@ import SwiftUI
 nonisolated enum SelectionLooks {
     static let chosenOpacity = 0.08
     static let hoverOpacity = 0.047
+    /// A chosen card's ring, which has no fill to show it, so it is stronger than a row's wash: on the dark ground the same
+    /// 8% white is lost against the card's own edge.
+    static let cardRingLightOpacity = 0.13
+    static let cardRingDarkOpacity = 0.26
 
     static func chosen(for scheme: ColorScheme) -> Color { wash(chosenOpacity, for: scheme) }
     static func hover(for scheme: ColorScheme) -> Color { wash(hoverOpacity, for: scheme) }
+    static func cardRing(for scheme: ColorScheme) -> Color {
+        wash(scheme == .dark ? cardRingDarkOpacity : cardRingLightOpacity, for: scheme)
+    }
 
     /// The same wash as an `NSColor` for a layer, drawn in `appearance`. The system's label color is left out because
     /// its own alpha is not the strength the tokens name.

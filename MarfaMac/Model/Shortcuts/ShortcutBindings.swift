@@ -60,10 +60,19 @@ final class ShortcutBindings {
 
     // MARK: Reading
 
-    /// The shortcut `command` has now: the person's choice, which may be none, or the default.
+    /// The shortcut `command` has now: the person's choice, which may be none, or the default. A default never takes a
+    /// key the person gave another command, so a command added later starts with none where its key is already theirs.
     func shortcut(for command: ShortcutCommand) -> Shortcut? {
         if let choice = chosen[command.id] { return choice }
-        return command.defaultShortcut
+        guard let standard = command.defaultShortcut, !isChosenByAnother(standard, besides: command) else { return nil }
+        return standard
+    }
+
+    private func isChosenByAnother(_ shortcut: Shortcut, besides command: ShortcutCommand) -> Bool {
+        commands.contains { other in
+            guard other.id != command.id, case .some(.some(let choice)) = chosen[other.id] else { return false }
+            return choice == shortcut
+        }
     }
 
     func display(for command: ShortcutCommand) -> String? { shortcut(for: command)?.display }

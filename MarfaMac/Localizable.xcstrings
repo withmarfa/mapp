@@ -1596,6 +1596,9 @@
     "%lld of the items don’t have a link yet, so only the others were copied." : {
 
     },
+    "%lld of the items have no file, or it couldn’t be fetched, so only the others were copied." : {
+
+    },
     "%lld on the weekend" : {
 
     },
@@ -3195,6 +3198,12 @@
     "Can’t Connect to the Server" : {
 
     },
+    "Can’t Copy File Path" : {
+
+    },
+    "Can’t Copy File Paths" : {
+
+    },
     "Can’t Copy Link" : {
 
     },
@@ -3731,6 +3740,9 @@
     "Click the map to place the pin." : {
       "extractionState" : "manual"
     },
+    "Clipboard Not Changed" : {
+
+    },
     "Clock" : {
 
     },
@@ -3946,6 +3958,15 @@
       "extractionState" : "manual"
     },
     "Copy Command" : {
+
+    },
+    "Copy File Path" : {
+
+    },
+    "Copy File Paths" : {
+
+    },
+    "Copy File Paths takes up to %lld items at once, because each file is fetched. Choose fewer items." : {
 
     },
     "Copy Files to Storage" : {
@@ -8018,6 +8039,9 @@
     "Pasting" : {
 
     },
+    "Paths Not Copied" : {
+
+    },
     "Pattern Not Added" : {
 
     },
@@ -9527,6 +9551,9 @@
     "Some Links Not Shared" : {
 
     },
+    "Some Paths Not Copied" : {
+
+    },
     "Some Typing Might Be Missing" : {
 
     },
@@ -10338,6 +10365,9 @@
     "The backup folder may not belong to this server alone." : {
 
     },
+    "The clipboard changed while the files were being fetched, so it was left as it is. Try again." : {
+
+    },
     "The clipboard changed while the links were being found, so it was left as it is. Try again." : {
 
     },
@@ -10986,6 +11016,9 @@
     "These items don’t have links yet. Try again once Marfa has finished syncing." : {
 
     },
+    "These items have no file." : {
+
+    },
     "They keep the old mapping until you apply this one." : {
 
     },
@@ -11522,6 +11555,9 @@
 
     },
     "Too Many Items for Links" : {
+
+    },
+    "Too Many Items for Paths" : {
 
     },
     "Too many tries. Try again in %@." : {
@@ -12437,6 +12473,9 @@
     },
     "Your sign-in is sent to %@ without encryption, so anyone on the network can read it. Use an https address unless this network is private." : {
       "extractionState" : "manual"
+    },
+    "Your unsaved text is still on the clipboard, so nothing was copied over it. Paste it back or answer its alert, then try again." : {
+
     },
     "Yours" : {
 

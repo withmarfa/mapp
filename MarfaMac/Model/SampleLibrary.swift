@@ -19,17 +19,21 @@ nonisolated enum SampleLibrary {
     /// Also asks for the tasks and events a board and a timeline show.
     static var withCollections: Bool { ProcessInfo.processInfo.arguments.contains("-MarfaMacCollectionSample") }
 
-    /// With the sample flag, `-MarfaMacOpenPlace` takes a type ID, `collection:<id>`, `items` or `feed`, and `-MarfaMacLayout` a layout.
+    /// With the sample flag, `-MarfaMacOpenPlace` takes a type ID, `collection:<id>`, `collections`, `items` or `feed`, and `-MarfaMacLayout` a layout.
     static var launchPlace: PlaceView? {
         argument(after: "-MarfaMacOpenPlace").map {
             switch $0 {
             case "items": .library
             case "feed": .feed
+            case "collections": PlaceView(.collections)
             case let word where word.hasPrefix("collection:"): .collection(ItemID(String(word.dropFirst("collection:".count))))
             default: .type(TypeID($0))
             }
         }
     }
+
+    /// Whether the launch opens the Collections place of a library with no collection, which no item will ever fill.
+    static var opensEmptyCollections: Bool { argument(after: "-MarfaMacOpenPlace") == "collections" && collections.isEmpty }
 
     static var launchLayout: ItemViewMode? { argument(after: "-MarfaMacLayout").flatMap(ItemViewMode.init(rawValue:)) }
 
@@ -411,8 +415,13 @@ nonisolated enum SampleLibrary {
         return rows
     }
 
-    /// The sample's collections. Home orders its members by position; Reading gives none, so it lists them by title.
-    static let collections: [(id: String, title: String, description: String, daysAgo: Int, members: [String], positioned: Bool)] = [
+    /// The sample's collections. Home orders its members by position; Reading gives none, so it lists them by title. With
+    /// `-MarfaMacNoCollections` there are none, as in a library that has made none.
+    static var collections: [(id: String, title: String, description: String, daysAgo: Int, members: [String], positioned: Bool)] {
+        ProcessInfo.processInfo.arguments.contains("-MarfaMacNoCollections") ? [] : allCollections
+    }
+
+    private static let allCollections: [(id: String, title: String, description: String, daysAgo: Int, members: [String], positioned: Bool)] = [
         ("collection-home", "Home", "Looking after the flat.", 30, ["boiler", "bike-service", "moving-checklist"], true),
         ("collection-reading", "Reading", "Books and ideas worth keeping.", 60,
          ["reading-list", "pattern-language", "design-of-everyday-things"], false),

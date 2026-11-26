@@ -51,8 +51,7 @@ struct HiddenGroupsEmptyState: View {
     }
 }
 
-/// What the window's place says when it holds nothing (`PlaceEmpty`): its own title and line, and for a type, New and the
-/// type's name, which opens the new item holding that type.
+/// Draws the empty place's message and opens New Item with the type `PlaceEmpty` offers.
 struct PlaceEmptyState: View {
     @CurrentLibrary private var library
     let browser: Browser

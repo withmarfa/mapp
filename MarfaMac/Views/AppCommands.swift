@@ -100,6 +100,7 @@ struct AppCommands: Commands {
         CommandGroup(after: .pasteboard) {
             Group {
                 command(.copyLink)
+                command(.copyFilePath)
                 command(.addAttachment)
             }
             // On macOS a menu item draws its symbol only when the menu asks for it.
