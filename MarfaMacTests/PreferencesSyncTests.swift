@@ -456,6 +456,46 @@ import Testing
         #expect(await copy.unitsHeld(item)[look] == #""later""#)
     }
 
+    /// A store that sets aside a synced row it cannot read, as at a launch of an earlier version than the one that wrote
+    /// it, leaves the row in the Marfa: the person did not remove it. Their later edits and removals still sync.
+    @Test func aRowAStoreSetsAsideOnItsOwnStaysInTheMarfa() async throws {
+        let note = PreferenceUnit.row(.types, setting: "look", key: "core.note")
+        let task = PreferenceUnit.row(.types, setting: "look", key: "core.task")
+        let later = #""a shape a later version of the app writes""#
+        let copy = FakePreferencesCopy()
+        let item = await copy.add([note: #"{"date":"created"}"#, task: later])
+        let reading = PreferencesSync(defaults: defaults, domain: suite, enabled: true, coalescing: .milliseconds(50), build: "1") {}
+        reading.attach(copy, library: "marfa:https://one", name: { nil })
+        await reading.flush()
+        reading.detach()
+        let looks = TypeLooks(defaults: defaults)
+        let aside = { [defaults] in (defaults.array(forKey: TypeLooks.setAsideKey) as? [Data] ?? []).map { String(decoding: $0, as: UTF8.self) } }
+        #expect(aside().count == 1)
+        #expect(aside().first?.contains("a shape a later version") == true)
+        let sync = PreferencesSync(defaults: defaults, domain: suite, enabled: true, coalescing: .milliseconds(50), build: "1") { looks.reload() }
+        sync.attach(copy, library: "marfa:https://one", name: { nil })
+        await sync.flush()
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[task] == later)
+        #expect(aside().count == 1)
+        // Another Mac's later value it cannot read either is set aside once, and the Marfa keeps it.
+        let laterStill = #""another shape""#
+        await copy.change(item, [task: laterStill])
+        await sync.flush()
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[task] == laterStill)
+        #expect(aside().count == 2)
+
+        defaults.set(Data(#"{"marfa:https://one":{}}"#.utf8), forKey: TypeLooks.defaultsKey)
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[note] == nil)
+        #expect(await copy.unitsHeld(item)[task] == laterStill)
+        defaults.set(Data(#"{"marfa:https://one":{"core.task":{"date":"created"}}}"#.utf8), forKey: TypeLooks.defaultsKey)
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[task] == #"{"date":"created"}"#)
+        #expect(aside().count == 2)
+    }
+
     /// A binned settings item's tables, which the copy never fills, and another type's tables, do not keep the
     /// settings from being judged whole.
     @Test func onlyTheTablesOfItemsOutsideTheBinCount() {

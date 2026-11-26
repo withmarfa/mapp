@@ -270,6 +270,13 @@ nonisolated extension SyncedSetting {
         case .string(let key): defaults.set((defaults.stringArray(forKey: key) ?? []) + [text], forKey: key)
         }
     }
+
+    static func setAsideCount(in setAside: SetAside, _ defaults: UserDefaults) -> Int {
+        switch setAside {
+        case .data(let key): (defaults.array(forKey: key) as? [Data])?.count ?? 0
+        case .string(let key): defaults.stringArray(forKey: key)?.count ?? 0
+        }
+    }
 }
 
 /// The sidebar layout as rows: one for each of its lists (`layout`, by the list's name), and one for each place's

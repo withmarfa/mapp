@@ -67,16 +67,16 @@ struct DateDisplayTests {
         #expect(DateFormat.stored(in: defaults) == .standard)
     }
 
-    @Test func aStoredValueThatDoesNotReadIsSetAsideBeforeAnythingWritesOverIt() throws {
+    @Test func aStoredValueThatDoesNotReadIsSetAsideOnceAndLeftInPlace() throws {
         let defaults = ThrowawayDefaults.make("DateDisplayTests")
         let unreadable = ["automatic", "relative", #"{"date":"weird"}"#]
         for text in unreadable {
             defaults.set(text, forKey: DateFormat.key)
             DateFormat.setAsideUnreadable(in: defaults)
-            #expect(defaults.object(forKey: DateFormat.key) == nil)
+            #expect(DateFormat.stored(in: defaults) == .standard)
+            #expect(defaults.string(forKey: DateFormat.key) == text)
         }
         #expect(defaults.stringArray(forKey: DateFormat.setAsideKey) == unreadable)
-        #expect(DateFormat.stored(in: defaults) == .standard)
         // A readable value is left where it is.
         let chosen = DateFormat(date: .long)
         defaults.set(chosen.rawValue, forKey: DateFormat.key)

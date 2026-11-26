@@ -300,7 +300,7 @@ final class PreferencesSync {
     }
 
     /// This Mac's settings as a step read them.
-    typealias Local = (units: PreferenceUnits, frozen: [SyncedSetting])
+    typealias Local = (units: PreferenceUnits, frozen: [SyncedSetting], asides: [String: Int])
 
     /// The person changed a setting a step was about to write, after the step read it: the step stops and runs again.
     private struct Moved: Error {}
@@ -324,8 +324,8 @@ final class PreferencesSync {
                 if let chosen = originals.first, chosen.id == adopted.item {
                     guard let followed = try await follow(
                         chosen, from: adopted, of: instance, local: local, switched: record.last != instance,
-                        winning: record.winning ?? [:], siblings: items.filter(\.isConflictedCopy), in: copy,
-                        generation: generation)
+                        winning: record.winning ?? [:], asides: record.asides, siblings: items.filter(\.isConflictedCopy),
+                        in: copy, generation: generation)
                     else { return }
                     record.marfas[instance] = followed
                 } else if !originals.isEmpty {
@@ -367,6 +367,7 @@ final class PreferencesSync {
             let read = record.winning ?? [:]
             let marked = (Record.read(defaults).winning ?? [:]).filter { key, units in read[key] != units }
             record.winning = marked.isEmpty ? nil : marked
+            record.asides = local.asides
             record.save(defaults)
             answered = answered.filter { id, _ in record.marfas.values.contains { $0.awaiting[id] != nil } }
             // What an earlier copy on another Mac kept for a place reaches this Mac only through the Marfa.
@@ -384,13 +385,15 @@ final class PreferencesSync {
         }
     }
 
-    /// This Mac's settings, and what each setting this Mac cannot read, or that has not yet moved to this library's
-    /// name (`unsettled`), owns, which no step changes.
+    /// This Mac's settings, what each setting this Mac cannot read, or that has not yet moved to this library's
+    /// name (`unsettled`), owns, which no step changes, and how many values each setting's store has set aside.
     func readLocal() -> Local {
         var units: PreferenceUnits = [:]
         var frozen: [SyncedSetting] = []
+        var asides: [String: Int] = [:]
         let held = unsettled(library)
         for setting in PreferencesMap.synced {
+            if let kind = setting.setAsideKind { asides[setting.key] = SyncedSetting.setAsideCount(in: kind, defaults) }
             if held.contains(setting.key) {
                 frozen.append(setting)
                 continue
@@ -400,7 +403,7 @@ final class PreferencesSync {
             case .unreadable: frozen.append(setting)
             }
         }
-        return (units, frozen)
+        return (units, frozen, asides)
     }
 
     /// Throws `Moved` where a setting that owns one of `units` is no longer what the step read: a step awaits the copy
@@ -473,9 +476,13 @@ final class PreferencesSync {
     /// no other Mac's value of a member it carries is taken; once the server answers that it kept another Mac's field
     /// and wrote this one to a conflicted copy, each member it carried that this Mac still holds is written again, so
     /// only the same member's later write wins.
+    ///
+    /// A row this Mac lacks of a setting whose store set something aside since the last step (`asides`, `Record.asides`)
+    /// is dropped as a row the store dropped when `apply` wrote it, so it stays in the Marfa.
     private func follow(_ chosen: PreferencesItem, from adopted: Record.Adopted, of instance: String, local: Local,
-                        switched: Bool, winning: [String: Set<PreferenceUnit>], siblings: [PreferencesItem],
-                        in copy: any PreferencesCopy, generation: Int) async throws -> Record.Adopted?
+                        switched: Bool, winning: [String: Set<PreferenceUnit>], asides: [String: Int]?,
+                        siblings: [PreferencesItem], in copy: any PreferencesCopy, generation: Int) async throws
+        -> Record.Adopted?
     {
         var adopted = adopted
         // The defaults hold the Marfa followed before, which this one's settings are about to replace.
@@ -512,6 +519,15 @@ final class PreferencesSync {
         // that reads it runs here.
         let retrying = adopted.frozenBuild == build ? [] : Set(adopted.frozen.keys)
         var mine = switched ? base : local.units
+        if !switched, let asides {
+            let setAside = PreferencesMap.synced.filter { setting in
+                guard winning[setting.key] == nil, let before = asides[setting.key] else { return false }
+                return local.asides[setting.key, default: 0] > before
+            }
+            for unit in base.keys where mine[unit] == nil && adopted.frozen[unit] == nil && setAside.contains(where: { $0.owns(unit) }) {
+                adopted.frozen[unit] = Record.Frozen(left: nil)
+            }
+        }
         for (unit, frozen) in adopted.frozen where !switched {
             // The person's own change to a dropped setting is theirs to send, so it is no longer held.
             if mine[unit] == frozen.left { mine[unit] = base[unit] } else { adopted.frozen[unit] = nil }
