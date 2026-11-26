@@ -93,6 +93,9 @@ import Testing
     }
 
     @Test func aTypeIconThatAppearsLaterJoinsTheOnesAlreadyDrawn() throws {
+        _ = try #require(PageHeaderIcons(textSize: 13, typeIcons: ["lucide:bug"]))
+        // Switch sizes so returning to 13 starts with an empty cache.
+        _ = try #require(PageHeaderIcons(textSize: 14, typeIcons: []))
         let one = try #require(PageHeaderIcons(textSize: 13, typeIcons: ["lucide:folder"]))
         #if DEBUG
         Cost.resetTallies()
