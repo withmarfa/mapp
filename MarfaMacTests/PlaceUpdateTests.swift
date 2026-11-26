@@ -491,7 +491,10 @@ import UniformTypeIdentifiers
         board.viewMode = .board
         #expect(board.tableOptions[logs]?.grouping == nil, "the board chooses its lanes")
         #expect(try #require(board.boardGrouping(in: library)).groupsByDate)
-        func lanes(_ browser: Browser) -> [[ItemID]]? { browser.boardLanes(in: library)?.all.map { $0.items.map(\.id) } }
+        // Each lane by the day it names, in the zone it was made in, with its cards.
+        func lanes(_ browser: Browser) -> [String]? {
+            browser.boardLanes(in: library)?.all.map { "\($0.groupKey): \($0.items.map(\.id.rawValue))" }
+        }
         let before = lanes(board)
         zone.zone = try #require(TimeZone(identifier: "Pacific/Honolulu"))
         let after = lanes(board)
