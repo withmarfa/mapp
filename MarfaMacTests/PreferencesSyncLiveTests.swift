@@ -130,7 +130,10 @@ extension LiveMarfaTests {
                     await libraries.preferences.flush()
                     return libraries.preferences.standing == .syncing
                 }, "the settings never synced: \(libraries.preferences.standing)")
-                #expect(LibrarySettings.instance(of: libraries.libraryKey) != nil, "\(libraries.libraryKey)")
+                // A copy that has not said its instance yet names the library by its folder until it next opens.
+                let stored = try JSONSerialization.jsonObject(with: try #require(older.defaults.data(forKey: TypeLooks.defaultsKey))) as? [String: Any]
+                #expect(stored.map { Array($0.keys) } == [libraries.libraryKey])
+                #expect(libraries.libraryKey != "marfa:" + address)
                 await libraries.preferences.flush()
                 await source.flush()
                 libraries.preferences.detach()
