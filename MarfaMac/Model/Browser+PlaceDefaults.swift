@@ -148,6 +148,7 @@ extension Browser {
         if placeProperties[place] != properties { placeProperties[place] = properties }
         if placeQuickActions[place] != stored.quickActions { placeQuickActions[place] = stored.quickActions }
         if placeDigests[place] != stored.digest { placeDigests[place] = stored.digest }
+        if placeCalendars[place] != stored.calendar { placeCalendars[place] = stored.calendar }
         if placeOpenings[place] != stored.opening { placeOpenings[place] = stored.opening }
         if placeMaps[place] != stored.map { placeMaps[place] = stored.map }
         observedChoices[place] = ViewChoices(options: options, timelineDate: stored.timelineField)
@@ -200,6 +201,7 @@ extension Browser {
         placeOpenings[place] = nil
         placeMaps[place] = nil
         placeDigests[place] = nil
+        placeCalendars[place] = nil
         observedChoices[place] = ViewChoices(options: ItemTableOptions(), timelineDate: nil)
         let natural = naturalLayout(of: place)
         if viewMode != natural, availableViewModes(in: library).contains(natural) { set(layout: natural) }
@@ -224,6 +226,7 @@ extension Browser {
         placeProperties[place] = stored.properties.isChanged ? stored.properties : nil
         placeQuickActions[place] = stored.quickActions
         placeDigests[place] = stored.digest
+        placeCalendars[place] = stored.calendar
         placeOpenings[place] = stored.opening
         placeMaps[place] = stored.map
     }

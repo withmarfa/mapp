@@ -3,32 +3,70 @@ import Foundation
 /// The run of days the calendar's week scrolls along: one column for each day, side by side, with day `index` being `index`
 /// calendar days after the strip's first. A swipe moves along the run and settles on a day's edge, so the week shown can
 /// start on any day. Days are counted on the calendar passed (the Mac's), never by a fixed 24 hours, so the day a clock
-/// change shortens or lengthens is still one column.
+/// change shortens or lengthens is still one column. A strip that skips weekends leaves those days out, so a column is
+/// each of the others and `index` counts only them.
 nonisolated struct CalendarStrip: Equatable, Sendable {
     /// How many days the strip reaches either side of the day it is built around.
     static let reach = 1000
     /// How close to an end of the strip a day may be before the strip is built again around it.
     static let margin = 60
 
-    /// The start of the day at index 0.
+    /// The start of the first calendar day of the strip.
     let first: Date
+    let skipsWeekends: Bool
+    /// The start of each day the strip holds, where it skips weekends. Empty otherwise, when a day's index is its distance.
+    private let kept: [Date]
+    /// How many columns a week has: seven, or those a week has without its weekend.
+    let columns: Int
 
     /// A strip built around `day`, which sits in the middle.
-    init(around day: Date, calendar: Calendar) {
+    init(around day: Date, calendar: Calendar, skipsWeekends: Bool = false) {
         let middle = calendar.startOfDay(for: day)
-        first = calendar.date(byAdding: .day, value: -Self.reach, to: middle) ?? middle
+        let first = calendar.date(byAdding: .day, value: -Self.reach, to: middle) ?? middle
+        self.first = first
+        self.skipsWeekends = skipsWeekends
+        guard skipsWeekends else {
+            kept = []
+            columns = 7
+            return
+        }
+        var days: [Date] = []
+        var date = first
+        for _ in 0..<(Self.reach * 2 + 1) {
+            if !calendar.isDateInWeekend(date) { days.append(date) }
+            date = calendar.date(byAdding: .day, value: 1, to: date) ?? date.addingTimeInterval(86_400)
+        }
+        kept = days
+        let weekend = (0..<7).filter { offset in
+            calendar.date(byAdding: .day, value: offset, to: middle).map(calendar.isDateInWeekend) ?? false
+        }.count
+        columns = max(7 - weekend, 1)
     }
 
-    var count: Int { Self.reach * 2 + 1 }
+    /// The same run of days built around `day`.
+    func rebuilt(around day: Date, calendar: Calendar) -> CalendarStrip {
+        CalendarStrip(around: day, calendar: calendar, skipsWeekends: skipsWeekends)
+    }
+
+    var count: Int { skipsWeekends ? kept.count : Self.reach * 2 + 1 }
 
     /// The start of the day at `index`.
     func day(at index: Int, calendar: Calendar) -> Date {
-        calendar.date(byAdding: .day, value: index, to: first) ?? first.addingTimeInterval(TimeInterval(index) * 86_400)
+        if skipsWeekends { return kept.indices.contains(index) ? kept[index] : first }
+        return calendar.date(byAdding: .day, value: index, to: first) ?? first.addingTimeInterval(TimeInterval(index) * 86_400)
     }
 
-    /// The index of the day that holds `date`. It may lie outside the strip.
+    /// The index of the day that holds `date`, or of the next day the strip holds where that is a weekend it skips. It
+    /// may lie outside the strip.
     func index(of date: Date, calendar: Calendar) -> Int {
-        calendar.dateComponents([.day], from: first, to: calendar.startOfDay(for: date)).day ?? 0
+        let day = calendar.startOfDay(for: date)
+        guard skipsWeekends else { return calendar.dateComponents([.day], from: first, to: day).day ?? 0 }
+        var low = 0, high = kept.count
+        while low < high {
+            let middle = (low + high) / 2
+            if kept[middle] < day { low = middle + 1 } else { high = middle }
+        }
+        return low
     }
 
     /// Whether `index` is far enough inside the strip to scroll to, with room to scroll on either side of it.

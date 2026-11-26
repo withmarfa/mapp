@@ -25,7 +25,9 @@ struct ViewPanelLayoutRows: View {
         case .gallery:
             ViewPanelGalleryRows(browser: browser)
         case .calendar:
+            calendarDate
             calendarSpan
+            calendarWeekends
         case .timeline:
             timelineDate
             ViewPanelPropertiesRow(browser: browser, panel: panel)
@@ -98,6 +100,30 @@ struct ViewPanelLayoutRows: View {
             title: { String(localized: $0.title) }, selection: browser.calendarScale,
             choose: { browser.changeCalendarScale($0) })
             .accessibilityIdentifier("CalendarScale")
+    }
+
+    /// The date field the calendar stands its items by: the chosen one, or the first where the choice is no longer one of
+    /// the place's. Nil is each type's own date.
+    private var calendarDate: some View {
+        let fields = browser.timelineFieldChoices(in: library)
+        let labels = Dictionary(fields.map { ($0.key, $0.label) }, uniquingKeysWith: { first, _ in first })
+        let selection: String? = switch browser.calendarDating(in: library) {
+        case .eachType, .nothing: nil
+        case .field(let key): key
+        }
+        return ViewPanelChoiceRow(
+            symbol: "calendar", label: String(localized: "Date"), choices: [String?.none] + fields.map { Optional($0.key) },
+            title: { $0.flatMap { labels[$0] } ?? String(localized: "Date of Each Type") }, selection: selection,
+            choose: { value in browser.changeCalendar { $0.date = value } })
+            .disabled(fields.isEmpty)
+            .accessibilityIdentifier("CalendarDateField")
+    }
+
+    private var calendarWeekends: some View {
+        ViewPanelSwitchRow(
+            symbol: "sun.max", label: String(localized: "Weekends"), isOn: browser.calendarChoices.showsWeekends,
+            set: { value in browser.changeCalendar { $0.weekends = value ? nil : false } })
+            .accessibilityIdentifier("CalendarWeekends")
     }
 
     private var timelineDate: some View {

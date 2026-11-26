@@ -93,6 +93,8 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
     /// The map's Style and whether it groups markers that crowd; nil follows the defaults.
     var map: MapChoices?
     var digest: DigestChoices?
+    /// The calendar's date field and whether it shows weekends; nil follows the defaults.
+    var calendar: CalendarChoices?
 
     init() {}
 
@@ -123,6 +125,7 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
         opening = try container.decodeIfPresent(String.self, forKey: .opening).flatMap(ItemOpening.init(rawValue:))
         map = try container.decodeIfPresent(MapChoices.self, forKey: .map)
         digest = try container.decodeIfPresent(DigestChoices.self, forKey: .digest)
+        calendar = try container.decodeIfPresent(CalendarChoices.self, forKey: .calendar)
     }
 
     var isEmpty: Bool { self == PlaceDefault() }
@@ -150,6 +153,7 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
         filled.opening = opening ?? other.opening
         filled.map = map ?? other.map
         filled.digest = digest ?? other.digest
+        filled.calendar = calendar ?? other.calendar
         return filled
     }
 

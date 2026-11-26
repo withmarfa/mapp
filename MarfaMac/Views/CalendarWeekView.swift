@@ -37,8 +37,10 @@ struct CalendarWeekView: View {
     /// The block being dragged out on a day, in minutes from its start, before it becomes a new item's (`InPlaceRow`).
     @State private var dragging: (day: Date, from: Int, to: Int)?
 
-    private static let margin: CGFloat = 56
-    private static let headerHeight: CGFloat = 40
+    /// The gutter holds the hours' labels, and in the heading the month: wide where the room is, else just the labels.
+    private static let wideMargin: CGFloat = 144
+    private static let narrowMargin: CGFloat = 56
+    private static let headerHeight: CGFloat = 36
     /// The hour the day opens scrolled to, a little above the working day's first hour.
     private static let workday = 8
     private nonisolated static let space = "CalendarWeekScroll"
@@ -56,23 +58,24 @@ struct CalendarWeekView: View {
         self.now = now
         self.choose = choose
         self.open = open
-        let strip = CalendarStrip(around: firstDay, calendar: calendar)
+        let strip = CalendarStrip(around: firstDay, calendar: calendar, skipsWeekends: !browser.calendarChoices.showsWeekends)
         let index = strip.index(of: firstDay, calendar: calendar)
         _strip = State(initialValue: strip)
         _scrolled = State(initialValue: CalendarStrip.Position(leading: index, nearest: index, isBetween: false))
     }
 
     private var hourHeight: CGFloat { pinchHeight ?? CalendarHourHeight.clamped(CGFloat(storedHeight)) }
-    private var columnWidth: CGFloat { max((size.width - Self.margin) / 7, 1) }
+    private var margin: CGFloat { size.width >= 760 ? Self.wideMargin : Self.narrowMargin }
+    private var columnWidth: CGFloat { max((size.width - margin) / CGFloat(strip.columns), 1) }
 
     var body: some View {
         let hour = hourHeight
         let column = columnWidth
         let range = strip.drawn(leading: scrolled.leading)
         let run = CalendarWeek.make(
-            entries: entries, startingOn: strip.day(at: range.lowerBound, calendar: calendar), count: range.count,
+            entries: entries, days: range.map { strip.day(at: $0, calendar: calendar) },
             calendar: calendar, now: now, shortestBlock: CalendarHourHeight.shortestBlock(at: hour))
-        let shown = scrolled.shown()
+        let shown = scrolled.shown(days: strip.columns)
         let showsAllDay = CalendarWeek.showsAllDay(
             run.days.enumerated().filter { shown.contains(range.lowerBound + $0.offset) }.map(\.element))
 
@@ -140,7 +143,7 @@ struct CalendarWeekView: View {
         let near = abs(index - scrolled.nearest) <= 21
         var rebuilt = false
         if !strip.holds(index) {
-            strip = CalendarStrip(around: day, calendar: calendar)
+            strip = strip.rebuilt(around: day, calendar: calendar)
             index = strip.index(of: day, calendar: calendar)
             rebuilt = true
         }
@@ -200,7 +203,7 @@ struct CalendarWeekView: View {
     // MARK: Heading
 
     private func heading(_ run: CalendarWeek, range: Range<Int>, showsAllDay: Bool, column: CGFloat) -> some View {
-        let lead = Self.margin + CGFloat(range.lowerBound) * column
+        let lead = margin + CGFloat(range.lowerBound) * column
         return VStack(spacing: 0) {
             HStack(spacing: 0) {
                 Color.clear.frame(width: lead)
@@ -219,7 +222,7 @@ struct CalendarWeekView: View {
         .frame(width: lead + CGFloat(strip.count - range.lowerBound) * column, alignment: .leading)
         .overlay(alignment: .topLeading) {
             VStack(spacing: 0) {
-                Color.clear
+                monthName
                     .frame(height: Self.headerHeight)
                     .overlay(alignment: .bottom) { Rectangle().fill(.separator).frame(height: 0.5) }
                 if showsAllDay {
@@ -232,7 +235,7 @@ struct CalendarWeekView: View {
                         .accessibilityLabel("All day")
                 }
             }
-            .frame(width: Self.margin)
+            .frame(width: margin)
             .background(.background)
             .pinnedToLeadingEdge()
         }
@@ -242,17 +245,36 @@ struct CalendarWeekView: View {
         }
     }
 
+    /// The month of the day at the left edge, in the corner above the hours: the whole of it where the gutter is wide.
+    private var monthName: some View {
+        let day = strip.day(at: scrolled.nearest, calendar: calendar)
+        let format = Date.FormatStyle(calendar: calendar).month(margin == Self.wideMargin ? .wide : .abbreviated)
+        let year = Date.FormatStyle(calendar: calendar).year()
+        return HStack(spacing: 4) {
+            Text(day, format: format)
+            if margin == Self.wideMargin { Text(day, format: year) }
+        }
+        .interfaceFont(.system(size: 14, weight: .semibold))
+        .lineLimit(1)
+        .padding(.leading, 16)
+        .padding(.trailing, 4)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .background(.background)
+        .accessibilityHidden(true)
+    }
+
     private func dayName(_ day: CalendarWeek.Day) -> some View {
         HStack(spacing: 6) {
             Text(day.date, format: .dateTime.weekday(.abbreviated))
                 .interfaceFont(.system(size: 12))
                 .foregroundStyle(day.isToday ? Color.calendarToday : .secondary)
             Text(day.date, format: .dateTime.day())
-                .interfaceFont(.system(size: 14, weight: day.isToday ? .semibold : .medium))
+                .interfaceFont(.system(size: 15, weight: day.isToday ? .semibold : .medium))
                 .monospacedDigit()
                 .foregroundStyle(day.isToday ? Color.white : .primary)
-                .frame(minWidth: 24, minHeight: 24)
-                .background { if day.isToday { Circle().fill(Color.calendarToday) } }
+                .padding(.horizontal, day.isToday ? 7 : 0)
+                .frame(minHeight: 22)
+                .background { if day.isToday { Capsule().fill(Color.calendarToday) } }
         }
         .padding(.horizontal, 8)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
@@ -293,7 +315,7 @@ struct CalendarWeekView: View {
 
     private func grid(_ run: CalendarWeek, range: Range<Int>, hour: CGFloat, column: CGFloat) -> some View {
         let height = hour * 24
-        let lead = Self.margin + CGFloat(range.lowerBound) * column
+        let lead = margin + CGFloat(range.lowerBound) * column
         return HStack(spacing: 0) {
             Color.clear.frame(width: lead)
             ForEach(run.days) { day in dayColumn(day, run: run, width: column, hour: hour) }
@@ -310,7 +332,7 @@ struct CalendarWeekView: View {
                         .offset(y: CGFloat(hourOfDay) * hour - 7)
                 }
             }
-            .frame(width: Self.margin, height: height, alignment: .topTrailing)
+            .frame(width: margin, height: height, alignment: .topTrailing)
             .background(.background)
             .pinnedToLeadingEdge()
             .accessibilityHidden(true)
@@ -340,7 +362,6 @@ struct CalendarWeekView: View {
                         entry: block.entry, calendar: calendar, format: format, width: blockWidth, height: tall - 1)
                         .frame(width: blockWidth, height: tall - 1, alignment: .topLeading)
                         .calendarFill(isSelected, radius: 6)
-                        .shadow(color: isSelected ? .black.opacity(0.18) : .clear, radius: 3, y: 2)
                 }
                 .offset(x: 3 + slot * CGFloat(block.column), y: top)
             }

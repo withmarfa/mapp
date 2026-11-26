@@ -36,6 +36,12 @@ struct ItemCalendar: View {
             ? DateInterval(start: firstShown, end: calendar.date(byAdding: .day, value: 7, to: firstShown) ?? firstShown)
             : CalendarLayout.interval(of: scale, containing: anchor, calendar: calendar)
         let drawn = CalendarLayout.drawn(scale, firstShown: firstShown, anchor: anchor, calendar: calendar)
+        // Only a week can hide its weekend: the month keeps all seven days, so an item on one stays reachable there.
+        let skipsWeekends = scale == .week && !browser.calendarChoices.showsWeekends
+        let hiddenOnWeekend = skipsWeekends
+            ? CalendarLayout.ids(in: placed.entries, within: drawn).count
+                - CalendarLayout.ids(in: placed.entries, within: drawn, weekends: false, calendar: calendar).count
+            : 0
 
         return Group {
             switch scale {
@@ -43,6 +49,7 @@ struct ItemCalendar: View {
                 CalendarWeekView(
                     entries: placed.entries, firstDay: firstShown, browser: browser, keyboard: keyboard, calendar: calendar,
                     format: dateFormat, now: now, choose: choose, open: open)
+                    .id(skipsWeekends)
             case .month:
                 let month = CalendarMonth.make(entries: placed.entries, around: anchor, calendar: calendar, now: now)
                 CalendarMonthView(month: month, browser: browser, calendar: calendar, format: dateFormat, choose: choose, open: open)
@@ -62,7 +69,8 @@ struct ItemCalendar: View {
             let from = current.flatMap {
                 CalendarNavigation.spot(of: $0, near: keyboard.day, in: placed.entries, visible: visible, calendar: calendar)
             }
-            guard let next = CalendarNavigation.move(from: from, direction, in: placed.entries, visible: visible, calendar: calendar)
+            guard let next = CalendarNavigation.move(
+                from: from, direction, in: placed.entries, visible: visible, calendar: calendar, skipsWeekends: skipsWeekends)
             else { return .ignored }
             if !visible.contains(next.day) { browser.showCalendarDay(next.day, calendar: calendar) }
             choose(next.id, next.day)
@@ -76,10 +84,17 @@ struct ItemCalendar: View {
         }
         // The menu and the capsule act on the whole choice, so a choice never holds an event the calendar has left behind.
         .onChange(of: drawn) {
-            let kept = browser.selection.intersection(CalendarLayout.ids(in: placed.entries, within: drawn))
+            let kept = browser.selection.intersection(
+                CalendarLayout.ids(in: placed.entries, within: drawn, weekends: !skipsWeekends, calendar: calendar))
+            if kept != browser.selection { browser.selection = kept }
+        }
+        .onChange(of: skipsWeekends) {
+            let kept = browser.selection.intersection(
+                CalendarLayout.ids(in: placed.entries, within: drawn, weekends: !skipsWeekends, calendar: calendar))
             if kept != browser.selection { browser.selection = kept }
         }
         .searchStatus(browser)
+        .overlay(alignment: .bottom) { footer(placed, hiddenOnWeekend: hiddenOnWeekend) }
         .overlay {
             if placed.isEmpty {
                 if browser.narrowsBySearch {
@@ -95,6 +110,23 @@ struct ItemCalendar: View {
         .onChange(of: browser.isSearchExpanded) {
             if !browser.isSearchExpanded { browser.focusRequest = .list }
         }
+    }
+
+    /// The No Date pill, and where the week hides its weekend the count of what that leaves out of it.
+    private func footer(_ placed: Browser.CalendarPlacing, hiddenOnWeekend: Int) -> some View {
+        GeometryReader { proxy in
+            let wide = proxy.size.width >= 760
+            HStack(spacing: 8) {
+                if !placed.leftOut.isEmpty { CalendarNoDatePill(ids: placed.leftOut, open: open) }
+                if hiddenOnWeekend > 0 {
+                    CalendarWeekendNote(count: hiddenOnWeekend) { browser.changeCalendarScale(.month) }
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: wide ? .bottom : .bottomLeading)
+            .padding(.bottom, WindowCorner<EmptyView, EmptyView>.inset)
+            .padding(.leading, wide ? 0 : WindowCorner<EmptyView, EmptyView>.inset)
+        }
+        .allowsHitTesting(true)
     }
 
     /// Chooses an event on one of its days, which is where the arrow keys go on from.
@@ -193,11 +225,10 @@ extension View {
 private struct CalendarFill: ViewModifier {
     let isSelected: Bool
     let radius: CGFloat
-    @Environment(\.colorScheme) private var scheme
 
     func body(content: Content) -> some View {
         content.background(
-            isSelected ? SelectionLooks.chosen(for: scheme) : Color.primary.opacity(0.05),
+            Color.primary.opacity(isSelected ? 0.14 : 0.05),
             in: .rect(cornerRadius: radius, style: .continuous))
     }
 }
@@ -215,10 +246,42 @@ private struct CalendarMonthView: View {
     let format: DateFormat
     let choose: (ItemID, Date) -> Void
     let open: (ItemID) -> Void
+    @State private var width: CGFloat = 0
+
+    /// The gutter holds the month's name above the weeks' numbers: the whole of it where the room is.
+    private var isWide: Bool { width >= 760 }
+    private var gutter: CGFloat { isWide ? 144 : 56 }
+
+    private var monthName: some View {
+        let day = month.weeks.joined().first(where: \.isInMonth)?.date ?? month.interval.start
+        let style = Date.FormatStyle(calendar: calendar).month(isWide ? .wide : .abbreviated)
+        return HStack(spacing: 4) {
+            Text(day, format: style)
+            if isWide { Text(day, format: Date.FormatStyle(calendar: calendar).year()) }
+        }
+        .interfaceFont(.system(size: 14, weight: .semibold))
+        .lineLimit(1)
+        .padding(.leading, 16)
+        .frame(width: gutter, alignment: .leading)
+    }
+
+    private func weekNumber(_ week: [CalendarMonth.Day]) -> some View {
+        let number = week.first.map { calendar.component(.weekOfYear, from: $0.date) } ?? 0
+        return (isWide ? Text("Week \(number)") : Text(verbatim: "\(number)"))
+            .interfaceFont(.system(size: 12))
+            .monospacedDigit()
+            .foregroundStyle(.tertiary)
+            .padding(.leading, 16)
+            .padding(.top, 6)
+            .frame(width: gutter, alignment: .topLeading)
+            .frame(maxHeight: .infinity, alignment: .topLeading)
+            .accessibilityHidden(true)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 0) {
+                monthName
                 ForEach(month.weeks.first ?? []) { day in
                     Text(day.date, format: .dateTime.weekday(.abbreviated))
                         .interfaceFont(.system(size: 12))
@@ -237,6 +300,7 @@ private struct CalendarMonthView: View {
                 VStack(spacing: 0) {
                     ForEach(Array(month.weeks.enumerated()), id: \.offset) { _, week in
                         HStack(spacing: 0) {
+                            weekNumber(week)
                             ForEach(week) { day in cell(day, capacity: capacity) }
                         }
                         .frame(height: rowHeight)
@@ -244,6 +308,7 @@ private struct CalendarMonthView: View {
                 }
             }
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .accessibilityLabel("Month")
     }
 
@@ -282,6 +347,7 @@ private struct CalendarMonthView: View {
             }
             Spacer(minLength: 0)
         }
+        .opacity(day.isInMonth ? 1 : 0.55)
         .padding(4)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(day.isWeekend ? Color.primary.opacity(0.03) : .clear)

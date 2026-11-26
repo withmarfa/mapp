@@ -667,13 +667,14 @@ extension Browser {
         let looks: [TypeID: TypeLook]
         let calendar: Calendar
         let marksFeed: Bool
+        let placing: CalendarChoices.Placing
     }
 
-    /// The calendar's entries, and how many items have no date to stand on.
+    /// The calendar's entries, and the items that have no date to stand on.
     nonisolated struct CalendarPlacing: Sendable {
         let entries: [CalendarEntry]
-        let leftOut: Int
-        var isEmpty: Bool { entries.isEmpty && leftOut == 0 }
+        let leftOut: [ItemID]
+        var isEmpty: Bool { entries.isEmpty && leftOut.isEmpty }
     }
 
     /// What the timeline places its items by, besides the items.
@@ -689,9 +690,11 @@ extension Browser {
         let looks = looks(in: library)
         let catalogue = library.catalogue
         let marksFeed = listing.scope == .all
-        let choice = CalendarChoice(looks: looks, calendar: calendar, marksFeed: marksFeed)
+        let placing = calendarDating(in: library)
+        let choice = CalendarChoice(looks: looks, calendar: calendar, marksFeed: marksFeed, placing: placing)
         return placed(calendarWork, choice: choice, in: library) { items in
-            let placed = CalendarLayout.entries(for: items, looks: looks, catalogue: catalogue, calendar: calendar, marksFeed: marksFeed)
+            let placed = CalendarLayout.entries(
+                for: items, looks: looks, catalogue: catalogue, calendar: calendar, marksFeed: marksFeed, placing: placing)
             return CalendarPlacing(entries: placed.entries, leftOut: placed.leftOut)
         }
     }

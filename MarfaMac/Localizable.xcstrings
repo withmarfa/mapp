@@ -1596,6 +1596,9 @@
     "%lld of the items don’t have a link yet, so only the others were copied." : {
 
     },
+    "%lld on the weekend" : {
+
+    },
     "%lld or more versions" : {
 
     },
@@ -7108,6 +7111,9 @@
     "No Date" : {
       "extractionState" : "manual"
     },
+    "No Date, %lld" : {
+
+    },
     "No Deliveries" : {
 
     },
@@ -9324,6 +9330,9 @@
 
     },
     "Show or Hide Sidebar" : {
+
+    },
+    "Show the Month" : {
 
     },
     "Showing %lld of %lld. The rest are listed by marfa folders inventory." : {
@@ -12048,6 +12057,9 @@
 
     },
     "Week of %@" : {
+
+    },
+    "Weekends" : {
 
     },
     "Weekly Review" : {
