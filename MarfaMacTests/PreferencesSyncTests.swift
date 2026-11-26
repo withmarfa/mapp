@@ -732,11 +732,7 @@ import Testing
         #expect(sync.standing == .off(.removed))
         #expect(await copy.creates == 1)
     }
-}
 
-@MainActor @Suite(.hangLimit) struct PreferencesWiringTests {
-    /// The library's copy is followed as it opens and let go as it closes; a copy whose slice lacks the type, as the
-    /// sample's does, changes nothing on this Mac.
     // MARK: Only the person's own change leaves the Marfa
 
     /// What a store set aside, as text, in the order it was set aside.
@@ -792,8 +788,8 @@ import Testing
         let shortcut = PreferenceUnit.row(.commands, setting: "shortcut", key: "newItem")
         let other = PreferenceUnit.row(.commands, setting: "shortcut", key: "refresh")
         let later = #""a shape a later version of the app writes""#
-        let readable = try #require(PreferenceJSON.text(
-            try #require(PreferenceJSON.value(String(decoding: try JSONEncoder().encode(Shortcut(key: "r", modifiers: [.command, .option])), as: UTF8.self)))))
+        let encoded = try JSONSerialization.jsonObject(with: JSONEncoder().encode(Shortcut(key: "r", modifiers: [.command, .option])))
+        let readable = try #require(PreferenceJSON.text(encoded))
         let copy = FakePreferencesCopy()
         let item = await copy.add([shortcut: later, other: readable])
         let reading = PreferencesSync(defaults: defaults, domain: suite, enabled: true, coalescing: .milliseconds(50), build: "1") {}
@@ -1015,7 +1011,11 @@ import Testing
         #expect(await copy.unitsHeld(item)[later] == #""a shape a later version of the app writes""#)
         #expect(setAside(ViewLayouts.setAsideKey).isEmpty)
     }
+}
 
+@MainActor @Suite(.hangLimit) struct PreferencesWiringTests {
+    /// The library's copy is followed as it opens and let go as it closes; a copy whose slice lacks the type, as the
+    /// sample's does, changes nothing on this Mac.
     @Test func theSettingsFollowTheOpenLibrary() async throws {
         let bench = HostBench()
         let host = bench.host(opener: { connection, _, _ in SampleLibrary.open(connection) })
