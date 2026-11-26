@@ -457,7 +457,7 @@ private struct KeyboardHold: View {
     }
 }
 
-/// The selected card's soft ring: 3 points wide, touching the card, in the gallery's ring grey (`SelectionLooks.cardRing`). It reads the selection itself, so a selection that moves redraws these and no card.
+/// Reads selection here so moving it redraws only the rings.
 private struct BoardSelection: View {
     @Environment(\.colorScheme) private var scheme
     let browser: Browser

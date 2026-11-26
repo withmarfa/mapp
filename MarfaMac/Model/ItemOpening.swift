@@ -88,7 +88,6 @@ nonisolated enum RowMenuEntry: Equatable, Sendable {
     case quickLook, share
     /// The item's link, for one item.
     case copyLink
-    /// The path of each chosen file's file; absent where none of the items is a file.
     case copyFilePath
     case favorite, tag, collection
     /// What the layout adds, such as a board's Move To.

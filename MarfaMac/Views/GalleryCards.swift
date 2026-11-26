@@ -214,7 +214,7 @@ private struct GalleryThumbnail: View {
     }
 }
 
-/// The soft ring around a selected card's picture: 3 points wide, touching the card, in the ring grey of `SelectionLooks`. It reads the selection itself, so a selection that moves redraws the rings and no card.
+/// Reads selection here so moving it redraws only the rings.
 private struct GalleryRing: View {
     @Environment(\.colorScheme) private var scheme
     let browser: Browser
