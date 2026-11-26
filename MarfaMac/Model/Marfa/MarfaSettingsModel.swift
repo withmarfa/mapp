@@ -367,7 +367,9 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
             case .switched:
                 Notice(
                     title: String(localized: "Switched Servers, but Not Everything Was Removed"),
-                    message: String(localized: "The previous server’s copy is still on this Mac. The app removes it before it connects to that server again."))
+                    message: withApproval(
+                        String(localized: "The previous server’s copy is still on this Mac. The app removes it before it connects to that server again."),
+                        approvalAt, .left))
             case .notOpened, .signedInAgain:
                 Notice(
                     title: String(localized: "Can’t Open the Library"),

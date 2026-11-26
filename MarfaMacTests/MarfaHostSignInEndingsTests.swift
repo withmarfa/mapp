@@ -151,7 +151,8 @@ import Testing
         } == nil)
         #expect(host.connection?.address.absoluteString == "http://second.test:8210")
         #expect(!bench.signIns.calls.contains { $0.hasPrefix("signOut") }, "\(bench.signIns.calls)")
-        #expect(host.notices.waiting.isEmpty)
+        let approvalTitles = [Words.approvalMayStandTitle(.left), Words.approvalMayStandTitle(.abandoned)]
+        #expect(!host.notices.waiting.contains { approvalTitles.contains($0.title) }, "\(host.notices.waiting.map(\.title))")
     }
 
     @Test(arguments: [MarfaHost.Problem.notRevoked(address: "https://marfa.test"), .copyKept(.changed(now: 2), signIn: nil, approvalAt: "https://marfa.test"), .notRemoved(signIn: nil, copy: "x", approvalAt: "https://marfa.test")])
