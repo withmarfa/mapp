@@ -13,6 +13,9 @@ paths:
   - MarfaMac/Views/Item*Inspector*.swift
   - MarfaMac/Views/ItemCorner.swift
   - MarfaMac/Views/PageOpener.swift
+  - MarfaMac/Views/FilePageHead.swift
+  - MarfaMac/Views/FileItemContent.swift
+  - MarfaMac/Views/ItemFileView.swift
   - MarfaMac/Model/Items/PageOpenTarget.swift
   - MarfaMac/Views/WebPageItemPage.swift
   - MarfaMac/Views/VersionHistory*.swift
@@ -73,8 +76,6 @@ A pause of 600 ms on a linked item (a chip, a foot or panel row, a link in the t
 - **A group whose field the item may change has a plus on its heading and Remove in each link's menu** (`PanelLinkGroup.editableField`): In Collection, Excerpts and Attachments. The plus opens the page's own relation panel, and a removal is one undo step. Referenced By, Links in the Text, More From This Book and Thread are read only.
 - **Links asks the server for nothing.** It uses edges the copy holds. A child, a collection's member and a file are left out of Referenced By, because each has a place. A link follows Open Items (`Browser.follow(link:)`).
 - **In ends Info's facts,** a menu that moves the item between Library and Feed (`ItemLibrary.perform`), plain where it may not. Leaves the Feed can follow.
-- **Who keeps the item is said once at the top of Info:** the Read Only reason (`Item.obstacle(to:)`), or Synced With a connector's name (`GET /plugins`, read once for a library).
-- **History is asked for only while Info shows** (`PanelHistory`), one read for each version while the item is among the eight latest.
 
 ## What the page locks
 
@@ -134,11 +135,17 @@ Quiet lines at the top of the column say what is not ordinary (`PageNotice.all`)
 - **A right-click on a picture of an item offers Open Item and Copy Link,** then Open and Show in Finder.
 - **Every look of a link reads the same under the pointer** (`LinkLook`); a link to nothing keeps its dashes.
 - **An address that may not be opened**, such as a script, is refused; the rest of the link's menu stays.
+- **A picture's and a PDF's head is the first inset of their own scroller** (`FileHeadSpace`). The title is text, not edited there; rows open their editor (`FilePageHead`).
+- **Fit:** a picture whole, never past its size; a PDF 600 points wide or the column's width, on gray or white (`PDFBackground`).
 - **Removing a link keeps its words.**
 
 ## Files and saved web pages
 
 - **A file's text is never edited here**, and its page is drawn around a viewer (`FileViewing`).
+- **A picture and a PDF keep their own scroller, with the head as its first inset** (`FileHeadSpace`), so the head and its notices scroll away with the file. Any other file has no head.
+- **The head's title and the rows the item may change are edited here** (`FilePageHead`). A file's size and type are Info's, never rows.
+- **Fit shows a picture whole in the page's column, never past its own size.** A PDF's pages are 600 points wide, or as wide as a narrower column.
+- **A PDF's pages sit on gray or on white with a soft shadow** (`PDFBackground`, View › PDF Background; Settings has no row yet). Outline says so when a PDF has no contents.
 - **A saved web page loads nothing from the network by itself.** Its pictures wait until the person asks (`PageNotice`), and asking changes only what is shown, never the file.
 - **A picture larger than the bitmap that the app keeps is softer when enlarged**, because a decoded picture must not take the window's memory.
 
@@ -146,4 +153,3 @@ Quiet lines at the top of the column say what is not ordinary (`PageNotice.all`)
 
 - **It takes the place of the left sidebar and the page** (`VersionHistoryWorkspace`), so nothing in it edits the item by mistake.
 - **The page shows the version as it was**, with the fields it pins while Pinned Properties is on, added words tinted and removed words struck through.
-- **Restoring is a new version**, and Restore Version is offered only when it can be done (`VersionHistoryMode`).

@@ -17,6 +17,8 @@ struct FileItemContent: View {
     /// page shown with neither offers nothing.
     var item: ItemID?
     var details: DetailsPresentation?
+    /// The head the viewer starts below, where the page has one (`FileHeadSpace`). Only a picture and a PDF take it.
+    var head: FileHeadSpace?
     @State private var textPreview: PlainTextFile.Preview?
     @State private var previewURL: URL?
 
@@ -59,9 +61,9 @@ struct FileItemContent: View {
         VStack(spacing: 0) {
             switch FileViewKind.of(type) {
             case .pdf:
-                FilePDFPreview(url: url, item: item, details: details)
+                FilePDFPreview(url: url, item: item, details: details, head: head)
             case .image:
-                FileImageView(url: url, title: title, item: item, details: details)
+                FileImageView(url: url, title: title, item: item, details: details, head: head)
             case nil:
                 FileQuickLookView(url: url, title: title, type: type)
             }
@@ -93,6 +95,7 @@ private struct FilePDFPreview: View {
     let url: URL
     let item: ItemID?
     let details: DetailsPresentation?
+    let head: FileHeadSpace?
     @State private var loaded: (url: URL, document: PDFDocument?)?
     @State private var viewing = FileViewing(kind: .pdf)
 
@@ -101,14 +104,15 @@ private struct FilePDFPreview: View {
         Group {
             if let loaded, loaded.url == url {
                 if let document {
-                    FilePDFView(document: document, viewing: viewing)
+                    FilePDFView(document: document, viewing: viewing, head: head)
                 } else {
                     ContentUnavailableView("Can’t Preview This PDF", systemImage: "doc", description: Text("The file may be damaged or unavailable. Try opening it in another app."))
+                        .padding(.top, head?.top ?? 0)
                 }
             } else {
                 // Something always shows, so the page keeps its height and the read below starts: a view with nothing in
                 // it never runs its task.
-                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity).padding(.top, head?.top ?? 0)
             }
         }
         .modifier(OfferedFileView(viewing: viewing, item: item, details: details, isReady: document != nil))
@@ -135,17 +139,19 @@ private struct FilePDFPreview: View {
 private struct FilePDFView: NSViewRepresentable {
     let document: PDFDocument
     let viewing: FileViewing
+    let head: FileHeadSpace?
+    @AppStorage(PDFBackground.key) private var background = PDFBackground.gray
 
     func makeCoordinator() -> Coordinator { Coordinator(viewing: viewing) }
 
     func makeNSView(context: Context) -> PDFView {
         let view = PDFView()
-        view.autoScales = true
         view.displayMode = .singlePageContinuous
         view.minScaleFactor = FileZoom.range.lowerBound
         view.maxScaleFactor = FileZoom.range.upperBound
         view.document = document
         context.coordinator.attach(to: view)
+        context.coordinator.place(head, background: background, in: view)
         return view
     }
 
@@ -155,6 +161,7 @@ private struct FilePDFView: NSViewRepresentable {
             context.coordinator.attach(to: view)
         }
         context.coordinator.apply(viewing.zoom, to: view)
+        context.coordinator.place(head, background: background, in: view)
     }
 
     static func dismantleNSView(_ view: PDFView, coordinator: Coordinator) {
@@ -165,10 +172,60 @@ private struct FilePDFView: NSViewRepresentable {
     final class Coordinator {
         let viewing: FileViewing
         private weak var view: PDFView?
+        /// The document Fit has sized, so a new one opens at its start.
+        private weak var document: PDFDocument?
         private var observers: [any NSObjectProtocol] = []
         /// The size last given to the view, or taken from it. The view is written only when the chosen size differs from
         /// this, so an update that runs between a pinch and its being read never writes the old size back.
         private var appliedZoom: FileZoom?
+        private var scrolled: ((CGFloat) -> Void)?
+        private var top: CGFloat = 0
+        private var toolbar: CGFloat = 0
+        private var clipObserver: (any NSObjectProtocol)?
+        /// The size Fit last gave the view, which the view reports back as Fit rather than as a size of its own.
+        private var fitted: CGFloat?
+        /// Whether Fit has sized this document yet; only that first fit goes to the start, with the head above it.
+        private var hasFitted = false
+
+        /// The scroller PDFKit keeps inside its view. It is found by type because PDFKit offers no handle to it; a view
+        /// without one is left as it is, with no head inset.
+        private func scroller(of view: PDFView) -> NSScrollView? {
+            view.subviews.lazy.compactMap { $0 as? NSScrollView }.first
+        }
+
+        /// Starts the pages below the toolbar and the head, which scrolls with them, and sets the ground behind the
+        /// pages. The PDF stays the scroller, so its gestures, zoom and find are its own.
+        func place(_ head: FileHeadSpace?, background: PDFBackground, in view: PDFView) {
+            view.backgroundColor = background.ground
+            let white = background == .white
+            if view.pageShadowsEnabled != white { view.pageShadowsEnabled = white }
+            scrolled = head?.scrolled
+            toolbar = head?.toolbar ?? 0
+            guard let scroll = scroller(of: view) else { return }
+            let newTop = head?.top ?? 0
+            if clipObserver == nil {
+                scroll.contentView.postsBoundsChangedNotifications = true
+                clipObserver = NotificationCenter.default.addObserver(
+                    forName: NSView.boundsDidChangeNotification, object: scroll.contentView, queue: .main
+                ) { [weak self, weak scroll] _ in
+                    MainActor.assumeIsolated {
+                        guard let self, let scroll else { return }
+                        self.scrolled?(scroll.contentView.bounds.origin.y + self.top)
+                    }
+                }
+            }
+            guard newTop != top || scroll.contentInsets.top != newTop else { return }
+            // A file still at its start stays there as the head grows or shrinks.
+            let atStart = abs(scroll.contentView.bounds.origin.y + top) < 1
+            top = newTop
+            scroll.automaticallyAdjustsContentInsets = false
+            scroll.contentInsets = NSEdgeInsets(top: newTop, left: 0, bottom: 0, right: 0)
+            scroll.scrollerInsets = NSEdgeInsets(top: toolbar, left: 0, bottom: 0, right: 0)
+            if atStart {
+                scroll.contentView.scroll(to: NSPoint(x: scroll.contentView.bounds.origin.x, y: -newTop))
+                scroll.reflectScrolledClipView(scroll.contentView)
+            }
+        }
 
         init(viewing: FileViewing) {
             self.viewing = viewing
@@ -180,19 +237,55 @@ private struct FilePDFView: NSViewRepresentable {
             appliedZoom = zoom
             switch zoom {
             case .fit:
-                if !view.autoScales { view.autoScales = true }
+                fit(view)
             case .scale(let scale):
-                if view.autoScales || abs(view.scaleFactor - scale) > 0.0005 {
-                    view.autoScales = false
-                    view.scaleFactor = scale
-                }
+                fitted = nil
+                if abs(view.scaleFactor - scale) > 0.0005 { view.scaleFactor = scale }
             }
         }
+
+        /// Fit shows a page as wide as the boards' paper where the column has room, and as wide as the column where it
+        /// has not. PDFKit's own fit fills the column, which leaves a wide window with a page far larger than the
+        /// boards'.
+        private func fit(_ view: PDFView) {
+            guard let page = view.document?.page(at: 0) else { return }
+            let box = page.bounds(for: view.displayBox)
+            let width = page.rotation % 180 == 0 ? box.width : box.height
+            guard width > 0 else { return }
+            let scale = FileZoom.clamped(min(Self.paperWidth / width, view.scaleFactorForSizeToFit))
+            // A file opened now, or at its start, goes to its start with the head above it. Any other keeps the page
+            // the reader is on, which PDFKit can leave as it keeps the middle of what shows.
+            let scroll = scroller(of: view)
+            let atStart = !hasFitted || scroll.map { abs($0.contentView.bounds.origin.y + top) < 1 } == true
+            let reading = atStart ? nil : view.currentPage
+            hasFitted = true
+            fitted = scale
+            if abs(view.scaleFactor - scale) > 0.0005 { view.scaleFactor = scale }
+            if let reading {
+                if view.currentPage !== reading { view.go(to: reading) }
+                return
+            }
+            guard let scroll else { return }
+            let start = { [top] in
+                scroll.contentView.scroll(to: NSPoint(x: scroll.contentView.bounds.origin.x, y: -top))
+                scroll.reflectScrolledClipView(scroll.contentView)
+            }
+            start()
+            // PDFKit lays the pages out again a turn later.
+            DispatchQueue.main.async(execute: start)
+        }
+
+        /// The width of a page in the boards (`PDF`, `PDF-Full`).
+        static let paperWidth: CGFloat = 600
 
         func attach(to view: PDFView) {
             detach()
             self.view = view
             appliedZoom = nil
+            if view.document !== document {
+                document = view.document
+                hasFitted = false
+            }
             let center = NotificationCenter.default
             observers = [
                 center.addObserver(forName: .PDFViewPageChanged, object: view, queue: .main) { [weak self] _ in
@@ -201,10 +294,24 @@ private struct FilePDFView: NSViewRepresentable {
                 center.addObserver(forName: .PDFViewScaleChanged, object: view, queue: .main) { [weak self] _ in
                     MainActor.assumeIsolated { self?.scaleChanged() }
                 },
+                // Fit follows the column as the window or the panes change width.
+                center.addObserver(forName: NSView.frameDidChangeNotification, object: view, queue: .main) { [weak self, weak view] _ in
+                    MainActor.assumeIsolated {
+                        guard let self, let view, self.appliedZoom == .fit else { return }
+                        self.fit(view)
+                    }
+                },
             ]
+            view.postsFrameChangedNotifications = true
             viewing.showPage = { [weak self] number in
                 guard let self, let shown = self.view, let page = shown.document?.page(at: number - 1) else { return number }
                 shown.go(to: page)
+                // The page's top is put at the scroller's top edge, which is under the toolbar.
+                if let scroll = scroller(of: shown), toolbar > 0 {
+                    let origin = scroll.contentView.bounds.origin
+                    scroll.contentView.scroll(to: NSPoint(x: origin.x, y: origin.y - toolbar))
+                    scroll.reflectScrolledClipView(scroll.contentView)
+                }
                 return currentPage(in: shown)
             }
             // Attaching happens while SwiftUI makes or updates the view, so what it reports is read a turn later.
@@ -213,6 +320,8 @@ private struct FilePDFView: NSViewRepresentable {
         }
 
         func detach() {
+            if let clipObserver { NotificationCenter.default.removeObserver(clipObserver) }
+            clipObserver = nil
             for observer in observers { NotificationCenter.default.removeObserver(observer) }
             observers = []
             viewing.showPage = nil
@@ -236,9 +345,12 @@ private struct FilePDFView: NSViewRepresentable {
         private func scaleChanged() {
             Task { @MainActor [weak self] in
                 guard let self, let view else { return }
-                if view.autoScales {
-                    viewing.reportFit(FileZoom.clamped(view.scaleFactor))
+                // Fit has not sized a view with no pages yet, so the size it has is not one the person chose.
+                if appliedZoom == .fit, fitted == nil { return }
+                if let fitted, abs(view.scaleFactor - fitted) <= 0.0005 {
+                    viewing.reportFit(fitted)
                 } else {
+                    fitted = nil
                     viewing.adopt(scale: view.scaleFactor)
                     // A size the view took on its own is now the chosen one, so it is not written back.
                     appliedZoom = viewing.zoom
@@ -254,6 +366,8 @@ private struct FileImageView: View {
     let title: String
     let item: ItemID?
     let details: DetailsPresentation?
+    let head: FileHeadSpace?
+    @StoredPageStyle private var style
     @State private var decoded: (url: URL, image: DecodedImage?)?
     @State private var viewing = FileViewing(kind: .image)
 
@@ -272,7 +386,10 @@ private struct FileImageView: View {
                     picture(image, in: geometry.size)
                 } else {
                     ContentUnavailableView("Can’t Preview This Image", systemImage: "photo", description: Text("Open the file in another app to view it."))
+                        .padding(.top, head?.top ?? 0)
                 }
+            } else {
+                ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity).padding(.top, head?.top ?? 0)
             }
         }
         .modifier(OfferedFileView(viewing: viewing, item: item, details: details, isReady: image != nil))
@@ -283,21 +400,32 @@ private struct FileImageView: View {
         }
     }
 
+    /// The picture sits in the page's column under the head, with the page's own scroller, and Fit shows it whole in the
+    /// column and the window's height. Larger sizes scroll both ways.
     private func picture(_ decoded: DecodedImage, in pane: CGSize) -> some View {
-        let fit = FileZoom.imageFit(content: decoded.pixelSize, in: pane) ?? 1
+        let inset = head == nil ? 0 : style.horizontalInset(for: pane.width)
+        let toolbar = head?.toolbar ?? 0
+        let column = CGSize(width: max(pane.width - inset * 2, 1), height: max(pane.height - toolbar - 48, 1))
+        let fit = FileZoom.imageFit(content: decoded.pixelSize, in: column) ?? 1
         let scale = viewing.zoom.scale(fit: fit)
-        // Fitted, the picture is never a rounding error larger than the pane, which would show scroll bars. A picture
+        // Fitted, the picture is never a rounding error larger than the column, which would show scroll bars. A picture
         // too large for Fit's smallest size overflows its pane and scrolls.
-        let width = decoded.pixelSize.width * scale
-        let height = decoded.pixelSize.height * scale
         let isFitted = viewing.zoom == .fit && fit > FileZoom.range.lowerBound
+        let width = isFitted ? min(decoded.pixelSize.width * scale, column.width) : decoded.pixelSize.width * scale
+        let height = isFitted ? min(decoded.pixelSize.height * scale, column.height) : decoded.pixelSize.height * scale
+        let top = head?.top ?? 0
         return ScrollView([.horizontal, .vertical]) {
             Image(decorative: decoded.image, scale: 1).resizable()
-                .frame(width: isFitted ? min(width, pane.width) : width, height: isFitted ? min(height, pane.height) : height)
+                .frame(width: width, height: height)
+                .clipShape(.rect(cornerRadius: 10))
                 .accessibilityLabel(title)
-                // A picture smaller than the pane sits in its middle.
-                .frame(minWidth: pane.width, minHeight: pane.height)
+                .padding(.horizontal, inset)
+                .padding(.bottom, 24)
+                .frame(minWidth: pane.width, alignment: .leading)
         }
+        .contentMargins(.top, top, for: .scrollContent)
+        .contentMargins(.top, toolbar, for: .scrollIndicators)
+        .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y + top } action: { _, offset in head?.scrolled(offset) }
         .onChange(of: fit, initial: true) { viewing.reportFit(fit) }
     }
 

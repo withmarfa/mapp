@@ -44,21 +44,31 @@ enum ItemFileResolution: Equatable {
 }
 
 /// A file item's file, shown once it is fetched, under the page's notice (`PageNotice`) where it has one: a deleted item,
-/// a held write, and a file the library does not have. Its viewer keeps its own scroller, so the notice stays above it.
+/// a held write, and a file the library does not have. A picture and a PDF keep their own scroller and take the page's
+/// head, with the notice above it, as the first inset of it (`FileHeadSpace`), so the head scrolls away with the file.
+/// Any other file's viewer has no head, and the notice stays above it.
 struct ItemFileView: View {
     @CurrentLibrary private var library
     @StoredPageStyle private var style
     @Environment(\.undoManager) private var undoManager
     @Environment(\.openWindow) private var openWindow
     @Environment(\.settingsLauncher) private var settingsLauncher
+    @AppStorage(InterfaceKey.showsPageToolbarBackground) private var showsToolbarBackground = true
     @State private var width: CGFloat = 0
     let id: ItemID
     /// The window the file's size and page are offered to once it is ready (`FileItemContent`).
     var details: DetailsPresentation?
-    /// Told where the file is once it is, and nil when it is not, so a window can offer to share it.
+    /// Shows the item a link in the head names.
+    var open: (ItemID) -> Void = { _ in }
+    /// Whether the page backs the toolbar with glass while the file is under it.
+    var backsToolbar = true
+    /// Told where the file is once it is, and nil when it is not, so a window can share it.
     var onResolved: (URL?) -> Void = { _ in }
 
     @State private var loader = ItemFileLoader()
+    @State private var headerScroll = HeaderScroll()
+    @State private var blockHeight: CGFloat = 0
+    @State private var headerHeight: CGFloat = 0
 
     private var item: Item? { library.item(id) }
 
@@ -68,44 +78,124 @@ struct ItemFileView: View {
         return PageNotice.all(for: item)
     }
 
+    /// Whether the file is drawn with the head as its first inset: a picture or a PDF, as the library names its type.
+    private var hasHead: Bool {
+        guard let item else { return false }
+        let url: URL
+        if case .ready(let ready)? = loader.resolution(of: id) { url = ready } else { url = URL(filePath: "/" + (item.name ?? "")) }
+        return FileViewKind.of(FileItemContent.type(of: url, contentType: item.fileType)) != nil
+    }
+
+    private static let headerBlock = "fileHeaderBlock"
+
     var body: some View {
         // The task sits on one container. On the switch itself (`Group` hands a modifier to each branch) it would
         // start again with every branch, and a load changes the branch: the file would be fetched over and over.
         ZStack {
-            switch loader.resolution(of: id) {
-            case nil:
-                ProgressView("Getting File…")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            case .ready(let url):
-                FileItemContent(url: url, title: item?.name ?? url.lastPathComponent, contentType: item?.fileType, item: id, details: details)
-            // The page's notice says so.
-            case .unavailable:
-                Color.clear
-            case .failed(let reason):
-                ContentUnavailableView {
-                    Label("Can’t Get This File", systemImage: "exclamationmark.icloud")
-                } description: {
-                    if let reason {
-                        Text(reason)
-                    } else {
-                        Text("The app couldn’t get the file from the server. Check your connection, then try again.")
+            if hasHead {
+                GeometryReader { geometry in
+                    let inset = style.horizontalInset(for: geometry.size.width)
+                    ZStack(alignment: .top) {
+                        content(space: FileHeadSpace(toolbar: geometry.safeAreaInsets.top, head: blockHeight, scrolled: scrolled))
+                            .ignoresSafeArea(.container, edges: .top)
+                        if let item {
+                            ScrollingHeader(scroll: headerScroll) { headBlock(item, inset: inset) }
+                        }
+                        ScrollingToolbarBand(
+                            scroll: headerScroll, toolbarHeight: geometry.safeAreaInsets.top, isEnabled: backsToolbar && showsToolbarBackground)
                     }
-                } actions: {
-                    Button("Try Again") { Task { await load() } }
                 }
+            } else {
+                content(space: nil)
+                    .safeAreaInset(edge: .top, spacing: 0) {
+                        if !notices.isEmpty {
+                            PageNoticeView(notices: notices, run: run)
+                                .padding(.horizontal, style.horizontalInset(for: width))
+                                .padding(.vertical, 12)
+                        }
+                    }
             }
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
-        .safeAreaInset(edge: .top, spacing: 0) {
+        .task(id: id) { await load() }
+        .onChange(of: id) { old, _ in
+            details?.headerScrolled(nil, for: old)
+            headerScroll.reset()
+        }
+        .onChange(of: headerHeight) { feedAway() }
+        .onChange(of: item?.displayTitle) { feedAway() }
+        .onChange(of: details?.isFocused(on: id)) { _, focused in
+            guard focused == true else { return }
+            headerHeight = 0
+            feedAway()
+        }
+        .onDisappear { details?.headerScrolled(nil, for: id) }
+    }
+
+    /// The notice and the head, one block whose height is the viewer's first inset.
+    private func headBlock(_ item: Item, inset: CGFloat) -> some View {
+        let isFocused = details?.isFocused(on: id) == true
+        return VStack(spacing: 0) {
             if !notices.isEmpty {
-                PageNoticeView(notices: notices) { notice in
-                    notice.run(in: library, undoManager: undoManager, openWindow: openWindow, openSettings: { [settingsLauncher] in settingsLauncher?.show($0) })
-                }
-                .padding(.horizontal, style.horizontalInset(for: width))
-                .padding(.vertical, 12)
+                PageNoticeView(notices: notices, run: run)
+                    .padding(.horizontal, inset)
+                    .padding(.top, 12)
+                    .padding(.bottom, isFocused ? 12 : 0)
+            }
+            // Focus leaves only the file: its title is in the toolbar and its properties are hidden.
+            if !isFocused, let details {
+                FilePageHead(item: item, inset: inset, drafts: details, open: open)
+                    .onGeometryChange(for: CGFloat.self) { [space = Self.headerBlock] in $0.frame(in: .named(space)).maxY } action: { headerHeight = $0 }
             }
         }
-        .task(id: id) { await load() }
+        .coordinateSpace(name: Self.headerBlock)
+        .frame(maxWidth: .infinity)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { blockHeight = $0 }
+        // Above the block too, so a file pulled past its start shows the window's color there.
+        .background { Color(nsColor: .windowBackgroundColor).padding(.top, -1_000) }
+    }
+
+    @ViewBuilder private func content(space: FileHeadSpace?) -> some View {
+        switch loader.resolution(of: id) {
+        case nil:
+            ProgressView("Getting File…")
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.top, space?.top ?? 0)
+        case .ready(let url):
+            FileItemContent(url: url, title: item?.name ?? url.lastPathComponent, contentType: item?.fileType, item: id, details: details, head: space)
+        // The page's notice says so.
+        case .unavailable:
+            Color.clear
+        case .failed(let reason):
+            ContentUnavailableView {
+                Label("Can’t Get This File", systemImage: "exclamationmark.icloud")
+            } description: {
+                if let reason {
+                    Text(reason)
+                } else {
+                    Text("The app couldn’t get the file from the server. Check your connection, then try again.")
+                }
+            } actions: {
+                Button("Try Again") { Task { await load() } }
+            }
+            .padding(.top, space?.top ?? 0)
+        }
+    }
+
+    private func run(_ notice: PageNotice) {
+        notice.run(in: library, undoManager: undoManager, openWindow: openWindow, openSettings: { [settingsLauncher] in settingsLauncher?.show($0) })
+    }
+
+    private func scrolled(_ offset: CGFloat) {
+        headerScroll.scrolled(to: offset, isShowingPage: true)
+        feedAway()
+    }
+
+    /// Tells the window once the head has gone under the toolbar, so the toolbar names the item.
+    private func feedAway() {
+        guard let item, let details else { return }
+        let head = ScrolledHead(item: id, title: item.displayTitle, typeIcon: library.catalogue.icon(for: item.type))
+        details.headerScrolled(hasHead && headerScroll.isAway(headerHeight: headerHeight) ? head : nil, for: id)
     }
 
     private func load() async {
@@ -123,7 +213,7 @@ struct FileItemPage: View {
     /// Shows the item a link in the page names.
     let open: (ItemID) -> Void
     var onResolved: (URL?) -> Void = { _ in }
-    /// Whether a web page backs the toolbar with a band while it is scrolled under it (`WebPageItemPage`).
+    /// Whether a web page or a file backs the toolbar with a band while it is scrolled under it (`WebPageItemPage`).
     var backsToolbar = true
 
     var body: some View {
@@ -137,7 +227,7 @@ struct FileItemPage: View {
                 item: item, document: document, runsScripts: runsScripts, drafts: drafts, open: open, onResolved: resolved,
                 backsToolbar: backsToolbar)
         } else {
-            ItemFileView(id: item.id, details: drafts, onResolved: resolved)
+            ItemFileView(id: item.id, details: drafts, open: open, backsToolbar: backsToolbar, onResolved: resolved)
         }
     }
 }

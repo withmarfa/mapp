@@ -344,7 +344,7 @@ struct WebPageItemPage: View {
 }
 
 /// Moves its content up with the page, so the header scrolls as the rest of the page does. A scroll redraws only this.
-private struct ScrollingHeader<Content: View>: View {
+struct ScrollingHeader<Content: View>: View {
     let scroll: HeaderScroll
     @ViewBuilder let content: Content
 
@@ -352,7 +352,7 @@ private struct ScrollingHeader<Content: View>: View {
 }
 
 /// The band behind the toolbar once the page is under it. It reads the offset itself, so a scroll redraws only this.
-private struct ScrollingToolbarBand: View {
+struct ScrollingToolbarBand: View {
     let scroll: HeaderScroll
     let toolbarHeight: CGFloat
     let isEnabled: Bool

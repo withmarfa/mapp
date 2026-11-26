@@ -9,7 +9,7 @@ import Marfa
 import UniformTypeIdentifiers
 import MarfaTesting
 
-/// Pictures, a PDF and bookmarks for a screenshot of the gallery: made here, so no picture ships. A debug build asks for
+/// Pictures, two PDFs and bookmarks for a screenshot of the gallery: made here, so no picture ships. A debug build asks for
 /// them with `-MarfaMacGallerySample`.
 nonisolated enum SampleGallery {
     static let flag = "-MarfaMacGallerySample"
@@ -81,6 +81,8 @@ nonisolated enum SampleGallery {
             File(id: "pdf-quotation", title: "Kitchen quotation, Harbour Joinery", type: "core.file", mime: "application/pdf",
                  data: document(title: "Kitchen quotation", lines: ["Harbour Joinery", "Worktops, units and fitting", "Total: 14,200", "Lead time: eight weeks"]),
                  favorite: false, daysAgo: 3, attachedTo: nil),
+            File(id: "pdf-report", title: "Lewes Trust annual report 2025.pdf", type: "core.file", mime: "application/pdf",
+                 data: report(), favorite: false, daysAgo: 3, attachedTo: nil),
             File(id: "video-resize", title: "Live resize at 120 Hz", type: "core.file", mime: "video/mp4",
                  data: await video(top: (0.2, 0.35, 0.55), bottom: (0.85, 0.6, 0.35)), favorite: false, daysAgo: 4, attachedTo: nil),
             File(id: "page-vans", title: "Hiring a van for a print fair", type: "core.file.webpage", mime: "text/html",
@@ -199,6 +201,56 @@ nonisolated enum SampleGallery {
         receiver.finish()
         await writer.finishWriting()
         return (try? Data(contentsOf: url)) ?? Data()
+    }
+
+    /// A report of 48 pages with contents, as the boards' long PDF has.
+    private static func report() -> Data {
+        let chapters = [
+            ("The chair’s letter", [String]()), ("The year in numbers", ["Income", "Spending", "Reserves"]),
+            ("The six projects", ["The boat shed", "Saturday school", "The orchard", "Warm rooms", "The archive", "Bursaries"]),
+            ("Who gave", []), ("Trustees and staff", []), ("Accounts", []),
+        ]
+        let data = NSMutableData()
+        var box = CGRect(x: 0, y: 0, width: 595, height: 842)
+        guard let consumer = CGDataConsumer(data: data as CFMutableData),
+              let context = CGContext(consumer: consumer, mediaBox: &box, nil) else { return Data() }
+        let headings = chapters.flatMap { [$0.0] + $0.1 }
+        // Every page after the cover runs under one heading, and the contents go to the first page of each.
+        let heading = { (page: Int) in (page - 1) * headings.count / 47 }
+        for page in 0..<48 {
+            context.beginPDFPage(nil)
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
+            NSColor.white.setFill()
+            box.fill()
+            if page == 0 {
+                NSColor(red: 0.55, green: 0.7, blue: 0.85, alpha: 1).setFill()
+                CGRect(x: 0, y: 442, width: 595, height: 400).fill()
+                "LEWES TRUST".draw(at: CGPoint(x: 48, y: 380), withAttributes: [.font: NSFont.boldSystemFont(ofSize: 11), .foregroundColor: NSColor.systemGreen])
+                "Annual report 2025".draw(at: CGPoint(x: 48, y: 320), withAttributes: [.font: NSFont(name: "Georgia-Bold", size: 44) ?? NSFont.boldSystemFont(ofSize: 44), .foregroundColor: NSColor.black])
+            } else {
+                headings[heading(page)].draw(at: CGPoint(x: 60, y: 760), withAttributes: [.font: NSFont.boldSystemFont(ofSize: 24), .foregroundColor: NSColor.black])
+                for line in 0..<14 {
+                    "Six projects, four hundred and twelve thousand pounds, and everyone who gave it."
+                        .draw(at: CGPoint(x: 60, y: 700 - Double(line) * 40), withAttributes: [.font: NSFont.systemFont(ofSize: 12), .foregroundColor: NSColor.darkGray])
+                }
+                "\(page + 1)".draw(at: CGPoint(x: 290, y: 40), withAttributes: [.font: NSFont.systemFont(ofSize: 10), .foregroundColor: NSColor.gray])
+            }
+            NSGraphicsContext.restoreGraphicsState()
+            context.endPDFPage()
+        }
+        // Written by Core Graphics as the file is made: an outline set through PDFKit is lost when it writes the file.
+        func entry(_ label: String, children: [String] = []) -> [String: Any] {
+            let index = headings.firstIndex(of: label) ?? 0
+            let first = (1..<48).first { heading($0) == index } ?? 1
+            var item: [String: Any] = [kCGPDFOutlineTitle as String: label, kCGPDFOutlineDestination as String: first + 1]
+            if !children.isEmpty { item[kCGPDFOutlineChildren as String] = children.map { entry($0) } }
+            return item
+        }
+        let outline = [kCGPDFOutlineChildren as String: chapters.map { entry($0.0, children: $0.1) }]
+        CGPDFContextSetOutline(context, outline as CFDictionary)
+        context.closePDF()
+        return data as Data
     }
 
     private static func document(title: String, lines: [String]) -> Data {

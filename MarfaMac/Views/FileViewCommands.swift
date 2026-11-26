@@ -75,10 +75,21 @@ enum FileViewCommand: CaseIterable {
     }
 }
 
-/// The commands as View menu items for the file page in front, the pages' commands after a divider.
+/// The commands as View menu items for the file page in front, the pages' commands after a divider, and for a PDF the
+/// background its pages sit on.
 struct FileViewCommands: View {
     let viewing: FileViewing
     let shortcuts: ShortcutBindings
+    @AppStorage(PDFBackground.key) private var background = PDFBackground.gray
+
+    /// Gray is the default, so it is stored as no choice.
+    private var storedBackground: Binding<PDFBackground> {
+        Binding {
+            background
+        } set: { choice in
+            if choice == .gray { UserDefaults.standard.removeObject(forKey: PDFBackground.key) } else { background = choice }
+        }
+    }
 
     var body: some View {
         let commands = FileViewCommand.offered(for: viewing.kind)
@@ -89,6 +100,11 @@ struct FileViewCommands: View {
             Divider()
             button(.nextPage)
             button(.previousPage)
+            Divider()
+            Picker("PDF Background", selection: storedBackground) {
+                ForEach(PDFBackground.allCases) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.menu)
         }
     }
 

@@ -7928,6 +7928,9 @@
     "PDF" : {
       "extractionState" : "manual"
     },
+    "PDF Background" : {
+
+    },
     "PDF, ^[%lld page](inflect: true)" : {
 
     },
@@ -11065,6 +11068,9 @@
 
     },
     "This Month" : {
+
+    },
+    "This PDF has no contents." : {
 
     },
     "This Place" : {

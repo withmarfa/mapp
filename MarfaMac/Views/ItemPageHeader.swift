@@ -203,12 +203,25 @@ struct ItemPageHeader: ViewModifier {
         of row: String, in id: ItemID, under rect: CGRect, library: any ItemLibrary, drafts: DetailsPresentation,
         undoManager: UndoManager?, editor: EditorController
     ) {
-        guard editor.isShowing(id), let item = library.item(id) else { return }
+        guard editor.isShowing(id) else { return }
+        let follow: (ItemID) -> Void = { [weak editor] in editor?.follow($0) }
+        guard let request = valueRequest(of: row, in: id, library: library, drafts: drafts, undoManager: undoManager, follow: follow) else { return }
+        editor.presentEditor(request, under: rect)
+    }
+
+    /// The editor for one of the item's values, or nil where the item cannot take the edit. A file's page asks the same.
+    static func valueRequest(
+        of row: String, in id: ItemID, library: any ItemLibrary, drafts: DetailsPresentation, undoManager: UndoManager?,
+        follow: @escaping (ItemID) -> Void
+    ) -> ValueEditRequest? {
+        guard let item = library.item(id) else { return nil }
         let catalogue = library.catalogue
         let kind: ValueEditKind?
         switch row {
         case PagePlacement.tags:
             kind = item.allows(.tags) ? .tags : nil
+        case PagePlacement.parent:
+            kind = item.allows(.links) ? .relation(PagePlacement.parent) : nil
         case EventTime.rowID:
             kind = EventTime.of(item.type, in: catalogue).flatMap { item.allows(.fields) ? ValueEditKind.eventTime($0) : nil }
         case ItemLocation.rowID:
@@ -223,12 +236,12 @@ struct ItemPageHeader: ViewModifier {
                 kind = item.allows(.fields) ? catalogue.itemTypes[item.type]?.fields.first { $0.key == row }.flatMap(ValueEditKind.init(field:)) : nil
             }
         }
-        guard let kind else { return }
-        var request = Self.request(kind, of: id, in: library, undoManager: undoManager, editor: editor)
+        guard let kind else { return nil }
+        var request = Self.request(kind, of: id, library: library, undoManager: undoManager, follow: follow)
         request.needsValues = { [weak drafts] type in
             drafts?.typeValues = TypeValuesRequest(ids: [id], type: type, undoManager: undoManager)
         }
-        editor.presentEditor(request, under: rect)
+        return request
     }
 
     /// Opens the menu a row's name asks for, under the name, and carries out what the person chooses. How the row shows
@@ -304,12 +317,18 @@ struct ItemPageHeader: ViewModifier {
     private static func request(
         _ kind: ValueEditKind, of id: ItemID, in library: any ItemLibrary, undoManager: UndoManager?, editor: EditorController
     ) -> ValueEditRequest {
+        request(kind, of: id, library: library, undoManager: undoManager) { [weak editor] in editor?.follow($0) }
+    }
+
+    private static func request(
+        _ kind: ValueEditKind, of id: ItemID, library: any ItemLibrary, undoManager: UndoManager?, follow: @escaping (ItemID) -> Void
+    ) -> ValueEditRequest {
         var request = ValueEditRequest(kind: kind, library: library, item: id, undoManager: undoManager)
         request.write = { value in
             guard let key = kind.field?.key else { return false }
             return library.setItemProperty(id, key: key, value: value, undoManager: undoManager)
         }
-        request.open = { [weak editor] in editor?.follow($0) }
+        request.open = follow
         return request
     }
 
