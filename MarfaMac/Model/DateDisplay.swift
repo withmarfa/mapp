@@ -90,9 +90,8 @@ nonisolated struct DateFormat: Hashable, Sendable, RawRepresentable {
         return defaults.string(forKey: key).flatMap(Self.init(rawValue:)) ?? standard
     }
 
-    /// Keeps a copy of a stored value that does not read, such as an older version's word, under `setAsideKey`, so a
-    /// change writes over nothing. The value stays where it is, since removing it would remove it from the Marfa too.
-    /// Run at launch, before any view writes.
+    /// Keeps a copy of an unreadable value before a view can replace it. Removing the active value would also clear
+    /// the date format in the Marfa.
     static func setAsideUnreadable(in defaults: UserDefaults = .standard) {
         guard let value = defaults.object(forKey: key) else { return }
         let text = value as? String ?? String(describing: value)

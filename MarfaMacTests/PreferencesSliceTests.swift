@@ -12,7 +12,6 @@ private actor SliceServer: MarfaRefreshing {
     var refusal: MarfaError?
     private(set) var hydrated: [[String]] = []
     private(set) var declared = 0
-    /// Each step in the order it was asked.
     private(set) var steps: [String] = []
 
     init(evidence: PreferencesReach.Evidence?, holds: [String] = MarfaSync.slice, refusal: MarfaError? = nil) {

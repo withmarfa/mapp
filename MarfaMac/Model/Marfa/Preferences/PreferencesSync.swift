@@ -477,8 +477,7 @@ final class PreferencesSync {
     /// and wrote this one to a conflicted copy, each member it carried that this Mac still holds is written again, so
     /// only the same member's later write wins.
     ///
-    /// A row this Mac lacks of a setting whose store set something aside since the last step (`asides`, `Record.asides`)
-    /// is dropped as a row the store dropped when `apply` wrote it, so it stays in the Marfa.
+    /// If a store set a value aside since the last step, its missing rows may still belong in the Marfa.
     private func follow(_ chosen: PreferencesItem, from adopted: Record.Adopted, of instance: String, local: Local,
                         switched: Bool, winning: [String: Set<PreferenceUnit>], asides: [String: Int]?,
                         siblings: [PreferencesItem], in copy: any PreferencesCopy, generation: Int) async throws

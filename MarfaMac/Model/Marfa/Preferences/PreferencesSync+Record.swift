@@ -47,9 +47,7 @@ extension PreferencesSync {
         /// carries the setting is queued (`PreferencesSync.apply`). A step that switches Marfa or adopts one clears the
         /// marks it read, as the Marfa's settings win whole there.
         var winning: [String: Set<PreferenceUnit>]?
-        /// How many values each setting's store had set aside, by defaults key, when the last step that finished read this
-        /// Mac's settings. A store sets aside only on its own, so a row of a setting whose count grew since is not one the
-        /// person removed (`PreferencesSync.follow`).
+        /// Set-aside counts by defaults key, sampled at the start of the last completed step.
         var asides: [String: Int]?
 
         static func read(_ defaults: UserDefaults) -> Record {

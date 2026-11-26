@@ -8,9 +8,8 @@ nonisolated protocol MarfaRefreshing: Sendable {
     func fetchKept() async throws -> KeptFetch
     /// Declares the app's own type, which a hydration registers where the server lacks it and the sign-in may.
     func declarePreferences() async throws
-    /// Chooses the app's settings tables where the copy has not. A table chosen once the copy is whole is filled at
-    /// once under the copy's stream, and the core refuses a follow that starts meanwhile, which stops the copy
-    /// (withmarfa/marfa#3606).
+    /// Chooses the settings tables before hydration. On a hydrated copy, filling a newly chosen table can keep the
+    /// follow from restarting (withmarfa/marfa#3606).
     func choosePreferencesTables() async
     /// Whether the server holds the app's own type and what the sign-in's scopes are; nil where either cannot be read.
     func preferencesEvidence() async -> PreferencesReach.Evidence?
