@@ -318,7 +318,7 @@ extension MarfaLibrary {
     }
 
     /// Newest first, as the source paints them; the views sort as the person chose.
-    static func ordered(_ items: [Item]) -> [Item] {
+    nonisolated static func ordered(_ items: [Item]) -> [Item] {
         // The keys are read once, and positions sorted rather than items, which are large to move.
         let keys = items.map { (created: $0.created, id: $0.id.rawValue) }
         return items.indices.sorted { a, b in

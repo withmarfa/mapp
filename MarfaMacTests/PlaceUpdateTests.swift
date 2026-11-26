@@ -199,10 +199,14 @@ import UniformTypeIdentifiers
     // MARK: Runs of changes
 
     @Test func aPlaceWaitingForItsFirstArrangementDoesNotReportItselfEmpty() async throws {
-        let (library, source) = try await BigLibrary.loaded(scale: 4)
+        let source = FakeItemSource()
+        let library = MarfaLibrary(source: source, notices: Notices())
         let list = browser(library)
         list.viewMode = .list
         let order = ItemOrder(sort: .title)
+        #expect(list.listDrawsNoItem(in: library, order: order) == nil, "the copy is still opening")
+        source.send(.loaded(SourceSnapshot(items: BigLibrary.items(scale: 4), catalogue: BigLibrary.catalogue)))
+        try #require(await eventually { library.isLoaded })
         #expect(library.count(in: .library) > Browser.arrangesAlongsideAbove)
         #expect(list.listDrawsNoItem(in: library, order: order) == nil, "the opening place is waiting")
         // Leave while the Library's ordering is under way. An empty place must still report that it is empty.

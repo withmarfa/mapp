@@ -39,7 +39,7 @@ struct ItemDetail: View {
             Group {
                 if let isEmpty = browser.listDrawsNoItem(in: library, order: order) {
                     if isEmpty { ListEmptyState(browser: browser) }
-                    else { EmptyState("No Item Selected") }
+                    else if !browser.wantsFirstSelection { EmptyState("No Item Selected") }
                 } else {
                     Color.clear
                 }

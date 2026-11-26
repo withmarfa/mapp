@@ -84,12 +84,14 @@ extension Browser {
             } else {
                 return shown
             }
+            if rest.count == shown.count { return shown }
             let isShown = Set(shown)
             return shown + rest.filter { !isShown.contains($0) }
         }
         guard let content = readyTable(in: library) else { return nil }
         // A grouped table shows its rows group by group, not in the sort's order across groups.
         let shown = (content.grouping == nil ? content.rows : content.groups.flatMap(\.rows)).map(\.id)
+        if shown.count == content.allRows.count { return shown }
         let isShown = Set(shown)
         return shown + content.allRows.map(\.id).filter { !isShown.contains($0) }
     }
