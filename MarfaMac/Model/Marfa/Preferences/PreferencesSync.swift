@@ -625,7 +625,7 @@ final class PreferencesSync {
             guard held > before else { continue }
             let missing = base.keys.filter { setting.owns($0) && mine[$0] == nil && adopted.frozen[$0] == nil }
             guard !missing.isEmpty else { continue }
-            let own = Set(base.merging(remote) { first, _ in first }.filter { setting.owns($0.key) }.values)
+            let own = Set([base, remote].flatMap { units in units.filter { setting.owns($0.key) }.values })
             for entry in SyncedSetting.setAsideEntries(in: kind, defaults).prefix(held).dropFirst(before) where !own.contains(entry) {
                 for unit in setting.units(setAsideIn: entry, among: missing, library: library) {
                     adopted.frozen[unit] = Record.Frozen(left: nil)
@@ -635,7 +635,8 @@ final class PreferencesSync {
     }
 
     /// Sets aside each row of `remote` whose value is not JSON and that `base` did not already hold, under its store's
-    /// key, and answers every such row. They count as held on this Mac, so a step never writes over or deletes them.
+    /// key, and answers every such row. They count as held on this Mac, so only the person's own change here writes
+    /// over them, and nothing deletes them.
     private func setAsideUnreadable(_ remote: PreferenceUnits, base: PreferenceUnits) -> PreferenceUnits {
         let unreadable = remote.filter { PreferenceJSON.value($0.value) == nil }
         for (unit, text) in unreadable where base[unit] != text {
