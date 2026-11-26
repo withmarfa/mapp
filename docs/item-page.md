@@ -16,6 +16,12 @@ paths:
   - MarfaMac/Views/FilePageHead.swift
   - MarfaMac/Views/FileItemContent.swift
   - MarfaMac/Views/ItemFileView.swift
+  - MarfaMac/Views/FileMediaPage.swift
+  - MarfaMac/Views/PlaybackBar.swift
+  - MarfaMac/Views/WaveformView.swift
+  - MarfaMac/Model/Items/MediaPlayback.swift
+  - MarfaMac/Model/Items/PlaybackPlaces.swift
+  - MarfaMac/Model/Items/WaveformEnvelope.swift
   - MarfaMac/Model/Items/PageOpenTarget.swift
   - MarfaMac/Views/WebPageItemPage.swift
   - MarfaMac/Views/VersionHistory*.swift
@@ -116,7 +122,7 @@ Quiet lines at the top of the column say what is not ordinary (`PageNotice.all`)
 | A web page without one | Focus |
 | An image | Size, Focus |
 | A PDF | Page (two or more), size, Focus |
-| Any other file, or one still arriving | Focus |
+| Audio, video, any other file, or one still arriving | Focus |
 | An item in the modal | None |
 | The column beside a layout | Open as Page |
 
@@ -133,17 +139,15 @@ Quiet lines at the top of the column say what is not ordinary (`PageNotice.all`)
 - **A plain click on a link places the caret**, because the page is for writing. Command-click, or Open Link at the caret, opens it.
 - **A link to an item opens as Settings says** (`ItemOpening`), and one followed in the modal stays there. So does a link in a row, the foot, a panel or a file's page (`EditorController.follow`).
 - **A right-click on a picture of an item offers Open Item and Copy Link,** then Open and Show in Finder.
-- **Every look of a link reads the same under the pointer** (`LinkLook`); a link to nothing keeps its dashes.
 - **An address that may not be opened**, such as a script, is refused; the rest of the link's menu stays.
-- **A picture's and a PDF's head is the first inset of their own scroller** (`FileHeadSpace`). The title is text, not edited there; rows open their editor (`FilePageHead`).
-- **Fit:** a picture whole, never past its size; a PDF 600 points wide or the column's width, on gray or white (`PDFBackground`).
 - **Removing a link keeps its words.**
 
 ## Files and saved web pages
 
+- **Audio and video play from one bar at the window's foot** (`PlaybackBar`): one item at a time, paused at first and where it was left (`PlaybackPlaces`). Leaving stops it. A transcript waits for Marfa.
 - **A file's text is never edited here**, and its page is drawn around a viewer (`FileViewing`).
-- **A picture and a PDF keep their own scroller, with the head as its first inset** (`FileHeadSpace`), so the head and its notices scroll away with the file. Any other file has no head.
-- **The head's title and the rows the item may change are edited here** (`FilePageHead`). A file's size and type are Info's, never rows.
+- **A picture, a PDF, audio and video keep their own scroller, with the head as its first inset** (`FileHeadSpace`), so the head scrolls away with the file. Any other file has no head.
+- **A file's title is text in its head, not edited there;** rows the item may change open their editor (`FilePageHead`). Size and type are Info's, never rows.
 - **Fit shows a picture whole in the page's column, never past its own size.** A PDF's pages are 600 points wide, or as wide as a narrower column.
 - **A PDF's pages sit on gray or on white with a soft shadow** (`PDFBackground`, View › PDF Background; Settings has no row yet). Outline says so when a PDF has no contents.
 - **A saved web page loads nothing from the network by itself.** Its pictures wait until the person asks (`PageNotice`), and asking changes only what is shown, never the file.

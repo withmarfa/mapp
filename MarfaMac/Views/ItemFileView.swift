@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Where a file item's file is, however the library gets it.
 enum ItemFileResolution: Equatable {
@@ -44,9 +45,10 @@ enum ItemFileResolution: Equatable {
 }
 
 /// A file item's file, shown once it is fetched, under the page's notice (`PageNotice`) where it has one: a deleted item,
-/// a held write, and a file the library does not have. A picture and a PDF keep their own scroller and take the page's
-/// head, with the notice above it, as the first inset of it (`FileHeadSpace`), so the head scrolls away with the file.
-/// Any other file's viewer has no head, and the notice stays above it.
+/// a held write, and a file the library does not have. A picture, a PDF, audio and video keep their own scroller and take
+/// the page's head, with the notice above it, as the first inset of it (`FileHeadSpace`), so the head scrolls away with
+/// the file. Audio and video also have the playback bar at the foot, which says so while the file is on its way or could
+/// not be had. Any other file's viewer has no head, and the notice stays above it.
 struct ItemFileView: View {
     @CurrentLibrary private var library
     @StoredPageStyle private var style
@@ -78,13 +80,21 @@ struct ItemFileView: View {
         return PageNotice.all(for: item)
     }
 
-    /// Whether the file is drawn with the head as its first inset: a picture or a PDF, as the library names its type.
-    private var hasHead: Bool {
-        guard let item else { return false }
+    /// What the file is shown as, from the file once it is here and from the library's name for it until then.
+    private var shownType: UTType? {
+        guard let item else { return nil }
         let url: URL
         if case .ready(let ready)? = loader.resolution(of: id) { url = ready } else { url = URL(filePath: "/" + (item.name ?? "")) }
-        return FileViewKind.of(FileItemContent.type(of: url, contentType: item.fileType)) != nil
+        return FileItemContent.type(of: url, contentType: item.fileType)
     }
+
+    /// Whether the file is drawn with the head as its first inset: a picture, a PDF, audio or video.
+    private var hasHead: Bool {
+        guard let type = shownType else { return false }
+        return FileViewKind.of(type) != nil || FileMedia.handles(type)
+    }
+
+    private var isMedia: Bool { shownType.map(FileMedia.handles) == true }
 
     private static let headerBlock = "fileHeaderBlock"
 
@@ -158,14 +168,27 @@ struct ItemFileView: View {
     @ViewBuilder private func content(space: FileHeadSpace?) -> some View {
         switch loader.resolution(of: id) {
         case nil:
-            ProgressView("Getting File…")
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(.top, space?.top ?? 0)
+            if isMedia {
+                Color.clear.overlay { PlaybackFoot { PlaybackBar(mode: .gettingFile) } }
+            } else {
+                ProgressView("Getting File…")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(.top, space?.top ?? 0)
+            }
         case .ready(let url):
             FileItemContent(url: url, title: item?.name ?? url.lastPathComponent, contentType: item?.fileType, item: id, details: details, head: space)
         // The page's notice says so.
         case .unavailable:
             Color.clear
+        case .failed(let reason) where isMedia:
+            // The bar says it and offers Try Again; the page keeps the reason the library gave.
+            Text(reason ?? String(localized: "The app couldn’t get the file from the server. Check your connection, then try again."))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+                .padding(.top, space?.top ?? 0)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .overlay { PlaybackFoot { PlaybackBar(mode: .failed(retry: { Task { await load() } })) } }
         case .failed(let reason):
             ContentUnavailableView {
                 Label("Can’t Get This File", systemImage: "exclamationmark.icloud")

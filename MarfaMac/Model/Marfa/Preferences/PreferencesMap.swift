@@ -116,11 +116,12 @@ enum PreferencesMap {
     static let inFiles: [SyncedSetting] = synced + inFilesOnly
 
     /// The settings that stay on this Mac: window sizes and column widths, the right sidebar's width, where the
-    /// last window was, what a new item last used (`NewItemRecents`), Reopen Windows (the Mac's own answer), consent to error reports, Export
+    /// last window was, what a new item last used (`NewItemRecents`), where each audio and video item was left
+    /// (`PlaybackPlaces`), Reopen Windows (the Mac's own answer), consent to error reports, Export
     /// Automatically (which folder and when, for each Marfa), Beta Versions (Sparkle keeps its own keys, which are never
     /// synced either), a table's columns (mostly widths), and the shortcuts that work in any app (`inFilesOnly`).
     static let staysOnMac: [String] = [
-        StartWith.lastPlaceKey, ReopenWindows.key, NewItemRecents.key, Reporting.switchKey, UpdateSettings.betaKey, ItemTableColumnLayouts.key,
+        StartWith.lastPlaceKey, ReopenWindows.key, NewItemRecents.key, PlaybackPlaces.key, Reporting.switchKey, UpdateSettings.betaKey, ItemTableColumnLayouts.key,
         InterfaceKey.inspectorWidth, AnyAppShortcuts.defaultsKey, AutomaticExport.plansKey,
     ] + ColumnWidth.allCases.map(\.key)
 

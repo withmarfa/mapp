@@ -2936,6 +2936,9 @@
     "Back" : {
 
     },
+    "Back 15 Seconds" : {
+
+    },
     "Back Up" : {
 
     },
@@ -3257,6 +3260,9 @@
     },
     "Can’t Open the Library" : {
       "extractionState" : "manual"
+    },
+    "Can’t Play This File" : {
+
     },
     "Can’t Preview This Image" : {
 
@@ -5159,6 +5165,9 @@
 
     },
     "Forward" : {
+
+    },
+    "Forward 15 Seconds" : {
 
     },
     "Found %@" : {
@@ -8125,6 +8134,12 @@
     "Plain Text" : {
 
     },
+    "Play" : {
+
+    },
+    "Playback" : {
+
+    },
     "Plugin" : {
 
     },
@@ -8135,6 +8150,9 @@
 
     },
     "Plural" : {
+
+    },
+    "Position" : {
 
     },
     "PostHog Host" : {
@@ -9605,6 +9623,9 @@
     "Space Used" : {
 
     },
+    "Speed" : {
+
+    },
     "Spotlight" : {
 
     },
@@ -11044,6 +11065,9 @@
 
     },
     "This Link Type Is Gone" : {
+
+    },
+    "This Mac can’t play this kind of file. Open it in another app." : {
 
     },
     "This Mac couldn’t verify the server’s certificate. Check the address and ask whoever manages the server to check its certificate." : {

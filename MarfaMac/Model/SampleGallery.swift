@@ -87,6 +87,11 @@ nonisolated enum SampleGallery {
                  data: await video(top: (0.2, 0.35, 0.55), bottom: (0.85, 0.6, 0.35)), favorite: false, daysAgo: 4, attachedTo: nil),
             File(id: "page-vans", title: "Hiring a van for a print fair", type: "core.file.webpage", mime: "text/html",
                  data: webPage, favorite: false, daysAgo: 1, attachedTo: nil),
+            File(id: "audio-memo", title: "voice-memo-2026-11-22.m4a", type: "core.file", mime: "audio/mp4",
+                 data: sound(seconds: 24), favorite: false, daysAgo: 1, attachedTo: nil),
+            File(id: "video-planing", title: "Planing the oak boards.mp4", type: "core.file", mime: "video/mp4",
+                 data: await video(top: (0.62, 0.45, 0.28), bottom: (0.88, 0.8, 0.62), seconds: 8),
+                 favorite: false, daysAgo: 2, attachedTo: nil),
             File(id: "cover-bm", title: "cover.png", type: "core.file.image", mime: "image/png",
                  data: picture(top: (0.35, 0.5, 0.75), bottom: (0.12, 0.2, 0.4)), favorite: false, daysAgo: 4, attachedTo: "bm-desk"),
         ]
@@ -164,8 +169,8 @@ nonisolated enum SampleGallery {
         return bitmap.representation(using: .png, properties: [:]) ?? Data()
     }
 
-    /// A one-second clip of a single gradient, written to a temporary file and read back.
-    private static func video(top: (Double, Double, Double), bottom: (Double, Double, Double)) async -> Data {
+    /// A clip of a single gradient with no sound, `seconds` long, written to a temporary file and read back.
+    private static func video(top: (Double, Double, Double), bottom: (Double, Double, Double), seconds: Int = 1) async -> Data {
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let url = directory.appending(path: "clip-\(UUID().uuidString).mp4")
         defer { try? FileManager.default.removeItem(at: url) }
@@ -191,7 +196,7 @@ nonisolated enum SampleGallery {
         do {
             try writer.start()
             writer.startSession(atSourceTime: .zero)
-            for frame in 0..<30 {
+            for frame in 0..<(30 * seconds) {
                 try await receiver.append(pixels, with: CMTime(value: CMTimeValue(frame), timescale: 30))
             }
         } catch {
@@ -200,6 +205,33 @@ nonisolated enum SampleGallery {
         }
         receiver.finish()
         await writer.finishWriting()
+        return (try? Data(contentsOf: url)) ?? Data()
+    }
+
+    /// A sound of `seconds` as an M4A file's bytes: a low tone with overtones, in phrases that swell and fall away with
+    /// pauses between, so the waveform has a shape.
+    private static func sound(seconds: Double) -> Data {
+        let rate = 22_050.0
+        guard let format = AVAudioFormat(standardFormatWithSampleRate: rate, channels: 1),
+              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(seconds * rate)),
+              let samples = buffer.floatChannelData?[0] else { return Data() }
+        buffer.frameLength = buffer.frameCapacity
+        for index in 0..<Int(buffer.frameLength) {
+            let t = Double(index) / rate
+            let phrase = max(0, sin(t * 0.9)) * (0.55 + 0.45 * sin(t * 7.3))
+            samples[index] = Float((sin(2 * .pi * 170 * t) + 0.5 * sin(2 * .pi * 340 * t) + 0.25 * sin(2 * .pi * 510 * t)) * phrase * 0.4)
+        }
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory.appending(path: "sound-\(UUID().uuidString).m4a")
+        defer { try? FileManager.default.removeItem(at: url) }
+        do {
+            // The file is complete once it is released at the end of this block.
+            let file = try AVAudioFile(forWriting: url, settings: [
+                AVFormatIDKey: kAudioFormatMPEG4AAC, AVSampleRateKey: rate, AVNumberOfChannelsKey: 1, AVEncoderBitRateKey: 48_000])
+            try file.write(from: buffer)
+        } catch {
+            return Data()
+        }
         return (try? Data(contentsOf: url)) ?? Data()
     }
 
