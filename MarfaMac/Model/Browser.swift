@@ -170,8 +170,8 @@ final class Browser {
     /// The pages of the table the person has loaded, with what they belong to. Held apart from the table's content,
     /// which a page never makes again, and read as one page once the key has changed (`tablePaging`).
     var pagingState: (key: TablePagingKey, paging: TablePaging)?
-    /// How many items the list or the timeline draws, with what they belong to (`listItemsDrawn`).
-    var listPagingState: (key: TablePagingKey, items: Int)?
+    /// Which items the list, the gallery or the timeline draws, with what they belong to (`listDrawn`).
+    var listPagingState: (key: TablePagingKey, drawn: ListDrawn)?
     /// The items the listed types may have as a parent, held for the types and what the library holds.
     @ObservationIgnored var parentMemo: (key: ParentKey, options: [SearchOffers.Option])?
     /// The search's offers for the last key they were worked out for (`searchOffers`).
@@ -185,6 +185,10 @@ final class Browser {
     /// The arrangement under way, what it is for, and the token its task ends it by, so a task that was replaced never
     /// ends its successor's record.
     @ObservationIgnored var arranging: (key: TableKey, token: UUID, task: Task<Void, Never>)?
+    /// The table last asked for, which an arrangement must be for to land, as `PlaceWork`'s runs must.
+    @ObservationIgnored var askedTable: TableKey?
+    /// The last arrangement begun, ended or not, which the next waits for.
+    @ObservationIgnored var lastArrangement: Task<Void, Never>?
     /// Counts the arrangements that landed, which a view reads through `tableContent(in:)` to draw the new one.
     var tableArrangements = 0
     /// The rows of Types, Collections or Sources, held while what they read stands (`Browser+PlaceIndex`).
@@ -475,6 +479,7 @@ final class Browser {
         heldSearch = nil
         arranging?.task.cancel()
         arranging = nil
+        askedTable = nil
         indexRowsMemo = nil
         offerMemo = nil
         parentMemo = nil

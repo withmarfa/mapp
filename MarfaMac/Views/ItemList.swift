@@ -29,8 +29,8 @@ struct ItemList: View, Equatable {
         let arrangement = browser.arrangement(in: library, order: order, now: now)
         // A folded section lists its heading alone.
         let ids = arrangement.shownIDs
-        // Only a page of a long list is drawn, and the next as its end comes into view (`Browser.listItemsDrawn`).
-        let lines = ListLine.lines(of: arrangement.sections, upTo: browser.listItemsDrawn)
+        // Only a page of a long list is drawn, and the next as its end comes into view (`Browser.listDrawn`).
+        let lines = ListLine.lines(of: arrangement.drawn(browser.listDrawn, countsFolded: false))
         let drawnIDs = lines.compactMap(\.itemID)
         // Each row's content is worked out once for the item as it is and held by the browser, so a change of selection or
         // of one item makes the content of that row alone, and a row's body looks nothing up.
@@ -82,7 +82,7 @@ struct ItemList: View, Equatable {
         .onChange(of: ids) { old, new in
             browser.keepSelection(from: old, to: new, isPending: isPending)
         }
-        .background(ChosenItemDrawn(browser: browser, positions: arrangement.positions))
+        .background(ChosenItemDrawn(browser: browser, positions: arrangement.shownPositions))
         // An answer that lists what the waiting list listed (nothing, most often) changes no ids.
         .onChange(of: isPending) { _, isPending in
             if !isPending { browser.keepHeldSelection(in: ids) }
@@ -109,9 +109,9 @@ struct ItemList: View, Equatable {
                     fold: browser.listShape?.arranged == true ? { browser.toggleGroup($0, in: library) } : nil)
                 .selectionDisabled(line.itemID == nil)
                 .listRowSeparator(line.itemID == nil ? .hidden : .automatic, edges: .top)
-                .listRowSeparator(line.endsSection || line.isMore ? .hidden : .automatic, edges: .bottom)
-                if line.isMore {
-                    row.onAppear { browser.drawMoreOfList() }
+                .listRowSeparator(line.endsSection || line.drawsMore != nil ? .hidden : .automatic, edges: .bottom)
+                if let run = line.drawsMore {
+                    row.onAppear { browser.drawMoreOfList(after: run) }
                 } else if !line.isHeading {
                     row.draggable(containerItemID: line.id)
                         .dropsInto(collection: line.collectionID(in: library.catalogue), browser: browser, order: order)
@@ -199,8 +199,8 @@ private struct ListLineRow: View {
 private enum ListLine: Identifiable {
     case heading(ItemGroup, isFirst: Bool, isCollapsed: Bool)
     case item(Item, group: ItemGroup?, endsSection: Bool)
-    /// The last line of a list drawn in part, which draws the next page as it comes into view.
-    case more
+    /// The line after a run of a list drawn in part, which draws the next page of the run as it comes into view.
+    case more(run: Int)
 
     /// An item's line is known by the item, so the list's selection is its items; a heading takes an identifier
     /// of its own, never selected.
@@ -208,7 +208,7 @@ private enum ListLine: Identifiable {
         switch self {
         case .heading(let group, _, _): ItemID("heading:\(group)")
         case .item(let item, _, _): item.id
-        case .more: ItemID("more:")
+        case .more(let run): ItemID("more:\(run)")
         }
     }
 
@@ -216,8 +216,9 @@ private enum ListLine: Identifiable {
         if case .heading = self { true } else { false }
     }
 
-    var isMore: Bool {
-        if case .more = self { true } else { false }
+    /// The run the line draws more of, where it is the line after one.
+    var drawsMore: Int? {
+        if case .more(let run) = self { run } else { nil }
     }
 
     /// The item of an item's line.
@@ -241,24 +242,19 @@ private enum ListLine: Identifiable {
         if case .item(_, _, let endsSection) = self { endsSection } else { false }
     }
 
-    /// The lines of `sections` up to `limit` items, then `more` where any are left.
-    static func lines(of sections: [ItemSection], upTo limit: Int) -> [ListLine] {
+    /// The lines of the parts of a list drawn (`ListArrangement.drawn`), with a `more` line after each run that has items
+    /// after it.
+    static func lines(of parts: [DrawnSection]) -> [ListLine] {
         var lines: [ListLine] = []
-        var drawn = 0
-        for section in sections {
-            if drawn == limit, section.isCollapsed || !section.items.isEmpty {
-                lines.append(.more)
-                return lines
+        for part in parts {
+            let section = part.section
+            if part.part.startsSection, let group = section.group {
+                lines.append(.heading(group, isFirst: lines.isEmpty, isCollapsed: section.isCollapsed))
             }
-            if let group = section.group { lines.append(.heading(group, isFirst: lines.isEmpty, isCollapsed: section.isCollapsed)) }
             for item in section.isCollapsed ? [] : section.items {
-                if drawn == limit {
-                    lines.append(.more)
-                    return lines
-                }
                 lines.append(.item(item, group: section.group, endsSection: item.id == section.items.last?.id))
-                drawn += 1
             }
+            if part.part.endsRun { lines.append(.more(run: part.part.run)) }
         }
         return lines
     }
@@ -292,14 +288,20 @@ private enum ListLine: Identifiable {
 /// without making the layout observe the selection.
 struct ChosenItemDrawn: View {
     let browser: Browser
-    /// Where each item of the layout stands, counting from its first.
+    /// Where each item of the layout stands, counting from its first, as the layout counts what it draws (`ListDrawn`).
     let positions: [ItemID: Int]
-    var cursor: ItemID?
+    /// The gallery's keyboard cursor, which a new single choice made elsewhere, such as a link, ends.
+    var cursor: Binding<ItemID?>?
 
     var body: some View {
-        let id = cursor ?? (browser.selection.count == 1 ? browser.selection.first : nil)
-        Color.clear.onChange(of: id.flatMap { positions[$0] }, initial: true) { _, position in
-            if let position { browser.drawList(through: position) }
-        }
+        let single = browser.selection.count == 1 ? browser.selection.first : nil
+        let id = cursor?.wrappedValue.flatMap { single == nil || single == $0 ? $0 : nil } ?? single
+        Color.clear
+            .onChange(of: id.flatMap { positions[$0] }, initial: true) { _, position in
+                if let position { browser.drawList(showing: position) }
+            }
+            .onChange(of: single) { _, single in
+                if let cursor, let single, cursor.wrappedValue != nil, cursor.wrappedValue != single { cursor.wrappedValue = nil }
+            }
     }
 }

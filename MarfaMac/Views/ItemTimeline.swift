@@ -20,7 +20,8 @@ struct ItemTimeline: View {
         let now = library.now()
         // Worked out off the main actor for a large place (`Browser.placed`); only a page of it is drawn, as the list's is.
         let placing = browser.timelinePlacing(in: library, field: field, now: now)
-        let (groups, more) = placing.drawn(upTo: browser.listItemsDrawn)
+        let days = placing.drawn(browser.listDrawn)
+        let groups = days.map(\.group)
         let list = RowList(
             mixesTypes: placing.types.count > 1, date: .look, format: dateFormat, datesApart: true, placedField: field, marksFeed: browser.listing.scope == .all, day: Calendar.current.startOfDay(for: now))
         let contents = rowContents.contents(
@@ -28,7 +29,7 @@ struct ItemTimeline: View {
             shape: CardShape(leaving: field))
 
         // Select All chooses every item, those not drawn yet too.
-        timeline(groups, more: more, contents: contents, now: now) { browser.selection = Set(placing.positions.keys) }
+        timeline(days, contents: contents, now: now) { browser.selection = Set(placing.positions.keys) }
         .topRowScrolls()
         .clearsSeveralOnEscape(browser)
         .deletesChosen(browser) { Set(items.map(\.id)) }
@@ -83,22 +84,23 @@ struct ItemTimeline: View {
     }
 
     private func timeline(
-        _ groups: [ItemTimelineGroup], more: Bool, contents: [ItemID: RowContent], now: Date, selectAll: @escaping () -> Void
+        _ days: [Browser.DrawnDay], contents: [ItemID: RowContent], now: Date, selectAll: @escaping () -> Void
     ) -> some View {
         ScrollViewReader { proxy in
-            list(groups, more: more, contents: contents, now: now)
+            list(days, contents: contents, now: now)
                 .selectsAll(selectAll)
                 // The days run from today on and then back, so today's agenda is the first line of the first group.
                 .onChange(of: browser.timelineTodayRequests) {
-                    guard let first = groups.first.flatMap({ lines(of: $0, now: now).first }) else { return }
+                    guard let first = days.first.flatMap({ lines(of: $0.group, now: now).first }) else { return }
                     withAnimation { proxy.scrollTo(first.id, anchor: .top) }
                 }
         }
     }
 
-    private func list(_ groups: [ItemTimelineGroup], more: Bool, contents: [ItemID: RowContent], now: Date) -> some View {
+    private func list(_ days: [Browser.DrawnDay], contents: [ItemID: RowContent], now: Date) -> some View {
         SelectableTimeline(browser: browser) {
-            ForEach(groups) { group in
+            ForEach(days) { day in
+                let group = day.group
                 ForEach(lines(of: group, now: now)) { line in
                     switch line {
                     case .row(let row, let startsDay, let endsDay):
@@ -149,19 +151,19 @@ struct ItemTimeline: View {
                         .accessibilityLabel(Text("Now"))
                     }
                 }
-            }
-            if more {
-                // Drawn only to come into view, which draws the next page.
-                Color.clear.frame(height: 1)
-                    .selectionDisabled()
-                    .listRowSeparator(.hidden)
-                    .accessibilityHidden(true)
-                    .onAppear { browser.drawMoreOfList() }
+                if day.part.endsRun {
+                    // Drawn only to come into view, which draws the next page of the run.
+                    Color.clear.frame(height: 1)
+                        .selectionDisabled()
+                        .listRowSeparator(.hidden)
+                        .accessibilityHidden(true)
+                        .onAppear { browser.drawMoreOfList(after: day.part.run) }
+                }
             }
         }
         .listStyle(.inset)
         .scrollContentBackground(.hidden)
-        .softSelection(rows: groups.flatMap { $0.rows.map(\.id.rawValue) }, hovers: true, inert: inertRows(groups, more: more, contents: contents, now: now), selection: { browser.selection })
+        .softSelection(rows: days.flatMap { $0.group.rows.map(\.id.rawValue) }, hovers: true, inert: inertRows(days, contents: contents, now: now), selection: { browser.selection })
         .focused(pane, equals: .list)
         .takesKeyboardOnClick { browser.focusRequest = .list }
         .accessibilityLabel("Timeline")
@@ -174,13 +176,13 @@ struct ItemTimeline: View {
         .onKeyPress(.return) { browser.openSelection() ? .handled : .ignored }
     }
 
-    /// The places in the list of the rows that are not items: the Earlier heading, the line for now and the line that draws
+    /// The places in the list of the rows that are not items: the Earlier heading, the line for now and the lines that draw
     /// more. An item with no content yet makes no row, so it takes no place.
-    private func inertRows(_ groups: [ItemTimelineGroup], more: Bool, contents: [ItemID: RowContent], now: Date) -> Set<Int> {
+    private func inertRows(_ days: [Browser.DrawnDay], contents: [ItemID: RowContent], now: Date) -> Set<Int> {
         var inert: Set<Int> = []
         var place = 0
-        for group in groups {
-            for line in lines(of: group, now: now) {
+        for day in days {
+            for line in lines(of: day.group, now: now) {
                 switch line {
                 case .row(let row, _, _):
                     if contents[row.id] != nil { place += 1 }
@@ -189,8 +191,11 @@ struct ItemTimeline: View {
                     place += 1
                 }
             }
+            if day.part.endsRun {
+                inert.insert(place)
+                place += 1
+            }
         }
-        if more { inert.insert(place) }
         return inert
     }
 

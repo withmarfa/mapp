@@ -350,7 +350,7 @@ import UniformTypeIdentifiers
         _ browser: Browser, in library: any ItemLibrary, order: ItemOrder, cards: CardContents? = nil
     ) -> [ItemID: RowContent] {
         let arrangement = browser.arrangement(in: library, order: order, now: Self.now)
-        let items = arrangement.drawn(upTo: browser.listItemsDrawn).sections.flatMap(\.items)
+        let items = arrangement.drawn(browser.listDrawn, countsFolded: cards != nil).flatMap(\.section.items)
         if let cards {
             return cards.contents(
                 of: items, in: library, looks: browser.propertyLooks(in: library),
@@ -444,6 +444,61 @@ import UniformTypeIdentifiers
         #expect(timeline.timelinePlacing(in: library, field: nil, now: Self.now).groups == days)
     }
 
+    /// A table and a list sorted by Created, then by Title, then by Created again before Title lands, after an edit neither
+    /// holds moved the library's revision: the Title answer never lands, because the request it answers is no longer the
+    /// one asked.
+    @Test func aSortLeftAfterAnEditNeverLands() async throws {
+        let (library, source) = try await BigLibrary.loaded(scale: 12)
+        #expect(library.items(in: Self.tasks.place).count > Browser.arrangesAlongsideAbove)
+        let byCreated = ItemTableOptions(sort: [ItemTableComparator(column: .created)])
+        let table = browser(library, showing: Self.tasks, options: byCreated)
+        _ = try await settled(table, in: library)
+        let list = browser(library, showing: Self.tasks)
+        list.viewMode = .list
+        let created = ItemOrder(sort: .dateCreated, groupsByDate: false)
+        _ = try await settledSections(list, in: library, order: created)
+        let note = try #require(library.items(in: .library).first { $0.type == BigLibrary.note })
+        try await send([Self.with(note, step: 1, Self.title("Edited note"))], to: source, of: library)
+
+        table.tableOptions[Self.tasks] = ItemTableOptions(sort: [ItemTableComparator(column: .title)])
+        _ = table.tableContent(in: library)
+        #expect(table.arranging?.key.choices.options.sort?.map(\.column.id) == [ItemTableColumn.title.id], "Title is under way")
+        table.tableOptions[Self.tasks] = byCreated
+        _ = table.tableContent(in: library)
+        _ = list.sections(in: library, order: ItemOrder(sort: .title, groupsByDate: false), now: Self.now)
+        #expect(list.sectionsWork.runningKey?.choices.order.sort == .title, "Title is under way")
+        let sections = list.sections(in: library, order: created, now: Self.now)
+
+        // Time enough for an answer under way to land, which it must not.
+        try await Task.sleep(for: .seconds(2))
+        #expect(table.tableMemo?.key.choices.options.sort?.map(\.column.id) == [ItemTableColumn.created.id])
+        try await expectSameTable(table, in: library, "sorted by Created")
+        #expect(list.sectionsWork.held?.key.choices.order == created)
+        #expect(list.sections(in: library, order: created, now: Self.now) == sections)
+    }
+
+    /// A board whose lanes it chose itself by a date, left open across a change of time zone, puts each card in the day of
+    /// the new zone, as a window opened then does. The zone is the library's (`ItemLibrary.calendar`), not the process's.
+    @Test func automaticDateLanesFollowTheTimeZone() async throws {
+        let zone = Zone(try #require(TimeZone(identifier: "Pacific/Auckland")))
+        let source = FakeItemSource()
+        let now = Date(timeIntervalSince1970: 1_780_000_000)
+        let library = MarfaLibrary(source: source, notices: Notices(), now: { now }, calendar: { zone.calendar })
+        source.send(.loaded(SourceSnapshot(items: BigLibrary.items(), catalogue: BigLibrary.catalogue)))
+        try #require(await eventually { library.isLoaded })
+        let logs = PlaceView.type(BigLibrary.log)
+        let board = browser(library, showing: logs)
+        board.viewMode = .board
+        #expect(board.tableOptions[logs]?.grouping == nil, "the board chooses its lanes")
+        #expect(try #require(board.boardGrouping(in: library)).groupsByDate)
+        func lanes(_ browser: Browser) -> [[ItemID]]? { browser.boardLanes(in: library)?.all.map { $0.items.map(\.id) } }
+        let before = lanes(board)
+        zone.zone = try #require(TimeZone(identifier: "Pacific/Honolulu"))
+        let after = lanes(board)
+        #expect(after == lanes(fresh(like: board, in: library)))
+        #expect(after != before, "the cards change day with the zone")
+    }
+
     /// A table, a board and a timeline grouped by day, left open over midnight, name the days as a window opened then does.
     @Test func dateGroupsFollowTheDay() async throws {
         let items = BigLibrary.items()
@@ -489,6 +544,38 @@ import UniformTypeIdentifiers
         let (made, _) = try await Self.copy(of: library)
         #expect(library.items(in: .library).map(\.id) == made.items(in: .library).map(\.id))
         #expect(library.items(in: Self.tasks.place).map(\.id) == made.items(in: Self.tasks.place).map(\.id))
+    }
+
+    /// A listing read again only once its change history no longer reaches it lists an item whose creation time changed
+    /// meanwhile where a fresh listing does.
+    @Test func aListingReadAfterItsHistoryEndsPlacesAnItemWhoseCreationTimeChanged() async throws {
+        let (library, source) = try await BigLibrary.loaded(scale: 12)
+        let listed = library.items(in: .library)
+        let revision = library.contentRevision
+        let moved = listed[3]
+        let tie = listed[listed.count - 10]
+        try await send([Self.with(moved, step: 1) { $0.created = tie.created }], to: source, of: library)
+        // Every item edited again until the history has let the listing's revision go, the listing not read meanwhile.
+        var step = 2
+        while library.changedItems(since: revision) != nil, step < 40 {
+            try await send(library.records.values.map { Self.with($0.item, step: step) { _ in } }, to: source, of: library)
+            step += 1
+        }
+        try #require(library.changedItems(since: revision) == nil)
+        let (made, _) = try await Self.copy(of: library)
+        #expect(library.items(in: .library).map(\.id) == made.items(in: .library).map(\.id))
+    }
+}
+
+/// A time zone a test moves the library to.
+private final class Zone: @unchecked Sendable {
+    var zone: TimeZone
+    init(_ zone: TimeZone) { self.zone = zone }
+
+    var calendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = zone
+        return calendar
     }
 }
 

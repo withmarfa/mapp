@@ -26,7 +26,7 @@ Windows, panes, toolbars and commands. Settings is a window of its own, in `Marf
 - **`ItemRow` takes only plain values worked out once for each item** (`RowContent`, a `Density`, an excerpt). It reads no library, catalogue or look.
 - **A row's picture is a view of its own** (`RowPictureView`) that only a row with a picture holds.
 - **A layout reads a place's items from the browser** (`Browser.arrangement`, `tableContent`, `placed`), worked out off the main actor for a large place, and makes no pass over them in its body.
-- **Hand a `List` a page of rows, never a whole place** (`Browser.listItemsDrawn`): SwiftUI goes through every row it is given at each change, which at 50,000 rows takes seconds. Select All still takes every item (`selectsAll`), and `ChosenItemDrawn` draws the chosen one.
+- **Hand a `List` a page of rows, never a whole place** (`Browser.listDrawn`): SwiftUI goes through every row it is given at each change, which at 50,000 rows takes seconds. Select All still takes every item (`selectsAll`), and `ChosenItemDrawn` draws a page around the chosen one, not every row up to it.
 
 ## Code Review Rules
 

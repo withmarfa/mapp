@@ -3,9 +3,9 @@ import SwiftUI
 import Testing
 @testable import MarfaMac
 
-/// The list, the gallery and the timeline draw a long place a page at a time (`Browser.listItemsDrawn`). These host the
+/// The list, the gallery and the timeline draw a long place a page at a time (`Browser.listDrawn`). These host the
 /// real window, in one nobody sees, and check that Select All chooses every item, not only those drawn, and that a chosen
-/// item a change moves past the page is drawn.
+/// item far past the page is drawn with a page around it, not every item up to it.
 @MainActor
 @Suite(.hangLimit, .serialized) struct PagedLayoutTests {
     /// Hosts the window on the Library of `BigLibrary` (650 items), in `mode`.
@@ -103,8 +103,46 @@ import Testing
             try #require(moved)
             let now = try #require(position())
             #expect(now > Browser.listPage, "moved to \(now) of \(held.ids.count)")
-            let drawn = await eventually { browser.listItemsDrawn > now }
+            let drawn = await eventually { Self.draws(now, in: browser, of: held.ids.count) }
             #expect(drawn, "the page follows the chosen item to \(now)")
+            #expect(Self.drawnCount(in: browser, of: held.ids.count) < held.ids.count, "a page around it, not everything up to it")
         }
+    }
+
+    /// The gallery's keyboard cursor on the first page, then a single choice made elsewhere, as a link makes, of a card
+    /// far past it: the new choice is drawn, not the cursor's card.
+    @Test func aChoiceMadeElsewhereEndsTheGallerysCursor() async throws {
+        try await hosted(.gallery) { browser, _, _, window in
+            let ids = try #require(browser.sectionsWork.held?.value.ids)
+            browser.focusRequest = .list
+            let right = try #require(NSEvent.keyEvent(
+                with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil,
+                characters: String(Character(UnicodeScalar(NSRightArrowFunctionKey)!)),
+                charactersIgnoringModifiers: String(Character(UnicodeScalar(NSRightArrowFunctionKey)!)), isARepeat: false, keyCode: 124))
+            // Sent again until the gallery has the keyboard; the arrow key sets its cursor to the card it chooses.
+            let moved = await eventually {
+                if browser.selection.isEmpty { window.sendEvent(right) }
+                return !browser.selection.isEmpty
+            }
+            try #require(moved)
+            let cursor = try #require(browser.selection.first)
+            #expect((ids.firstIndex(of: cursor) ?? .max) < Browser.listPage)
+            let far = ids.count - 1
+            #expect(far >= 2 * Browser.listPage, "far enough to need a page of its own")
+            browser.selection = [ids[far]]
+            let drawn = await eventually { Self.draws(far, in: browser, of: ids.count) }
+            #expect(drawn, "the card chosen at \(far) is drawn")
+            #expect(Self.drawnCount(in: browser, of: ids.count) < ids.count, "a page around it, not everything up to it")
+        }
+    }
+
+    /// Whether the layout draws the item at `position` of `count`.
+    private static func draws(_ position: Int, in browser: Browser, of count: Int) -> Bool {
+        browser.listDrawn.runs(of: count).contains { $0.contains(position) }
+    }
+
+    /// How many items of `count` the layout draws.
+    private static func drawnCount(in browser: Browser, of count: Int) -> Int {
+        browser.listDrawn.runs(of: count).reduce(0) { $0 + $1.count }
     }
 }

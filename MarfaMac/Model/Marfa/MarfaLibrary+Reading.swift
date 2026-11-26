@@ -107,8 +107,9 @@ extension MarfaLibrary {
             listed[key] = listing
             return listing.items
         }
-        var listing = listed[key].flatMap { $0.membership == membership && !isCollection ? $0 : nil }
-            ?? Listing(membership: membership, ids: listingOrder(of: key))
+        // Where the change history no longer reaches the listing, its order may be out of date too (a creation time
+        // changes with no membership move), so it is made whole.
+        var listing = Listing(membership: membership, ids: listingOrder(of: key))
         listing.content = content
         listing.items = listing.ids.compactMap { records[$0]?.item }
         listing.positions = nil

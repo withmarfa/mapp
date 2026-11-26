@@ -71,6 +71,7 @@ final class FakeItemLibrary: ItemLibrary {
     var relationshipWrites: [(item: ItemID, field: String, adding: [ItemID], removing: [ItemID])] = []
     var syncReport = SyncReport(queueRead: true)
     var now: () -> Date
+    var calendar: () -> Calendar = { .current }
     /// What `attach` answers, which may wait; nil attaches nothing.
     var attaching: (() async -> AttachReport)?
     /// Awaited while a view is being made, before it exists, and while one is being deleted, once it is gone, so a

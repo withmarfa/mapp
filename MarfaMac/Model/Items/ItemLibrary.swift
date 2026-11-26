@@ -33,6 +33,8 @@ protocol ItemLibrary: AnyObject, Observable {
     /// False where the action is not offered for the problem.
     func resolve(_ problem: SyncProblemEntry.ID, by action: SyncAction) async throws -> Bool
     var now: () -> Date { get }
+    /// The calendar and time zone dates are grouped and named in, read at each ask, as the system's change.
+    var calendar: () -> Calendar { get }
 
     // MARK: Reading
 

@@ -110,6 +110,7 @@ import Observation
     /// nothing the old one's library kept (`ItemLibrary.serverKey`).
     var serverKey = ""
     let now: () -> Date
+    let calendar: () -> Calendar
 
     /// Bumped when any item changes, for the lists and search.
     var contentRevision = 0
@@ -393,6 +394,7 @@ import Observation
         typeIcons: (any TypeIconSource)? = nil, typeSchemas: (any TypeSchemaSource)? = nil, config: (any InstanceConfigSource)? = nil,
         sourceNames: (any SourceNameSource)? = nil, links: (any ItemLinkSource)? = nil,
         now: @escaping () -> Date = Date.init,
+        calendar: @escaping () -> Calendar = { .current },
         textPause: TextPause = .typing,
         cameOnline: @escaping () -> Void = {}) {
         self.source = source
@@ -406,6 +408,7 @@ import Observation
         self.links = links
         self.notices = notices
         self.now = now
+        self.calendar = calendar
         syncReport = source.syncReport
         connection = source.connectionState
         let changes = source.changes()

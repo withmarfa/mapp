@@ -109,7 +109,7 @@ final class ItemTableContent {
         groupMode = options.grouping == .automatic ? .statusGroups : options.grouping.mode
         self.hidesEmptyGroups = hidesEmptyGroups
         groupsAsMarfa = browser.isViewPlace
-        calendar = browser.isViewPlace ? DateGroups.viewCalendar() : WeekStart.calendar(.current, in: browser.defaults)
+        calendar = browser.isViewPlace ? DateGroups.viewCalendar(library.calendar()) : WeekStart.calendar(library.calendar(), in: browser.defaults)
     }
 
     /// The links the table wants (`ItemTableLayout.relations`) and the counts the looks show, with the items the library

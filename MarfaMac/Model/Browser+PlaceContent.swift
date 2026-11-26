@@ -152,7 +152,7 @@ extension Browser {
         let derived = derivedKey(in: library)
         let shape = listShape
         let choices = SectionsChoices(
-            derived: derived.key, order: order, clock: ClockDay(now: now), shape: shape,
+            derived: derived.key, order: order, clock: ClockDay(now: now, calendar: library.calendar()), shape: shape,
             hidesEmpty: shape != nil && hidesEmptyGroups)
         // A filtered or arranged place takes its rows, and where it is arranged its order and groups, from the table.
         let content = shape.map { _ in tableContent(in: library) }
@@ -297,16 +297,20 @@ extension Browser {
         // Read, so whoever asks is told when an arrangement lands.
         _ = tableArrangements
         // Not held: the options are those of every source, whose table comes back as it was once one is ticked.
-        if previewsNothing { return ItemTableContent(browser: self, library: library, items: []) }
+        if previewsNothing {
+            askedTable = nil
+            return ItemTableContent(browser: self, library: library, items: [])
+        }
         let keyed = (tableOptions[shown] ?? ItemTableOptions()).settled
         let derived = derivedKey(in: library)
         let key = TableKey(
             choices: TableChoices(
                 derived: derived.key, options: keyed, choices: lookChoices, shownRelations: shownRelations, hidesEmpty: hidesEmptyGroups,
                 sources: library.sources.infos,
-                clock: !keyed.filter.relative.isEmpty || keyed.grouping.groupsByDate ? ClockDay(now: library.now()) : nil,
+                clock: ClockDay(now: library.now(), calendar: library.calendar()),
                 tokens: narrowingSearchTokens),
             basis: TableBasis(content: library.contentRevision, membership: library.membershipRevision, counts: library.counts.revision))
+        askedTable = key
         // Returning to a cached sort supersedes the sort the person just left.
         if let held = tableMemo, held.key == key {
             if arranging.map({ $0.key != key }) == true { endArranging() }
@@ -328,7 +332,8 @@ extension Browser {
         let earlier = [tableMemo, held].compactMap { $0 }.first { $0.key.choices == key.choices }
         let changed = earlier.flatMap { changes(since: $0.key.basis, in: library) }
         if let earlier, let changed, earlier.content.isUntouched(by: changed, listing: listed.count) {
-            if arranging?.key.choices == key.choices { endArranging() }
+            // Whatever is under way is for another choice or an older revision.
+            endArranging()
             take((key, earlier.content), searching: searching, isLarge: isLarge)
             return earlier.content
         }
@@ -386,7 +391,8 @@ extension Browser {
     /// Makes the table for `key` off the main actor, from `update`'s table where one is given, which then makes only the rows
     /// of the items that changed again, and shows it once it is still the one asked for. The main actor only reads the links
     /// of the rows it makes, and takes the table as it lands. One arrangement works off the main actor at a time: a newer one
-    /// waits for the one it replaces to end, which it does at its next step, so a steady run of edits never piles sorts up.
+    /// waits for the one before it to end, ended or not, which it does at its next step, so a steady run of edits never piles
+    /// sorts up. Like `PlaceWork`'s runs, it lands only while `key` is still the table asked for.
     private func arrange(
         _ key: TableKey, items: [Item], after earlier: (key: TableKey, content: ItemTableContent),
         updating update: (content: ItemTableContent, changed: Set<ItemID>)?, in library: any ItemLibrary
@@ -396,8 +402,8 @@ extension Browser {
         let sameChoices = key.choices == earlier.key.choices
         // Only the items' own changes settle: a membership change may have taken an item away, which must not stay chosen.
         let settles = sameChoices && key.basis.membership == earlier.key.basis.membership
-        // The arrangement replaced ends once the work it has off the main actor ends.
-        let previous = arranging?.task
+        // The arrangement before ends once the work it has off the main actor ends.
+        let previous = lastArrangement
         let options = tableOptions[shown] ?? ItemTableOptions()
         let searching = isSearching
         let token = UUID()
@@ -405,7 +411,10 @@ extension Browser {
         let task = Task { [weak self] in
             if settles { try? await Task.sleep(for: Browser.arrangeSettling) }
             await previous?.value
-            guard let self, !Task.isCancelled, self.shown == place, self.isShowing(library) else { self?.endArranging(token); return }
+            guard let self, !Task.isCancelled, self.askedTable == key, self.shown == place, self.isShowing(library) else {
+                self?.endArranging(token)
+                return
+            }
             let looks = self.looks(in: library)
             let shownRelations = self.shownRelations
             let (wants, plan) = await Task.detached(priority: .userInitiated) {
@@ -415,7 +424,7 @@ extension Browser {
                 }
                 return (wants, plan)
             }.value
-            guard self.isLive(token, place, searching) else { return self.endArranging(token) }
+            guard self.isLive(token, key, place, searching) else { return self.endArranging(token) }
             var start = ContinuousClock.now
             let reading = plan.map { ItemTableContent.reading(browser: self, library: library, update: $0, items: items) }
                 ?? ItemTableContent.reading(browser: self, library: library, items: items, wants: wants)
@@ -423,7 +432,7 @@ extension Browser {
             let made = await Task.detached(priority: .userInitiated) {
                 if let from, plan != nil { ItemTableContent.Made(reading, updating: from.made, items: items) } else { ItemTableContent.Made(reading) }
             }.value
-            guard self.isLive(token, place, searching) else { return self.endArranging(token) }
+            guard self.isLive(token, key, place, searching) else { return self.endArranging(token) }
             start = ContinuousClock.now
             // The options the rows and the key were made from, not the window's now.
             let content = ItemTableContent(
@@ -437,7 +446,7 @@ extension Browser {
                     columns: from.earlier.columns, sort: from.earlier.sort, ordered: from.earlier.landed ?? from.earlier.ordering.ordered())
                 return ordering.updated(from: earlier, changed: remade)
             }.value
-            guard self.isLive(token, place, searching) else { return self.endArranging(token) }
+            guard self.isLive(token, key, place, searching) else { return self.endArranging(token) }
             start = ContinuousClock.now
             // The chosen row is read as the table lands, where the held table shows it now. The held table's rows are
             // read only for that row, since reading them sorts them on the main actor where they were never asked for.
@@ -451,12 +460,14 @@ extension Browser {
             if searching { self.heldSearch = (key, content) } else { self.hold((key, content), for: place) }
             self.tableArrangements += 1
         }
+        lastArrangement = task
         arranging = (key, token, task)
     }
 
-    /// Whether the arrangement of `token` is still the one under way, for the place and the search it began for.
-    private func isLive(_ token: UUID, _ place: PlaceView, _ searching: Bool) -> Bool {
-        !Task.isCancelled && arranging?.token == token && shown == place && isSearching == searching
+    /// Whether the arrangement of `token` is still the one under way, for the table last asked, the place and the search it
+    /// began for.
+    private func isLive(_ token: UUID, _ key: TableKey, _ place: PlaceView, _ searching: Bool) -> Bool {
+        !Task.isCancelled && arranging?.token == token && askedTable == key && shown == place && isSearching == searching
     }
 
     /// Ends the arrangement of `token` that did not land, so the next ask for that table arranges it again. A task that
@@ -507,9 +518,10 @@ extension Browser {
         let day: Date
         let zone: TimeZone
 
-        init(now: Date) {
-            day = Calendar.current.startOfDay(for: now)
-            zone = .current
+        /// The day of `now` in `calendar`, the library's (`ItemLibrary.calendar`).
+        init(now: Date, calendar: Calendar) {
+            day = calendar.startOfDay(for: now)
+            zone = calendar.timeZone
         }
     }
 
@@ -561,7 +573,8 @@ extension Browser {
     func timelinePlacing(in library: any ItemLibrary, field: String?, now: Date) -> TimelinePlacing {
         let looks = looks(in: library)
         let catalogue = library.catalogue
-        return placed(timelineWork, choice: TimelineChoice(field: field, looks: looks, clock: ClockDay(now: now)), in: library) { items in
+        let clock = ClockDay(now: now, calendar: library.calendar())
+        return placed(timelineWork, choice: TimelineChoice(field: field, looks: looks, clock: clock), in: library) { items in
             TimelinePlacing(groups: ItemTimelineLayout.groups(for: items, field: field, looks: looks, catalogue: catalogue, today: now))
         }
     }
@@ -580,21 +593,20 @@ extension Browser {
             types = Set(rows.map(\.item.type))
         }
 
-        /// The days up to `limit` rows, the last of them cut short where it holds more, and whether any rows are left.
-        func drawn(upTo limit: Int) -> (groups: [ItemTimelineGroup], more: Bool) {
-            var drawn: [ItemTimelineGroup] = []
-            var left = limit
-            for group in groups {
-                guard left > 0 || group.rows.isEmpty else { return (drawn, true) }
-                if group.rows.count > left {
-                    drawn.append(ItemTimelineGroup(id: group.id, rows: Array(group.rows.prefix(left))))
-                    return (drawn, true)
-                }
-                drawn.append(group)
-                left -= group.rows.count
+        /// The parts of the days that `drawn` draws (`ListDrawn`), each a day or the part of one.
+        func drawn(_ drawn: ListDrawn) -> [DrawnDay] {
+            drawn.parts(of: groups.map(\.rows.count)).map { part in
+                let group = groups[part.section]
+                return DrawnDay(group: ItemTimelineGroup(id: group.id, rows: Array(group.rows[part.items])), part: part)
             }
-            return (drawn, false)
         }
+    }
+
+    /// A day of the timeline as drawn, or the part of one.
+    nonisolated struct DrawnDay: Identifiable, Sendable {
+        let group: ItemTimelineGroup
+        let part: ListDrawn.Part
+        var id: String { "\(part.run):\(group.id)" }
     }
 
     nonisolated struct SectionsChoices: Equatable, Sendable {
@@ -632,8 +644,9 @@ extension Browser {
         let hidesEmpty: Bool
         /// The names the server gave sources, which a row holds from when it was made, so the Source column sorts by them.
         let sources: [String: SourceInfo]
-        /// The clock used for relative filters and date groups.
-        let clock: ClockDay?
+        /// The clock used for relative filters and date groups, which a board's lanes read too wherever the board chose
+        /// them by date itself (`boardLanes`), so it is held whatever the table groups by.
+        let clock: ClockDay
         /// The search's tokens, which narrow the rows the table keeps.
         let tokens: [FilterClause]
     }
@@ -717,6 +730,8 @@ nonisolated struct ListArrangement: Sendable {
     let shownIDs: [ItemID]
     /// Where each of `ids` stands.
     let positions: [ItemID: Int]
+    /// Where each of `shownIDs` stands.
+    let shownPositions: [ItemID: Int]
     /// The types of the items.
     let types: Set<TypeID>
     /// The items in the list's own order, before favorites lead, where the list ordered them.
@@ -731,26 +746,21 @@ nonisolated struct ListArrangement: Sendable {
         ids = sections.flatMap { $0.items.map(\.id) }
         shownIDs = sections.flatMap { $0.isCollapsed ? [] : $0.items.map(\.id) }
         positions = Dictionary(ids.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
+        shownPositions = shownIDs.count == ids.count
+            ? positions : Dictionary(shownIDs.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
         types = Set(sections.lazy.flatMap(\.items).map(\.type))
     }
 
-    /// The sections up to `limit` items, the last of them cut short where it holds more, and whether any items are left,
-    /// for a layout that draws a page at a time (`Browser.listItemsDrawn`).
-    func drawn(upTo limit: Int) -> (sections: [ItemSection], more: Bool) {
-        var drawn: [ItemSection] = []
-        var left = limit
-        for section in sections {
-            guard left > 0 || section.items.isEmpty else { return (drawn, true) }
-            if section.items.count > left {
-                var cut = section
-                cut.items = Array(section.items.prefix(left))
-                drawn.append(cut)
-                return (drawn, true)
-            }
-            drawn.append(section)
-            left -= section.items.count
+    /// The parts of the sections that `drawn` draws (`ListDrawn`), for a layout that draws a page at a time
+    /// (`Browser.listDrawn`). A folded section's items count only where `countsFolded`, as in the gallery, which draws
+    /// them; the list counts the items it shows (`shownPositions`). In a grid of `columns`, a part starts at a row.
+    func drawn(_ drawn: ListDrawn, countsFolded: Bool, columns: Int = 1) -> [DrawnSection] {
+        let counts = sections.map { countsFolded || !$0.isCollapsed ? $0.items.count : 0 }
+        return drawn.parts(of: counts, columns: columns).map { part in
+            var section = sections[part.section]
+            if part.items.count < section.items.count { section.items = Array(section.items[part.items]) }
+            return DrawnSection(section: section, part: part)
         }
-        return (drawn, false)
     }
 
     /// The same sections, as made at the library's revision `content`, which changed none of their items.
@@ -759,6 +769,13 @@ nonisolated struct ListArrangement: Sendable {
         moved.content = content
         return moved
     }
+}
+
+/// A section of the list or the gallery as drawn, or the part of one, with where it falls among the runs drawn.
+nonisolated struct DrawnSection: Identifiable, Sendable {
+    let section: ItemSection
+    let part: ListDrawn.Part
+    var id: String { "\(part.run):\(part.section)" }
 }
 
 /// What an arranged table gives the list's sections: its rows in order and its groups.

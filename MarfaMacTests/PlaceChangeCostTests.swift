@@ -7,8 +7,8 @@ import Testing
 
 /// Measures a hosted window with 48,750 items in each layout. Run with the Measure test plan.
 /// Each `BUSY` line gives main-thread CPU time and share, the longest sampled stall including the action,
-/// and elapsed time. For sampled items, `landed` is when the layout cache first contains the expected titles.
-/// The test can wait for those titles after the five-second measurement ends.
+/// and elapsed time. For a change, `landed` is when what the layout draws (`drawn`) first matches what a window opened on
+/// a copy with the change draws; a change that draws nothing new, or never matches, fails the run.
 @MainActor
 @Suite(.tags(.measure), .enabled(if: ProcessInfo.processInfo.environment["MARFA_MAC_MEASURE"] != nil), .serialized)
 struct PlaceChangeCostTests {
@@ -22,24 +22,21 @@ struct PlaceChangeCostTests {
         for (layout, setUp) in Self.layouts where named?.contains(layout.name) ?? true {
             try await hosted(layout) { browser, library, source, step in
                 setUp(browser)
-                try await step("idle", [:]) {}
-                try await step("open (\(library.items(in: .library).count))", [:]) { browser.viewMode = layout.mode }
+                try await step("idle", nil) {}
+                try await step("open (\(library.items(in: .library).count))", nil) { browser.viewMode = layout.mode }
                 for (round, name) in [(1, "2000 edited"), (2, "2000 edited again")] {
                     let edited = Self.edited(library, round: round)
-                    try await step(name, Self.awaited(edited, in: browser, mode: layout.mode)) { source.send(.upserted(edited)) }
+                    let expected = try await Self.drawn(after: Self.upserting(edited, in: library), like: browser, mode: layout.mode)
+                    try await step(name, expected) { source.send(.upserted(edited)) }
                 }
                 let added = Self.added(round: 1)
-                try await step("2000 new", Self.awaited(added, in: browser, mode: layout.mode, joining: true)) {
-                    source.send(.upserted(added))
-                }
+                let joined = try await Self.drawn(after: Self.upserting(added, in: library), like: browser, mode: layout.mode)
+                try await step("2000 new", joined) { source.send(.upserted(added)) }
                 // The copy read whole again, with a sync's edits in it, as a rehydration brings them.
-                let reread = Self.edited(library, round: 3)
-                let rereadIDs = Set(reread.map(\.id))
-                let rest = library.records.values.map(\.item).filter { !rereadIDs.contains($0.id) }
-                let snapshot = SourceSnapshot(items: reread + rest, catalogue: BigLibrary.catalogue)
-                try await step("whole copy read again", Self.awaited(reread, in: browser, mode: layout.mode)) {
-                    source.send(.loaded(snapshot))
-                }
+                let reread = Self.upserting(Self.edited(library, round: 3), in: library)
+                let snapshot = SourceSnapshot(items: reread, catalogue: BigLibrary.catalogue)
+                let expected = try await Self.drawn(after: reread, like: browser, mode: layout.mode)
+                try await step("whole copy read again", expected) { source.send(.loaded(snapshot)) }
             }
         }
     }
@@ -48,11 +45,11 @@ struct PlaceChangeCostTests {
     @Test func openingSortingAndScrolling() async throws {
         for layout in [Layout(name: "table", mode: .table), Layout(name: "list", mode: .list)] {
             try await hosted(layout) { browser, _, _, step in
-                try await step("open", [:]) { browser.viewMode = layout.mode }
-                try await step("sort by name", [:]) {
+                try await step("open", nil) { browser.viewMode = layout.mode }
+                try await step("sort by name", nil) {
                     Self.sortByName(browser)
                 }
-                for index in 1...3 { try await step("scroll \(index)", [:]) { Self.scroll(by: 2_000) } }
+                for index in 1...3 { try await step("scroll \(index)", nil) { Self.scroll(by: 2_000) } }
             }
         }
     }
@@ -80,11 +77,12 @@ struct PlaceChangeCostTests {
         browser.tableOptions[.library, default: ItemTableOptions()].sort = [ItemTableComparator(column: .title)]
     }
 
-    /// `changed` items of the Library with a new title and edit date, which moves them in a sort by name or by Edited.
+    /// `changed` items of the Library with a new title and edit date, which moves them to the front of a sort by name or
+    /// by Edited, so the first page drawn shows them.
     private static func edited(_ library: any ItemLibrary, round: Int) -> [Item] {
         library.items(in: .library).prefix(changed).enumerated().map { index, item in
             var item = item
-            item.title = "Round \(round) \(index)"
+            item.title = String(format: "0 Round %d %04d", round, index)
             item.name = item.title
             item.modified = Date(timeIntervalSince1970: 1_790_000_000 + Double(round * 10_000 + index))
             return item
@@ -93,48 +91,82 @@ struct PlaceChangeCostTests {
 
     private static func added(round: Int) -> [Item] {
         (0..<changed).map { index in
-            LibraryFixture.item(
-                ItemID("added-\(round)-\(index)"), BigLibrary.note, "Added \(index)", age: index,
-                properties: [Property(key: "title", value: .string("Added \(index)"))])
+            let title = String(format: "0 Added %04d", index)
+            return LibraryFixture.item(
+                ItemID("added-\(round)-\(index)"), BigLibrary.note, title, age: index,
+                properties: [Property(key: "title", value: .string(title))])
         }
     }
 
-    /// Up to five of `items` the layout shows now, spread through them, with the titles it is to show once it takes them;
-    /// for items `joining` the place, up to five of them.
-    private static func awaited(_ items: [Item], in browser: Browser, mode: ItemViewMode, joining: Bool = false) -> [ItemID: String] {
-        let candidates = joining ? items : items.filter { shown($0.id, in: browser, mode: mode) != nil }
-        let step = max(1, candidates.count / 5)
-        return Dictionary(stride(from: 0, to: candidates.count, by: step).prefix(5).map { (candidates[$0].id, candidates[$0].title) },
-            uniquingKeysWith: { first, _ in first })
+    /// Every item of `library` with `items` in place of those of the same id, and those it lacks added.
+    private static func upserting(_ items: [Item], in library: MarfaLibrary) -> [Item] {
+        let ids = Set(items.map(\.id))
+        return library.records.values.map(\.item).filter { !ids.contains($0.id) } + items
     }
 
-    /// Reads a cached title without asking the layout to update.
-    private static func shown(_ id: ItemID, in browser: Browser, mode: ItemViewMode) -> String? {
-        func nth<Group>(_ position: Int?, of groups: [Group], _ items: (Group) -> [Item]) -> String? {
-            guard var position else { return nil }
-            for group in groups {
-                let held = items(group)
-                if position < held.count { return held[position].title }
-                position -= held.count
-            }
-            return nil
+    /// An item as a layout draws it.
+    struct DrawnItem: Equatable {
+        let id: ItemID
+        let title: String
+    }
+
+    /// What a window opened on a copy holding `items` draws in `mode`, with `browser`'s choices: what the hosted window is
+    /// to draw once it takes the change.
+    private static func drawn(after items: [Item], like browser: Browser, mode: ItemViewMode) async throws -> [DrawnItem] {
+        let source = FakeItemSource()
+        let copy = MarfaLibrary(source: source, notices: Notices())
+        source.send(.loaded(SourceSnapshot(items: items, catalogue: BigLibrary.catalogue)))
+        try #require(await eventually(within: .seconds(60)) { copy.isLoaded })
+        let fresh = Browser()
+        fresh.adopt(copy)
+        fresh.showing = browser.shown
+        fresh.tableOptions = browser.tableOptions
+        fresh.viewMode = mode
+        // Asked as the layout asks, so the fresh window holds what it would draw.
+        switch mode {
+        case .table: _ = fresh.tableContent(in: copy)
+        case .list, .gallery:
+            let order = try #require(browser.sectionsWork.held?.key.choices.order)
+            _ = fresh.arrangement(in: copy, order: order, now: copy.now())
+        case .timeline:
+            let field = try #require(browser.timelineWork.held?.key.choice).field
+            _ = fresh.timelinePlacing(in: copy, field: field, now: copy.now())
+        case .board: _ = fresh.boardLanes(in: copy)
+        case .calendar: _ = fresh.calendarPlacing(in: copy, calendar: Calendar.chosenWeekStart)
         }
+        return try #require(drawn(in: fresh, mode: mode, library: copy))
+    }
+
+    /// What the layout draws now, read from what the window holds without asking the layout to update: the table's loaded
+    /// pages, the list's, the gallery's and the timeline's drawn runs (`Browser.listDrawn`), the board's shown lanes and
+    /// the calendar's drawn days.
+    private static func drawn(in browser: Browser, mode: ItemViewMode, library: any ItemLibrary) -> [DrawnItem]? {
+        func items(_ items: some Sequence<Item>) -> [DrawnItem] { items.map { DrawnItem(id: $0.id, title: $0.title) } }
         switch mode {
         case .table:
-            guard let content = browser.tableMemo?.content, let at = content.made.positions[id] else { return nil }
-            return content.allRows[at].item.title
+            guard let content = browser.tableMemo?.content else { return nil }
+            let (paging, size) = (browser.tablePaging, browser.tablePageSize)
+            let rows = content.grouping == nil
+                ? paging.slice(content.rows, size: size).rows
+                : paging.slice(groups: content.groups, collapsed: content.collapsed, size: size).groups.flatMap(\.rows)
+            return items(rows.map(\.item))
         case .list, .gallery:
             guard let held = browser.sectionsWork.held?.value else { return nil }
-            return nth(held.positions[id], of: held.sections, \.items)
+            return items(held.drawn(browser.listDrawn, countsFolded: mode == .gallery).flatMap(\.section.items))
         case .timeline:
             guard let held = browser.timelineWork.held?.value else { return nil }
-            return nth(held.positions[id], of: held.groups) { $0.rows.map(\.item) }
+            return items(held.drawn(browser.listDrawn).flatMap { $0.group.rows.map(\.item) })
         case .board:
-            return browser.boardWork.held?.value.all.lazy.flatMap(\.items).first { $0.id == id }?.title
+            guard let held = browser.boardWork.held?.value else { return nil }
+            return items(browser.shownBoardLanes(held).flatMap(\.items))
         case .calendar:
-            return browser.calendarWork.held?.value.entries.first { $0.id == id }?.title
-        default:
-            return nil
+            guard let held = browser.calendarWork.held?.value else { return nil }
+            let calendar = Calendar.chosenWeekStart
+            let now = library.now()
+            let first = CalendarLayout.firstDayShown(browser.calendarDay, now: now, calendar: calendar)
+            let days = CalendarLayout.drawn(browser.calendarScale, firstShown: first, anchor: browser.calendarDay ?? now, calendar: calendar)
+            let ids = CalendarLayout.ids(in: held.entries, within: days)
+            return held.entries.filter { ids.contains($0.id) }.map { DrawnItem(id: $0.id, title: $0.title) }
         }
     }
 
@@ -171,7 +203,7 @@ struct PlaceChangeCostTests {
     /// Hosts the real window on the Library, in `layout`, and hands `script` the browser, the library, the source and `step`.
     private func hosted(
         _ layout: Layout,
-        _ script: (Browser, MarfaLibrary, FakeItemSource, (String, [ItemID: String], () -> Void) async throws -> Void) async throws -> Void
+        _ script: (Browser, MarfaLibrary, FakeItemSource, (String, [DrawnItem]?, () -> Void) async throws -> Void) async throws -> Void
     ) async throws {
         #if DEBUG
         let (library, source) = try await BigLibrary.loaded(scale: 75)
@@ -189,25 +221,30 @@ struct PlaceChangeCostTests {
         // Lets the window draw the Library first, so the first move is measured on its own.
         try await Task.sleep(for: .seconds(3))
 
-        /// Runs `move` and watches the main thread; `awaited` names the items whose titles the layout is to show after it.
-        func step(_ name: String, _ awaited: [ItemID: String], _ move: () -> Void) async throws {
+        /// Runs `move` and watches the main thread; `expected` is what the layout is to draw after it, nil for a move that
+        /// changes no item.
+        func step(_ name: String, _ expected: [DrawnItem]?, _ move: () -> Void) async throws {
             // Lets earlier work finish, so it is not counted in the measure.
             try await Task.sleep(for: .seconds(1))
-            func took() -> Bool { awaited.allSatisfy { Self.shown($0.key, in: browser, mode: layout.mode) == $0.value } }
+            func took() -> Bool { expected.map { Self.drawn(in: browser, mode: layout.mode, library: library) == $0 } ?? true }
+            if let expected {
+                #expect(Self.drawn(in: browser, mode: layout.mode, library: library) != expected, "\(layout.name), \(name): the change draws something new")
+                #expect(!expected.isEmpty, "\(layout.name), \(name): the layout draws items")
+            }
             Cost.resetTallies()
             let cpu = Self.threadMilliseconds()
             let start = ContinuousClock.now
             move()
             // The move itself holds the main actor too.
             var stall = Self.milliseconds(ContinuousClock.now - start)
-            var landed: Duration? = awaited.isEmpty ? .zero : nil
+            var landed: Duration? = expected == nil ? .zero : nil
             var checked = start
             while ContinuousClock.now - start < Self.watched {
                 let before = ContinuousClock.now
                 try await Task.sleep(for: .milliseconds(5))
                 stall = max(stall, Self.milliseconds(ContinuousClock.now - before - .milliseconds(5)))
-                // Checked a few times a second, so the check costs the main thread next to nothing.
-                if landed == nil, ContinuousClock.now - checked >= .milliseconds(50) {
+                // Checked four times a second, so reading what the layout draws costs the main thread little.
+                if landed == nil, ContinuousClock.now - checked >= .milliseconds(250) {
                     checked = ContinuousClock.now
                     if took() { landed = checked - start }
                 }
@@ -220,7 +257,7 @@ struct PlaceChangeCostTests {
             print(String(
                 format: "BUSY|%@|%@|main=%.0fms|busy=%.1f%%|stall=%.0fms|window=%.0fms|landed=%@|%@", layout.name, name, main,
                 main / window * 100, stall, window, landed.map { String(format: "%.0fms", Self.milliseconds($0)) } ?? "never", costs))
-            #expect(landed != nil, "\(layout.name), \(name): the layout showed the change")
+            #expect(landed != nil, "\(layout.name), \(name): the layout drew the change")
         }
 
         try await script(browser, library, source, step)

@@ -192,7 +192,7 @@ extension Browser {
         let own = options?.grouping == grouping
         let choice = BoardChoice(
             column: column, mode: mode, own: own, groupOrder: own ? options?.groupOrder : nil, asMarfa: isViewPlace,
-            clock: grouping.groupsByDate ? ClockDay(now: library.now()) : nil)
+            clock: grouping.groupsByDate ? ClockDay(now: library.now(), calendar: library.calendar()) : nil)
         // The cards follow the place's sort where the person or the view set one, else their titles.
         let rows = options?.sort?.isEmpty == false ? content.rows : nil
         let kept = content.kept
