@@ -297,13 +297,24 @@ struct ChosenItemDrawn: View {
 
     var body: some View {
         let single = browser.selection.count == 1 ? browser.selection.first : nil
-        let id = cursor?.wrappedValue.flatMap { single == nil || single == $0 ? $0 : nil } ?? single
+        let id = Self.shown(cursor: cursor?.wrappedValue, single: single)
         Color.clear
             .onChange(of: id.flatMap { positions[$0] }, initial: true) { _, position in
                 if let position { browser.drawList(showing: position) }
             }
             .onChange(of: single) { _, single in
-                if let cursor, let single, cursor.wrappedValue != nil, cursor.wrappedValue != single { cursor.wrappedValue = nil }
+                if let cursor, Self.endsCursor(cursor.wrappedValue, single: single) { cursor.wrappedValue = nil }
             }
+    }
+
+    /// The item to keep drawn: the cursor while it is the single choice or there is none, else the single choice.
+    static func shown(cursor: ItemID?, single: ItemID?) -> ItemID? {
+        cursor.flatMap { single == nil || single == $0 ? $0 : nil } ?? single
+    }
+
+    /// Whether a new single choice made elsewhere, such as a link, ends the cursor.
+    static func endsCursor(_ cursor: ItemID?, single: ItemID?) -> Bool {
+        guard let cursor, let single else { return false }
+        return cursor != single
     }
 }
