@@ -11,7 +11,7 @@ extension Browser {
         if let held = groupOfferMemo, held.content === content, held.layout == mode { return held.offer }
         let offer = Cost.measure(.groupOffer) {
             GroupOffer.make(
-                columns: content.columns, types: listedTypes(in: library).union(content.allRows.map(\.item.type)), rows: content.allRows,
+                columns: content.columns, types: listedTypes(in: library).union(content.made.types), rows: content.allRows,
                 catalogue: library.catalogue,
                 layout: mode)
         }
@@ -47,8 +47,11 @@ extension Browser {
     /// The grouping a board makes its lanes of: the place's own where the board can show it, else the status or the
     /// first field offered (`GroupOffer.fallback`), which leaves the place's choice as it is for the layouts that can.
     func boardGrouping(in library: any ItemLibrary) -> ItemTableOptions.Grouping? {
-        let offer = groupOffer(in: library, layout: .board)
-        if let stored = tableOptions[shown]?.grouping, case .column = stored, offer.entry(for: stored) != nil {
+        Self.boardGrouping(in: groupOffer(in: library, layout: .board), stored: tableOptions[shown]?.grouping)
+    }
+
+    nonisolated private static func boardGrouping(in offer: GroupOffer, stored: ItemTableOptions.Grouping?) -> ItemTableOptions.Grouping? {
+        if let stored, case .column = stored, offer.entry(for: stored) != nil {
             return stored
         }
         return offer.fallback
@@ -99,21 +102,29 @@ extension Browser {
     /// How many items the arranged list holds, hidden and folded groups included, since those leave the list and not
     /// the place; nil where the list is in its starting order, which hides nothing.
     func listedCount(in library: any ItemLibrary) -> Int? {
-        guard listShape?.arranged == true, !ordersByRelevance else { return nil }
-        return tableContent(in: library).rows.count
+        if let shape = listShape {
+            if let table = readyTable(in: library) {
+                return shape.arranged && !ordersByRelevance ? table.rows.count : table.keptItems.count
+            }
+        } else {
+            guard listsArchive else { return nil }
+            if let items = isSearching ? items(in: library) : requestPlaceItems(in: library) { return items.count }
+        }
+        return library.count(in: shown, favoritesScope: listing.scope)
     }
 
     /// Whether the arranged list is grouped and every group holding items is hidden, which says so rather than that
     /// the place is empty.
     func listHidesEveryGroup(in library: any ItemLibrary) -> Bool {
         guard let shape = listShape, shape.arranged, !ordersByRelevance, shape.options.grouping.columnID != nil else { return false }
-        return tableContent(in: library).hidesEveryGroup
+        return readyTable(in: library)?.hidesEveryGroup == true
     }
 
     /// Whether the list beside the page draws no item, so the page column says why: the place lists none after its
     /// filters, or every group holding items is hidden.
-    func listDrawsNoItem(in library: any ItemLibrary) -> Bool {
-        filteredItems(in: library).isEmpty || listHidesEveryGroup(in: library)
+    func listDrawsNoItem(in library: any ItemLibrary, order: ItemOrder) -> Bool? {
+        guard let arrangement = readyArrangement(in: library, order: order, now: library.now()) else { return nil }
+        return arrangement.ids.isEmpty || listHidesEveryGroup(in: library)
     }
 
     func expandAllGroups() {
@@ -177,17 +188,18 @@ extension Browser {
         var byStatusGroups: Bool
         /// Whether the lanes are the place's own grouping, whose hidden groups then apply.
         var isOwn: Bool
+        var mixesTypes: Bool
+        var isEmpty: Bool
+        var positions: [ItemID: Int]
     }
 
     /// What a board's lanes are made by, besides the items and the table.
     nonisolated struct BoardChoice: Equatable, Sendable {
-        let column: ItemTableColumn
-        let mode: GroupMode
-        let own: Bool
+        let grouping: ItemTableOptions.Grouping?
         let groupOrder: [String]?
         let asMarfa: Bool
         /// Lanes by date may say Today.
-        let clock: ClockDay?
+        let clock: ClockDay
     }
 
     /// The open board's lanes, by `boardGrouping`: a choice or status by its words with every option a lane and a card
@@ -195,19 +207,30 @@ extension Browser {
     /// its groups, of which only Not Set takes a card. The place's order applies where the lanes are its own grouping.
     /// A large place's are worked out off the main actor (`placed`).
     func boardLanes(in library: any ItemLibrary) -> BoardLanes? {
-        guard let grouping = boardGrouping(in: library), case .column(let id, let mode) = grouping else { return nil }
-        let content = tableContent(in: library)
-        guard let column = content.columns.first(where: { $0.id == id && $0.groups(by: mode) }) else { return nil }
+        _ = placeWorkLanded
+        guard let content = readyTable(in: library) else {
+            return boardWork.held.flatMap {
+                $0.key.derived.library == ObjectIdentifier(library) && $0.key.derived.place == shown ? $0.value : nil
+            }
+        }
         let options = tableOptions[shown]
-        let own = options?.grouping == grouping
+        let (catalogue, calendar, now) = (library.catalogue, content.calendar, library.now())
         let choice = BoardChoice(
-            column: column, mode: mode, own: own, groupOrder: own ? options?.groupOrder : nil, asMarfa: isViewPlace,
-            clock: grouping.groupsByDate ? ClockDay(now: library.now(), calendar: library.calendar()) : nil)
+            grouping: options?.grouping, groupOrder: options?.groupOrder, asMarfa: isViewPlace,
+            clock: ClockDay(now: now, calendar: library.calendar()))
         // The cards follow the place's sort where the person or the view set one, else their titles.
         let rows = options?.sort?.isEmpty == false ? content.rows : nil
         let kept = content.kept
-        let (catalogue, calendar, now) = (library.catalogue, content.calendar, library.now())
+        let (columns, allRows) = (content.columns, content.allRows)
+        let types = listedTypes(in: library).union(content.made.types)
         return placed(boardWork, choice: choice, table: content, in: library) { items in
+            let offer = GroupOffer.make(columns: columns, types: types, rows: allRows, catalogue: catalogue, layout: .board)
+            guard let grouping = Self.boardGrouping(in: offer, stored: choice.grouping),
+                  case .column(let id, let mode) = grouping,
+                  let column = columns.first(where: { $0.id == id && $0.groups(by: mode) }) else {
+                return BoardLanes(all: [], key: "", byStatusGroups: false, isOwn: false, mixesTypes: false, isEmpty: items.isEmpty, positions: [:])
+            }
+            let own = choice.grouping == grouping
             let order = rows.map { Dictionary($0.enumerated().map { ($1.item.id, $0) }, uniquingKeysWith: { first, _ in first }) }
             let key = column.field?.key ?? ""
             let lanes: [ItemBoardLane]
@@ -220,8 +243,14 @@ extension Browser {
                     of: kept, by: column, mode: mode, catalogue: catalogue, declared: true, asMarfa: choice.asMarfa, calendar: calendar, now: now)
                 lanes = ItemBoardLayout.lanes(of: groups, mode: mode, order: order)
             }
-            let all = ItemBoardLayout.arranged(lanes, order: choice.groupOrder, hidden: nil, hidesEmpty: false)
-            return BoardLanes(all: all, key: key, byStatusGroups: mode == .statusGroups, isOwn: own)
+            let all = ItemBoardLayout.arranged(lanes, order: own ? choice.groupOrder : nil, hidden: nil, hidesEmpty: false)
+            var positions: [ItemID: Int] = [:]
+            for lane in all {
+                for (index, item) in lane.items.enumerated() { positions[item.id] = index }
+            }
+            return BoardLanes(
+                all: all, key: key, byStatusGroups: mode == .statusGroups, isOwn: own,
+                mixesTypes: Set(items.lazy.map(\.type)).count > 1, isEmpty: items.isEmpty, positions: positions)
         }
     }
 

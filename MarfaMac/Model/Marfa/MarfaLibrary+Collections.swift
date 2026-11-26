@@ -20,7 +20,10 @@ extension MarfaLibrary {
     /// The members of a collection in the order Marfa keeps for them: by each edge's `position` where it has one,
     /// then the rest by title.
     func membersInOrder(of collection: ItemID, among members: [Item]) -> [ItemID] {
-        let positions = positions(in: collection)
+        Self.orderMembers(members, at: positions(in: collection)).map(\.id)
+    }
+
+    nonisolated static func orderMembers(_ members: [Item], at positions: [ItemID: Double]) -> [Item] {
         return members.sorted { a, b in
             switch (positions[a.id], positions[b.id]) {
             case let (x?, y?) where x != y: return x < y
@@ -28,10 +31,10 @@ extension MarfaLibrary {
             case (nil, .some): return false
             default: return Self.titleOrder(a, b)
             }
-        }.map(\.id)
+        }
     }
 
-    private func positions(in collection: ItemID) -> [ItemID: Double] {
+    func positions(in collection: ItemID) -> [ItemID: Double] {
         index.links(to: collection, type: MarfaMapping.collectionEdge).reduce(into: [:]) { positions, link in
             guard let position = link.position else { return }
             positions[link.from] = min(positions[link.from] ?? position, position)

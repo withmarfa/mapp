@@ -14,12 +14,9 @@ struct ItemBoard: View {
     /// The lanes in view in the horizontal scroll view, which are the only ones whose cards ask for counts.
     @State private var visibleLanes: Set<ItemBoardLane.ID> = []
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
-    /// What each card says, worked out once for each item from its type's look.
-    @State private var cardContents = CardContents()
 
     var body: some View {
         let _ = daysSeen
-        let items = browser.filteredItems(in: library)
         // The lanes are the place's group (`Browser.boardGrouping`), so a saved view's group is its lanes.
         let lanes = browser.boardLanes(in: library)
         VStack(spacing: 0) {
@@ -28,29 +25,33 @@ struct ItemBoard: View {
                 let grouped = lanes.byStatusGroups
                 // A card leaves off what its lane already says: the field the board is grouped by.
                 let list = RowList(
-                    mixesTypes: Set(items.map(\.type)).count > 1, date: .look, format: dateFormat,
+                    mixesTypes: lanes.mixesTypes, date: .look, format: dateFormat,
                     marksFeed: browser.listing.scope == .all, day: Calendar.current.startOfDay(for: library.now()))
-                let contents = cardContents.contents(
-                    of: items, in: library, looks: browser.propertyLooks(in: library), list: list, shape: CardShape(leaving: lanes.key, groupsByStatus: grouped))
-                if shown.isEmpty, !items.isEmpty, lanes.all.contains(where: { !$0.items.isEmpty }) {
+                if shown.isEmpty, !lanes.isEmpty, !lanes.positions.isEmpty {
                     HiddenGroupsEmptyState()
+                } else if shown.isEmpty, lanes.isEmpty {
+                    if browser.narrowsBySearch { SearchEmptyState(browser: browser) }
+                    else { PlaceEmptyState(browser: browser) }
                 } else {
-                    board(shown, key: lanes.key, grouped: grouped, contents: contents)
+                    board(shown, key: lanes.key, grouped: grouped, list: list, positions: lanes.positions)
+                        .id(browser.shown)
                 }
-            } else if items.isEmpty {
-                if browser.narrowsBySearch { SearchEmptyState(browser: browser) }
-                else { PlaceEmptyState(browser: browser) }
+            } else {
+                PlaceProgress()
             }
         }
         .searchStatus(browser)
-        .filteredEmptyState(browser)
+        .overlay { if lanes != nil { FilteredEmptyState(browser: browser) } }
         .accessibilityIdentifier("ItemBoard")
         .onChange(of: browser.isSearchExpanded) {
             if !browser.isSearchExpanded { browser.focusRequest = .list }
         }
-        .onChange(of: items.map(\.id)) { _, ids in
-            if let cursor, !ids.contains(cursor) { self.cursor = nil }
-            if let anchor, !ids.contains(anchor) { self.anchor = nil }
+        .onChange(of: browser.shown) { cursor = nil; anchor = nil }
+        .onChange(of: cursor.flatMap { lanes?.positions[$0] }) { _, position in
+            if position == nil { cursor = nil }
+        }
+        .onChange(of: anchor.flatMap { lanes?.positions[$0] }) { _, position in
+            if position == nil { anchor = nil }
         }
         .onClockChange { daysSeen += 1 }
     }
@@ -69,14 +70,23 @@ struct ItemBoard: View {
         return min(max(share, compact ? 200 : 236), compact ? 260 : 340)
     }
 
-    private func board(_ lanes: [ItemBoardLane], key: String, grouped: Bool, contents: [ItemID: RowContent]) -> some View {
-        let ids = lanes.flatMap { $0.items.map(\.id) }
+    private func board(
+        _ lanes: [ItemBoardLane], key: String, grouped: Bool, list: RowList, positions: [ItemID: Int]
+    ) -> some View {
+        let looks = browser.propertyLooks(in: library)
+        func ids() -> [ItemID] { lanes.flatMap { $0.items.map(\.id) } }
+        func cursorLane() -> ItemBoardLane.ID? {
+            guard let cursor, let position = positions[cursor] else { return nil }
+            return lanes.first { $0.items.indices.contains(position) && $0.items[position].id == cursor }?.id
+        }
+        let activeLane = cursorLane()
         return ScrollViewReader { proxy in
             GeometryReader { geometry in
                 ScrollView(.horizontal) {
-                    HStack(alignment: .top, spacing: Self.laneGap) {
+                    LazyHStack(alignment: .top, spacing: Self.laneGap) {
                         ForEach(lanes) { lane in
-                            laneView(lane, lanes: lanes, key: key, grouped: grouped, ids: ids, contents: contents)
+                            let position = activeLane == lane.id ? cursor.flatMap { positions[$0] } : nil
+                            laneView(lane, lanes: lanes, key: key, grouped: grouped, list: list, looks: looks, position: position, ids: ids)
                                 .frame(width: laneWidth(count: lanes.count, in: geometry.size.width))
                                 .onScrollVisibilityChange(threshold: 0.01) { visible in
                                     if visible { visibleLanes.insert(lane.id) } else { visibleLanes.remove(lane.id) }
@@ -96,27 +106,28 @@ struct ItemBoard: View {
             .focused(pane, equals: .list)
             .onKeyPress(keys: [.upArrow, .downArrow, .leftArrow, .rightArrow], phases: .down) { press in
                 guard let next = neighbor(in: lanes, direction: press.key) else { return .ignored }
-                select(next, ids: ids, extending: press.modifiers.contains(.shift), toggling: false)
+                select(next, ids: ids(), extending: press.modifiers.contains(.shift), toggling: false)
                 return .handled
             }
             .onKeyPress(.return) {
                 browser.openSelection() ? .handled : .ignored
             }
             .onKeyPress(.escape) { browser.selection = []; return .handled }
-            .deletesChosen(browser) { Set(ids) }
+            .deletesChosen(browser) { Set(ids()) }
             .onKeyPress("a", phases: .down) { press in
                 guard press.modifiers.contains(.command) else { return .ignored }
-                browser.selection = Set(ids)
+                browser.selection = Set(ids())
                 return .handled
             }
-            .onChange(of: cursor) { if let cursor { proxy.scrollTo(cursor) } }
+            .onChange(of: activeLane) { if let activeLane { proxy.scrollTo(activeLane) } }
         }
         .dragContainer(for: ItemReference.self) { ids in ids.map(library.dragReference(of:)) }
         .dragsSelection(of: browser)
     }
 
     private func laneView(
-        _ lane: ItemBoardLane, lanes: [ItemBoardLane], key: String, grouped: Bool, ids: [ItemID], contents: [ItemID: RowContent]
+        _ lane: ItemBoardLane, lanes: [ItemBoardLane], key: String, grouped: Bool,
+        list: RowList, looks: [TypeID: TypeLook], position: Int?, ids: @escaping () -> [ItemID]
     ) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 7) {
@@ -135,22 +146,12 @@ struct ItemBoard: View {
             .padding(.bottom, 10)
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isHeader)
-            ScrollView {
-                LazyVStack(spacing: compact ? 8 : 10) {
-                    ForEach(lane.items) { item in
-                        if let content = contents[item.id] {
-                            card(item, content: content, lane: lane, lanes: lanes, key: key, grouped: grouped, ids: ids).id(item.id)
-                        }
-                    }
-                    if lane.items.isEmpty {
-                        Text("No Items")
-                            .interfaceFont(.callout)
-                            .foregroundStyle(.tertiary)
-                            .frame(maxWidth: .infinity, minHeight: 72)
-                    }
-                }
+            BoardLaneCards(
+                items: lane.items, looks: looks, list: list, shape: CardShape(leaving: key, groupsByStatus: grouped),
+                compact: compact, position: position
+            ) { item, content in
+                card(item, content: content, lane: lane, lanes: lanes, key: key, grouped: grouped, ids: ids)
             }
-            .scrollIndicators(.hidden)
         }
         .padding(.horizontal, 8)
         .padding(.bottom, 8)
@@ -163,7 +164,9 @@ struct ItemBoard: View {
         }
     }
 
-    private func card(_ item: Item, content: RowContent, lane: ItemBoardLane, lanes: [ItemBoardLane], key: String, grouped: Bool, ids: [ItemID]) -> some View {
+    private func card(
+        _ item: Item, content: RowContent, lane: ItemBoardLane, lanes: [ItemBoardLane], key: String, grouped: Bool, ids: @escaping () -> [ItemID]
+    ) -> some View {
         let invalid = lane.id == .invalid
             ? item.value(of: ItemBoardLayout.invalidValueKey(of: item, key: key, groupsByStatus: grouped, catalogue: library.catalogue)).map(ItemValueText.string)
             : nil
@@ -171,7 +174,7 @@ struct ItemBoard: View {
             item: item, browser: browser, content: content, compact: compact, invalidValue: invalid,
             wantsCounts: visibleLanes.contains(lane.id),
             select: { extending, toggling in
-                select(item.id, ids: ids, extending: extending, toggling: toggling)
+                select(item.id, ids: ids(), extending: extending, toggling: toggling)
                 pane.wrappedValue = .list
             },
             open: { open(item.id) }
@@ -250,6 +253,54 @@ struct ItemBoard: View {
             next += step
         }
         return current
+    }
+}
+
+/// Each lane builds card contents only for the pages it draws.
+private struct BoardLaneCards<Card: View>: View {
+    @CurrentLibrary private var library
+    let items: [Item]
+    let looks: [TypeID: TypeLook]
+    let list: RowList
+    let shape: CardShape
+    let compact: Bool
+    let position: Int?
+    @ViewBuilder let card: (Item, RowContent) -> Card
+    @State private var paging = ListDrawn()
+    @State private var cardContents = CardContents()
+
+    var body: some View {
+        var drawn = paging
+        let _ = position.map { drawn.show($0) }
+        let parts = drawn.parts(of: [items.count])
+        let contents = cardContents.contents(
+            of: parts.flatMap { items[$0.items] }, in: library, looks: looks, list: list, shape: shape)
+        let target = position.flatMap { items.indices.contains($0) ? items[$0].id : nil }
+        ScrollViewReader { scroll in
+            ScrollView {
+                LazyVStack(spacing: compact ? 8 : 10) {
+                    ForEach(parts, id: \.run) { part in
+                        ForEach(items[part.items]) { item in
+                            if let content = contents[item.id] { card(item, content).id(item.id) }
+                        }
+                        if part.endsRun {
+                            Color.clear.frame(height: 1).accessibilityHidden(true)
+                                .onAppear { paging.drawMore(after: part.run) }
+                        }
+                    }
+                    if items.isEmpty {
+                        Text("No Items")
+                            .interfaceFont(.callout)
+                            .foregroundStyle(.tertiary)
+                            .frame(maxWidth: .infinity, minHeight: 72)
+                    }
+                }
+            }
+            .scrollIndicators(.hidden)
+            .onChange(of: target, initial: true) {
+                if let target, let position { paging.show(position); scroll.scrollTo(target) }
+            }
+        }
     }
 }
 

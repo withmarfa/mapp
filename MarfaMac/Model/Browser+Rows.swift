@@ -16,7 +16,7 @@ extension Browser {
         return RowList(
             mixesTypes: !groupedByType && types.count > 1,
             date: RowDateSource.of(
-                sort: arranged ? tableContent(in: library).sort.first : nil, order: order,
+                sort: arranged ? readyTable(in: library)?.sort.first : nil, order: order,
                 ordersItself: keepsPlaceOrder || ordersByRelevance),
             format: format, showsPictures: density == .standard, marksFeed: listing.scope == .all, day: calendar.startOfDay(for: now))
     }

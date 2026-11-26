@@ -29,6 +29,8 @@ private struct PlaceWatch: View {
             .onChange(of: browser.collectionItemIDs(in: library, order: order)) { old, new in
                 browser.collectionItemsChanged(from: old, to: new)
             }
+            .onChange(of: browser.placeWorkLanded) { browser.finishFirstSelection(in: library, order: order) }
+            .onChange(of: browser.tableArrangements) { browser.finishFirstSelection(in: library, order: order) }
             // A layout the place cannot show (Board with no choice fields) is not offered, and a window left on one
             // returns to the list. Changing `viewMode` only moves between layouts the workspace already handles.
             .onChange(of: browser.availableViewModes(in: library), initial: true) { browser.fallBackToListIfUnavailable(in: library) }

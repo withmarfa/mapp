@@ -42,7 +42,8 @@ final class PlaceWork<Key: Equatable & Sendable, Value: Sendable> {
     /// is still the one asked when it lands; `landed` is told on the main actor. A run waits for the one before it to end,
     /// so a steady stream of changes never piles work up. With `settling`, a run of changes is let end first.
     func start(
-        _ key: Key, settling: Duration? = nil, _ make: @escaping @Sendable () -> Value, landed: @escaping @MainActor () -> Void
+        _ key: Key, settling: Duration? = nil, _ make: @escaping @Sendable () -> Value,
+        accepts: @escaping @MainActor () -> Bool = { true }, landed: @escaping @MainActor () -> Void
     ) {
         asked = key
         guard running?.key != key else { return }
@@ -56,7 +57,7 @@ final class PlaceWork<Key: Equatable & Sendable, Value: Sendable> {
             let value = await Task.detached(priority: .userInitiated) { make() }.value
             guard let self, !Task.isCancelled, self.running?.token == token else { return }
             self.running = nil
-            guard self.asked == key else { return }
+            guard self.asked == key, accepts() else { return }
             self.held = (key, value)
             landed()
         }
@@ -64,11 +65,16 @@ final class PlaceWork<Key: Equatable & Sendable, Value: Sendable> {
         running = (key, token, task)
     }
 
-    /// Forgets what is held and asked and ends the run under way, as when the window changes library.
-    func reset() {
+    /// Ends the ask when the window leaves the place.
+    func cancel() {
         running?.task.cancel()
         running = nil
         asked = nil
+    }
+
+    /// Forgets what is held and asked and ends the run under way, as when the window changes library.
+    func reset() {
+        cancel()
         held = nil
     }
 }

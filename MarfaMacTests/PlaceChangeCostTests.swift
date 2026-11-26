@@ -16,6 +16,24 @@ struct PlaceChangeCostTests {
     private static let watched = Duration.seconds(5)
     private static let changed = 2_000
 
+    @Test func firstOpenInEachLayout() async throws {
+        let named = ProcessInfo.processInfo.environment["MARFA_MAC_MEASURE_LAYOUTS"].map { Set($0.split(separator: ",").map(String.init)) }
+        let layouts = Self.layouts + [(Layout(name: "map", mode: .map), { (_: Browser) in })]
+        for (layout, setUp) in layouts where named?.contains(layout.name) ?? true {
+            try await hosted(layout, startsAtIndex: true) { browser, library, _, step in
+                setUp(browser)
+                browser.updatePlaceDefault(.library) {
+                    $0.layout = layout.mode
+                    $0.keep(browser.tableOptions[.library])
+                }
+                try await step("first open", nil) {
+                    browser.viewMode = layout.mode
+                    browser.show(.library, in: library, order: browser.storedOrder)
+                }
+            }
+        }
+    }
+
     @Test func aSyncOfTwoThousandItemsInEachLayout() async throws {
         // `MARFA_MAC_MEASURE_LAYOUTS` names the layouts to run, by name and comma-separated; unset runs them all.
         let named = ProcessInfo.processInfo.environment["MARFA_MAC_MEASURE_LAYOUTS"].map { Set($0.split(separator: ",").map(String.init)) }
@@ -158,23 +176,21 @@ struct PlaceChangeCostTests {
         fresh.calendarDay = browser.calendarDay
         fresh.viewMode = mode
         // Asked as the layout asks, so the fresh window holds what it would draw.
-        switch mode {
-        case .table: _ = fresh.tableContent(in: copy)
-        case .list, .gallery:
-            let order = try #require(browser.sectionsWork.held?.key.choices.order)
-            _ = fresh.arrangement(in: copy, order: order, now: copy.now())
-        case .digest:
-            try #require(await eventually(within: .seconds(60)) {
+        let order = browser.sectionsWork.held?.key.choices.order ?? browser.storedOrder
+        let field = browser.timelineWork.held?.key.choice.field
+        try #require(await eventually {
+            switch mode {
+            case .table: return fresh.readyTable(in: copy) != nil
+            case .list, .gallery: return fresh.readyArrangement(in: copy, order: order, now: copy.now()) != nil
+            case .digest:
                 fresh.digestDisplay = fresh.digestArrangement(in: copy, now: copy.now())
                 return fresh.currentDigest != nil
-            })
-        case .timeline:
-            let field = try #require(browser.timelineWork.held?.key.choice).field
-            _ = fresh.timelinePlacing(in: copy, field: field, now: copy.now())
-        case .board: _ = fresh.boardLanes(in: copy)
-        case .calendar: _ = fresh.calendarPlacing(in: copy, calendar: Calendar.chosenWeekStart)
-        case .map: break
-        }
+            case .timeline: return fresh.timelinePlacing(in: copy, field: field, now: copy.now()) != nil
+            case .board: return fresh.boardLanes(in: copy) != nil
+            case .calendar: return fresh.calendarPlacing(in: copy, calendar: Calendar.chosenWeekStart) != nil
+            case .map: return fresh.mapPlacing(in: copy) != nil
+            }
+        })
         return try #require(drawn(in: fresh, mode: mode, library: copy))
     }
 
@@ -202,7 +218,7 @@ struct PlaceChangeCostTests {
             return items(held.drawn(browser.listDrawn).flatMap { $0.group.rows.map(\.item) })
         case .board:
             guard let held = browser.boardWork.held?.value else { return nil }
-            return items(browser.shownBoardLanes(held).flatMap(\.items))
+            return items(browser.shownBoardLanes(held).flatMap { $0.items.prefix(Browser.listPage) })
         case .calendar:
             guard let held = browser.calendarWork.held?.value else { return nil }
             let calendar = Calendar.chosenWeekStart
@@ -211,8 +227,15 @@ struct PlaceChangeCostTests {
             let days = CalendarLayout.drawn(browser.calendarScale, firstShown: first, anchor: browser.calendarDay ?? now, calendar: calendar)
             let ids = CalendarLayout.ids(in: held.entries, within: days)
             return held.entries.filter { ids.contains($0.id) }.map { DrawnItem(id: $0.id, title: $0.title) }
-        case .map: return nil
+        case .map:
+            return browser.mapWork.held?.value.pins.map { DrawnItem(id: $0.id, title: $0.title) }
         }
+    }
+
+    private static func opened(_ mode: ItemViewMode, in browser: Browser, library: any ItemLibrary) -> Bool {
+        guard mode == browser.viewMode else { return false }
+        if mode == .calendar { return browser.calendarWork.held?.value.isEmpty == false }
+        return drawn(in: browser, mode: mode, library: library)?.isEmpty == false
     }
 
     private static func scroll(by points: CGFloat) {
@@ -247,14 +270,14 @@ struct PlaceChangeCostTests {
 
     /// Hosts the real window on the Library, in `layout`, and hands `script` the browser, the library, the source and `step`.
     private func hosted(
-        _ layout: Layout,
+        _ layout: Layout, startsAtIndex: Bool = false,
         _ script: (Browser, MarfaLibrary, FakeItemSource, (String, [DrawnItem]?, () -> Void) async throws -> Void) async throws -> Void
     ) async throws {
         #if DEBUG
-        let (library, source) = try await BigLibrary.loaded(scale: 75)
+        let (library, source) = try await BigLibrary.loaded(scale: 75, withLocations: layout.mode == .map)
         let browser = Browser()
         browser.adopt(library)
-        browser.showing = .library
+        browser.showing = startsAtIndex ? .types : .library
         let libraries = ItemPreviewFixtures.libraries(named: "MarfaMac.PlaceChangeCost")
         let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 1280, height: 800), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
@@ -263,7 +286,7 @@ struct PlaceChangeCostTests {
             .environment(libraries))
         window.makeKeyAndOrderFront(nil)
         defer { window.performClose(nil); window.contentView = nil }
-        // Lets the window draw the Library first, so the first move is measured on its own.
+        // Lets the starting place draw, so the first move is measured on its own.
         try await Task.sleep(for: .seconds(3))
 
         /// Runs `move` and watches the main thread; `expected` is what the layout is to draw after it, nil for a move that
@@ -271,7 +294,11 @@ struct PlaceChangeCostTests {
         func step(_ name: String, _ expected: [DrawnItem]?, _ move: () -> Void) async throws {
             // Lets earlier work finish, so it is not counted in the measure.
             try await Task.sleep(for: .seconds(1))
-            func took() -> Bool { expected.map { Self.drawn(in: browser, mode: layout.mode, library: library) == $0 } ?? true }
+            let firstOpen = name == "first open"
+            func took() -> Bool {
+                if firstOpen { return Self.opened(layout.mode, in: browser, library: library) }
+                return expected.map { Self.drawn(in: browser, mode: layout.mode, library: library) == $0 } ?? true
+            }
             if let expected {
                 #expect(Self.drawn(in: browser, mode: layout.mode, library: library) != expected, "\(layout.name), \(name): the change draws something new")
                 #expect(!expected.isEmpty, "\(layout.name), \(name): the layout draws items")
@@ -282,7 +309,7 @@ struct PlaceChangeCostTests {
             move()
             // The move itself holds the main actor too.
             var stall = Self.milliseconds(ContinuousClock.now - start)
-            var landed: Duration? = expected == nil ? .zero : nil
+            var landed: Duration? = expected == nil && !firstOpen ? .zero : nil
             var checked = start
             while ContinuousClock.now - start < Self.watched {
                 let before = ContinuousClock.now
@@ -303,6 +330,7 @@ struct PlaceChangeCostTests {
                 format: "BUSY|%@|%@|main=%.0fms|busy=%.1f%%|stall=%.0fms|window=%.0fms|landed=%@|%@", layout.name, name, main,
                 main / window * 100, stall, window, landed.map { String(format: "%.0fms", Self.milliseconds($0)) } ?? "never", costs))
             #expect(landed != nil, "\(layout.name), \(name): the layout drew the change")
+            if firstOpen { #expect(stall < 250, "\(layout.name): first open must keep the main thread responsive") }
         }
 
         try await script(browser, library, source, step)

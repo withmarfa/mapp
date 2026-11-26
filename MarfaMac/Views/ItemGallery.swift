@@ -39,7 +39,17 @@ struct ItemGallery: View {
 
     var body: some View {
         let _ = daysSeen
-        let arrangement = browser.arrangement(in: library, order: order, now: library.now())
+        Group {
+            if let arrangement = browser.readyArrangement(in: library, order: order, now: library.now()) {
+                content(arrangement)
+            } else {
+                PlaceProgress()
+            }
+        }
+        .onClockChange { daysSeen += 1 }
+    }
+
+    private func content(_ arrangement: ListArrangement) -> some View {
         let sections = arrangement.sections
         let ids = arrangement.ids
         let title = browser.pageTitle(in: library)
@@ -53,7 +63,7 @@ struct ItemGallery: View {
         let drawnItems = drawn.flatMap(\.section.items)
         let contents = cardContents.contents(of: drawnItems, in: library, looks: browser.propertyLooks(in: library), list: list, shape: shape)
         let attachments = CardAttachments.of(drawnItems, in: library, showsPicture: browser.cards.preview.showsPicture)
-        keyboardCollection(sections, drawn: drawn, ids: ids, plan: plan(for: browser.cards, contents: contents, attachments: attachments))
+        return keyboardCollection(sections, drawn: drawn, ids: ids, plan: plan(for: browser.cards, contents: contents, attachments: attachments))
         .searchStatus(browser)
         .accessibilityLabel(title)
         .onChange(of: browser.isSearchExpanded) {
@@ -76,7 +86,6 @@ struct ItemGallery: View {
             }
         }
         .filteredEmptyState(browser)
-        .onClockChange { daysSeen += 1 }
         .dragContainer(for: ItemReference.self) { ids in ids.map(library.dragReference(of:)) }
         .dragsSelection(of: browser)
     }

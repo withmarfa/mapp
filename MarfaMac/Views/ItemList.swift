@@ -26,7 +26,23 @@ struct ItemList: View, Equatable {
         let _ = daysSeen
         let now = library.now()
         // Worked out off the main actor for a large place, with the ids and types read here, so the body makes no pass over it.
-        let arrangement = browser.arrangement(in: library, order: order, now: now)
+        Group {
+            if let arrangement = browser.readyArrangement(in: library, order: order, now: now) {
+                content(arrangement, now: now)
+            } else {
+                PlaceProgress()
+            }
+        }
+        .toolbar {
+            // While the sidebar is hidden its button and Back and Forward lead this column's toolbar.
+            ListToolbar(
+                browser: browser, columnWidth: width - (isSidebarHidden ? ColumnSearchMetrics.sidebarButtonRoom : 0),
+                leadsWithHistory: isSidebarHidden && showsSidebarHistory)
+        }
+        .onClockChange { daysSeen += 1 }
+    }
+
+    private func content(_ arrangement: ListArrangement, now: Date) -> some View {
         // A folded section lists its heading alone.
         let ids = arrangement.shownIDs
         // Only a page of a long list is drawn, and the next as its end comes into view (`Browser.listDrawn`).
@@ -45,7 +61,7 @@ struct ItemList: View, Equatable {
         // Headings are rows of their own rather than section headers: a list of sections leaves every row at
         // the table's default height, and its first header floats into the toolbar's edge, whose line then runs
         // the list's full width.
-        listContent(lines: lines, ids: ids, drawnIDs: drawnIDs, contents: contents, density: density, excerpts: excerpts, title: title)
+        return listContent(lines: lines, ids: ids, drawnIDs: drawnIDs, contents: contents, density: density, excerpts: excerpts, title: title)
         .onDeleteCommand(perform: deleteSelection)
         .clearsSeveralOnEscape(browser)
         .quickLooksOnSpace(browser)
@@ -69,14 +85,6 @@ struct ItemList: View, Equatable {
         }
         .searchStatus(browser)
         .topRowTable()
-        .toolbar {
-            // While the sidebar is hidden its button and Back and Forward lead this column's toolbar, so the field has
-            // that much less room.
-            ListToolbar(
-                browser: browser, columnWidth: width - (isSidebarHidden ? ColumnSearchMetrics.sidebarButtonRoom : 0),
-                leadsWithHistory: isSidebarHidden && showsSidebarHistory)
-        }
-        .onClockChange { daysSeen += 1 }
         .dragContainer(for: ItemReference.self) { ids in ids.map(library.dragReference(of:)) }
         .dragsSelection(of: browser)
         .onChange(of: ids) { old, new in

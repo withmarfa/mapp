@@ -56,7 +56,7 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **The Library opens as a table, and as a list while it holds ten items or fewer** (`Browser.naturalLayout`). It and the Archive, reached from the Library's row and Go, list Name, Type, Source and Edited, latest first (`listsByOrigin`).
 - **The Feed opens in Digest, newest created first.** Every item list offers it. Cards show type, source, title, text and pictures.
 - **Digest stacks messages by `in-thread` and excerpts by `excerpt-of`** (`DigestLayout`). Piles span sources and sit at their newest visible member. Choosing an earlier card opens its pile.
-- **Digest draws by page.** Select All reaches every page.
+- **Digest and board lanes draw by page.** Counts and Select All cover every page.
 - **Several chosen items show a command capsule** (`SelectionCapsule`), a pile beside a list (`SelectionPile`). Escape clears them.
 - **⌘⌫ deletes chosen items shown in a board, timeline, Digest, or map** (`ChosenItemDeletion`). Changing the calendar span drops old events.
 - **Calendar and Timeline use each type's date** (`ItemPlacement`) or a field chosen for the view.
@@ -117,8 +117,7 @@ A filter is a `FilterClause`: a field, a `FilterOp` and values, shown as a chip.
 - **Library › Types, Collections, and Sources** (`PlaceIndex`) show places, searched by name, with no View button.
 - **Types nest kinds under their type.** Made By waits for the package's provenance; a type has no link to copy.
 - **Source kind** shows App for `oauth:` codes and Connector for `GET /plugins` sources (`SourceKind`).
-- **Above 2,000 items, layout updates run off the main actor.** Tables and lists reuse unchanged rows. Search keeps its own table.
-- **Trap:** a table's body must not read the choice, or choosing a row draws every row.
+- **Above 2,000 items, layouts open and update off the main actor.** The content shows progress on first open and keeps the current layout during updates.
 - **A row's count is of what the place lists.** A file attached to an item shows on its page, so no list or count but search takes it. The Feed's row has none.
 
 ## Search

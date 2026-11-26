@@ -131,10 +131,25 @@ nonisolated enum BigLibrary {
     }
 
     @MainActor
-    static func loaded(scale: Int = 1) async throws -> (MarfaLibrary, FakeItemSource) {
+    static func loaded(scale: Int = 1, withLocations: Bool = false) async throws -> (MarfaLibrary, FakeItemSource) {
         let source = FakeItemSource()
         let library = MarfaLibrary(source: source, notices: Notices())
-        source.send(.loaded(SourceSnapshot(items: items(scale: scale), catalogue: catalogue)))
+        var items = items(scale: scale)
+        var catalogue = Self.catalogue
+        if withLocations {
+            let latitude = field(MarfaMapping.latitudeField, .number, in: project)
+            let longitude = field(MarfaMapping.longitudeField, .number, in: project)
+            catalogue = Catalogue(itemTypes: catalogue.itemTypes.values.map {
+                $0.id == project ? info(project, "Project", $0.fields.dropFirst(2) + [latitude, longitude]) : $0
+            }, edgeTypes: Array(catalogue.edgeTypes.values))
+            for index in items.indices where items[index].type == project && index % 4 == 0 {
+                items[index].properties += [
+                    Property(key: latitude.key, value: .number(Decimal(index % 170 - 85))),
+                    Property(key: longitude.key, value: .number(Decimal(index % 350 - 175))),
+                ]
+            }
+        }
+        source.send(.loaded(SourceSnapshot(items: items, catalogue: catalogue)))
         try #require(await eventually { library.isLoaded })
         return (library, source)
     }

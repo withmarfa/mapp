@@ -94,6 +94,50 @@ extension MarfaLibrary {
         listing(ListingKey(place: .library, favorites: true, scope: scope, archived: archived, includingKinds: true))
     }
 
+    func favoriteCount(in scope: ListScope) -> Int {
+        _ = membershipRevision
+        return members(of: ListingKey(place: .library, favorites: true, scope: scope, archived: .hidden, includingKinds: true)).count
+    }
+
+    func deferredListing(in place: PlaceView, listing: PlaceListing, preview: LibraryViewQuery?, above limit: Int) -> DeferredListing? {
+        if let id = place.savedView { return deferredView(id, preview: preview, above: limit) }
+        let key = listingKey(for: place, listing: listing)
+        let content = contentRevision
+        let membership = membershipRevision
+        if let held = listed[key], held.content == content || canPatch(key, since: held.content) { return nil }
+        let ids = members(of: key)
+        guard ids.count > limit else { return nil }
+        let items = ids.compactMap { records[$0]?.listedItem }
+        let positions: [ItemID: Double]?
+        if case .collection(let id) = key.place, !key.favorites { positions = self.positions(in: id) }
+        else { positions = nil }
+        return DeferredListing(make: {
+            if let positions { return Self.orderMembers(items, at: positions) }
+            return Self.ordered(items)
+        }, take: { [weak self] items in
+            guard let self, contentRevision == content, membershipRevision == membership else { return }
+            listed[key] = Listing(membership: membership, content: content, ids: items.map(\.id), items: items)
+        })
+    }
+
+    func listed(_ ids: Set<ItemID>, in place: PlaceView, listing: PlaceListing) -> Set<ItemID> {
+        if let view = place.savedView { return listedIDs(ids, inView: view) }
+        let key = listingKey(for: place, listing: listing)
+        if case .collection = key.place { return ids.intersection(members(of: key)) }
+        return Set(ids.filter { isMember($0, of: key) })
+    }
+
+    private func listingKey(for place: PlaceView, listing: PlaceListing) -> ListingKey {
+        ListingKey(
+            place: place.place, favorites: place.view == .favorites, scope: listing.scope, archived: listing.archived,
+            includingKinds: place.view == .favorites || listing.includesKinds)
+    }
+
+    private func canPatch(_ key: ListingKey, since content: Int) -> Bool {
+        if case .collection = key.place { return false }
+        return changedItems(since: content) != nil
+    }
+
     private func listing(_ key: ListingKey) -> [Item] {
         let content = contentRevision
         let membership = membershipRevision

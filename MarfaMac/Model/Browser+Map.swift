@@ -55,34 +55,10 @@ extension Browser {
 // MARK: Where the items stand
 
 extension Browser {
-    /// What the map's placing of the open place's items depends on, besides the items themselves.
-    struct MapKey: Equatable {
-        let library: ObjectIdentifier
-        let content: Int
-        let membership: Int
-        let place: PlaceView
-        let listing: PlaceListing
-        let search: String?
-        let options: ItemTableOptions
-        let tokens: [FilterClause]
-        /// The ordered IDs when a result can change independently of the library's revisions.
-        let itemIDsHash: Int?
-    }
-
-    /// The items the map places: what the place lists, less those its filters hide, and the key their placing is held by.
-    func mapItems(in library: any ItemLibrary) -> (items: [Item], key: MapKey) {
-        let items = filteredItems(in: library)
-        let options = tableOptions[shown] ?? ItemTableOptions()
-        var itemIDsHash: Int?
-        if isSearching || shown.savedView != nil || options.isFiltering || hasSearchTokens {
-            var hasher = Hasher()
-            for item in items { hasher.combine(item.id) }
-            itemIDsHash = hasher.finalize()
+    func mapPlacing(in library: any ItemLibrary) -> MapLayout.Placing? {
+        let catalogue = library.catalogue
+        return placed(mapWork, choice: catalogue, in: library) { items in
+            MapLayout.placing(for: items, catalogue: catalogue)
         }
-        let key = MapKey(
-            library: ObjectIdentifier(library), content: library.contentRevision, membership: library.membershipRevision, place: shown,
-            listing: listing, search: isSearching ? searchText : nil, options: options,
-            tokens: narrowingSearchTokens, itemIDsHash: itemIDsHash)
-        return (items, key)
     }
 }
