@@ -81,7 +81,7 @@ struct SettingsControlTests {
     private func clickClear(in field: NSSearchField) throws {
         let cell = try #require(field.cell as? NSSearchFieldCell)
         let cancel = try #require(cell.cancelButtonCell)
-        cancel.performClick(withFrame: cell.cancelButtonRect(forBounds: field.bounds), in: field)
+        cancel.performClick(field)
     }
 
     @Test(arguments: [false, true])
