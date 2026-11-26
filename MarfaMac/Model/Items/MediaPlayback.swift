@@ -19,7 +19,8 @@ nonisolated enum FileMedia {
 
 /// One audio or video file being played in one page: its position, speed and state, and the place it keeps (`PlaybackPlaces`).
 /// Nothing plays until `play()` is called. Only one plays at a time in the app, so starting one pauses another.
-/// The place is written when playback pauses and when the page is left (`leave()`), never on every tick.
+/// The place is written when playback pauses and when the page is left (`leave()`), never on every tick, and only once
+/// the person has played or moved this page's file: another window on the same item may have moved the place since.
 @MainActor @Observable final class MediaPlayback {
     enum State: Equatable {
         /// Reading the file's tracks and length.
@@ -49,6 +50,8 @@ nonisolated enum FileMedia {
     @ObservationIgnored private var timeObserver: Any?
     @ObservationIgnored private var isLeft = false
     @ObservationIgnored private var isScrubbing = false
+    /// Whether the person has played or moved the file in this page, so its place is theirs to keep.
+    @ObservationIgnored private var isTouched = false
     /// Where the latest move is going while the player has not yet landed there, which is where the file is until it does.
     @ObservationIgnored private var pendingTarget: Double?
     @ObservationIgnored private var moves = 0
@@ -112,6 +115,7 @@ nonisolated enum FileMedia {
         guard state == .ready, !isLeft else { return }
         if let other = Self.playing, other !== self { other.pause() }
         Self.playing = self
+        isTouched = true
         // A file that ended starts again from its start.
         if position >= duration - 0.05 { seek(to: 0) }
         player.defaultRate = Float(speed)
@@ -146,6 +150,7 @@ nonisolated enum FileMedia {
     }
 
     private func move(to target: Double, tolerance: CMTime) {
+        isTouched = true
         position = target
         pendingTarget = target
         moves += 1
@@ -208,7 +213,7 @@ nonisolated enum FileMedia {
 
     /// Keeps where the file is, or nothing where it is at its start or its end: a finished file opens at its start.
     private func keepPlace() {
-        guard let item else { return }
+        guard let item, isTouched else { return }
         PlaybackPlaces.keep(position >= duration - 0.5 ? 0 : position, of: item, in: defaults)
     }
 

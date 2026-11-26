@@ -87,6 +87,23 @@ struct PlaybackPlaceTests {
         past.leave()
     }
 
+    /// Two windows on one item: the one the person left alone never writes its opening place over the other's newer one.
+    @Test func aPageLeftUntouchedKeepsAnotherPagesNewerPlace() async throws {
+        let defaults = defaults()
+        let url = try sound()
+        let id = ItemID.mint()
+        PlaybackPlaces.keep(0.6, of: id, in: defaults)
+        let untouched = MediaPlayback(item: id, url: url, type: .wav, defaults: defaults)
+        let played = MediaPlayback(item: id, url: url, type: .wav, defaults: defaults)
+        await untouched.load()
+        await played.load()
+        played.seek(to: 1.2)
+        played.pause()
+        untouched.leave()
+        #expect(abs((PlaybackPlaces.place(of: id, in: defaults) ?? 0) - 1.2) < 0.05)
+        played.leave()
+    }
+
     @Test func aFileAVFoundationCannotPlayIsSaidToBeUnplayable() async throws {
         let folder = FileManager.default.temporaryDirectory.appending(path: "PlaybackPlaceTests-\(UUID().uuidString)", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)

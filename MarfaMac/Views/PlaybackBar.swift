@@ -145,50 +145,43 @@ private struct PlayerControls: View {
     }
 }
 
-/// The track, drawn as the board draws it: a 4 point line with the played part darker and a knob. A click or a drag
-/// moves the file to that place; VoiceOver and the keyboard see an ordinary slider.
+/// The system slider, small and gray as the board's track: a click or a drag moves the file to that place, and it takes
+/// the keyboard as any slider does. While it is dragged the player lands near each place, then exactly where it ends.
 private struct PlaybackScrubber: View {
     let playback: MediaPlayback
+    /// Where a drag has the knob, while one is under way.
+    @State private var dragged: Double?
 
     var body: some View {
-        let share = playback.duration > 0 ? min(max(playback.position / playback.duration, 0), 1) : 0
-        GeometryReader { geometry in
-            let width = geometry.size.width
-            ZStack(alignment: .leading) {
-                Capsule().fill(.primary.opacity(0.1)).frame(height: 4)
-                Capsule().fill(.primary.opacity(0.55)).frame(width: width * share, height: 4)
-                Circle()
-                    .fill(.white)
-                    .shadow(color: .black.opacity(0.2), radius: 1.5, y: 1)
-                    .overlay { Circle().strokeBorder(.black.opacity(0.18), lineWidth: 0.5) }
-                    .frame(width: 12, height: 12)
-                    .offset(x: width * share - 6)
+        Slider(
+            value: Binding {
+                dragged ?? playback.position
+            } set: { time in
+                if dragged != nil {
+                    dragged = time
+                    playback.scrub(to: time)
+                } else {
+                    playback.seek(to: time)
+                }
+            },
+            in: 0...max(playback.duration, 0.001)
+        ) {
+            Text("Position")
+        } onEditingChanged: { editing in
+            if editing {
+                dragged = playback.position
+            } else if let time = dragged {
+                dragged = nil
+                playback.endScrub(at: time)
             }
-            .frame(maxHeight: .infinity)
-            .contentShape(.rect)
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { drag in playback.scrub(to: time(at: drag.location.x, in: width)) }
-                    .onEnded { drag in playback.endScrub(at: time(at: drag.location.x, in: width)) })
         }
-        .frame(minWidth: 40, maxWidth: .infinity, minHeight: 20, maxHeight: 20)
-        .opacity(playback.state == .ready ? 1 : 0.35)
-        .accessibilityRepresentation {
-            // A step longer than the file is not a step a slider takes.
-            let span = max(playback.duration, 1)
-            Slider(
-                value: Binding { playback.position } set: { playback.seek(to: $0) },
-                in: 0...span, step: min(5, span / 2)
-            ) { Text("Position") }
-            .accessibilityValue(Text("\(PlaybackClock.label(playback.position)) of \(PlaybackClock.label(playback.duration))"))
-            .disabled(playback.state != .ready)
-        }
+        .labelsHidden()
+        .controlSize(.mini)
+        .tint(.primary.opacity(0.55))
+        .frame(minWidth: 40, maxWidth: .infinity)
+        .disabled(playback.state != .ready)
+        .accessibilityValue(Text("\(PlaybackClock.label(playback.position)) of \(PlaybackClock.label(playback.duration))"))
         .accessibilityIdentifier("PlaybackScrubber")
-    }
-
-    private func time(at x: CGFloat, in width: CGFloat) -> Double {
-        guard width > 0 else { return 0 }
-        return Double(min(max(x / width, 0), 1)) * playback.duration
     }
 }
 
@@ -202,45 +195,63 @@ struct PlaybackFoot<Bar: View>: View {
     @Environment(\.interfaceTextSize) private var textSize
 
     var body: some View {
-        let scale = InterfaceStyle.scale(for: textSize)
-        let inset = WindowCorner<EmptyView, EmptyView>.inset
-        // What the corner's buttons take at the trailing edge at the default text size: Open and Focus, with the gap between.
-        let cornerRoom: CGFloat = 72 + 8
-        let lift = WindowCorner<EmptyView, EmptyView>.lift(summary: summary, details: details, scale: scale)
-        PlaybackFootLayout(
-            leading: inset, trailing: cornerRoom * scale + inset * 2, ideal: 500 * scale, least: 300 * scale,
-            raise: CornerMetrics.height * scale + inset
-        ) { bar.pointerStyle(.default) }
-            .padding(.bottom, inset + lift)
+        let metrics = PlaybackFootMetrics(scale: InterfaceStyle.scale(for: textSize))
+        let lift = WindowCorner<EmptyView, EmptyView>.lift(summary: summary, details: details, scale: metrics.scale)
+        PlaybackFootLayout(metrics: metrics) { bar.pointerStyle(.default) }
+            .padding(.bottom, metrics.inset + lift)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
             .animation(.smooth(duration: 0.25), value: lift)
     }
 }
 
-private struct PlaybackFootLayout: Layout {
-    var leading: CGFloat
-    var trailing: CGFloat
-    var ideal: CGFloat
+/// Where the foot puts the bar, which the page also reads to keep its last part clear of the bar.
+nonisolated struct PlaybackFootMetrics {
+    let scale: CGFloat
+    let inset: CGFloat
+    var barHeight: CGFloat { 44 * scale }
+    var ideal: CGFloat { 500 * scale }
     /// The narrowest the bar is drawn beside the buttons.
-    var least: CGFloat
+    var least: CGFloat { 300 * scale }
+    /// What the corner's buttons take at the trailing edge: Open and Focus, with the gap between, and the gaps beside.
+    var trailing: CGFloat { (72 + 8) * scale + inset * 2 }
     /// How far the bar rises when it cannot sit beside the buttons: their height and the gap above them.
-    var raise: CGFloat
+    let raise: CGFloat
+
+    @MainActor init(scale: CGFloat) {
+        self.scale = scale
+        inset = WindowCorner<EmptyView, EmptyView>.inset
+        raise = CornerMetrics.height * scale + inset
+    }
+
+    func isRaised(in width: CGFloat) -> Bool { width - inset - trailing < least }
+
+    /// What the page leaves under its content so its last part scrolls clear of the bar: the bar, how far it stands
+    /// above the pane's foot, and a gap above it.
+    @MainActor
+    func reserve(in width: CGFloat, summary: SelectionSummary?, details: DetailsPresentation?) -> CGFloat {
+        let lift = WindowCorner<EmptyView, EmptyView>.lift(summary: summary, details: details, scale: scale)
+        return inset + lift + (isRaised(in: width) ? raise : 0) + barHeight + inset
+    }
+}
+
+private struct PlaybackFootLayout: Layout {
+    var metrics: PlaybackFootMetrics
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let height = subviews.first?.sizeThatFits(.unspecified).height ?? 0
-        return CGSize(width: proposal.width ?? ideal, height: height)
+        return CGSize(width: proposal.width ?? metrics.ideal, height: height)
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
         guard let bar = subviews.first else { return }
-        let beside = bounds.width - leading - trailing
-        let lifted = beside < least
-        let room = lifted ? max(bounds.width - leading * 2, 1) : beside
-        let width = min(ideal, room)
-        let end = lifted ? bounds.maxX - leading : bounds.maxX - trailing
+        let leading = metrics.inset
+        let lifted = metrics.isRaised(in: bounds.width)
+        let room = lifted ? max(bounds.width - leading * 2, 1) : bounds.width - leading - metrics.trailing
+        let width = min(metrics.ideal, room)
+        let end = lifted ? bounds.maxX - leading : bounds.maxX - metrics.trailing
         let x = min(max(bounds.midX - width / 2, bounds.minX + leading), end - width)
         bar.place(
-            at: CGPoint(x: x, y: bounds.maxY - (lifted ? raise : 0)), anchor: .bottomLeading,
+            at: CGPoint(x: x, y: bounds.maxY - (lifted ? metrics.raise : 0)), anchor: .bottomLeading,
             proposal: ProposedViewSize(width: width, height: nil))
     }
 }

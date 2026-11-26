@@ -16,6 +16,8 @@ struct FileMediaPage: View {
     @CurrentLibrary private var library
     @StoredPageStyle private var style
     @Environment(\.interfaceTextSize) private var textSize
+    @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
+    @Environment(SelectionSummary.self) private var summary: SelectionSummary?
     @State private var playback: MediaPlayback
     @State private var envelope: WaveformEnvelope?
     @State private var appName: String?
@@ -55,8 +57,8 @@ struct FileMediaPage: View {
         let inset = head == nil ? 0 : style.horizontalInset(for: pane.width)
         let toolbar = head?.toolbar ?? 0
         let top = head?.top ?? 0
-        // The foot's bar and its gap, so the last of the page scrolls clear of it.
-        let foot = 44 * scale + WindowCorner<EmptyView, EmptyView>.inset * 3
+        // The foot's bar where it stands, raised or lifted above a toast, so the last of the page scrolls clear of it.
+        let foot = PlaybackFootMetrics(scale: scale).reserve(in: pane.width, summary: summary, details: details)
         let column = CGSize(width: max(pane.width - inset * 2, 1), height: max(pane.height - toolbar - foot - 22, 120))
         return ScrollView(.vertical) {
             VStack(alignment: .leading, spacing: 0) {
