@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// The layout's own section of the View panel: what only that layout has. A list has its properties and density, a
-/// table its columns and how many rows it shows at a time, a board its properties and cards, a gallery its cards and
-/// properties, a calendar its span and a timeline its date and properties.
+/// table its columns and how many rows it shows at a time, a board its properties, cards and sub-items, a gallery its
+/// cards, a calendar its span and a timeline its date and properties.
 struct ViewPanelLayoutRows: View {
     @CurrentLibrary private var library
     @Bindable var browser: Browser
@@ -21,9 +21,9 @@ struct ViewPanelLayoutRows: View {
         case .board:
             ViewPanelPropertiesRow(browser: browser, panel: panel)
             boardCards
+            boardSubItems
         case .gallery:
             ViewPanelGalleryRows(browser: browser)
-            ViewPanelPropertiesRow(browser: browser, panel: panel)
         case .calendar:
             calendarSpan
         case .timeline:
@@ -78,9 +78,18 @@ struct ViewPanelLayoutRows: View {
         ViewPanelChoiceRow(
             symbol: "rectangle.compress.vertical", label: String(localized: "Card Size"), choices: [false, true],
             title: { $0 ? String(localized: "Compact") : String(localized: "Comfortable") },
-            selection: browser.compactBoards[browser.shown, default: false],
-            choose: { browser.setCompactBoard($0, in: browser.shown) })
+            selection: browser.boardChoices.isCompact,
+            choose: { value in browser.changeBoard { $0.compact = value } })
             .accessibilityIdentifier("BoardCardDensity")
+    }
+
+    private var boardSubItems: some View {
+        ViewPanelChoiceRow(
+            symbol: "list.bullet.indent", label: String(localized: "Sub-Items"), choices: [true, false],
+            title: { $0 ? String(localized: "Count on the Card") : String(localized: "Hidden") },
+            selection: browser.boardChoices.showsSubItems,
+            choose: { value in browser.changeBoard { $0.hidesSubItems = !value } })
+            .accessibilityIdentifier("BoardSubItems")
     }
 
     private var calendarSpan: some View {
@@ -127,7 +136,7 @@ private struct ViewPanelPropertiesRow: View {
 }
 
 /// A gallery's cards: what fills each card's picture area, how large a card is, its shape, and whether a picture fits
-/// whole. What a card says under its picture is its type's look until the view's Properties change it.
+/// whole. Cards still read the view's shared Properties choices.
 private struct ViewPanelGalleryRows: View {
     @Bindable var browser: Browser
 

@@ -54,7 +54,7 @@ struct PlaceDefaultsTests {
         first.viewMode = .table
         first.timelineFields[first.shown] = "due_at"
         first.choicesChanged()
-        first.setCompactBoard(true, in: first.shown)
+        first.changeBoard { $0.compact = true }
         first.changeCards { $0.size = .large }
         first.changeCalendarScale(.month)
 
@@ -66,11 +66,23 @@ struct PlaceDefaultsTests {
         #expect(options?.grouping == ItemTableOptions.Grouping.none)
         #expect(second.viewMode == .table)
         #expect(second.timelineFields[second.shown] == "due_at")
-        #expect(second.compactBoards[second.shown] == true)
+        #expect(second.boardChoices.isCompact)
         #expect(second.cards.size == .large)
         #expect(second.calendarScale == .month)
         // Opening is not the person's change: it makes no step of Undo and no write.
         #expect(second.liveChoices == second.observedChoices[second.shown])
+    }
+
+    @Test func aBoardChoiceChangesOnlyItsOwnMemberOfWhatIsStored() {
+        let defaults = ViewPanelTests.defaults()
+        let library = Self.library()
+        let first = Self.window(defaults, library: library)
+        let second = Self.window(defaults, library: library)
+        first.changeBoard { $0.hidesSubItems = true }
+        second.changeBoard { $0.compact = true }
+        let stored = PlaceDefaults.stored(in: defaults).default(for: Self.tasks)?.board
+        #expect(stored?.compact == true)
+        #expect(stored?.hidesSubItems == true)
     }
 
     @Test func anotherPlaceKeepsItsOwnAndAPlaceNobodyChangedKeepsNothing() {

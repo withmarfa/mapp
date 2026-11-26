@@ -53,6 +53,8 @@ nonisolated struct ViewMacSettings: Codable, Hashable, Sendable {
     /// The map's Style and whether it groups markers that crowd. Nil follows the defaults.
     var map: MapChoices?
     var digest: DigestChoices?
+    /// The board's card size and whether a card says its sub-items.
+    var board: BoardChoices?
 
     init(
         layout: ItemViewMode? = nil, properties: ViewProperties = ViewProperties(), hidesEmptyGroups: Bool = false,
@@ -70,7 +72,7 @@ nonisolated struct ViewMacSettings: Codable, Hashable, Sendable {
 
     /// The Properties list is stored under the key the table's columns used, so a view's choices carry over.
     private enum CodingKeys: String, CodingKey {
-        case layout, hidesEmptyGroups, cards, density, widths, calendarScale, quickActions, opening, map, digest
+        case layout, hidesEmptyGroups, cards, density, widths, calendarScale, quickActions, opening, map, digest, board
         case properties = "columns"
     }
 
@@ -88,6 +90,7 @@ nonisolated struct ViewMacSettings: Codable, Hashable, Sendable {
         opening = try? container.decodeIfPresent(ItemOpening.self, forKey: .opening)
         map = try? container.decodeIfPresent(MapChoices.self, forKey: .map)
         digest = try? container.decodeIfPresent(DigestChoices.self, forKey: .digest)
+        board = try? container.decodeIfPresent(BoardChoices.self, forKey: .board)
     }
 
     /// Whether a list offers its quick actions: as the person chose, else only at the Feed, the Archive and in a view

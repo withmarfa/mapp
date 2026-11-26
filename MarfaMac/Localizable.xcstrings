@@ -4179,6 +4179,9 @@
     "Couldn’t sync" : {
 
     },
+    "Count on the Card" : {
+
+    },
     "Counting…" : {
 
     },
@@ -6785,6 +6788,12 @@
 
     },
     "Move Feed Items to Recently Deleted After" : {
+
+    },
+    "Move Lane Left" : {
+
+    },
+    "Move Lane Right" : {
 
     },
     "Move Them to Another Type" : {

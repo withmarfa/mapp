@@ -10,10 +10,10 @@ struct BrowserTests {
         let browser = Browser()
         browser.adopt(first)
         browser.timelineFields[.library] = "starts_at"
-        browser.compactBoards[.library] = true
+        browser.placeBoards[.library] = BoardChoices(compact: true)
         browser.adopt(second)
         #expect(browser.timelineFields.isEmpty)
-        #expect(browser.compactBoards.isEmpty)
+        #expect(browser.placeBoards.isEmpty)
     }
 
     let start = Date(timeIntervalSinceReferenceDate: 800_000_000)

@@ -65,15 +65,42 @@ extension Browser {
         }
     }
 
-    /// Changes whether the open place's board draws compact cards, and keeps it.
-    func setCompactBoard(_ isCompact: Bool, in place: PlaceView) {
-        let before = compactBoards[place] ?? false
-        guard before != isCompact else { return }
-        compactBoards[place] = isCompact
-        updatePlaceDefault(place) { $0.compactBoard = isCompact }
+    /// The board's choices in the open place: a saved view's in the app's settings, else the place's default view's.
+    var boardChoices: BoardChoices {
+        if let id = shown.savedView { return macSettings(for: id).board ?? BoardChoices() }
+        return placeBoards[shown] ?? BoardChoices()
+    }
+
+    /// Changes the board's choices: the member `change` touches, on what is stored now, so a choice another Mac or window
+    /// made to another member stays. A saved view's are kept in the app's settings as they are made, and a place's in its
+    /// default view. Undo takes either back.
+    func changeBoard(_ change: @escaping (inout BoardChoices) -> Void) {
+        if let id = shown.savedView {
+            changeViewSettings(id) {
+                var choices = $0.board ?? BoardChoices()
+                change(&choices)
+                $0.board = choices.kept
+            }
+        } else {
+            setPlaceBoard(change, in: shown)
+        }
+    }
+
+    private func setPlaceBoard(_ change: (inout BoardChoices) -> Void, in place: PlaceView) {
+        let writes = Self.hasDefaultView(place) && viewPanel?.isNew != true
+        let before = writes ? PlaceDefaults.stored(in: defaults).default(for: place)?.board : placeBoards[place]
+        var choices = before ?? BoardChoices()
+        change(&choices)
+        setPlaceBoard(choices.kept, from: before, in: place)
+    }
+
+    private func setPlaceBoard(_ stored: BoardChoices?, from before: BoardChoices?, in place: PlaceView) {
+        guard before != stored else { return }
+        placeBoards[place] = stored
+        updatePlaceDefault(place) { $0.board = stored }
         registerUndo(String(localized: "Change View")) { browser in
             guard browser.shown.isSame(place) else { return }
-            browser.setCompactBoard(before, in: place)
+            browser.setPlaceBoard(before, from: stored, in: place)
         }
     }
 
@@ -111,8 +138,7 @@ extension Browser {
         let options = stored.options(replacing: tableOptions[place], in: place, catalogue: library.catalogue)
         if options != (tableOptions[place] ?? ItemTableOptions()) { tableOptions[place] = options }
         if timelineFields[place] != stored.timelineField { timelineFields[place] = stored.timelineField }
-        let compact: Bool? = stored.compactBoard ? true : nil
-        if compactBoards[place] != compact { compactBoards[place] = compact }
+        if placeBoards[place] != stored.board { placeBoards[place] = stored.board }
         let cards: ViewCards? = stored.cards == ViewCards() ? nil : stored.cards
         if placeCards[place] != cards { placeCards[place] = cards }
         if placeCalendarScales[place] != stored.calendarScale { placeCalendarScales[place] = stored.calendarScale }
@@ -165,7 +191,7 @@ extension Browser {
                      forKey: ItemTableColumnLayouts.key)
         tableOptions[place] = nil
         timelineFields[place] = nil
-        compactBoards[place] = nil
+        placeBoards[place] = nil
         placeCards[place] = nil
         placeCalendarScales[place] = nil
         placeHidesEmptyGroups[place] = nil
@@ -192,7 +218,7 @@ extension Browser {
     /// Puts back what a place's default view kept, with what the window holds of it.
     func reinstate(_ stored: PlaceDefault, for place: PlaceView) {
         PlaceDefaults.update(in: defaults) { $0.set(stored, for: place) }
-        compactBoards[place] = stored.compactBoard ? true : nil
+        placeBoards[place] = stored.board
         placeCalendarScales[place] = stored.calendarScale
         placeHidesEmptyGroups[place] = stored.hidesEmptyGroups ? true : nil
         placeProperties[place] = stored.properties.isChanged ? stored.properties : nil

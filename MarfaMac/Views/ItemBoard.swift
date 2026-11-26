@@ -75,7 +75,7 @@ struct ItemBoard: View {
     }
 
     /// Set in the View panel's Board section (`ViewPanelLayoutRows`).
-    private var compact: Bool { browser.compactBoards[browser.shown, default: false] }
+    private var compact: Bool { browser.boardChoices.isCompact }
 
     private static let laneGap: CGFloat = 12
     private static let edge: CGFloat = 20
@@ -91,7 +91,9 @@ struct ItemBoard: View {
     private func board(
         _ lanes: [ItemBoardLane], key: String, grouped: Bool, list: RowList, positions: [ItemID: Int]
     ) -> some View {
-        let looks = browser.propertyLooks(in: library)
+        // Sub-Items off: a card leaves out the counts of its sub-items before it chooses its facts, and does not ask Marfa for them.
+        let owned = browser.propertyLooks(in: library)
+        let looks = browser.boardChoices.showsSubItems ? owned : owned.mapValues(\.withoutSubItemCounts)
         func ids() -> [ItemID] { lanes.flatMap { $0.items.map(\.id) } }
         func cursorLane() -> ItemBoardLane.ID? {
             guard let cursor, let position = positions[cursor] else { return nil }
@@ -178,6 +180,8 @@ struct ItemBoard: View {
             .padding(.horizontal, 4)
             .padding(.top, 12)
             .padding(.bottom, 10)
+            .contentShape(.rect)
+            .modifier(LaneOrder(browser: browser, library: library, lane: lane))
             .accessibilityElement(children: .contain)
             let typing = browser.inPlace.place == browser.shown && browser.inPlace.spot == .lane(lane.id)
             // A held card the filters now leave out is still drawn where it was seen (`RowHold`); only a lane holding
@@ -297,6 +301,48 @@ struct ItemBoard: View {
             next += step
         }
         return current
+    }
+}
+
+/// A lane header dragged onto another lane's header moves the lane there, in the order the Group page keeps
+/// (`Browser.moveGroup`). It carries a lane, never an item, so it starts no card drag; a card dropped on a lane still
+/// moves the card. A lane no card can be put in because it holds no group of its own (Not Applicable) stays last.
+private struct LaneOrder: ViewModifier {
+    let browser: Browser
+    let library: any ItemLibrary
+    let lane: ItemBoardLane
+    @State private var isTargeted = false
+
+    private static let prefix = "group:"
+    private var movable: Bool { lane.id != .notApplicable && lane.id != .invalid }
+
+    func body(content: Content) -> some View {
+        if movable {
+            content
+                .draggable(LayoutRowDrag(id: Self.prefix + lane.groupKey))
+                .dropDestination(for: LayoutRowDrag.self) { (drops: [LayoutRowDrag], _: CGPoint) -> Bool in
+                    guard let dragged = drops.first?.id, dragged.hasPrefix(Self.prefix) else { return false }
+                    let moved = String(dragged.dropFirst(Self.prefix.count))
+                    guard moved != lane.groupKey else { return false }
+                    browser.moveGroup(moved, onto: lane.groupKey, in: library)
+                    return true
+                } isTargeted: { isTargeted = $0 }
+                .overlay(alignment: .leading) {
+                    if isTargeted {
+                        Capsule().fill(Color.accentColor).frame(width: 3).padding(.vertical, 6).offset(x: -6).allowsHitTesting(false)
+                    }
+                }
+                .accessibilityAction(named: Text("Move Lane Left")) { move(by: -1) }
+                .accessibilityAction(named: Text("Move Lane Right")) { move(by: 1) }
+        } else {
+            content
+        }
+    }
+
+    private func move(by offset: Int) {
+        let order = browser.groupRows(in: library).map(\.key).filter { $0 != GroupKey.notApplicable }
+        guard let index = order.firstIndex(of: lane.groupKey), order.indices.contains(index + offset) else { return }
+        browser.moveGroup(lane.groupKey, onto: order[index + offset], in: library)
     }
 }
 

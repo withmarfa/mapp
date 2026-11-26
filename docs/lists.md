@@ -49,7 +49,7 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **Starting points preview in the window's layout** (`NewViewStart`). Create View applies the draft's layout. This Search comes first, saving supported tokens and unchanged From. An existing view asks before discarding changes.
 - **A saved view belongs to one place** (`Place.home(of:catalogue:)`). Its sole type, then its sole required collection (by the outbound edge) or source, else the Feed or the Library by its tier.
 - **The Library and the Feed list their own tier.** The Feed's first view is All. A type, a collection and a source choose From (`ListScope`).
-- **Favorites starts on Library,** with the usual From choices.
+- **Favorites starts on Library.**
 - **Include Kinds defaults on.** A saved view with no state shows archived items (`ArchivedItems`).
 
 ## Layouts
@@ -63,7 +63,9 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **Calendar and Timeline use each type's date** (`ItemPlacement`) or a chosen field.
 - **An event's span is one rule** (`EventSpan`); all-day events ignore the Mac's zone.
 - **Map needs both coordinate fields and valid values** (`MapLayout`). No Location lists the rest.
-- **Board lanes default to status.** Types with different status names use the four status groups.
+- **A board always has lanes,** by status when none is chosen.
+- **A board's lanes are its groups;** a header drags to reorder. Sub-Items hides only cards' sub-item counts.
+- **A gallery card with no picture shows its opening lines, else its type's mark.**
 - **A row stays where seen until the pointer or keys leave** (`RowHold`).
 - **A drop in a lane is one edit.** Not Set clears the field; Set and date lanes refuse a drop.
 - **Table text aligns with the title** (`TopRowSpace.titleLead`). Widths sample 120 rows (`ItemTableFit`). Name fills spare space until resized. A column keeps the width its words fit, up to its style's widest; the last hide whole if others do not fit (`ItemTableRoom`).
@@ -123,8 +125,7 @@ A filter is a `FilterClause`: a field, a `FilterOp` and values, shown as a chip.
 ## Indexes
 
 - **Library › Types, Collections, and Sources** (`PlaceIndex`) show places, searched by name, with no View button.
-- **Types nest kinds under their type.** Made By waits for the package's provenance.
-- **Source kind** shows App for `oauth:` codes and Connector for `GET /plugins` sources (`SourceKind`).
+- **Types nest kinds under their type.**
 - **Above 2,000 items, layouts work off the main actor.** First open shows progress; an update keeps the layout.
 - **A row's count is of what the place lists.** A file attached to an item shows on its page, so no list or count but search takes it. The Feed's row has none.
 

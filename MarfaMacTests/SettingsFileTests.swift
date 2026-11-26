@@ -51,7 +51,7 @@ import Testing
         ViewLayouts.update(in: defaults) { $0.set(ViewMacSettings(layout: .board, widths: Data("widths".utf8)), for: view) }
         PlaceDefaults.update(in: defaults) {
             var choice = PlaceDefault()
-            choice.compactBoard = true
+            choice.board = BoardChoices(compact: true)
             $0.set(choice, for: .favorites)
         }
         PlaceDensities.update(in: defaults) { $0.set(.compact, for: .favorites) }

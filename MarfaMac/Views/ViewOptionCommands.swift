@@ -114,14 +114,13 @@ struct ViewOptionCommand {
     }
 
     private static func board(_ browser: Browser, _ library: any ItemLibrary) -> [ViewOptionCommand] {
-        let place = browser.shown
         var commands = grouping(browser, library)
-        let compact = browser.compactBoards[place, default: false]
+        let compact = browser.boardChoices.isCompact
         commands.append(.init(
             title: compact ? String(localized: "Comfortable Cards") : String(localized: "Compact Cards"),
             systemImage: "rectangle.compress.vertical"
         ) {
-            browser.setCompactBoard(!compact, in: place)
+            browser.changeBoard { $0.compact = !compact }
         })
         return commands
     }
