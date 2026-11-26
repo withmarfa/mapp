@@ -406,10 +406,4 @@ extension NSView {
         }
         return nil
     }
-
-    static func tables(in view: NSView) -> [NSTableView] {
-        view.subviews.flatMap { subview in
-            (subview as? NSTableView).map { [$0] } ?? tables(in: subview)
-        }
-    }
 }

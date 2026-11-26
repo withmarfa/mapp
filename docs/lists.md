@@ -118,6 +118,8 @@ A filter is a `FilterClause`: a field, a `FilterOp` and values, shown as a chip.
 - **Types nest kinds under their type.** Made By waits for the package's provenance; a type has no link to copy.
 - **Source kind** shows App for `oauth:` codes and Connector for `GET /plugins` sources (`SourceKind`).
 - **Above 2,000 items, layouts open and update off the main actor.** First open shows progress. Updates keep the current layout. Lists and timelines draw fewer rows at first.
+- **Tables and lists reuse unchanged rows. Search keeps its own table.**
+- **Trap:** a table's body must not read the choice, or choosing a row draws every row.
 - **A row's count is of what the place lists.** A file attached to an item shows on its page, so no list or count but search takes it. The Feed's row has none.
 
 ## Search
