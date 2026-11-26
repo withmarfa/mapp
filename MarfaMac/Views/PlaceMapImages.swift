@@ -18,7 +18,7 @@ final class PlaceMapImages {
     /// The pictures' size in points. The page fits them to its column.
     static let size = CGSize(width: 680, height: 260)
     /// How much of the world the picture shows, across its width.
-    private static let span: CLLocationDistance = 900
+    private static let span: CLLocationDistance = 500
 
     private var held: [LocationPoint: Pictures] = [:]
     private var waiting: [LocationPoint: [@MainActor () -> Void]] = [:]
@@ -60,6 +60,8 @@ final class PlaceMapImages {
         bitmap.size = size
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = context
+        // Points, as the snapshot and the pin are drawn in.
+        context.cgContext.scaleBy(x: CGFloat(scale), y: CGFloat(scale))
         let rect = CGRect(origin: .zero, size: size)
         snapshot.image.draw(in: rect)
         // The snapshot answers a point in the picture's own top-left coordinates; this context is bottom-left.
