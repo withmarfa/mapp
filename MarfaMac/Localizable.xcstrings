@@ -1570,6 +1570,16 @@
     "%lld of %lld done" : {
       "extractionState" : "manual"
     },
+    "%lld of %lld sub-items done" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld of %2$lld sub-items done"
+          }
+        }
+      }
+    },
     "%lld of the %lld files added have not reached the library yet, so this drop has no Undo." : {
       "localizations" : {
         "en" : {
@@ -5391,6 +5401,9 @@
 
     },
     "Hide Sidebar" : {
+
+    },
+    "Hide Sub-Items" : {
 
     },
     "Hide from Page" : {
@@ -9227,6 +9240,9 @@
 
     },
     "Show Spelling and Grammar" : {
+
+    },
+    "Show Sub-Items" : {
 
     },
     "Show This Type Only" : {
