@@ -209,6 +209,7 @@ nonisolated struct SystemSignIns: SignIns {
 
     init(
         bundleIdentifier: String = AppPaths.bundleIdentifier,
+        computerName: String? = nil,
         anchor: @escaping @MainActor @Sendable () -> NSWindow? = {
             NSApp.keyWindow ?? NSApp.mainWindow ?? NSApp.windows.first { $0.isVisible }
         }

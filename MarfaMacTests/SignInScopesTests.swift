@@ -41,6 +41,24 @@ struct SignInScopesTests {
         #expect(try signIns.authorization(for: connection).client.scopes == SystemSignIns.scopes)
     }
 
+    @Test(arguments: [
+        (nil as String?, "Marfa for Mac"),
+        (" \t\u{2003}\n", "Marfa for Mac"),
+        ("  Studio Mac  ", "Marfa for Mac on Studio Mac"),
+        ("Étage 🖥️", "Marfa for Mac on Étage 🖥️"),
+        (String(repeating: "🚀", count: 90), "Marfa for Mac on " + String(repeating: "🚀", count: 83)),
+        (String(repeating: "e\u{301}", count: 50), "Marfa for Mac on " + String(repeating: "e\u{301}", count: 41)),
+    ])
+    func aNewRegistrationNamesTheMac(computerName: String?, expected: String) throws {
+        let signIns = SystemSignIns(bundleIdentifier: "com.withmarfa.marfa.debug", computerName: computerName, anchor: { nil })
+        let connection = try MarfaConnection(address: "https://marfa.example")
+        let client = try signIns.authorization(for: connection).client
+        #expect(client.name == expected)
+        #expect(client.name.unicodeScalars.count <= 100)
+        #expect(client.redirect?.absoluteString == "com.withmarfa.marfa.debug:/signed-in")
+        #expect(signIns.service == "com.withmarfa.marfa.debug.marfa-sign-in")
+    }
+
     @Test func theScriptedSignInRecordsTheList() async throws {
         let signIns = ScriptedSignIns()
         signIns.script(codeKey: "scripted")
