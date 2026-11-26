@@ -90,14 +90,15 @@ nonisolated struct DateFormat: Hashable, Sendable, RawRepresentable {
         return defaults.string(forKey: key).flatMap(Self.init(rawValue:)) ?? standard
     }
 
-    /// Keeps a stored value that does not read, such as an older version's word, under `setAsideKey` and removes it, so
-    /// the page starts from the standard and a change writes over nothing. Run at launch, before any view writes.
+    /// Keeps a copy of a stored value that does not read, such as an older version's word, under `setAsideKey`, once,
+    /// before anything can write over it. The value stays in place: removing it would read as the person clearing the
+    /// date format, which the sync would send to the Marfa. Run at launch, before any view writes.
     static func setAsideUnreadable(in defaults: UserDefaults = .standard) {
         guard let value = defaults.object(forKey: key) else { return }
         let text = value as? String ?? String(describing: value)
-        guard Self(rawValue: text) == nil else { return }
-        defaults.set((defaults.stringArray(forKey: setAsideKey) ?? []) + [text], forKey: setAsideKey)
-        defaults.removeObject(forKey: key)
+        let setAside = defaults.stringArray(forKey: setAsideKey) ?? []
+        guard Self(rawValue: text) == nil, !setAside.contains(text) else { return }
+        defaults.set(setAside + [text], forKey: setAsideKey)
     }
 
     /// `locale` read on the chosen clock.

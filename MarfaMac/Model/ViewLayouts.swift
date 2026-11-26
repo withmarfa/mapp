@@ -10,6 +10,8 @@ nonisolated struct ViewLayouts: Equatable, Sendable {
     static let setAsideKey = "viewLayoutsSetAside"
 
     private(set) var views: [String: ViewMacSettings] = [:]
+    /// The views whose stored settings this version cannot read, as stored, so a write keeps them.
+    private(set) var unread: [String: StoredJSON] = [:]
 
     init(_ views: [String: ViewMacSettings] = [:]) {
         self.views = views
@@ -21,10 +23,12 @@ nonisolated struct ViewLayouts: Equatable, Sendable {
 
     mutating func set(_ settings: ViewMacSettings, for id: ItemID) {
         views[id.rawValue] = settings
+        unread[id.rawValue] = nil
     }
 
     mutating func forget(_ id: ItemID) {
         views[id.rawValue] = nil
+        unread[id.rawValue] = nil
     }
 }
 
@@ -156,14 +160,13 @@ nonisolated struct ViewMacSettings: Codable, Hashable, Sendable {
 /// The settings as `@AppStorage` keeps them: JSON, with sorted keys so the same settings are the same text.
 nonisolated extension ViewLayouts: RawRepresentable {
     var rawValue: String {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys]
-        return (try? encoder.encode(views)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+        StoredEntries.encode(views, keeping: unread).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
     }
 
     init?(rawValue: String) {
-        guard let views = try? JSONDecoder().decode([String: ViewMacSettings].self, from: Data(rawValue.utf8)) else { return nil }
+        guard let (views, unread) = StoredEntries.decode(Data(rawValue.utf8), as: ViewMacSettings.self) else { return nil }
         self.init(views)
+        self.unread = unread
     }
 }
 
@@ -173,13 +176,20 @@ nonisolated extension ViewLayouts {
         defaults.string(forKey: key).flatMap(ViewLayouts.init(rawValue:)) ?? ViewLayouts()
     }
 
+    /// Changes the stored settings. A view's settings this version cannot read stay as stored until the change replaces
+    /// them, and are set aside first; stored text that is no object of views is set aside whole.
     static func update(in defaults: UserDefaults = .standard, _ change: (inout ViewLayouts) -> Void) {
-        // This write replaces every view's settings, so text it could not read is kept rather than lost.
-        if let text = defaults.string(forKey: key), !text.isEmpty, ViewLayouts(rawValue: text) == nil {
-            defaults.set((defaults.stringArray(forKey: setAsideKey) ?? []) + [text], forKey: setAsideKey)
-        }
+        let whole = defaults.string(forKey: key).flatMap { !$0.isEmpty && ViewLayouts(rawValue: $0) == nil ? $0 : nil }
         var value = stored(in: defaults)
+        let unread = value.unread
         change(&value)
+        let replaced = unread.filter { value.unread[$0.key] == nil }.sorted { $0.key < $1.key }.map(\.value.text)
+        if !replaced.isEmpty { defaults.set((defaults.stringArray(forKey: setAsideKey) ?? []) + replaced, forKey: setAsideKey) }
         defaults.set(value.rawValue, forKey: key)
+        if let whole {
+            PreferenceHolds.setAside(
+                whole, under: setAsideKey, of: key, keys: PreferenceHolds.keys(of: Data(whole.utf8)), kept: Array(value.views.keys),
+                in: defaults)
+        }
     }
 }

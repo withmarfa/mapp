@@ -136,7 +136,7 @@ nonisolated extension SyncedSetting {
     /// itself rather than JSON text. A member's `null` stands for no value.
     func accepts(_ text: String) -> Bool {
         switch place {
-        case .member: PreferenceJSON.value(text) is NSNull || PreferenceJSON.defaultsValue(text) != nil
+        case .member: PreferenceJSON.value(text) is NSNull || (PreferenceJSON.defaultsValue(text) != nil && reader.map { $0.reads(text) } ?? true)
         case .serverMember, .rows, .serverRows, .set, .sidebar: PreferenceJSON.value(text) != nil
         }
     }

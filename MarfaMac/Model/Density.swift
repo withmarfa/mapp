@@ -70,16 +70,18 @@ nonisolated struct PlaceDensities: Equatable, Sendable {
     /// Changes the stored densities. What this write would replace and cannot read is kept aside first.
     static func update(in defaults: UserDefaults = .standard, _ change: (inout PlaceDensities) -> Void) {
         var value = PlaceDensities()
-        if let saved = defaults.data(forKey: key) {
-            let (readable, unreadable) = read(saved)
-            value = readable
-            if let unreadable { defaults.set((defaults.array(forKey: setAsideKey) as? [Data] ?? []) + [unreadable], forKey: setAsideKey) }
-        }
+        var unreadable: Data?
+        if let saved = defaults.data(forKey: key) { (value, unreadable) = read(saved) }
         change(&value)
         if value.places.isEmpty {
             defaults.removeObject(forKey: key)
         } else if let data = try? encode(value.places.mapValues(\.rawValue)) {
             defaults.set(data, forKey: key)
+        }
+        if let unreadable {
+            PreferenceHolds.setAside(
+                unreadable, under: setAsideKey, of: key, keys: PreferenceHolds.keys(of: unreadable), kept: Array(value.places.keys),
+                in: defaults)
         }
     }
 }

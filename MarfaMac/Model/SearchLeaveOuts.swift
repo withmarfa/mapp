@@ -33,6 +33,7 @@ final class SearchLeaveOuts {
         guard let unreadable else { return }
         defaults.set((defaults.array(forKey: Self.setAsideKey) as? [Data] ?? []) + [unreadable], forKey: Self.setAsideKey)
         save()
+        PreferenceHolds.recordByLibrary(unreadable, of: Self.defaultsKey, from: saved, in: defaults)
     }
 
     /// The entries that can be read, and the stored data of those that cannot: the whole of it where it is not an object

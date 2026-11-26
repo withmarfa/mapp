@@ -9,7 +9,8 @@ import Observation
 /// sync through its Marfa (`PreferencesMap`). A look kept for a type the server lacks waits for the type.
 ///
 /// Stored text that cannot be read, such as a look a later version wrote, is moved aside under a key of its own, kept and
-/// never removed, and reported; what can be read is kept, and the looks of the rest are worked out as if never chosen.
+/// never removed, and reported; what can be read is kept as stored, with members a later version added, and the looks of
+/// the rest are worked out as if never chosen.
 @Observable @MainActor
 final class TypeLooks {
     static let defaultsKey = "typeLooks"
@@ -38,15 +39,40 @@ final class TypeLooks {
         chosen = readable
         guard let unreadable else { return }
         defaults.set((defaults.array(forKey: Self.setAsideKey) as? [Data] ?? []) + [unreadable], forKey: Self.setAsideKey)
-        save()
+        // Only what was set aside leaves the stored value, and the sync keeps it in the Marfa.
+        if var libraries = Self.stored(saved) {
+            for (library, entry) in Self.stored(unreadable) ?? [:] {
+                guard let types = entry as? [String: Any], var held = libraries[library] as? [String: Any] else {
+                    libraries[library] = nil
+                    PreferenceHolds.record(Self.defaultsKey, library: library, keys: nil, in: defaults)
+                    continue
+                }
+                for type in types.keys { held[type] = nil }
+                libraries[library] = held.isEmpty ? nil : held
+                PreferenceHolds.record(Self.defaultsKey, library: library, keys: Array(types.keys), in: defaults)
+            }
+            write(libraries)
+        } else {
+            defaults.removeObject(forKey: Self.defaultsKey)
+            PreferenceHolds.record(Self.defaultsKey, keys: nil, in: defaults)
+        }
         Telemetry.typeLooksUnreadable(reporting: reporting)
     }
 
     /// The choices that can be read, and the stored data of those that cannot: the whole of it where it is not an object
-    /// of servers at all, otherwise an object of the unreadable looks alone.
+    /// of servers at all, otherwise an object of the unreadable looks alone. A look that holds only members a later version
+    /// added is no choice.
     private static func read(_ saved: Data) -> (readable: [String: [String: TypeLookChoice]], unreadable: Data?) {
+        let (readable, unreadable) = readEvery(saved)
+        return (readable.compactMapValues { types in
+            let chosen = types.filter { !$0.value.isEmpty }
+            return chosen.isEmpty ? nil : chosen
+        }, unreadable)
+    }
+
+    private static func readEvery(_ saved: Data) -> (readable: [String: [String: TypeLookChoice]], unreadable: Data?) {
         if let all = try? JSONDecoder().decode([String: [String: TypeLookChoice]].self, from: saved) { return (all, nil) }
-        guard let libraries = (try? JSONSerialization.jsonObject(with: saved)) as? [String: Any] else { return ([:], saved) }
+        guard let libraries = stored(saved) else { return ([:], saved) }
         var readable: [String: [String: TypeLookChoice]] = [:]
         var unreadable: [String: Any] = [:]
         for (library, entry) in libraries {
@@ -114,7 +140,7 @@ final class TypeLooks {
         var types = chosen[library] ?? [:]
         types[type.rawValue] = choice.isEmpty ? nil : choice
         chosen[library] = types.isEmpty ? nil : types
-        save()
+        save(library)
     }
 
     /// Takes back every choice for `type`, so it shows what its preset and the types above it give. Other types' choices
@@ -122,7 +148,7 @@ final class TypeLooks {
     func restore(_ type: TypeID, in library: String) {
         guard var types = chosen[library], types.removeValue(forKey: type.rawValue) != nil else { return }
         chosen[library] = types.isEmpty ? nil : types
-        save()
+        save(library)
     }
 
     // MARK: Export and import
@@ -169,7 +195,7 @@ final class TypeLooks {
         let kept: [String: TypeLookChoice]? = types.isEmpty ? nil : types
         guard kept != chosen[library] else { return }
         chosen[library] = kept
-        save()
+        save(library)
     }
 
     /// How many types lie above `type` along the catalogue's `parent` links, however long the chain: `ancestors(of:)` stops
@@ -182,10 +208,41 @@ final class TypeLooks {
         return seen.count - 1
     }
 
-    private func save() {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = .sortedKeys
-        guard let data = try? encoder.encode(chosen) else { return }
+    /// Writes `library`'s choices over what is stored, so the other servers' looks and a later version's members of a
+    /// look are kept as they were. A look with no choice left keeps those members.
+    private func save(_ library: String) {
+        var all = defaults.data(forKey: Self.defaultsKey).flatMap(Self.stored) ?? [:]
+        var stored = all[library] as? [String: Any] ?? [:]
+        let types = chosen[library] ?? [:]
+        for (type, value) in stored where types[type] == nil && Self.choice(value) != nil {
+            let others = (value as? [String: Any] ?? [:]).filter { !TypeLookChoice.members.contains($0.key) }
+            stored[type] = others.isEmpty ? nil : others
+        }
+        for (type, choice) in types where Self.choice(stored[type]) != choice {
+            var look = stored[type] as? [String: Any] ?? [:]
+            let encoded = (try? JSONEncoder().encode(choice)).flatMap(Self.stored) ?? [:]
+            for member in TypeLookChoice.members { look[member] = encoded[member] }
+            stored[type] = look
+        }
+        all[library] = stored.isEmpty ? nil : stored
+        write(all)
+    }
+
+    private func write(_ libraries: [String: Any]) {
+        guard !libraries.isEmpty else {
+            defaults.removeObject(forKey: Self.defaultsKey)
+            return
+        }
+        guard let data = try? JSONSerialization.data(withJSONObject: libraries, options: .sortedKeys) else { return }
         defaults.set(data, forKey: Self.defaultsKey)
+    }
+
+    private static func stored(_ data: Data) -> [String: Any]? {
+        (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+    }
+
+    private static func choice(_ value: Any?) -> TypeLookChoice? {
+        guard let value, let data = try? JSONSerialization.data(withJSONObject: value, options: .fragmentsAllowed) else { return nil }
+        return try? JSONDecoder().decode(TypeLookChoice.self, from: data)
     }
 }

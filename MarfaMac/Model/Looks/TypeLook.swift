@@ -236,7 +236,10 @@ nonisolated extension TypeLook: Codable {
 }
 
 nonisolated extension TypeLookChoice: Codable {
-    private enum CodingKeys: String, CodingKey { case date, secondary, facts }
+    private enum CodingKeys: String, CodingKey, CaseIterable { case date, secondary, facts }
+
+    /// The stored members this version reads and writes; a later version's other members are kept as they were.
+    static var members: [String] { CodingKeys.allCases.map(\.stringValue) }
 
     init(from decoder: any Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)

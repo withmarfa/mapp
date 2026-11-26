@@ -16,7 +16,9 @@ extension PreferencesSync {
     {
         // A dropped setting the Marfa has not changed keeps what the store left, so it is not set aside again.
         let kept = adopted.frozen.filter { unit, _ in !retrying.contains(unit) && outcome.merged[unit] == adopted.base[unit] }
-        var written = outcome.merged.filter { PreferenceJSON.value($0.value) != nil }
+        // A value this Mac cannot store is refused by its setting, which sets it aside and keeps what this Mac held, and
+        // that is recorded below as what was left, so only the person's later change here is sent over it.
+        var written = outcome.merged
         for (unit, frozen) in kept { written[unit] = frozen.left }
         try unchanged(since: local, writing: outcome.toLocal)
         let settings = writeLocal(outcome.toLocal, from: written)

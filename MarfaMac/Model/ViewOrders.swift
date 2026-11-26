@@ -109,14 +109,11 @@ nonisolated struct ViewOrders: Equatable, Sendable {
     /// Changes the stored orders and hidden views, writing only the setting that changed. What a write would replace
     /// and cannot read is kept aside first.
     static func update(in defaults: UserDefaults = .standard, _ change: (inout ViewOrders) -> Void) {
-        var setAside: Set<String> = []
+        var setAside: [String: (data: Data, list: String)] = [:]
         func load<Value>(_ key: String, as type: Value.Type, setAside aside: String) -> [String: Value] {
             guard let saved = defaults.data(forKey: key) else { return [:] }
             let (readable, unreadable) = read(saved, as: type)
-            if let unreadable {
-                defaults.set((defaults.array(forKey: aside) as? [Data] ?? []) + [unreadable], forKey: aside)
-                setAside.insert(key)
-            }
+            if let unreadable { setAside[key] = (unreadable, aside) }
             return readable
         }
         func save(_ entries: [String: Any], to key: String) {
@@ -130,7 +127,12 @@ nonisolated struct ViewOrders: Equatable, Sendable {
             load(key, as: [String].self, setAside: setAsideKey), hidden: load(hiddenKey, as: Bool.self, setAside: hiddenSetAsideKey))
         var value = before
         change(&value)
-        if value.places != before.places || setAside.contains(key) { save(value.places, to: key) }
-        if value.hiddenViews != before.hiddenViews || setAside.contains(hiddenKey) { save(value.hiddenViews, to: hiddenKey) }
+        if value.places != before.places || setAside[key] != nil { save(value.places, to: key) }
+        if value.hiddenViews != before.hiddenViews || setAside[hiddenKey] != nil { save(value.hiddenViews, to: hiddenKey) }
+        for (setting, aside) in setAside {
+            let kept = setting == key ? Array(value.places.keys) : Array(value.hiddenViews.keys)
+            PreferenceHolds.setAside(
+                aside.data, under: aside.list, of: setting, keys: PreferenceHolds.keys(of: aside.data), kept: kept, in: defaults)
+        }
     }
 }

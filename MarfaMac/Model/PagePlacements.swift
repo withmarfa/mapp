@@ -81,6 +81,8 @@ nonisolated struct PagePlacements: Equatable, Sendable {
 
     /// By type identifier.
     private(set) var choices: [String: Choice]
+    /// The types whose stored choice this version cannot read, as stored, so a write keeps them.
+    private(set) var unread: [String: StoredJSON] = [:]
 
     init(_ choices: [String: Choice] = [:]) {
         self.choices = choices.filter { !$0.value.isEmpty }
@@ -214,26 +216,27 @@ nonisolated struct PagePlacements: Equatable, Sendable {
     /// Takes back every choice for the type, so it follows the defaults again.
     mutating func reset(_ type: TypeID) {
         choices[type.rawValue] = nil
+        unread[type.rawValue] = nil
     }
 
     private mutating func update(_ type: TypeID, _ change: (inout Choice) -> Void) {
         var choice = choices[type.rawValue] ?? Choice()
         change(&choice)
         choices[type.rawValue] = choice.isEmpty ? nil : choice
+        unread[type.rawValue] = nil
     }
 }
 
 /// The choice as `@AppStorage` keeps it: JSON with sorted keys, so the same choice is the same text.
 nonisolated extension PagePlacements: RawRepresentable {
     var rawValue: String {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys]
-        return (try? encoder.encode(choices)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+        StoredEntries.encode(choices, keeping: unread).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
     }
 
     init?(rawValue: String) {
-        guard let choices = try? JSONDecoder().decode([String: Choice].self, from: Data(rawValue.utf8)) else { return nil }
+        guard let (choices, unread) = StoredEntries.decode(Data(rawValue.utf8), as: Choice.self) else { return nil }
         self.init(choices)
+        self.unread = unread
     }
 }
 
@@ -242,14 +245,21 @@ nonisolated extension PagePlacements {
         defaults.string(forKey: key).flatMap(PagePlacements.init(rawValue:)) ?? PagePlacements()
     }
 
+    /// Changes the stored choices. A type's choice this version cannot read stays as stored until the change replaces it,
+    /// and is set aside first; stored text that is no object of types is set aside whole.
     static func update(in defaults: UserDefaults = .standard, _ change: (inout PagePlacements) -> Void) {
-        // This write replaces every type's choices, so text it could not read is kept rather than lost.
-        if let text = defaults.string(forKey: key), PagePlacements(rawValue: text) == nil {
-            defaults.set((defaults.stringArray(forKey: setAsideKey) ?? []) + [text], forKey: setAsideKey)
-        }
+        let whole = defaults.string(forKey: key).flatMap { PagePlacements(rawValue: $0) == nil ? $0 : nil }
         var value = stored(in: defaults)
+        let unread = value.unread
         change(&value)
+        let replaced = unread.filter { value.unread[$0.key] == nil }.sorted { $0.key < $1.key }.map(\.value.text)
+        if !replaced.isEmpty { defaults.set((defaults.stringArray(forKey: setAsideKey) ?? []) + replaced, forKey: setAsideKey) }
         defaults.set(value.rawValue, forKey: key)
+        if let whole {
+            PreferenceHolds.setAside(
+                whole, under: setAsideKey, of: key, keys: PreferenceHolds.keys(of: Data(whole.utf8)), kept: Array(value.choices.keys),
+                in: defaults)
+        }
     }
 }
 

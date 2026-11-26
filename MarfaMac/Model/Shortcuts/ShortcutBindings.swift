@@ -5,8 +5,10 @@ import Observation
 /// better default reaches every command nobody changed; a command the person cleared is stored as cleared. Shortcuts sync
 /// through the connected Marfa (`PreferencesMap`).
 ///
-/// A stored command that the app no longer has is ignored and kept, in case it returns. Stored text that cannot be read is
-/// moved aside under a key of its own, kept and never removed, and the commands start from their defaults.
+/// A stored command that the app no longer has is ignored and kept, in case it returns. A stored shortcut this version cannot
+/// read stays as stored until the person sets that command's shortcut, and is moved aside under a key of its own first.
+/// Stored text that is no map of shortcuts is moved aside whole, kept and never removed, and the commands start from their
+/// defaults.
 @Observable @MainActor
 final class ShortcutBindings {
     static let defaultsKey = "keyboardShortcuts"
@@ -35,6 +37,8 @@ final class ShortcutBindings {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored let commands: [ShortcutCommand]
     private var chosen: [String: Shortcut?]
+    /// The commands whose stored shortcut this version cannot read, as stored.
+    @ObservationIgnored private var unread: [String: StoredJSON] = [:]
 
     init(defaults: UserDefaults = .standard, commands: [ShortcutCommand] = ShortcutCommand.all) {
         self.defaults = defaults
@@ -47,14 +51,20 @@ final class ShortcutBindings {
     func reload() {
         guard let saved = defaults.data(forKey: Self.defaultsKey) else {
             chosen = [:]
+            unread = [:]
             return
         }
-        if let stored = try? JSONDecoder().decode(Stored.self, from: saved) {
-            chosen = stored.shortcuts
+        if let shortcuts = ((try? JSONSerialization.jsonObject(with: saved)) as? [String: Any])?["shortcuts"] as? [String: Any],
+           let data = try? JSONSerialization.data(withJSONObject: shortcuts),
+           let (readable, unread) = StoredEntries.decode(data, as: Shortcut?.self)
+        {
+            chosen = readable
+            self.unread = unread
         } else {
             chosen = [:]
-            defaults.set((defaults.array(forKey: Self.setAsideKey) as? [Data] ?? []) + [saved], forKey: Self.setAsideKey)
+            unread = [:]
             defaults.removeObject(forKey: Self.defaultsKey)
+            PreferenceHolds.setAside(saved, under: Self.setAsideKey, of: Self.defaultsKey, keys: nil, in: defaults)
         }
     }
 
@@ -103,6 +113,7 @@ final class ShortcutBindings {
     }
 
     private func setWithoutSaving(_ shortcut: Shortcut?, for command: ShortcutCommand) {
+        displace(command.id)
         if shortcut == command.defaultShortcut {
             chosen.removeValue(forKey: command.id)
         } else {
@@ -110,19 +121,19 @@ final class ShortcutBindings {
         }
     }
 
-    private func save() {
-        if chosen.isEmpty {
-            defaults.removeObject(forKey: Self.defaultsKey)
-        } else if let data = try? Self.encoder.encode(Stored(shortcuts: chosen)) {
-            defaults.set(data, forKey: Self.defaultsKey)
-        }
+    /// Sets aside the stored shortcut of `command` this version cannot read, which the person's choice replaces.
+    private func displace(_ command: String) {
+        guard let kept = unread.removeValue(forKey: command) else { return }
+        defaults.set((defaults.array(forKey: Self.setAsideKey) as? [Data] ?? []) + [Data(kept.text.utf8)], forKey: Self.setAsideKey)
     }
 
-    private static let encoder: JSONEncoder = {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys]
-        return encoder
-    }()
+    private func save() {
+        if chosen.isEmpty, unread.isEmpty {
+            defaults.removeObject(forKey: Self.defaultsKey)
+        } else if let entries = StoredEntries.encode(chosen, keeping: unread) {
+            defaults.set(Data(#"{"shortcuts":"#.utf8) + entries + Data("}".utf8), forKey: Self.defaultsKey)
+        }
+    }
 
     // MARK: Files
 
@@ -160,6 +171,7 @@ final class ShortcutBindings {
                 continue
             }
             result.applied += 1
+            displace(command.id)
             if let entry { taken[entry] = command.id }
             if entry != command.defaultShortcut { next[command.id] = .some(entry) } else { next.removeValue(forKey: command.id) }
         }

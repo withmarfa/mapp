@@ -618,6 +618,7 @@ final class SidebarLayouts {
         guard let unreadable else { return }
         defaults.set((defaults.array(forKey: Self.setAsideKey) as? [Data] ?? []) + [unreadable], forKey: Self.setAsideKey)
         save()
+        PreferenceHolds.recordByLibrary(unreadable, of: Self.defaultsKey, from: saved, in: defaults)
         Telemetry.sidebarLayoutsUnreadable(reporting: reporting)
     }
 

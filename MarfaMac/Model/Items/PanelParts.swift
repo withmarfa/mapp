@@ -83,12 +83,18 @@ nonisolated extension PanelParts {
     /// Remembers `part` for `type`. Stored text that is not a map of rows, and a row the choice replaces that this version
     /// cannot read, are set aside before they are written over.
     static func choose(_ part: PanelPart, for type: TypeID, in defaults: UserDefaults = .standard) {
-        var aside: [String] = []
-        if let text = defaults.string(forKey: key), PanelParts(rawValue: text) == nil { aside.append(text) }
+        let whole = defaults.string(forKey: key).flatMap { PanelParts(rawValue: $0) == nil ? $0 : nil }
         var value = stored(in: defaults)
-        if let displaced = value.choose(part, for: type) { aside.append(displaced) }
-        if !aside.isEmpty { defaults.set((defaults.stringArray(forKey: setAsideKey) ?? []) + aside, forKey: setAsideKey) }
+        // The row the person's choice replaces is theirs to change; only a value that is no map of rows drops others.
+        if let displaced = value.choose(part, for: type) {
+            defaults.set((defaults.stringArray(forKey: setAsideKey) ?? []) + [displaced], forKey: setAsideKey)
+        }
         defaults.set(value.rawValue, forKey: key)
+        if let whole {
+            PreferenceHolds.setAside(
+                whole, under: setAsideKey, of: key, keys: PreferenceHolds.keys(of: Data(whole.utf8)), kept: Array(value.rows.keys),
+                in: defaults)
+        }
     }
 }
 

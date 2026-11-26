@@ -379,7 +379,8 @@ struct PagePlacementsTests {
         PagePlacements.update(in: defaults) { $0.setShows(.hidden, row: "repo", of: Self.ticket) }
         PagePlacements.update(in: defaults) { $0.setShows(.whenSet, row: "repo", of: Self.ticket) }
 
-        #expect(defaults.stringArray(forKey: PagePlacements.setAsideKey) == [unreadable])
+        // Only the type's own choice was unreadable, and only it is set aside, as the change replaced it.
+        #expect(defaults.stringArray(forKey: PagePlacements.setAsideKey) == [#"{"rows":{"repo":"not a flag"}}"#])
         #expect(PagePlacements.stored(in: defaults).choices["aic.ticket"]?.shows == ["repo": .whenSet])
     }
 }

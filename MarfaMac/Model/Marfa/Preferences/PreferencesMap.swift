@@ -31,8 +31,16 @@ nonisolated struct SyncedSetting: Sendable {
         case sidebar(SetAside)
     }
 
+    /// How a member's store judges a stored value, where it judges more than JSON does: a value it rejects is never sent
+    /// or written over the Marfa's, and `setAside` keeps a copy of this Mac's before the Marfa's is written over it.
+    struct Reader: Sendable {
+        let reads: @Sendable (String) -> Bool
+        let setAside: @Sendable (UserDefaults) -> Void
+    }
+
     let key: String
     let place: Place
+    var reader: Reader? = nil
 
     /// Where the setting's store sets aside a value it cannot read, where it has such a place.
     var setAsideKind: SetAside? {
@@ -58,7 +66,19 @@ enum PreferencesMap {
     static let synced: [SyncedSetting] = members + tables
 
     private static func members(_ keys: [String], in field: PreferencesField) -> [SyncedSetting] {
-        keys.map { SyncedSetting(key: $0, place: .member(field)) }
+        keys.map { SyncedSetting(key: $0, place: .member(field), reader: readers[$0]) }
+    }
+
+    private static let readers: [String: SyncedSetting.Reader] = [
+        DateFormat.key: SyncedSetting.Reader(
+            reads: { text in (PreferenceJSON.value(text) as? String).flatMap(DateFormat.init(rawValue:)) != nil },
+            setAside: { defaults in DateFormat.setAsideUnreadable(in: defaults) }),
+    ]
+
+    /// Whether this Mac reads `text` as a value of the setting that owns `unit`: JSON, and what its reader takes.
+    static func reads(_ unit: PreferenceUnit, _ text: String) -> Bool {
+        guard PreferenceJSON.value(text) != nil else { return false }
+        return synced.first { $0.owns(unit) }?.reader.map { $0.reads(text) } ?? true
     }
 
     /// Each field holds the settings of one Settings page.
