@@ -21,49 +21,33 @@ nonisolated struct WaveformEnvelope: Sendable, Equatable {
         }
     }
 
-    /// Reads the file's sound at a low rate and keeps its peaks, or nil where it has none or cannot be read. A two-hour
-    /// file reads in the time it takes to decode it, in a task that stops when the page goes.
-    @concurrent static func read(_ url: URL, type: UTType?, duration: Double) async -> WaveformEnvelope? {
-        guard duration > 0 else { return nil }
-        let asset = FileMedia.asset(at: url, type: type)
-        guard let track = try? await asset.loadTracks(withMediaType: .audio).first,
-              let reader = try? AVAssetReader(asset: asset) else { return nil }
-        let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
-            AVFormatIDKey: kAudioFormatLinearPCM,
-            AVLinearPCMBitDepthKey: 16,
-            AVLinearPCMIsFloatKey: false,
-            AVLinearPCMIsBigEndianKey: false,
-            AVLinearPCMIsNonInterleaved: false,
-            AVNumberOfChannelsKey: 1,
-            AVSampleRateKey: 8000,
-        ])
-        guard reader.canAdd(output) else { return nil }
-        let provider = reader.outputProvider(for: output)
-        guard (try? reader.start()) != nil else { return nil }
-        let rate = 8000.0
-        let total = duration * rate
+    /// Decodes the file in chunks and keeps the peaks, or nil where it has no sound or cannot be read. It reads through
+    /// the audio file reader, which decodes in this process and needs no audio device, and stops when the page goes. A
+    /// two-hour file takes the time its decoding takes, and nothing waits for it.
+    @concurrent static func read(_ url: URL, type: UTType?) async -> WaveformEnvelope? {
+        // A Marfa file has no extension, which the reader may need to tell its format: a copy that has one is read.
+        let copy = type.flatMap { QuickLookFile.copy(of: url, titled: "Sound", as: $0, in: "Waveforms") }
+        defer { copy?.remove() }
+        guard let file = try? AVAudioFile(forReading: copy?.url ?? url, commonFormat: .pcmFormatFloat32, interleaved: false),
+              file.length > 0,
+              let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: 65_536) else { return nil }
+        let total = Double(file.length)
+        let channels = Int(file.processingFormat.channelCount)
         var peaks = [Float](repeating: 0, count: resolution)
         var index = 0.0
-        while let buffer = try? await provider.next() {
-            if Task.isCancelled {
-                reader.cancelReading()
-                return nil
+        while file.framePosition < file.length {
+            if Task.isCancelled { return nil }
+            do { try file.read(into: buffer) } catch { return nil }
+            guard buffer.frameLength > 0, let data = buffer.floatChannelData else { break }
+            for frame in 0..<Int(buffer.frameLength) {
+                let bucket = min(Int((index + Double(frame)) / total * Double(resolution)), resolution - 1)
+                var level: Float = 0
+                for channel in 0..<channels { level = max(level, abs(data[channel][frame])) }
+                if level > peaks[bucket] { peaks[bucket] = level }
             }
-            buffer.withUnsafeSampleBuffer { sampleBuffer in
-                guard let block = CMSampleBufferGetDataBuffer(sampleBuffer) else { return }
-                let count = CMBlockBufferGetDataLength(block) / 2
-                var samples = [Int16](repeating: 0, count: count)
-                let copied = samples.withUnsafeMutableBytes { CMBlockBufferCopyDataBytes(block, atOffset: 0, dataLength: count * 2, destination: $0.baseAddress!) }
-                guard copied == kCMBlockBufferNoErr else { return }
-                for sample in samples {
-                    let bucket = min(Int(index / total * Double(resolution)), resolution - 1)
-                    let level = Float(abs(Int32(sample))) / 32768
-                    if level > peaks[bucket] { peaks[bucket] = level }
-                    index += 1
-                }
-            }
+            index += Double(buffer.frameLength)
         }
-        guard reader.status == .completed, let loudest = peaks.max(), loudest > 0 else { return nil }
+        guard let loudest = peaks.max(), loudest > 0 else { return nil }
         // Quiet parts stay visible beside loud ones.
         return WaveformEnvelope(levels: peaks.map { pow($0 / loudest, 0.7) })
     }

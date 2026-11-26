@@ -97,4 +97,12 @@ struct PlaybackPlaceTests {
         #expect(playback.state == .unplayable)
         playback.leave()
     }
+
+    @Test func aSoundsWaveformIsWorkedOutFromItsLoudness() async throws {
+        let url = try sound()
+        let envelope = try #require(await WaveformEnvelope.read(url, type: .wav))
+        #expect(envelope.levels.count == WaveformEnvelope.resolution)
+        #expect(envelope.levels.max() == 1)
+        #expect(envelope.bars(40).count == 40)
+    }
 }

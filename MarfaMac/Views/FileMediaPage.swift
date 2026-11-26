@@ -46,7 +46,7 @@ struct FileMediaPage: View {
         .task(id: url) {
             await playback.load()
             guard playback.state == .ready, !playback.hasVideo, playback.hasAudio else { return }
-            envelope = await WaveformEnvelope.read(url, type: type, duration: playback.duration)
+            envelope = await WaveformEnvelope.read(url, type: type)
         }
         .onDisappear { playback.leave() }
     }
