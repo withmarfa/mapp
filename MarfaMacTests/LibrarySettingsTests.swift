@@ -45,6 +45,11 @@ import Testing
         return Set(object.keys)
     }
 
+    private func stored(_ bench: HostBench, _ key: String) throws -> [String: Any] {
+        let data = try #require(bench.defaults.data(forKey: key))
+        return try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+    }
+
     private func setAside() throws -> [[String: Any]] {
         let files = try FileManager.default.contentsOfDirectory(at: aside, includingPropertiesForKeys: nil)
         #expect(files.count == 1)
@@ -328,11 +333,11 @@ import Testing
         let moved = try settings.settle(rename: { host.currentLibraryKey(forStored: $0) })
         #expect(moved.libraries[key] == [portKey])
         #expect(settings.unsettled[key] == [TypeLooks.defaultsKey, SidebarLayouts.defaultsKey])
-        let stored = try #require(try JSONSerialization.jsonObject(with: #require(bench.defaults.data(forKey: TypeLooks.defaultsKey))) as? [String: Any])
-        #expect(stored[bareKey] as? String == "broken", "kept as stored")
-        #expect(stored[portKey] == nil)
-        #expect((stored[key] as? [String: Any])?.keys.sorted() == ["core.event", "core.note"])
-        let sidebar = try #require(try JSONSerialization.jsonObject(with: #require(bench.defaults.data(forKey: SidebarLayouts.defaultsKey))) as? [String: Any])
+        let looksHeld = try stored(bench, TypeLooks.defaultsKey)
+        #expect(looksHeld[bareKey] as? String == "broken", "kept as stored")
+        #expect(looksHeld[portKey] == nil)
+        #expect((looksHeld[key] as? [String: Any])?.keys.sorted() == ["core.event", "core.note"])
+        let sidebar = try stored(bench, SidebarLayouts.defaultsKey)
         #expect(sidebar[bareKey] as? Int == 7)
         #expect(sidebar[key] != nil)
 
@@ -427,7 +432,7 @@ import Testing
         host.bindOrigin(of: bare)
         try bench.location.copies.change { $0.instances[bench.location.directory(for: bare).lastPathComponent] = "instance-x" }
         let settings = LibrarySettings(defaults: bench.defaults, aside: aside, lastOpen: nil)
-        var object = try #require(try JSONSerialization.jsonObject(with: #require(bench.defaults.data(forKey: TypeLooks.defaultsKey))) as? [String: Any])
+        var object = try stored(bench, TypeLooks.defaultsKey)
         object[bareKey] = "written by a later version"
         bench.defaults.set(try JSONSerialization.data(withJSONObject: object), forKey: TypeLooks.defaultsKey)
         _ = TypeLooks(defaults: bench.defaults)
