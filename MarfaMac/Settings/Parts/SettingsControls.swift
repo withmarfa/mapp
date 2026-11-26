@@ -241,6 +241,7 @@ struct SettingsField: View {
     var onCancel: (() -> Void)?
     @FocusState private var isFocused: Bool
     @State private var cancelMonitor = SettingsKeyMonitor()
+    @State private var cancelAnchor = NSView()
     @Environment(\.settingsTextScale) private var scale
 
     init(
@@ -298,9 +299,8 @@ struct SettingsField: View {
         .onSubmit(onSubmit)
         .onChange(of: isFocused) { _, focused in
             if focused, let onCancel {
-                let editingWindow = NSApp.windows.first(where: \.isKeyWindow)
-                cancelMonitor.start { [weak editingWindow] event in
-                    guard let editingWindow, event.window === editingWindow, event.isEscape else { return false }
+                cancelMonitor.start { [weak cancelAnchor] event in
+                    guard let window = cancelAnchor?.window, event.windowNumber == window.windowNumber, event.isEscape else { return false }
                     onCancel()
                     return true
                 }
@@ -310,8 +310,18 @@ struct SettingsField: View {
             }
         }
         .onDisappear { cancelMonitor.stop() }
+        .background {
+            if onCancel != nil { CancelAnchor(view: cancelAnchor).allowsHitTesting(false) }
+        }
         .frame(width: width)
         .settingsErrorRing(isError)
+    }
+
+    private struct CancelAnchor: NSViewRepresentable {
+        let view: NSView
+
+        func makeNSView(context: Context) -> NSView { view }
+        func updateNSView(_ view: NSView, context: Context) {}
     }
 }
 
