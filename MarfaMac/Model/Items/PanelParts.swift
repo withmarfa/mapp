@@ -36,7 +36,7 @@ nonisolated struct PanelParts: Equatable, Sendable {
     }
 
     /// Whether the row of `type` is one this version can read: an object whose part, if it has one, is a word.
-    private func isReadable(_ row: StoredJSON) -> Bool {
+    fileprivate static func isReadable(_ row: StoredJSON) -> Bool {
         guard case .object(let members) = row else { return false }
         switch members[Self.partMember] {
         case nil, .string?: return true
@@ -52,7 +52,7 @@ nonisolated struct PanelParts: Equatable, Sendable {
         var members: [String: StoredJSON] = [:]
         var displaced: StoredJSON?
         if let row = rows[name] {
-            if isReadable(row), case .object(let kept) = row {
+            if Self.isReadable(row), case .object(let kept) = row {
                 members = kept
                 if case .string(let word)? = kept[Self.partMember], PanelPart(rawValue: word) == nil { displaced = row }
             } else {
@@ -76,12 +76,10 @@ nonisolated extension PanelParts: RawRepresentable {
 }
 
 nonisolated extension PanelParts {
-    /// Whether `text` is a row this version reads: an object whose part, where it has one, is a part it knows.
+    /// Whether `text` is a row this version reads and keeps: an object whose part, where it has one, is a word. A word
+    /// it does not know is kept, with the row's other members, as no choice.
     static func reads(_ text: String) -> Bool {
-        guard case .object(let members)? = try? JSONDecoder().decode(StoredJSON.self, from: Data(text.utf8)) else { return false }
-        guard let part = members[partMember] else { return true }
-        guard case .string(let word) = part else { return false }
-        return PanelPart(rawValue: word) != nil
+        (try? JSONDecoder().decode(StoredJSON.self, from: Data(text.utf8))).map(isReadable) ?? false
     }
 
     static func stored(in defaults: UserDefaults = .standard) -> PanelParts {

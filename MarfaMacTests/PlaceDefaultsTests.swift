@@ -335,7 +335,7 @@ struct PlaceDefaultsTests {
         }
     }
 
-    @Test func oneUnreadableEntryIsSetAsideAndTheOthersKeepWorking() throws {
+    @Test func oneUnreadableEntryStaysUntilItsPlaceIsSetAndTheOthersKeepWorking() throws {
         let defaults = ViewPanelTests.defaults()
         let bad = #"{"filter":"not a table","layout":"table"}"#
         let good = try String(decoding: JSONEncoder().encode(PlaceDefault(layout: .board)), as: UTF8.self)
@@ -347,7 +347,11 @@ struct PlaceDefaultsTests {
         #expect(PlaceDefaults.stored(in: defaults).default(for: .favorites)?.layout == .board)
         #expect(PlaceDefaults.stored(in: defaults).default(for: Self.tasks) == nil)
 
+        // Another place's change keeps it as stored; the person's change to its own place sets it aside with its key.
         Self.store(PlaceDefault(layout: .table), for: .feed, in: defaults)
+        #expect(defaults.object(forKey: PlaceDefaults.setAsideKey) == nil)
+        #expect(PlaceDefaults.stored(in: defaults).default(for: Self.tasks) == nil)
+        Self.store(PlaceDefault(layout: .list), for: Self.tasks, in: defaults)
         let aside = try #require(defaults.array(forKey: PlaceDefaults.setAsideKey) as? [Data])
         #expect(aside.count == 1)
         let kept = try #require(JSONSerialization.jsonObject(with: aside[0]) as? [String: Any])
@@ -355,6 +359,7 @@ struct PlaceDefaultsTests {
         #expect((kept[Self.tasks.storageKey] as? [String: Any])?["filter"] as? String == "not a table")
         #expect(PlaceDefaults.stored(in: defaults).default(for: .favorites)?.layout == .board)
         #expect(PlaceDefaults.stored(in: defaults).default(for: .feed)?.layout == .table)
+        #expect(PlaceDefaults.stored(in: defaults).default(for: Self.tasks)?.layout == .list)
     }
 
     // MARK: Column layouts that cannot be read

@@ -64,15 +64,15 @@ import Testing
     @Test func aMemberKeepsItsKindThroughTheMarfa() throws {
         let here = defaults(), there = defaults()
         here.set(true, forKey: PageKey.foldsHeadings)
-        here.set(1.25, forKey: LineSpacing.key)
+        here.set(72.5, forKey: CalendarHourHeight.key)
         here.set(3, forKey: PageKey.titleLines)
         here.set("serif", forKey: AppearanceKey.textFont)
-        for key in [PageKey.foldsHeadings, LineSpacing.key, PageKey.titleLines, AppearanceKey.textFont] {
+        for key in [PageKey.foldsHeadings, CalendarHourHeight.key, PageKey.titleLines, AppearanceKey.textFont] {
             let setting = try setting(key)
             setting.write(units(setting.read(here, library: "a")), to: there, library: "a")
         }
         #expect(there.object(forKey: PageKey.foldsHeadings) as? Bool == true)
-        #expect(there.double(forKey: LineSpacing.key) == 1.25)
+        #expect(there.double(forKey: CalendarHourHeight.key) == 72.5)
         #expect(there.integer(forKey: PageKey.titleLines) == 3)
         #expect(there.string(forKey: AppearanceKey.textFont) == "serif")
         #expect(units(try setting(PageKey.foldsHeadings).read(there, library: "a")) == [.member(.editor, PageKey.foldsHeadings): "true"])
@@ -96,9 +96,9 @@ import Testing
         let setting = try setting(TypeLooks.defaultsKey)
         let read = units(setting.read(here, library: "a"))
         #expect(read == [.row(.types, setting: "look", key: "core.note"): #"{"date":"created"}"#])
-        setting.write([.row(.types, setting: "look", key: "core.event"): #"{"date":"start"}"#], to: here, library: "a")
+        setting.write([.row(.types, setting: "look", key: "core.event"): #"{"date":"field:start"}"#], to: here, library: "a")
         let stored = try #require(here.data(forKey: TypeLooks.defaultsKey))
-        #expect(String(decoding: stored, as: UTF8.self) == #"{"a":{"core.event":{"date":"start"}},"b":{"core.task":{"date":"due"}}}"#)
+        #expect(String(decoding: stored, as: UTF8.self) == #"{"a":{"core.event":{"date":"field:start"}},"b":{"core.task":{"date":"due"}}}"#)
     }
 
     @Test func theSidebarSplitsIntoRowsAndComesBackWhole() throws {
@@ -148,14 +148,14 @@ import Testing
         let here = defaults()
         here.set(#"{"core.event":{"part":42}}"#, forKey: PanelParts.key)
         PanelParts.choose(.links, for: TypeID("core.event"), in: here)
-        #expect(here.stringArray(forKey: PanelParts.setAsideKey) == [#"{"part":42}"#])
+        #expect(here.stringArray(forKey: PanelParts.setAsideKey) == [#"{"core.event":{"part":42}}"#])
         #expect(PanelParts.stored(in: here).part(of: TypeID("core.event")) == .links)
         here.set("[1]", forKey: PanelParts.key)
         PanelParts.choose(.info, for: TypeID("core.note"), in: here)
         #expect(here.stringArray(forKey: PanelParts.setAsideKey)?.last == "[1]")
         here.set(#"{"core.task":{"extra":true,"part":"timeline"}}"#, forKey: PanelParts.key)
         PanelParts.choose(.info, for: TypeID("core.task"), in: here)
-        #expect(here.stringArray(forKey: PanelParts.setAsideKey)?.last == #"{"extra":true,"part":"timeline"}"#, "a word a later copy wrote is kept before it is replaced")
+        #expect(here.stringArray(forKey: PanelParts.setAsideKey)?.last == #"{"core.task":{"extra":true,"part":"timeline"}}"#, "a word a later copy wrote is kept before it is replaced")
         #expect(PanelParts.stored(in: here).part(of: TypeID("core.task")) == .info)
     }
 

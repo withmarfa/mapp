@@ -40,13 +40,19 @@ struct PlaceDensitiesTests {
         #expect(PlaceDensities.stored(in: defaults).density(for: .library) == .compact)
     }
 
-    @Test func aDensityThisVersionDoesNotKnowIsSetAsideWhileTheRestIsKept() throws {
+    /// A density this version does not know stays as stored beside the rest until the person sets that place, and is
+    /// set aside with its place first.
+    @Test func aDensityThisVersionDoesNotKnowStaysUntilThePlaceIsSet() throws {
         let defaults = Self.defaults()
         let key = PlaceView.library.storageKey
-        defaults.set(try JSONEncoder().encode([key: "compact", "other": "roomy"]), forKey: PlaceDensities.key)
+        let other = PlaceView.feed.storageKey
+        defaults.set(try JSONEncoder().encode([key: "compact", other: "roomy"]), forKey: PlaceDensities.key)
+        PlaceDensities.update(in: defaults) { $0.set(.standard, for: .favorites) }
+        #expect(defaults.object(forKey: PlaceDensities.setAsideKey) == nil)
+        #expect(try JSONDecoder().decode([String: String].self, from: #require(defaults.data(forKey: PlaceDensities.key)))[other] == "roomy")
         PlaceDensities.update(in: defaults) { $0.set(.standard, for: .feed) }
         let aside = try #require(defaults.array(forKey: PlaceDensities.setAsideKey) as? [Data])
-        #expect(try JSONDecoder().decode([String: String].self, from: aside[0]) == ["other": "roomy"])
+        #expect(try aside.map { try JSONDecoder().decode([String: String].self, from: $0) } == [[other: "roomy"]])
         let stored = PlaceDensities.stored(in: defaults)
         #expect(stored.density(for: .library) == .compact)
         #expect(stored.density(for: .feed) == .standard)
