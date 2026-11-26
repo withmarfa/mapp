@@ -160,6 +160,7 @@ nonisolated struct PageHead: Equatable, Sendable {
             cut.more = values.count - listLimit
             cut.help = row.wholeValue
             cut.optionTones = Array(row.optionTones.prefix(listLimit))
+            cut.answers = Array(row.answers.prefix(listLimit))
             return cut
         }
         switch row.value {

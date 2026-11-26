@@ -113,8 +113,13 @@ struct PageHeadView<Title: View>: View {
                     .buttonStyle(.plain)
                 }
             case .people(let names):
-                ForEach(Array(names.enumerated()), id: \.offset) { _, name in
-                    PagePerson(name: name, initials: PersonInitials.of(name))
+                ForEach(Array(names.enumerated()), id: \.offset) { index, name in
+                    HStack(spacing: 6) {
+                        PagePerson(name: name, initials: PersonInitials.of(name))
+                        if row.answers.indices.contains(index), !row.answers[index].isEmpty {
+                            Text(row.answers[index]).foregroundStyle(.tertiary)
+                        }
+                    }
                 }
             case .options(let words):
                 ForEach(Array(words.enumerated()), id: \.offset) { index, word in

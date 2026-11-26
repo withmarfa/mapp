@@ -171,6 +171,8 @@ extension PropertyRow: Encodable {
     private struct Listed: Encodable {
         let title: String
         let initials: String?
+        /// What the person answers, in grey after the name.
+        let note: String?
     }
     private struct Option: Encodable {
         let label: String
@@ -195,7 +197,9 @@ extension PropertyRow: Encodable {
             }
         case .people(let names):
             try container.encode("people", forKey: .kind)
-            try container.encode(names.map { Listed(title: $0, initials: PersonInitials.of($0)) }, forKey: .people)
+            try container.encode(names.enumerated().map { index, name in
+                Listed(title: name, initials: PersonInitials.of(name), note: answers.indices.contains(index) && !answers[index].isEmpty ? answers[index] : nil)
+            }, forKey: .people)
         case .options(let options):
             try container.encode("options", forKey: .kind)
             try container.encode(

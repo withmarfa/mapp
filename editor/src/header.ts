@@ -51,6 +51,8 @@ export interface HeaderListedPerson {
   title: string
   /** Absent where the name has no letters, so no empty circle is drawn. */
   initials?: string | null
+  /** What the person answers, such as an attendee's response, drawn in grey after the name. */
+  note?: string | null
 }
 
 /** One row of the head, or one pin under the title (the app sends both in this shape). The status and parent rows hold
@@ -988,7 +990,10 @@ export class ItemHeader {
         this.itemsOf(value, row)
         break
       case 'people':
-        for (const person of row.people ?? []) this.person(value, 'span', person)
+        for (const person of row.people ?? []) {
+          this.person(value, 'span', person)
+          if (person.note) element('span', 'item-text item-note', value).textContent = person.note
+        }
         break
       case 'options':
         for (const option of row.options ?? [])

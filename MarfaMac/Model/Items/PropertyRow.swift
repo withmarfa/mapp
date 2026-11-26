@@ -85,6 +85,9 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     /// priority, by rank (`OptionTone.tone(of:in:isPriority:)`). Empty for any other row, whose values take the color
     /// of their words (`OptionTone.tone(for:)`).
     var optionTones: [TypeTone] = []
+    /// What each person of a `people` row answers, such as an attendee's response, in the order of the names; empty where
+    /// the list holds no answers. The page draws it in grey after the name.
+    var answers: [String] = []
     /// The symbol beside the label where it is not the one the value's kind gives: a Location's pin, whose value is text.
     var symbol: String?
     /// Text that may run to a second line before it is cut.
@@ -168,6 +171,8 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
                 var row = PropertyRow(
                     id: field.key, label: field.label, value: value, numberToCall: numberToCall(of: field, in: item), editable: edits,
                     optionTones: optionTones(of: field, in: item, isPriority: isPriority(field)))
+                row.answers = personAnswers(of: field, in: item)
+                if let sender = senders(of: field, in: item) { (row.value, row.answers) = sender }
                 if case .text(let text) = value { row.long = text.count > longestText || text.contains(where: \.isNewline) }
                 // A number to call opens the phone, as an address opens its page.
                 if let number = row.numberToCall { row.value = .phone(number) }
@@ -261,6 +266,30 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     static func numberToCall(of field: ItemTypeInfo.Field, in item: Item) -> String? {
         guard case .list(let shape) = field.kind, let main = ListEntries.main(of: item.value(of: field.key)) else { return nil }
         return shape.numberToCall(in: main)
+    }
+
+    /// A message's sender and recipients as people, for its page: each written as `Name <address>` or as a name, drawn
+    /// as the name with the address in grey. Nil for any other field. A list's rows and cells keep the text.
+    static func senders(of field: ItemTypeInfo.Field, in item: Item) -> (Value, [String])? {
+        let texts: [String]
+        switch (field.key, item.value(of: field.key)) {
+        case (MarfaMapping.fromField, .string(let text)?): texts = [text]
+        case (MarfaMapping.toField, .array(let values)?): texts = values.compactMap(\.string)
+        default: return nil
+        }
+        let people = texts.compactMap(PersonAddress.init)
+        guard !people.isEmpty else { return nil }
+        return (.people(people.map(\.name)), people.map { $0.address ?? "" })
+    }
+
+    /// What each person `field` names answers, one for each name `value(of:in:format:)` shows, or empty where no entry
+    /// answers: an attendee's response.
+    static func personAnswers(of field: ItemTypeInfo.Field, in item: Item) -> [String] {
+        guard case .list(let shape) = field.kind, shape.holdsPeople, case .array(let entries)? = item.value(of: field.key) else { return [] }
+        let answers = entries.compactMap(ListEntries.object).compactMap { entry in
+            shape.personName(of: entry).map { _ in shape.answer(of: entry) ?? "" }
+        }
+        return answers.contains { !$0.isEmpty } ? answers : []
     }
 
     /// The color of each option `field` holds in `item`, for a field that colors its options by rank; empty for any other.
