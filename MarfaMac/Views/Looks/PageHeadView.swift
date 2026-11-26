@@ -82,6 +82,8 @@ struct PageHeadView<Title: View>: View {
                         Button(expanded ? String(localized: "Show Less") : head.showMore) { expanded.toggle() }
                             .buttonStyle(.plain)
                             .foregroundStyle(.tertiary)
+                            // A symbol is `size` wide, centered in a slot of 16 points: the line starts at its edge.
+                            .padding(.leading, (size * 16 / 13 - size) / 2)
                             .frame(minHeight: size * 30 / 13)
                     }
                 }

@@ -1166,6 +1166,12 @@ button.item-kicker-type:focus-visible {
   color: var(--label-secondary);
 }
 
+/* The rows' Show More starts where their symbols do: a symbol is its text size wide in a slot of 16 points (see
+   `.item-prop-symbol`), centered, so its edge is half the slack in. `PageHeadView` insets its line the same way. */
+.item-rows > .item-more {
+  padding-inline-start: calc(var(--interface-text-size) * (16 - 13) / 2 / 13);
+}
+
 /* What belongs to the item, under the text: Sub-Items, nested, and Timeline or Linked From. Every measure is its design
    point at the 13 point interface text. */
 .item-foot + .item-foot {
