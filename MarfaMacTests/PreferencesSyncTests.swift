@@ -466,6 +466,25 @@ import Testing
         #expect(!WorkingCopyPreferences.tablesWhole(whole + binned, of: ["kept", "binned"]))
     }
 
+    @Test func anItemWithNoTableListedIsNotWhole() {
+        #expect(!WorkingCopyPreferences.tablesWhole([], of: ["kept"]))
+        let other = HeldTable(itemId: "other-type", table: PreferencesTable.commands.rawValue, state: .whole, rows: 0)
+        #expect(!WorkingCopyPreferences.tablesWhole([other], of: ["kept"]))
+        let whole = PreferencesTable.allCases.map { HeldTable(itemId: "kept", table: $0.rawValue, state: .whole, rows: 0) }
+        #expect(!WorkingCopyPreferences.tablesWhole(whole, of: ["kept", "unlisted"]))
+    }
+
+    @Test func anItemMissingOneTableIsNotWhole() {
+        let tables = PreferencesTable.allCases
+        let all = tables.map { HeldTable(itemId: "kept", table: $0.rawValue, state: .whole, rows: 0) }
+        #expect(WorkingCopyPreferences.tablesWhole(all, of: ["kept"]))
+        #expect(!WorkingCopyPreferences.tablesWhole(Array(all.dropLast()), of: ["kept"]))
+    }
+
+    @Test func noItemIsWhole() {
+        #expect(WorkingCopyPreferences.tablesWhole([], of: []))
+    }
+
     /// Start Again after another Marfa was adopted keeps this Mac's settings, as it says.
     @Test func startingAgainKeepsThisMacsSettings() async throws {
         var record = PreferencesSync.Record()
