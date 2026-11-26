@@ -298,8 +298,9 @@ struct SettingsField: View {
         .onSubmit(onSubmit)
         .onChange(of: isFocused) { _, focused in
             if focused, let onCancel {
-                cancelMonitor.start { event in
-                    guard event.isEscape else { return false }
+                let editingWindow = NSApp.windows.first(where: \.isKeyWindow)
+                cancelMonitor.start { [weak editingWindow] event in
+                    guard let editingWindow, event.window === editingWindow, event.isEscape else { return false }
                     onCancel()
                     return true
                 }
