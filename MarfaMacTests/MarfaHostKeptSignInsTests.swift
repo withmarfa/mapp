@@ -212,10 +212,155 @@ import Testing
         #expect(host.notices.waiting.contains { $0.title == Words.changesWaitTitle })
     }
 
+    /// The same Marfa at a second origin: `first` and `alias` both say `instance-a`, so they share one copy.
+    private let alias = try! MarfaConnection(address: "http://alias.test:8210")
+
+    /// A bench where `first` and `alias` are one instance whose copy holds one change not yet sent.
+    private func aliasBench() -> HostBench {
+        let bench = bench()
+        bench.servers.instances.withLock { $0[alias] = "instance-a" }
+        bench.servers.storedWrites.withLock { $0 = 1 }
+        return bench
+    }
+
+    /// A host whose opener records the address and the key each open was given, read as the package reads it.
+    private func recordingHost(_ bench: HostBench, keys used: Mutex<[String]>) -> MarfaHost {
+        let opener = bench.servers.opener
+        return bench.host(opener: { connection, signIns, location in
+            let key = (try? signIns.server(for: connection))??.key ?? "none"
+            used.withLock { $0.append("\(connection.address.absoluteString) \(key)") }
+            return try await opener(connection, signIns, location)
+        })
+    }
+
+    private func unsent(_ store: URL) async throws -> Int {
+        try await WorkingCopy.unsentWrites(in: store).writes.count
+    }
+
+    /// A to B to A: each origin keeps its own approval, the return uses A's own with no browser, and the one copy keeps
+    /// its unsent change throughout.
+    @Test func anotherAddressOfTheSameMarfaKeepsEachOriginsApprovalThereAndBack() async throws {
+        let bench = aliasBench()
+        let used = Mutex<[String]>([])
+        let host = recordingHost(bench, keys: used)
+        try await host.connect(address: first.address.absoluteString, key: "a")
+        let store = bench.location.store(for: first)
+        #expect(try await unsent(store) == 1)
+
+        try await host.changeAddress(to: alias.address.absoluteString, key: "b")
+        #expect(host.connection == alias)
+        #expect(bench.location.store(for: alias) == store, "one instance is one copy")
+        #expect(signOuts(of: first, bench) == 0, "a successful move revokes nothing")
+        #expect(try bench.signIns.key(for: first.address) == "a")
+        #expect(try bench.signIns.key(for: alias.address) == "b")
+        #expect(try await unsent(store) == 1)
+
+        // Any browser asked for from here fails, so a return that needed one would fail.
+        bench.signIns.script(browser: [.failure(SignInError.canceled)])
+        try #require(await problem { () throws(MarfaHost.Problem) in try await host.changeAddress(to: first.address.absoluteString, via: .browser) } == nil)
+        #expect(host.connection == first)
+        #expect(bench.location.store(for: first) == store)
+        #expect(try await unsent(store) == 1)
+        #expect(bench.signIns.calls == ["browser \(first.address.absoluteString)", "browser \(alias.address.absoluteString)"])
+        #expect(used.withLock { $0 } == [
+            "\(first.address.absoluteString) a", "\(alias.address.absoluteString) b", "\(first.address.absoluteString) a",
+        ], "each origin opens with its own approval, never the other's")
+        #expect(try bench.signIns.key(for: alias.address) == "b")
+    }
+
+    /// Disconnecting at one origin keeping the copy ends only that origin's approval. The other origin opens the kept copy
+    /// with its own approval and no browser, and the change still waits in it.
+    @Test func disconnectingAtOneAddressOfTheSameMarfaKeepsTheOtherOriginsApprovalAndTheQueue() async throws {
+        let bench = aliasBench()
+        let used = Mutex<[String]>([])
+        let host = recordingHost(bench, keys: used)
+        try await host.connect(address: first.address.absoluteString, key: "a")
+        let store = bench.location.store(for: first)
+        try await host.changeAddress(to: alias.address.absoluteString, key: "b")
+
+        try await host.disconnect(.keepCopy)
+        #expect(host.connection == nil)
+        #expect(signOuts(of: alias, bench) == 1)
+        #expect(signOuts(of: first, bench) == 0)
+        #expect(try bench.signIns.key(for: alias.address) == nil)
+        #expect(try bench.signIns.key(for: first.address) == "a")
+        #expect(try await unsent(store) == 1, "kept as the person chose")
+
+        bench.signIns.script(browser: [.failure(SignInError.canceled)])
+        try await host.connect(address: first.address.absoluteString, via: .browser)
+        #expect(host.connection == first)
+        #expect(browsers(to: first, bench) == 1, "only the first connection's")
+        #expect(used.withLock { $0.last } == "\(first.address.absoluteString) a")
+        #expect(bench.location.store(for: first) == store)
+        #expect(try await unsent(store) == 1)
+    }
+
+    /// Disconnecting at one origin discarding the copy removes the copy and ends only that origin's approval.
+    @Test func discardingAtOneAddressOfTheSameMarfaKeepsTheOtherOriginsApproval() async throws {
+        let bench = aliasBench()
+        let host = bench.host()
+        try await host.connect(address: first.address.absoluteString, key: "a")
+        try await host.changeAddress(to: alias.address.absoluteString, key: "b")
+
+        try await discardEverything(host)
+        #expect(!bench.hasCopy(alias))
+        #expect(signOuts(of: first, bench) == 0)
+        #expect(try bench.signIns.key(for: alias.address) == nil)
+        #expect(try bench.signIns.key(for: first.address) == "a")
+
+        bench.signIns.script(browser: [.failure(SignInError.canceled)])
+        try await host.connect(address: first.address.absoluteString, via: .browser)
+        #expect(host.connection == first)
+        #expect(browsers(to: first, bench) == 1)
+    }
+
+    /// A move that fails ends the approval it made at the new origin, and only that: the origin left keeps its own, and
+    /// the copy and its change are as they were.
+    @Test func aMoveToAnotherAddressThatFailsEndsOnlyTheApprovalItMade() async throws {
+        let bench = aliasBench()
+        let host = bench.host()
+        try await host.connect(address: first.address.absoluteString, key: "a")
+        let store = bench.location.store(for: first)
+        bench.servers.failure.withLock { $0 = SourceFailure(kind: .failed, message: "no") }
+
+        let failed = await problem { () throws(MarfaHost.Problem) in try await host.changeAddress(to: alias.address.absoluteString, key: "b") }
+        #expect(failed != nil)
+        #expect(signOuts(of: alias, bench) == 1, "the approval this move made")
+        #expect(signOuts(of: first, bench) == 0)
+        #expect(try bench.signIns.key(for: alias.address) == nil)
+        #expect(try bench.signIns.key(for: first.address) == "a")
+        #expect(try await unsent(store) == 1)
+    }
+
+    /// Returning to an origin whose held approval the server has since revoked opens the copy at Sign In Again. Signing
+    /// in again there replaces only that origin's approval; the other's stays and the change still waits.
+    @Test func returningWithARevokedApprovalReachesSignInAgainAndKeepsTheOtherOrigins() async throws {
+        let bench = aliasBench()
+        let host = bench.host()
+        try await host.connect(address: first.address.absoluteString, key: "a")
+        let store = bench.location.store(for: first)
+        try await host.changeAddress(to: alias.address.absoluteString, key: "b")
+
+        bench.signIns.script(browser: [.failure(SignInError.canceled)])
+        try await host.changeAddress(to: first.address.absoluteString, via: .browser)
+        let returned = try #require(bench.servers.last)
+        #expect(returned.connection == first)
+        returned.state.set(.keyRefused)
+        #expect(await eventually { host.state == .keyRefused })
+        #expect(browsers(to: first, bench) == 1, "the held approval was used, not a new one")
+
+        try await host.signInAgain(via: host.scripted("a2"))
+        #expect(try bench.signIns.key(for: first.address) == "a2")
+        #expect(returned.given == ["a2"])
+        #expect(host.source === returned, "the copy is kept, not reopened")
+        #expect(try bench.signIns.key(for: alias.address) == "b")
+        #expect(bench.signIns.calls.allSatisfy { !$0.hasPrefix("signOut") }, "\(bench.signIns.calls)")
+        #expect(try await unsent(store) == 1)
+    }
+
     /// The same Marfa at another address uses a sign-in that address already holds, and a failure leaves it held.
     @Test func anotherAddressOfTheSameMarfaUsesItsHeldSignIn() async throws {
         let bench = bench()
-        let alias = try MarfaConnection(address: "http://alias.test:8210")
         bench.servers.instances.withLock { $0[alias] = "instance-a" }
         let host = bench.host()
         try await host.connect(address: first.address.absoluteString, key: "a")
@@ -232,5 +377,7 @@ import Testing
         #expect(host.connection == alias)
         #expect(browsers(to: alias, bench) == 0)
         #expect(try bench.signIns.key(for: alias.address) == "alias")
+        #expect(try bench.signIns.key(for: first.address) == "a", "the origin left keeps its approval")
+        #expect(signOuts(of: first, bench) == 0)
     }
 }
