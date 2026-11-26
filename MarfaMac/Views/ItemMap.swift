@@ -79,7 +79,7 @@ private struct NothingOnMap: View {
     }
 }
 
-/// The pair that zooms out and in, drawn side by side as the board has it, and the button that fits every marker, in the map's corner above Apple's Legal link.
+/// The map controls sit above Apple's Legal link.
 private struct MapControls: View {
     let controller: MapController
     let browser: Browser

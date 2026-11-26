@@ -157,9 +157,7 @@ final class MapController: NSObject, MKMapViewDelegate {
 
     // MARK: Fitting
 
-    /// Fits every marker, as the Fit button and View menu ask.
-    /// Zooms in (a factor under 1 of the camera's distance) or out about the map's centre, as the system's own zoom control
-    /// does. MapKit's `MKZoomControl` stacks its buttons and has no way to lay them side by side.
+    /// MapKit's zoom control stacks its buttons, so the horizontal pair adjusts the camera distance directly.
     func zoom(by factor: Double) {
         guard let camera = mapView.camera.copy() as? MKMapCamera else { return }
         camera.centerCoordinateDistance = min(max(camera.centerCoordinateDistance * factor, Self.distances.lowerBound), Self.distances.upperBound)
@@ -169,6 +167,7 @@ final class MapController: NSObject, MKMapViewDelegate {
     /// The nearest and farthest the camera stands from the map: a street and the whole of a continent.
     private static let distances: ClosedRange<Double> = 150...20_000_000
 
+    /// Shared by the Fit button and View command.
     func fitAll() {
         if let shown { fit(shown, animated: true) }
     }

@@ -3,7 +3,7 @@ import Marfa
 
 /// How wide each column of the table starts, from what its cells say: the widest of the first rows' words, with a cell's
 /// room and the chip or mark it draws, and not less than its heading with the sort mark. The name is the table's flexible
-/// column and has none (`ColumnResizing`). A width the person dragged is kept apart and wins (`ItemTable.setStartingWidths`).
+/// column and has none (`ColumnResizing`). A width the person dragged takes precedence (`ItemTable.fitting`).
 @MainActor
 enum ItemTableFit {
     /// How many rows are read: the page's first, which are the ones a person sees.

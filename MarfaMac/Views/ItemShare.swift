@@ -28,8 +28,7 @@ struct ItemShare {
         Self.show(fileURL.map { [$0] } ?? text.map { [$0] } ?? [], near: page)
     }
 
-    /// Shares the links of several items, one for each, as the system's picker takes them. A link an item has none of
-    /// yet is left out and the person is told, and with none to share nothing opens.
+    /// Tell the person about missing links before offering the rest to the picker.
     @MainActor static func presentLinks(of ids: [ItemID], in library: any ItemLibrary, near page: NSView?) async {
         let found = await library.links(of: ids)
         guard !found.links.isEmpty else {
@@ -55,8 +54,7 @@ struct ItemShare {
     }
 }
 
-/// Shares an item's markdown as text, the form every destination can take, or a file as itself.
-/// The text is read in this view. A toolbar or menu that shows the control does not follow a keystroke.
+/// The toolbar or menu can offer Share without observing each keystroke in the item's body.
 struct ItemShareLink: View {
     var item: Item?
     var fileURL: URL?

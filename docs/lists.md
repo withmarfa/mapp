@@ -55,18 +55,18 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 ## Layouts
 
 - **The Library opens as a table, and as a list while it holds ten items or fewer** (`Browser.naturalLayout`). It and the Archive list Name, Type, Source and Edited, latest first (`listsByOrigin`).
-- **The Feed opens in Digest, newest created first.** Every item list offers it. Cards show type, source, title, text, pictures.
-- **Digest stacks messages by `in-thread` and excerpts by `excerpt-of`** (`DigestLayout`). Piles span sources and sit at their newest visible member. Choosing an earlier card opens its pile.
-- **Digest and board lanes draw by page.** Select All covers all.
+- **The Feed opens in Digest, newest created first.** Any list offers it. Cards show type, source, title, text, and pictures.
+- **Digest stacks messages by `in-thread` and excerpts by `excerpt-of`** (`DigestLayout`). Piles span sources, sort by newest visible member, and open from earlier cards.
+- **Digest and board lanes draw by page.** Counts and Select All cover all.
 - **Several chosen items show a command capsule** (`SelectionCapsule`), a pile beside a list (`SelectionPile`). Escape clears them.
-- **⌘⌫ deletes chosen items shown in a board, timeline, Digest, or map** (`ChosenItemDeletion`).
+- **⌘⌫ deletes chosen items** on a board, timeline, Digest or map (`ChosenItemDeletion`). Changing the calendar span clears selections outside it.
 - **Calendar and Timeline use each type's date** (`ItemPlacement`) or a field chosen for the view.
 - **An event's span is one rule** (`EventSpan`); all-day events ignore the Mac's zone.
-- **Map places items with two valid coordinates** (`MapLayout`); No Location lists the rest.
-- **A board always has lanes.** With no grouping chosen it takes the status.
+- **Map needs both coordinate fields and valid values** (`MapLayout`). No Location lists the rest.
+- **Board lanes default to status.** Types with different status names use the four status groups.
 - **A row stays where seen until the pointer or keyboard leaves** (`RowHold`).
 - **A drop in a lane is one edit.** A drop in Not Set clears the field; Set and date lanes refuse one.
-- **Table text starts where the title does** (`TopRowSpace.titleLead`). Widths sample 120 rows (`ItemTableFit`). Too narrow, columns shrink, then the last drops whole; Name keeps 240 (`ItemTableRoom`).
+- **Table text aligns with the title** (`TopRowSpace.titleLead`). Widths sample 120 rows (`ItemTableFit`). Name fills spare space until resized. Columns shrink to their minimums, then hide from the end (`ItemTableRoom`).
 
 ## Sub-items
 

@@ -35,11 +35,6 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | Undo of state and tier where the copy cannot be sure | **Waits for Marfa:** an expected state on a transition (marfa#3523) and an update that refuses a stale version (marfa#3528). Until then, Undo does nothing and says so when the copy shows a change, and a change the copy has not yet learned of can still be overwritten. | `MarfaEngine+Writing.swift`, `MarfaLibrary+Bin.swift`, `MarfaLibrary+Moves.swift` | `Rethink-Archive-Toast` |
 | An archived item's page | Says Archived over its title, and edits as any other. | `ItemPageHeader.swift`, `BatchSkips` | `Rethink-Archived-Page` |
 
-## Several items
-
-| Part | What it is | Lands in | Boards |
-| --- | --- | --- | --- |
-
 ## Layouts
 
 | Part | What it is | Lands in | Boards |

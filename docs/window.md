@@ -29,11 +29,12 @@ paths:
 
 ## Sidebar
 
-- **Search and New, the Library and the Feed, then Pinned, Types and the person's sections** (`SidebarLayout`). A row whose thing is gone keeps its place.
-- **Pinned holds views, collections and items;** a saved view until taken out.
-- **Five types show, then "N More",** each counting its kinds' items too.
-- **Customize Sidebar works in place:** each faint place is a menu of what fits.
-- **Go lists the same places, views and types** (`GoMenu`), and the Archive.
+- **Search and New, Library and Feed, then Pinned, Types and custom sections** (`SidebarLayout`). Missing items keep their rows.
+- **Pinned holds views, collections and items.** Saved views stay until unpinned.
+- **Five types show, then "N More".** Counts include kinds.
+- **Hover highlights rows,** swaps type, kind or collection counts for Add, and shows Add and More on headings. Sections stay open.
+- **Customize Sidebar** uses a menu on each faded place.
+- **Go lists sidebar places, views and types, plus Archive** (`GoMenu`).
 
 ### A layout an earlier copy stored
 
@@ -51,7 +52,7 @@ paths:
 
 - **The top row is drawn in the content under a title the window hides** (`TopRowFrame`); a plain `toolbar` holds only the buttons.
 - **The views are a radio group;** VoiceOver reads every view, folded or not.
-- **The first pill's capsule starts on the title's left edge,** not its text.
+- **The first pill's capsule aligns with the title's left edge.**
 - **The row folds by the room it has** (`ToolbarRoomProbe`) into N More, with hidden pills and New View…, and holds no width. One view makes no row.
 - **An on button is gray, never the accent.** An item that cannot act dims.
 - **Trap:** hide the title on the window (`hidesWindowTitle`), or it returns in full screen. Read the row's line from `TopRowSpace`, never a safe area: full screen hides the toolbar.
@@ -62,13 +63,14 @@ paths:
 
 ## Smallest window
 
-- **The main window goes down to 760 by 520,** set once on its content. The panel folds under 1000 wide, the sidebar under 900 (only what folded reopens), and under 800 the views are one pill beside the title.
-- **The page beside a layout gives way first,** 372 to 300, then the table drops columns whole, then the panel and sidebar fold (`BesideColumn`). Their line runs up through the toolbar.
+- **The main window's minimum is 760 by 520,** set on its content. The panel folds below 1000 and the sidebar below 900. The app reopens only what it folded. Below 800, views share one pill.
+- **The panel starts at 300 points** and can be widened (`PanelWidth`).
+- **The page beside a layout shrinks from 372 to 300 points,** or less below 600 shared points (`BesideColumn`). Their divider reaches the window's top.
 
 ## Corner
 
 - **The corner holds only controls for viewing** the page or list in front (`WindowCorner`, `PageCorner`): formats, text size, focus, zoom, pages. A control turned off in Settings is in More instead.
-- **Glass the content draws dims with the window,** as the toolbar's does (`windowGlass`).
+- **Labels on content glass dim with the window** (`windowGlass`).
 - **The modal has no corner,** and the column beside a layout has Open as Page alone.
 
 ## Menus and palettes
