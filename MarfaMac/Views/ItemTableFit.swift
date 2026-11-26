@@ -85,3 +85,40 @@ enum ItemTableFit {
         ceil((words as NSString).size(withAttributes: [.font: font]).width)
     }
 }
+
+/// Which columns fit the table's width, and how wide each is. The name keeps its least width and the other columns give way
+/// in two steps: each shrinks from its ideal toward its least, in proportion, and only then does the last of them go,
+/// whole, until the rest fit. A column the person dragged to a width keeps it and does not shrink.
+nonisolated enum ItemTableRoom {
+    struct Column: Equatable {
+        let id: String
+        let isName: Bool
+        let minimum: CGFloat
+        let ideal: CGFloat
+        /// Whether the person set the width.
+        let isKept: Bool
+    }
+
+    /// The columns that stay, with their starting widths, in order. The name's own width is the table's to fill, so its
+    /// entry is its least. A width of 0 or less is an unmeasured table, which hides nothing.
+    static func plan(_ columns: [Column], available: CGFloat) -> [(id: String, width: CGFloat)] {
+        guard available > 0 else { return columns.map { ($0.id, $0.ideal) } }
+        var kept = columns
+        while true {
+            let others = kept.filter { !$0.isName }
+            let room = available - (kept.first { $0.isName }?.minimum ?? 0)
+            let leastNeeded = others.reduce(0) { $0 + ($1.isKept ? $1.ideal : $1.minimum) }
+            if leastNeeded <= room || others.isEmpty {
+                let idealNeeded = others.reduce(0) { $0 + $1.ideal }
+                let slack = others.reduce(0) { $0 + ($1.isKept ? 0 : $1.ideal - $1.minimum) }
+                let squeeze = idealNeeded > room && slack > 0 ? min(1, (idealNeeded - room) / slack) : 0
+                return kept.map { column in
+                    if column.isName || column.isKept { return (column.id, column.ideal) }
+                    return (column.id, floor(column.ideal - (column.ideal - column.minimum) * squeeze))
+                }
+            }
+            guard let last = kept.lastIndex(where: { !$0.isName }) else { return kept.map { ($0.id, $0.ideal) } }
+            kept.remove(at: last)
+        }
+    }
+}

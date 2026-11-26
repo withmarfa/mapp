@@ -46,7 +46,7 @@ paths:
 
 ## Foot
 
-- **The foot is one button that opens the Marfa's panel** (`SidebarFoot`, `MarfaPanel`). Refresh, Settings and a warning line are buttons of their own; that line opens Settings › Connection.
+- **The foot is one button that opens the Marfa's panel** (`SidebarFoot`, `MarfaPanel`). Refresh, Settings and a warning line are separate buttons; that line opens Settings › Connection.
 
 ## Toolbar
 
@@ -63,8 +63,8 @@ paths:
 ## Smallest window
 
 - **The main window goes down to 760 by 520,** set once on its content. The panel folds under 1000 wide, the sidebar under 900 (only what folded reopens), and under 800 the views are one pill beside the title.
-- **The panel is 300 wide** in every window (`PanelWidth`).
-- **The page beside a layout, up to 372, gives way first,** to a third, so the layout keeps 320 (`BesideColumn`).
+- **The panel is 300 wide** (`PanelWidth`).
+- **The page beside a layout gives way first,** 372 to 300, then the table drops columns whole, then the panel and sidebar fold (`BesideColumn`).
 
 ## Corner
 

@@ -115,7 +115,7 @@ enum ItemCommand: CaseIterable {
         case .openInNewWindow: "Open in New Window"
         case .openOutside:
             if let name = context.openTarget.flatMap({ PageOpener.appName(for: $0) }) { LocalizedStringResource("Open in \(name)") } else { LocalizedStringResource("Open") }
-        case .copyLink: "Copy Link"
+        case .copyLink: context.ids.count > 1 ? "Copy Links" : "Copy Link"
         case .addAttachment: "Add Attachment…"
         case .toggleSource: (sourceMode ?? context.showsSource) ? "Show Formatted Text" : "Show Markdown Source"
         case .toggleReader: context.pageLook?.mode == .original ? "Show Reader" : "Show Original"
@@ -177,7 +177,7 @@ enum ItemCommand: CaseIterable {
         case .openAsFullPage: context.hasBrowser && ItemOpening.fullPage.canOpen(context.ids.count)
         case .quickLook, .openInNewWindow: context.hasBrowser && !context.ids.isEmpty
         case .openOutside: context.openTarget != nil
-        case .copyLink: context.item != nil
+        case .copyLink: !context.ids.isEmpty
         case .addAttachment: context.editableItem != nil
         case .toggleSource, .print, .exportPDF: context.visibleItem != nil
         case .toggleReader: context.pageLook != nil
@@ -198,7 +198,13 @@ enum ItemCommand: CaseIterable {
         case .openInNewWindow: ItemWindows.open(library.idsForWindows(context.ids), opening: openWindow)
         case .openOutside:
             if let item = context.item, let target = context.openTarget { PageOpener.open(target, for: item) }
-        case .copyLink: if let id = context.item?.id { Task { await library.copyLink(of: id) } }
+        case .copyLink:
+            if let browser = context.browser, context.ids.count > 1 {
+                let ids = browser.inListOrder(context.ids, in: library)
+                Task { await library.copyLinks(of: ids) }
+            } else if let id = context.item?.id {
+                Task { await library.copyLink(of: id) }
+            }
         case .addAttachment: editor?.isChoosingImages = true
         case .toggleSource: editor.map { $0.setSourceMode(!$0.caret.sourceMode) }
         case .toggleReader: context.pageLook.map { $0.choose($0.mode == .reader ? .original : .reader) }

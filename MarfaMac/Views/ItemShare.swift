@@ -25,9 +25,30 @@ struct ItemShare {
     /// hangs from the top of the page when one is showing, and from the top of the window otherwise.
     func present(near page: NSView?) {
         guard isAvailable else { return }
+        Self.show(fileURL.map { [$0] } ?? text.map { [$0] } ?? [], near: page)
+    }
+
+    /// Shares the links of several items, one for each, as the system's picker takes them. A link an item has none of
+    /// yet is left out and the person is told, and with none to share nothing opens.
+    @MainActor static func presentLinks(of ids: [ItemID], in library: any ItemLibrary, near page: NSView?) async {
+        let found = await library.links(of: ids)
+        guard !found.links.isEmpty else {
+            library.notices.tell(
+                String(localized: "Can’t Share"),
+                String(localized: "These items don’t have links yet. Try again once Marfa has finished syncing."))
+            return
+        }
+        if found.missing > 0 {
+            library.notices.tell(
+                String(localized: "Some Links Not Shared"),
+                String(localized: "\(found.missing) of the items don’t have a link yet, so only the others are shared."))
+        }
+        show(found.links.map(\.url), near: page)
+    }
+
+    private static func show(_ items: [Any], near page: NSView?) {
         let anchor = page.flatMap { $0.window != nil ? $0 : nil } ?? NSApp.keyWindow?.contentView
         guard let anchor else { return }
-        let items: [Any] = fileURL.map { [$0] } ?? text.map { [$0] } ?? []
         let bounds = anchor.bounds
         let rect = NSRect(x: bounds.midX - 1, y: anchor.isFlipped ? bounds.minY + 40 : bounds.maxY - 40, width: 2, height: 2)
         NSSharingServicePicker(items: items).show(relativeTo: rect, of: anchor, preferredEdge: anchor.isFlipped ? .maxY : .minY)
@@ -43,8 +64,23 @@ struct ItemShareLink: View {
     var library: (any ItemLibrary)?
     /// The More menu shows titles alone, so its Share does too.
     var showsIcon = true
+    /// Several chosen items, whose Share offers every one's link (`ItemShare.presentLinks`), in the order the window draws
+    /// them. A link comes from the server, so a button reads it when it is chosen. Empty where one item or none is chosen.
+    var chosen: Set<ItemID> = []
+    var browser: Browser?
 
     var body: some View {
+        if chosen.count > 1, let library, let browser {
+            Button {
+                let ids = browser.inListOrder(chosen, in: library)
+                Task { await ItemShare.presentLinks(of: ids, in: library, near: nil) }
+            } label: { label }
+        } else {
+            single
+        }
+    }
+
+    @ViewBuilder private var single: some View {
         let share = library.map { ItemShare(item: item, fileURL: fileURL, in: $0) } ?? ItemShare()
         if let fileURL = share.fileURL {
             ShareLink(item: fileURL) { label }

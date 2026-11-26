@@ -31,6 +31,8 @@ struct ItemTable: View {
     @State private var resizing = ColumnResizing()
     /// Where each row was last drawn, which the row under the pointer or the keyboard's is held at (`RowHold`).
     @State private var drawn = DrawnRows()
+    /// The width inside the table's margin, which decides how many columns fit (`ItemTableRoom`); 0 until measured.
+    @State private var tableWidth: CGFloat = 0
 
     /// The inset style's own margin before the first column.
     static let inset: CGFloat = 16
@@ -50,11 +52,11 @@ struct ItemTable: View {
     }
 
     private func contents(_ content: ItemTableContent) -> some View {
-        let shown = browser.shownColumns(content.columns)
+        let wanted = browser.shownColumns(content.columns)
         let fit = ItemTableFit.widths(
-            of: shown, rows: content.rows.prefix(ItemTableFit.sample), library: library, format: dateFormat, now: library.now(),
+            of: wanted, rows: content.rows.prefix(ItemTableFit.sample), library: library, format: dateFormat, now: library.now(),
             scale: CGFloat(textSize) / CGFloat(InterfaceStyle.defaultTextSize))
-        let _ = setStartingWidths(shown, fit: fit)
+        let shown = fitting(wanted, fit: fit)
         let (allRows, rows) = (content.allRows, content.rows)
         let _ = browser.rowHoldReleases
         let pages = Pages(
@@ -63,8 +65,9 @@ struct ItemTable: View {
         let _ = drawn.take(pages.anchors)
 
         return ItemTableSelection(browser: browser, content: content, drawn: drawn) { selection in
-            table(selection: selection, columns: content.columns, fit: fit, pages: pages, grouping: content.grouping, collapsed: content.collapsed)
+            table(selection: selection, columns: content.columns, shown: shown, fit: fit, pages: pages, grouping: content.grouping, collapsed: content.collapsed)
         }
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { tableWidth = $0 }
             .padding(.horizontal, margin)
             .searchStatus(browser)
             .overlay {
@@ -102,14 +105,14 @@ struct ItemTable: View {
     }
 
     private func table(
-        selection: Binding<Set<ItemID>>, columns: [ItemTableColumn], fit: [String: ItemTableFit.Width], pages: Pages,
+        selection: Binding<Set<ItemID>>, columns: [ItemTableColumn], shown: [ItemTableColumn], fit: [String: ItemTableFit.Width], pages: Pages,
         grouping: ItemTableColumn?, collapsed: Set<String>
     ) -> some View {
-        let last = browser.shownColumns(columns).last?.id
+        let last = shown.last?.id
         return Table(of: ItemTableRow.self, selection: selection, sortOrder: sortBinding(columns), columnCustomization: customization(columns)) {
             // Only the columns showing. SwiftUI adds and hides every column it is given on live rows when the place
             // changes, which for the many columns of a mixed place costs far more than the few it shows.
-            TableColumnForEach(browser.shownColumns(columns)) { column in
+            TableColumnForEach(shown) { column in
                 tableColumn(column, fit: fit[column.id], endsRow: column.id == last, places: pages.places)
             }
         } rows: {
@@ -295,14 +298,28 @@ struct ItemTable: View {
         }
     }
 
-    /// Tells the table's header what width each shown column starts at, which is the width the person kept or the column's
-    /// ideal one (`ColumnResizing`).
-    private func setStartingWidths(_ shown: [ItemTableColumn], fit: [String: ItemTableFit.Width]) {
+    /// The columns that fit the table's width, in order. Tells the table's header what width each starts at, which is the
+    /// width the person kept or one between the column's least and its ideal (`ItemTableRoom`, `ColumnResizing`).
+    private func fitting(_ wanted: [ItemTableColumn], fit: [String: ItemTableFit.Width]) -> [ItemTableColumn] {
         let kept = (try? JSONEncoder().encode(decodedWidths())).map(Self.keptWidths(in:)) ?? [:]
-        resizing.widths = shown.map { kept[$0.id] ?? fit[$0.id]?.ideal ?? $0.widths.ideal }
+        let title = ItemTableColumn.title.widths
+        let parts = wanted.map { column in
+            let isName = column.content == .title
+            let own = kept[column.id]
+            let ideal = own ?? fit[column.id]?.ideal ?? column.widths.ideal
+            let least = own ?? (isName ? title.min : fit[column.id]?.minimum ?? column.widths.min)
+            return ItemTableRoom.Column(id: column.id, isName: isName, minimum: least, ideal: ideal, isKept: own != nil)
+        }
+        // The inset style keeps its room before the first column and after the last, and the table a gap between columns.
+        let room = tableWidth - 2 * Self.inset - 2 * CGFloat(wanted.count)
+        let plan = ItemTableRoom.plan(parts, available: tableWidth > 0 ? room : 0)
+        let widths = Dictionary(uniqueKeysWithValues: plan.map { ($0.id, $0.width) })
+        let shown = wanted.filter { widths[$0.id] != nil }
+        resizing.widths = shown.map { widths[$0.id] ?? 0 }
         // The name takes what the other columns leave, until a person drags its divider.
         resizing.flexible = shown.firstIndex { $0.content == .title && kept[$0.id] == nil }
-        resizing.flexibleMinimum = ItemTableColumn.title.widths.min
+        resizing.flexibleMinimum = title.min
+        return shown
     }
 
     /// The stored widths for the place showing now. Decoded when the place or the stored data changes, and kept until

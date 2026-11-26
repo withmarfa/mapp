@@ -79,19 +79,33 @@ private struct NothingOnMap: View {
     }
 }
 
-/// The system's zoom stepper and the button that fits every marker, in the map's corner above Apple's Legal link.
+/// The pair that zooms out and in, drawn side by side as the board has it, and the button that fits every marker, in the map's corner above Apple's Legal link.
 private struct MapControls: View {
     let controller: MapController
     let browser: Browser
     @Environment(SelectionSummary.self) private var summary: SelectionSummary?
     @Environment(\.interfaceTextSize) private var textSize
 
+    private func zoomButton(_ title: LocalizedStringKey, symbol: String, factor: Double) -> some View {
+        Button { controller.zoom(by: factor) } label: {
+            Image(systemName: symbol).frame(width: 36, height: 36).contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .help(title)
+        .accessibilityLabel(title)
+        .accessibilityIdentifier("Map" + (factor < 1 ? "ZoomIn" : "ZoomOut"))
+    }
+
     var body: some View {
         HStack(spacing: 8) {
-            MapZoomControl(controller: controller)
-                .frame(width: 64, height: 28)
+            HStack(spacing: 0) {
+                zoomButton("Zoom Out", symbol: "minus", factor: 2)
+                zoomButton("Zoom In", symbol: "plus", factor: 0.5)
+            }
+            .glassEffect(.regular, in: .capsule)
+            .accessibilityElement(children: .contain)
             Button { browser.requestMapFit() } label: {
-                Image(systemName: "scope").frame(width: 28, height: 28)
+                Image(systemName: "scope").frame(width: 36, height: 36)
             }
             .buttonStyle(.plain)
             .glassEffect(.regular.interactive(), in: .circle)

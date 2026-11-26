@@ -1590,6 +1590,12 @@
         }
       }
     },
+    "%lld of the items don’t have a link yet, so only the others are shared." : {
+
+    },
+    "%lld of the items don’t have a link yet, so only the others were copied." : {
+
+    },
     "%lld or more versions" : {
 
     },
@@ -3183,6 +3189,9 @@
     "Can’t Copy Link" : {
 
     },
+    "Can’t Copy Links" : {
+
+    },
     "Can’t Copy Wiki Link" : {
 
     },
@@ -3299,6 +3308,9 @@
     },
     "Can’t Search" : {
       "extractionState" : "manual"
+    },
+    "Can’t Share" : {
+
     },
     "Can’t Show This Page" : {
       "extractionState" : "manual"
@@ -3928,6 +3940,9 @@
 
     },
     "Copy Link" : {
+
+    },
+    "Copy Links" : {
 
     },
     "Copy Steps" : {
@@ -9455,6 +9470,12 @@
     "Some Items Were Skipped" : {
       "extractionState" : "manual"
     },
+    "Some Links Not Copied" : {
+
+    },
+    "Some Links Not Shared" : {
+
+    },
     "Some Typing Might Be Missing" : {
 
     },
@@ -10904,6 +10925,9 @@
     },
     "These items are already linked this way." : {
       "extractionState" : "manual"
+    },
+    "These items don’t have links yet. Try again once Marfa has finished syncing." : {
+
     },
     "They keep the old mapping until you apply this one." : {
 

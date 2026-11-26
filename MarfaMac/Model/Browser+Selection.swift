@@ -51,6 +51,12 @@ extension Browser {
         selection = ids
     }
 
+    /// These items in the order the window draws them, then any it does not draw.
+    func inListOrder(_ ids: Set<ItemID>, in library: any ItemLibrary) -> [ItemID] {
+        var seen: Set<ItemID> = []
+        return (onScreenOrder(in: library) + ids).filter { ids.contains($0) && seen.insert($0).inserted }
+    }
+
     /// Whether the selection follows the items the window's layout holds as they change: a layout that spans the window
     /// has no list to do it, and nor has a full page opened from the list, which takes the list's place.
     var followsCollection: Bool { usesCollection || isCollectionItemPresented }

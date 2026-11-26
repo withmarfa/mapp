@@ -268,7 +268,8 @@ struct ItemToolbarActions {
     var shareLink: some View {
         let hasSingleSelection = (browser?.selection.count ?? items.count) == 1
         let item = hasSingleSelection && pageItems.count == 1 ? pageItems.first : nil
-        return ItemShareLink(item: item, fileURL: selectedFileURL, library: library)
+        return ItemShareLink(
+            item: item, fileURL: selectedFileURL, library: library, chosen: ids.count > 1 && browser != nil ? ids : [], browser: browser)
             .help("Share…")
             .accessibilityIdentifier("ShareToolbar")
     }
@@ -353,7 +354,9 @@ private struct MoreMenu: View {
                 command(.openInNewWindow)
                 command(.quickLook)
                 command(.openOutside)
-                ItemShareLink(item: item, fileURL: fileURL, library: library, showsIcon: false)
+                ItemShareLink(
+                    item: item, fileURL: fileURL, library: library, showsIcon: false, chosen: ids.count > 1 && browser != nil ? ids : [],
+                    browser: browser)
                 command(.copyLink)
                 Divider()
                 ItemOrganizeActions(ids: ids, undoManager: undoManager, keepsPlace: true)

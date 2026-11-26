@@ -69,8 +69,8 @@ The `ItemLibrary` calls take the whole selection and return a `CommandOutcome` w
 | File | Keep in Library | ⌃⌘K | Yes |
 | File | Archive, Unarchive | ⌃⌘A | Yes |
 | File | Print… | ⌘P | Yes |
-| File | Open, Open Beside the List, Open as Modal, Open as Full Page, Quick Look, Open in Default App, Share…, Add to Favorites, Add Tag…, Change Type…, Add to Collection…, Version History…, Move to Feed, Delete, Recover, Rename Source…, Choose Source Mark…, Delete Collection…, Export Layouts…, Import Layouts…, Export as PDF… | – | Yes |
-| Edit | Copy Link | ⇧⌘C | Yes |
+| File | Open, Open Beside the List, Open as Modal, Open as Full Page, Quick Look, Open in Default App, Share… (every chosen link), Add to Favorites, Add Tag…, Change Type…, Add to Collection…, Version History…, Move to Feed, Delete, Recover, Rename Source…, Choose Source Mark…, Delete Collection…, Export Layouts…, Import Layouts…, Export as PDF… | – | Yes |
+| Edit | Copy Link (Copy Links for several, one per line in list order) | ⇧⌘C | Yes |
 | Edit | Add Attachment… | ⇧⌘A | Yes |
 | Edit | Search Items… | ⇧⌘P | Yes |
 | Edit | Command Palette | ⌘K | Yes |

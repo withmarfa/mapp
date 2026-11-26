@@ -39,13 +39,11 @@ Read only the row you are building. A row says what was agreed; the boards it na
 
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
-| Undo | Each link and new row is one undo, however many items. | `StepUndo`, `ItemWrite` | `Rethink-Archive-Toast` |
 
 ## Layouts
 
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
-| List beside a page | The entries of every list beside a page, the same in every place. | `ItemList.swift`, `ItemRow.swift` | `Rethink-Notes`, `Rethink-Highlights` |
 | Board | Its columns are its groups, so Hide Empty Groups is the one switch. Rows: Properties, Card Size, Sub-Items. | `ItemBoard.swift` | `Rethink-Tasks-Board` |
 | Calendar | A choice of the date field, No Date with a count, Weekends, a gray chosen event, and a one-line header on the week. | `ItemCalendar.swift`, `CalendarWeekView.swift` | `Rethink-Calendar`, `Rethink-Calendar-Month`, `Rethink-Calendar-Light`, `Rethink-Calendar-Light-Full` |
 | Gallery | Preview, Card Size, Shape and Fit Picture. A card without a picture fills with its opening lines, or its type's mark. | `ItemGallery.swift`, `GalleryCards.swift` | `Rethink-Gallery`, `Rethink-Gallery-Full`, `Rethink-Gallery-View` |

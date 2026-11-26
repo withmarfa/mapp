@@ -82,7 +82,8 @@ struct AppCommands: Commands {
                 command(.openOutside)
                 Divider()
                 ItemShareLink(
-                    item: one, fileURL: ids.count == 1 ? ids.first.flatMap { browser?.fileURL(of: $0) } : nil, library: library)
+                    item: one, fileURL: ids.count == 1 ? ids.first.flatMap { browser?.fileURL(of: $0) } : nil, library: library,
+                    chosen: ids.count > 1 ? ids : [], browser: browser)
                 if let library {
                     ItemActions(ids: ids, undoManager: focused?.undoManager, inMenuBar: true, shortcuts: shortcuts)
                         .environment(\.library, library)
