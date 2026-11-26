@@ -64,7 +64,7 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **An event's span is one rule** (`EventSpan`); all-day events ignore the Mac's zone.
 - **Map needs both coordinate fields and valid values** (`MapLayout`). No Location lists the rest.
 - **A board always has lanes,** by status when none is chosen.
-- **A board's lanes are its groups:** Hide Empty Groups covers empty lanes, and a header drags to reorder.
+- **A board's lanes are its groups;** a header drags to reorder. Sub-Items hides only cards' sub-item counts.
 - **A gallery card with no picture shows its opening lines, else its type's mark.**
 - **A row stays where seen until the pointer or keys leave** (`RowHold`).
 - **A drop in a lane is one edit.** Not Set clears the field; Set and date lanes refuse a drop.
