@@ -437,7 +437,7 @@ import Testing
         #expect(await copy.removed == [sibling])
     }
 
-    /// A setting a store dropped is tried again by another app build, which may read it.
+    /// Both builds reject the same look. The second keeps the recovery copy the first one saved.
     @Test func aValueNoStoreHereReadsIsSetAsideOnceAcrossBuilds() async throws {
         let look = PreferenceUnit.row(.types, setting: "look", key: "core.note")
         let copy = FakePreferencesCopy()

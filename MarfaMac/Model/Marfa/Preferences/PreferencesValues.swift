@@ -94,8 +94,8 @@ nonisolated extension SyncedSetting {
         }
     }
 
-    /// What this Mac holds of the setting, for `library` where it is kept for each server. A stored value of another kind
-    /// than the store keeps, such as text where it keeps data, is unreadable, so it is set aside rather than written over.
+    /// What this Mac holds of the setting, for `library` where it is kept for each server. A stored map can be JSON
+    /// text or data.
     func read(_ defaults: UserDefaults, library: String) -> PreferenceReading {
         switch place {
         case .member(let field):
