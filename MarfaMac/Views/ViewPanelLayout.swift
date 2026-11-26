@@ -136,7 +136,7 @@ private struct ViewPanelPropertiesRow: View {
 }
 
 /// A gallery's cards: what fills each card's picture area, how large a card is, its shape, and whether a picture fits
-/// whole. What a card says under its picture is its type's look.
+/// whole. Cards still read the view's shared Properties choices.
 private struct ViewPanelGalleryRows: View {
     @Bindable var browser: Browser
 
