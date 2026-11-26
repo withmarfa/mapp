@@ -50,8 +50,9 @@ nonisolated enum FileMedia {
     @ObservationIgnored private var timeObserver: Any?
     @ObservationIgnored private var isLeft = false
     @ObservationIgnored private var isScrubbing = false
-    /// Whether the person has played or moved the file in this page, so its place is theirs to keep.
-    @ObservationIgnored private var isTouched = false
+    /// Whether the file has played or moved in this page since the page last kept its place, so the place it would keep
+    /// is newer than any another window has kept since.
+    @ObservationIgnored private var hasNewPlace = false
     /// Where the latest move is going while the player has not yet landed there, which is where the file is until it does.
     @ObservationIgnored private var pendingTarget: Double?
     @ObservationIgnored private var moves = 0
@@ -115,7 +116,7 @@ nonisolated enum FileMedia {
         guard state == .ready, !isLeft else { return }
         if let other = Self.playing, other !== self { other.pause() }
         Self.playing = self
-        isTouched = true
+        hasNewPlace = true
         // A file that ended starts again from its start.
         if position >= duration - 0.05 { seek(to: 0) }
         player.defaultRate = Float(speed)
@@ -150,7 +151,7 @@ nonisolated enum FileMedia {
     }
 
     private func move(to target: Double, tolerance: CMTime) {
-        isTouched = true
+        hasNewPlace = true
         position = target
         pendingTarget = target
         moves += 1
@@ -213,8 +214,10 @@ nonisolated enum FileMedia {
 
     /// Keeps where the file is, or nothing where it is at its start or its end: a finished file opens at its start.
     private func keepPlace() {
-        guard let item, isTouched else { return }
+        guard let item, hasNewPlace else { return }
         PlaybackPlaces.keep(position >= duration - 0.5 ? 0 : position, of: item, in: defaults)
+        // A file still playing moves on from what was kept.
+        hasNewPlace = isPlaying
     }
 
     // MARK: Watching the player

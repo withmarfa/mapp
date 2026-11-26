@@ -87,7 +87,7 @@ struct PlaybackPlaceTests {
         past.leave()
     }
 
-    /// Two windows on one item: the one the person left alone never writes its opening place over the other's newer one.
+    /// Two windows on one item: a window never writes a place it already kept, or its opening place, over the other's newer one.
     @Test func aPageLeftUntouchedKeepsAnotherPagesNewerPlace() async throws {
         let defaults = defaults()
         let url = try sound()
@@ -102,6 +102,19 @@ struct PlaybackPlaceTests {
         untouched.leave()
         #expect(abs((PlaybackPlaces.place(of: id, in: defaults) ?? 0) - 1.2) < 0.05)
         played.leave()
+
+        // Once each window has kept its place, closing the one kept earlier leaves the newer place.
+        let first = MediaPlayback(item: id, url: url, type: .wav, defaults: defaults)
+        let second = MediaPlayback(item: id, url: url, type: .wav, defaults: defaults)
+        await first.load()
+        await second.load()
+        first.seek(to: 1.05)
+        first.pause()
+        second.seek(to: 1.40)
+        second.pause()
+        first.leave()
+        #expect(abs((PlaybackPlaces.place(of: id, in: defaults) ?? 0) - 1.40) < 0.05)
+        second.leave()
     }
 
     @Test func aFileAVFoundationCannotPlayIsSaidToBeUnplayable() async throws {
