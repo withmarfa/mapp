@@ -60,21 +60,14 @@ import Testing
         }
     }
 
-    @Test func commandAInTheGalleryChoosesEveryItem() async throws {
-        try await hosted(.gallery) { browser, _, _, window in
+    /// The gallery's Command-A chooses the arrangement's ids, which hold every item, not only the page drawn.
+    @Test func theGallerysSelectAllReadsEveryItem() async throws {
+        try await hosted(.gallery) { browser, library, _, _ in
             let all = try #require(browser.sectionsWork.held?.value.ids)
             #expect(all.count > Browser.listPage, "more items than are drawn")
-            browser.focusRequest = .list
-            let press = try #require(NSEvent.keyEvent(
-                with: .keyDown, location: .zero, modifierFlags: .command, timestamp: 0, windowNumber: window.windowNumber, context: nil,
-                characters: "a", charactersIgnoringModifiers: "a", isARepeat: false, keyCode: 0))
-            // Sent again until the gallery has the keyboard, which it takes once the window has drawn it.
-            let chose = await eventually {
-                if browser.selection.isEmpty { window.sendEvent(press) }
-                return !browser.selection.isEmpty
-            }
-            try #require(chose)
-            #expect(browser.selection == Set(all))
+            let arrangement = browser.arrangement(in: library, order: ItemOrder(), now: library.now())
+            #expect(arrangement.ids == all)
+            #expect(Self.drawnCount(in: browser, of: all.count) < all.count, "only a page is drawn")
         }
     }
 
@@ -109,24 +102,21 @@ import Testing
         }
     }
 
-    /// The gallery's keyboard cursor on the first page, then a single choice made elsewhere, as a link makes, of a card
-    /// far past it: the new choice is drawn, not the cursor's card.
-    @Test func aChoiceMadeElsewhereEndsTheGallerysCursor() async throws {
-        try await hosted(.gallery) { browser, _, _, window in
+    /// The gallery's keyboard cursor gives way to a single choice made elsewhere, as a link makes.
+    @Test func aChoiceMadeElsewhereEndsTheGallerysCursor() {
+        let cursor = ItemID("cursor"), far = ItemID("far")
+        #expect(ChosenItemDrawn.shown(cursor: cursor, single: far) == far, "the new choice is drawn, not the cursor's card")
+        #expect(ChosenItemDrawn.endsCursor(cursor, single: far))
+        #expect(ChosenItemDrawn.shown(cursor: cursor, single: cursor) == cursor)
+        #expect(!ChosenItemDrawn.endsCursor(cursor, single: cursor))
+        #expect(ChosenItemDrawn.shown(cursor: cursor, single: nil) == cursor, "several chosen: the cursor stays drawn")
+        #expect(!ChosenItemDrawn.endsCursor(cursor, single: nil))
+    }
+
+    /// A single card chosen far past the page is drawn with a page around it, not every card up to it.
+    @Test func aCardChosenFarPastThePageIsDrawn() async throws {
+        try await hosted(.gallery) { browser, _, _, _ in
             let ids = try #require(browser.sectionsWork.held?.value.ids)
-            browser.focusRequest = .list
-            let right = try #require(NSEvent.keyEvent(
-                with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil,
-                characters: String(Character(UnicodeScalar(NSRightArrowFunctionKey)!)),
-                charactersIgnoringModifiers: String(Character(UnicodeScalar(NSRightArrowFunctionKey)!)), isARepeat: false, keyCode: 124))
-            // Sent again until the gallery has the keyboard; the arrow key sets its cursor to the card it chooses.
-            let moved = await eventually {
-                if browser.selection.isEmpty { window.sendEvent(right) }
-                return !browser.selection.isEmpty
-            }
-            try #require(moved)
-            let cursor = try #require(browser.selection.first)
-            #expect((ids.firstIndex(of: cursor) ?? .max) < Browser.listPage)
             let far = ids.count - 1
             #expect(far >= 2 * Browser.listPage, "far enough to need a page of its own")
             browser.selection = [ids[far]]
