@@ -29,6 +29,8 @@ struct ItemTableCell: View {
     let hover: ItemTableHover
     /// Set on the last column shown, where the row's quick actions stand while the pointer is on the row.
     var endsRow = false
+    /// Where the row stands among its parents, set on the name's cell of a table where any row nests.
+    var nest: ItemNesting.Place?
     @State private var isHovering = false
     @State private var anchor = ValueEditAnchorBox()
 
@@ -182,7 +184,20 @@ struct ItemTableCell: View {
 
     // MARK: The name
 
-    private var title: some View {
+    @ViewBuilder private var title: some View {
+        if let nest {
+            HStack(spacing: SubItemDisclosure.gap) {
+                SubItemDisclosure(place: nest) { browser.toggleSubItems(of: row.id) }
+                name
+            }
+            // The chevron hangs before the name, in the margin at the top, as a group's does.
+            .padding(.leading, CGFloat(nest.depth) * SubItemDisclosure.indent - SubItemDisclosure.width - SubItemDisclosure.gap)
+        } else {
+            name
+        }
+    }
+
+    private var name: some View {
         HStack(spacing: 8) {
             Text(row.item.displayTitle)
                 .fontWeight(.medium)
@@ -196,8 +211,10 @@ struct ItemTableCell: View {
                     .foregroundStyle(.yellow)
                     .accessibilityLabel("Favorite")
             }
+            if let nest, nest.children > 0 { SubItemProgress(id: row.id, counts: library.counts) }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background { if let nest, nest.children > 0 { Color.clear.wantsCounts(of: row.id, [.children], in: library.counts) } }
         .overlay(alignment: .trailing) { openButton }
     }
 
@@ -480,6 +497,58 @@ private struct OptionDot: View {
 
     var body: some View {
         Circle().fill(tone.color(for: scheme)).frame(width: 8, height: 8).accessibilityHidden(true)
+    }
+}
+
+/// The chevron before a parent's name that shows or hides its sub-items, or the room for one before a row with none, so
+/// every name at one depth starts at one edge.
+struct SubItemDisclosure: View {
+    let place: ItemNesting.Place
+    let toggle: () -> Void
+    @State private var isOver = false
+
+    static let width: CGFloat = 10
+    static let gap: CGFloat = 4
+    /// How far each depth of sub-items stands in.
+    static let indent: CGFloat = 20
+
+    var body: some View {
+        if place.children > 0 {
+            Button(action: toggle) {
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(isOver ? .secondary : .tertiary)
+                    .rotationEffect(.degrees(place.isExpanded ? 90 : 0))
+                    .frame(width: Self.width)
+                    .contentShape(.rect.inset(by: -5))
+            }
+            .buttonStyle(.plain)
+            .onHover { isOver = $0 }
+            .accessibilityLabel(place.isExpanded ? Text("Hide Sub-Items") : Text("Show Sub-Items"))
+            .accessibilityValue(place.isExpanded ? Text("Expanded") : Text("Collapsed"))
+            .help(place.isExpanded ? Text("Hide Sub-Items") : Text("Show Sub-Items"))
+        } else {
+            Color.clear.frame(width: Self.width, height: 1).accessibilityHidden(true)
+        }
+    }
+}
+
+/// How many of a parent's sub-items are done, after its name, as "1 of 3": Marfa's count of the children that have a
+/// status, which a parent whose children have none leaves unsaid. Its own view, so only a parent's row reads the counts;
+/// the row wants the count (`wantsCounts`).
+struct SubItemProgress: View {
+    let id: ItemID
+    let counts: ItemCounts
+
+    var body: some View {
+        let answer = counts.answer(of: id, .children)
+        if let groups = answer?.groups, groups.withStatus > 0 {
+            Text("\(groups.finished) of \(groups.withStatus)")
+                .foregroundStyle(.tertiary)
+                .monospacedDigit()
+                .help(CountWording.help(of: .progress, answer: answer) ?? "")
+                .accessibilityLabel(Text("\(groups.finished) of \(groups.withStatus) sub-items done"))
+        }
     }
 }
 

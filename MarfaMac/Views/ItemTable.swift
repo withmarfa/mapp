@@ -44,7 +44,7 @@ struct ItemTable: View {
             scale: CGFloat(textSize) / CGFloat(InterfaceStyle.defaultTextSize))
         let _ = setStartingWidths(shown, fit: fit)
         let (allRows, rows) = (content.allRows, content.rows)
-        let pages = Pages(content: content, paging: browser.tablePaging, size: browser.tablePageSize)
+        let pages = Pages(content: content, paging: browser.tablePaging, size: browser.tablePageSize, expanded: browser.expandedHere)
 
         ItemTableSelection(browser: browser, content: content) { selection in
             table(selection: selection, columns: content.columns, fit: fit, pages: pages, grouping: content.grouping, collapsed: content.collapsed)
@@ -94,7 +94,7 @@ struct ItemTable: View {
             // Only the columns showing. SwiftUI adds and hides every column it is given on live rows when the place
             // changes, which for the many columns of a mixed place costs far more than the few it shows.
             TableColumnForEach(browser.shownColumns(columns)) { column in
-                tableColumn(column, fit: fit[column.id], endsRow: column.id == last)
+                tableColumn(column, fit: fit[column.id], endsRow: column.id == last, places: pages.places)
             }
         } rows: {
             if let grouping {
@@ -133,6 +133,8 @@ struct ItemTable: View {
             browser.selection = []
             return .handled
         }
+        .onKeyPress(.rightArrow) { foldSubItems(open: true, places: pages.places) }
+        .onKeyPress(.leftArrow) { foldSubItems(open: false, places: pages.places) }
         .onDeleteCommand {
             let ids = browser.selection
             library.deleteAfterSaving(ids, undoManager: undoManager, asking: details)
@@ -142,12 +144,12 @@ struct ItemTable: View {
     /// A count has no sort control: it is asked for only the rows on screen (`ItemTableColumn.isSortable`).
     @TableColumnBuilder<ItemTableRow, ItemTableComparator>
     private func tableColumn(
-        _ column: ItemTableColumn, fit: ItemTableFit.Width?, endsRow: Bool
+        _ column: ItemTableColumn, fit: ItemTableFit.Width?, endsRow: Bool, places: [ItemID: ItemNesting.Place]
     ) -> some TableColumnContent<ItemTableRow, ItemTableComparator> {
         let widths = (min: fit?.minimum ?? column.widths.min, ideal: fit?.ideal ?? column.widths.ideal, max: column.widths.max)
         if column.isSortable {
             TableColumn(Text(verbatim: column.label), sortUsing: ItemTableComparator(column: column, order: column.firstOrder)) { row in
-                cell(of: row, in: column, endsRow: endsRow)
+                cell(of: row, in: column, endsRow: endsRow, place: places[row.id])
             }
             .width(min: widths.min, ideal: widths.ideal, max: widths.max)
             .customizationID(column.id)
@@ -156,7 +158,7 @@ struct ItemTable: View {
         }
         if !column.isSortable {
             TableColumn(Text(verbatim: column.label)) { row in
-                cell(of: row, in: column, endsRow: endsRow)
+                cell(of: row, in: column, endsRow: endsRow, place: places[row.id])
             }
             .width(min: widths.min, ideal: widths.ideal, max: widths.max)
             .customizationID(column.id)
@@ -164,10 +166,26 @@ struct ItemTable: View {
         }
     }
 
-    private func cell(of row: ItemTableRow, in column: ItemTableColumn, endsRow: Bool) -> some View {
+    private func cell(of row: ItemTableRow, in column: ItemTableColumn, endsRow: Bool, place: ItemNesting.Place?) -> some View {
         var cell = ItemTableCell(library: library, row: row, column: column, browser: browser, order: order, dateFormat: dateFormat, hover: hover)
         cell.endsRow = endsRow
+        if column.content == .title { cell.nest = place }
         return cell
+    }
+
+    /// The Right Arrow opens the chosen parent's sub-items and the Left Arrow closes them, or chooses the parent of a
+    /// chosen sub-item, as an outline does.
+    private func foldSubItems(open: Bool, places: [ItemID: ItemNesting.Place]) -> KeyPress.Result {
+        guard browser.selection.count == 1, let id = browser.selection.first, let place = places[id] else { return .ignored }
+        if place.children > 0, place.isExpanded != open {
+            browser.toggleSubItems(of: id)
+            return .handled
+        }
+        let content = browser.tableContent(in: library)
+        let nestings = content.grouping == nil ? [content.nesting] : Array(content.groupNestings.values)
+        guard !open, let parent = nestings.lazy.compactMap({ $0.parents[id] }).first else { return .ignored }
+        browser.selection = [parent]
+        return .handled
     }
 
     @TableRowBuilder<ItemTableRow>
@@ -508,18 +526,23 @@ private struct Pages {
     let groups: [GroupPage]
     /// The item rows still to load, in the groups the person has not folded away.
     let remaining: Int
+    /// Where each row drawn stands among its parents, where any nests (`ItemNesting`).
+    let places: [ItemID: ItemNesting.Place]
 
     @MainActor
-    init(content: ItemTableContent, paging: TablePaging, size: TablePageSize) {
+    init(content: ItemTableContent, paging: TablePaging, size: TablePageSize, expanded: Set<ItemID>) {
         if content.grouping == nil {
-            slice = paging.slice(content.rows, size: size)
+            slice = paging.slice(content.rows, nesting: content.nesting, expanded: expanded, size: size)
             groups = []
             remaining = slice.remaining
+            places = Dictionary(slice.places.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         } else {
-            let drawn = paging.slice(groups: content.groups, collapsed: content.collapsed, size: size)
+            let drawn = paging.slice(
+                groups: content.groups, nestings: content.groupNestings, collapsed: content.collapsed, expanded: expanded, size: size)
             slice = TablePaging.Slice(rows: [], remaining: 0)
             groups = drawn.groups.map { GroupPage(group: $0.group, rows: $0.rows) }
             remaining = drawn.remaining
+            places = Dictionary(drawn.groups.flatMap(\.places).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         }
     }
 

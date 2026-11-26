@@ -68,6 +68,10 @@ final class ItemTableContent {
         let hidden = options.hiddenGroups ?? []
         return allGroups.filter { !hidden.contains($0.id) && !(hidesEmptyGroups && $0.rows.isEmpty) }
     }()
+    /// The rows under their parents (`ItemNesting`), in the order of `rows`.
+    lazy var nesting = ItemNesting(rows: rows)
+    /// Each group's rows under their parents, by the group's id: a parent nests only the children in its own group.
+    lazy var groupNestings: [String: ItemNesting] = ItemTableLayout.nestings(of: allGroups)
     lazy var collapsed: Set<String> = grouping.map { ItemTableLayout.collapsed(options, groups: groups, by: $0, mode: groupMode) } ?? []
     /// Whether the rows are all in hidden groups, which says so rather than that the place is empty.
     var hidesEveryGroup: Bool { grouping != nil && !rows.isEmpty && groups.allSatisfy(\.rows.isEmpty) }
@@ -285,6 +289,8 @@ final class ItemTableContent {
             let sortChoices: [ItemTableColumn]
             /// Every group of `rows` in order, for a table that is grouped.
             let groups: [ItemTableGroup]
+            let nesting: ItemNesting
+            let groupNestings: [String: ItemNesting]
 
             fileprivate init(ordering: Ordering, offer: FilterOffer, kept: [ItemTableRow], rows: [ItemTableRow]? = nil) {
                 let rows = rows ?? ItemTableLayout.sorted(kept, by: ordering.sort)
@@ -300,15 +306,22 @@ final class ItemTableContent {
                             asMarfa: ordering.groupsAsMarfa, calendar: ordering.calendar, now: ordering.now),
                         by: ordering.groupOrder)
                 } ?? []
+                nesting = ItemNesting(rows: rows)
+                groupNestings = ItemTableLayout.nestings(of: groups)
             }
 
-            init(offer: FilterOffer, kept: [ItemTableRow], rows: [ItemTableRow], sortChoices: [ItemTableColumn], groups: [ItemTableGroup]) {
+            init(
+                offer: FilterOffer, kept: [ItemTableRow], rows: [ItemTableRow], sortChoices: [ItemTableColumn], groups: [ItemTableGroup],
+                nesting: ItemNesting, groupNestings: [String: ItemNesting]
+            ) {
                 self.offer = offer
                 self.kept = kept
                 keptItems = kept.map(\.item)
                 self.rows = rows
                 self.sortChoices = sortChoices
                 self.groups = groups
+                self.nesting = nesting
+                self.groupNestings = groupNestings
             }
         }
 
@@ -382,7 +395,11 @@ final class ItemTableContent {
         kept = ordered.kept
         keptItems = ordered.keptItems
         sortChoices = ordered.sortChoices
-        if rows?.elementsEqual(ordered.rows, by: { $0.id == $1.id }) != false { allGroups = ordered.groups }
+        if rows?.elementsEqual(ordered.rows, by: { $0.id == $1.id }) != false {
+            allGroups = ordered.groups
+            nesting = ordered.nesting
+            groupNestings = ordered.groupNestings
+        }
         self.rows = rows ?? ordered.rows
     }
 
@@ -394,7 +411,8 @@ final class ItemTableContent {
     /// they are read, which a small place sorts and groups on the main actor anyway.
     var earlier: Ordering.Earlier {
         let ordered = landed ?? Ordering.Ordered(
-            offer: filterOffer, kept: kept, rows: rows, sortChoices: sortChoices, groups: grouping == nil ? [] : allGroups)
+            offer: filterOffer, kept: kept, rows: rows, sortChoices: sortChoices, groups: grouping == nil ? [] : allGroups,
+            nesting: nesting, groupNestings: grouping == nil ? [:] : groupNestings)
         return Ordering.Earlier(columns: columns, sort: sort, ordered: ordered)
     }
 

@@ -45,7 +45,9 @@ struct ItemList: View, Equatable {
         // Headings are rows of their own rather than section headers: a list of sections leaves every row at
         // the table's default height, and its first header floats into the toolbar's edge, whose line then runs
         // the list's full width.
-        listContent(lines: lines, ids: ids, drawnIDs: drawnIDs, contents: contents, density: density, excerpts: excerpts, title: title)
+        listContent(
+            lines: lines, ids: ids, drawnIDs: drawnIDs, contents: contents, density: density, excerpts: excerpts, title: title,
+            nesting: arrangement.nesting)
         .onDeleteCommand(perform: deleteSelection)
         .clearsSeveralOnEscape(browser)
         .quickLooksOnSpace(browser)
@@ -97,21 +99,25 @@ struct ItemList: View, Equatable {
     /// The list and its row traits, apart from `body` so that neither is too long for the compiler to check.
     private func listContent(
         lines: [ListLine], ids: [ItemID], drawnIDs: [ItemID], contents: [ItemID: RowContent], density: Density,
-        excerpts: [ItemID: SearchExcerpt], title: String
+        excerpts: [ItemID: SearchExcerpt], title: String, nesting: [ItemID: ItemNesting.Place]
     ) -> some View {
         SelectableList(browser: browser) {
             // The list reads every line's traits (whether it can be selected, its separators, its drag) each time
             // it updates, as it does on every change of selection, out of sight too. Set here, they come from the
             // line alone; set inside `ListLineRow`, they would have SwiftUI run every row's body to find them.
             ForEach(lines) { line in
+                let nest = nesting[line.id]
                 let row = ListLineRow(
                     line: line, content: contents[line.id], density: density, excerpt: excerpts[line.id], browser: browser,
-                    fold: browser.listShape?.arranged == true ? { browser.toggleGroup($0, in: library) } : nil)
+                    fold: browser.listShape?.arranged == true ? { browser.toggleGroup($0, in: library) } : nil, nest: nest)
                 .selectionDisabled(line.itemID == nil)
                 .listRowSeparator(line.itemID == nil ? .hidden : .automatic, edges: .top)
                 .listRowSeparator(line.endsSection || line.drawsMore != nil ? .hidden : .automatic, edges: .bottom)
                 if let run = line.drawsMore {
                     row.onAppear { browser.drawMoreOfList(after: run) }
+                } else if (nest?.depth ?? 0) > 0 {
+                    // A sub-item stays under its parent.
+                    row
                 } else if !line.isHeading {
                     row.draggable(containerItemID: line.id)
                         .dropsInto(collection: line.collectionID(in: library.catalogue), browser: browser, order: order)
@@ -160,6 +166,8 @@ private struct ListLineRow: View {
     let browser: Browser
     /// Folds or opens a section by its key, where the list's groups fold.
     var fold: ((String) -> Void)?
+    /// Where the item stands among its parents, where the list nests it.
+    var nest: ItemNesting.Place?
 
     var body: some View {
         switch line {
@@ -192,7 +200,24 @@ private struct ListLineRow: View {
                 ItemRow(content: content, density: density, excerpt: excerpt, itemID: line.id)
                     .wantsCounts(of: line.id, content.countQueries, in: library.counts)
                     .hoverQuickActions(for: line.id, actions: browser.quickActions(for: item))
+                    .nested(nest, id: line.id, browser: browser)
             }
+        }
+    }
+}
+
+extension View {
+    /// A list row under its parent: stood in by its depth, with the chevron of a parent before it (`SubItemDisclosure`).
+    /// How many sub-items are done is the type's look's to say, as a progress count, as on a card.
+    @ViewBuilder fileprivate func nested(_ nest: ItemNesting.Place?, id: ItemID, browser: Browser) -> some View {
+        if let nest {
+            HStack(spacing: SubItemDisclosure.gap) {
+                SubItemDisclosure(place: nest) { browser.toggleSubItems(of: id) }
+                self
+            }
+            .padding(.leading, CGFloat(nest.depth) * SubItemDisclosure.indent - SubItemDisclosure.width - SubItemDisclosure.gap)
+        } else {
+            self
         }
     }
 }

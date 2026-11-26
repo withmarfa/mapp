@@ -164,7 +164,8 @@ extension Browser {
         let shape = listShape
         let choices = SectionsChoices(
             derived: derived.key, order: order, clock: ClockDay(now: now, calendar: library.calendar()), shape: shape,
-            hidesEmpty: shape != nil && hidesEmptyGroups, digestStacking: stacking)
+            hidesEmpty: shape != nil && hidesEmptyGroups, digestStacking: stacking,
+            expanded: viewMode == .list && stacking == nil ? expandedHere : nil)
         let shown = work.held.flatMap { $0.key.choices.derived.isSamePlace(as: derived.key) ? $0.value : nil }
         // A filtered or arranged place takes its rows, order and groups from the table.
         let content: ItemTableContent?
@@ -178,8 +179,9 @@ extension Browser {
         }
         let key = SectionsKey(choices: choices, table: content?.serial, content: content == nil ? library.contentRevision : nil)
         if let held = work.value(for: key) { return held }
-        // A list of the place's own items that no change touched stands as it is.
-        if content == nil, let held = work.held, held.key.choices == choices, let since = held.value.content,
+        // A list of the place's own items that no change touched stands as it is. A nested list hides sub-items, whose
+        // change it would not see, so it is made again.
+        if content == nil, choices.expanded == nil, let held = work.held, held.key.choices == choices, let since = held.value.content,
            let changed = library.changedItems(since: since),
            (derived.items ?? items(in: library)).count == held.value.ids.count, !changed.contains(where: { held.value.positions[$0] != nil }) {
             let kept = held.value.at(library.contentRevision)
@@ -193,8 +195,10 @@ extension Browser {
         }
         let count = content?.allRows.count ?? making.count
         let place = self.shown
+        let expanded = choices.expanded
         let make: @Sendable () -> ListArrangement = {
             var arrangement = making.make()
+            if let expanded { arrangement = arrangement.nested(expanded: expanded) }
             if let stacking {
                 arrangement.digest = DigestLayout.Display(place: place, sections: DigestLayout.sections(arrangement.sections, stacking: stacking))
             }
@@ -657,6 +661,8 @@ extension Browser {
         /// Hide Empty Groups, which only an arranged list's groups read and which is kept apart from the place's options.
         let hidesEmpty: Bool
         let digestStacking: Bool?
+        /// The parents whose sub-items the list shows, where the list nests them (`ListArrangement.nested`).
+        let expanded: Set<ItemID>?
     }
 
     nonisolated struct SectionsKey: Equatable, Sendable {
@@ -780,11 +786,14 @@ nonisolated struct ListArrangement: Sendable {
     let sorted: [Item]?
     /// The library's revision the items were listed at, where they are the place's own.
     private(set) var content: Int?
+    /// Where each item drawn stands among its parents, where the list nests them; empty where none nests.
+    private(set) var nesting: [ItemID: ItemNesting.Place] = [:]
 
-    init(sections: [ItemSection], sorted: [Item]?, content: Int?) {
+    init(sections: [ItemSection], sorted: [Item]?, content: Int?, nesting: [ItemID: ItemNesting.Place] = [:]) {
         self.sections = sections
         self.sorted = sorted
         self.content = content
+        self.nesting = nesting
         ids = sections.flatMap { $0.items.map(\.id) }
         shownIDs = sections.flatMap { $0.isCollapsed ? [] : $0.items.map(\.id) }
         positions = Dictionary(ids.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
@@ -803,6 +812,25 @@ nonisolated struct ListArrangement: Sendable {
             if part.items.count < section.items.count { section.items = Array(section.items[part.items]) }
             return DrawnSection(section: section, part: part)
         }
+    }
+
+    /// The same sections with each sub-item under its parent where both are in one section (`ItemNesting`), and drawn only
+    /// where every parent above it is in `expanded`.
+    func nested(expanded: Set<ItemID>) -> ListArrangement {
+        var places: [ItemID: ItemNesting.Place] = [:]
+        let sections = sections.map { section in
+            let nesting = ItemNesting(items: section.items)
+            guard !nesting.isFlat else { return section }
+            var nested = section
+            let drawn = nesting.drawn(expanded: expanded).places
+            nested.items = drawn.map { section.items[$0.index] }
+            for place in drawn { places[place.id] = place }
+            return nested
+        }
+        guard !places.isEmpty else { return self }
+        var made = ListArrangement(sections: sections, sorted: sorted, content: content, nesting: places)
+        made.digest = digest
+        return made
     }
 
     /// The same sections, as made at the library's revision `content`, which changed none of their items.
