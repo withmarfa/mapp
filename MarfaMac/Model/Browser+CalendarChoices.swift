@@ -15,7 +15,10 @@ extension Browser {
         if let id = shown.savedView {
             changeViewSettings(id) { $0.calendar = Self.changedCalendar($0.calendar, change) }
         } else {
-            setPlaceCalendar(Self.changedCalendar(placeCalendars[shown], change), in: shown)
+            let place = shown
+            let writes = Self.hasDefaultView(place) && viewPanel?.isNew != true
+            let stored = writes ? PlaceDefaults.stored(in: defaults).default(for: place)?.calendar : placeCalendars[place]
+            setPlaceCalendar(Self.changedCalendar(stored, change), from: placeCalendars[place], in: place)
         }
     }
 
@@ -25,14 +28,13 @@ extension Browser {
         return choices == CalendarChoices() ? nil : choices
     }
 
-    private func setPlaceCalendar(_ stored: CalendarChoices?, in place: PlaceView) {
-        let before = placeCalendars[place]
-        guard before != stored else { return }
+    private func setPlaceCalendar(_ stored: CalendarChoices?, from before: CalendarChoices?, in place: PlaceView) {
+        guard before != stored || placeCalendars[place] != stored else { return }
         placeCalendars[place] = stored
         updatePlaceDefault(place) { $0.calendar = stored }
         registerUndo(String(localized: "Change View")) { browser in
             guard browser.shown.isSame(place) else { return }
-            browser.setPlaceCalendar(before, in: place)
+            browser.setPlaceCalendar(before, from: stored, in: place)
         }
     }
 }
