@@ -3157,7 +3157,7 @@
     "Can’t Check Apps That Write" : {
 
     },
-    "Can’t Reach the Server" : {
+    "Can’t Connect to the Server" : {
 
     },
     "Can’t Copy Link" : {
@@ -3292,11 +3292,11 @@
     "Can’t Undo" : {
 
     },
-    "Can’t Connect to the Server" : {
-
-    },
     "Can’t Update View" : {
       "extractionState" : "manual"
+    },
+    "Can’t Verify the Server’s Certificate" : {
+
     },
     "Can’t be read. Set it again." : {
 
@@ -9937,10 +9937,10 @@
     "The app closed the library before it could keep your change. Make the change again." : {
       "extractionState" : "manual"
     },
-    "The app couldn’t find the server by name. Check the address and your connection, then try again." : {
+    "The app couldn’t confirm that %@ ended its earlier approval." : {
 
     },
-    "The app couldn’t confirm that %@ ended its earlier approval." : {
+    "The app couldn’t connect to the server. Check the address and make sure the server is running and reachable from this Mac, then try again." : {
 
     },
     "The app couldn’t drop a sign-in it didn’t use, so the sign-in may still be kept on this Mac and the approval may stand at %@." : {
@@ -9952,7 +9952,7 @@
     "The app couldn’t finish signing in. Check your connection and try again, or sign in with a code." : {
 
     },
-    "The app couldn’t reach that address, so nothing changed. Check the address and your connection, then try again." : {
+    "The app couldn’t find the server by name. Check the address and your connection, then try again." : {
 
     },
     "The app couldn’t get the file from the server. Check your connection, then try again." : {
@@ -10960,7 +10960,7 @@
     "This Link Type Is Gone" : {
 
     },
-    "The app couldn’t connect to the server. Check the address and make sure the server is running and reachable from this Mac, then try again." : {
+    "This Mac couldn’t verify the server’s certificate. Check the address and ask whoever manages the server to check its certificate." : {
 
     },
     "This Mac doesn’t have enough space to download this file." : {
