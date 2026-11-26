@@ -50,7 +50,7 @@ struct SignInScopesTests {
         (String(repeating: "e\u{301}", count: 50), "Marfa for Mac on " + String(repeating: "e\u{301}", count: 41)),
     ])
     func aNewRegistrationNamesTheMac(computerName: String?, expected: String) throws {
-        let signIns = SystemSignIns(bundleIdentifier: "com.withmarfa.marfa.debug", computerName: computerName, anchor: { nil })
+        let signIns = SystemSignIns(bundleIdentifier: "com.withmarfa.marfa.debug", computerName: { computerName }, anchor: { nil })
         let connection = try MarfaConnection(address: "https://marfa.example")
         let client = try signIns.authorization(for: connection).client
         #expect(client.name == expected)

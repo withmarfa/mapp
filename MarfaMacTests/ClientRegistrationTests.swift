@@ -10,7 +10,7 @@ struct ClientRegistrationTests {
     func aNewSignInSendsTheMacName(device: Bool) async throws {
         let probe = try await RegistrationProbe()
         let connection = try MarfaConnection(address: probe.origin)
-        let signIns = SystemSignIns(computerName: "Étage 🖥️", anchor: { nil })
+        let signIns = SystemSignIns(computerName: { "Étage 🖥️" }, anchor: { nil })
         do {
             if device {
                 _ = try await signIns.startCodeSignIn(to: connection)
