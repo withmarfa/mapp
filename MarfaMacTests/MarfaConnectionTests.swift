@@ -39,15 +39,15 @@ struct MarfaConnectionTests {
         #expect(stores.store(for: typed) == stores.store(for: explicit))
     }
 
-    /// An address names its copy and its discard marks as it was entered, so a port the scheme already means is kept.
-    @Test func anAddressKeepsAPortTheSchemeAlreadyMeansAndSoItsOwnCopy() throws {
+    /// The address keeps a port the scheme already means as typed, and either spelling finds the other's copy.
+    @Test func anAddressKeepsAPortTheSchemeAlreadyMeansAndBothSpellingsNameOneOrigin() throws {
         let withPort = try MarfaConnection(address: "HTTPS://Marfa.Example:443/")
         let without = try MarfaConnection(address: "https://marfa.example")
         #expect(withPort.address.absoluteString == "https://marfa.example:443")
-        #expect(withPort != without)
-        let location = MarfaStoreLocation(root: URL.temporaryDirectory.appending(path: "Stores", directoryHint: .isDirectory))
-        #expect(location.directory(for: withPort) != location.directory(for: without))
-        #expect(location.directory(for: withPort) == location.directory(for: try MarfaConnection(address: "https://marfa.example:443/")))
+        #expect(MarfaCopies.origin(of: withPort) == MarfaCopies.origin(of: without))
+        #expect(MarfaStoreLocation.spellings(of: withPort.address) == ["https://marfa.example:443", "https://marfa.example"])
+        #expect(MarfaStoreLocation.spellings(of: without.address) == ["https://marfa.example", "https://marfa.example:443"])
+        #expect(MarfaStoreLocation.spellings(of: URL(string: "https://marfa.example:8443")!) == ["https://marfa.example:8443"])
     }
 
     @Test(arguments: [

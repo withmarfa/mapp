@@ -123,6 +123,7 @@ import Observation
     /// Read from the copy each time it is read whole (`readServerKey`), so a server replaced at the same address finds
     /// nothing the old one's library kept (`ItemLibrary.serverKey`).
     var serverKey = ""
+    @ObservationIgnored let pictures: WebPictures
     let now: () -> Date
     let calendar: () -> Calendar
 
@@ -408,11 +409,13 @@ import Observation
         source: any ItemSource, notices: Notices, history: (any ItemHistorySource)? = nil,
         typeIcons: (any TypeIconSource)? = nil, typeSchemas: (any TypeSchemaSource)? = nil, config: (any InstanceConfigSource)? = nil,
         sourceNames: (any SourceNameSource)? = nil, links: (any ItemLinkSource)? = nil,
+        pictures: WebPictures = .kept(for: "Sample"),
         now: @escaping () -> Date = Date.init,
         calendar: @escaping () -> Calendar = { .current },
         textPause: TextPause = .typing,
         cameOnline: @escaping () -> Void = {}) {
         self.source = source
+        self.pictures = pictures
         self.textPause = textPause
         counts = ItemCounts { ids, query in try await source.counts(of: ids, query) }
         self.history = history

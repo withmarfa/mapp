@@ -458,7 +458,7 @@ import Testing
             try await host.disconnect(.discardCopy(shown))
         }
         #expect(FileManager.default.fileExists(atPath: store.path))
-        #expect(bench.defaults.dictionary(forKey: "MarfaDiscardedCopies") as? [String: [String]] == ["http://first.test:8210": held])
+        #expect(bench.defaults.dictionary(forKey: "MarfaDiscardedCopies") as? [String: [String]] == [bench.location.directory(for: try MarfaConnection(address: "http://first.test:8210")).lastPathComponent: held])
 
         // Once that process lets go, the copy marked to go is removed before the address opens again.
         holder.release()
@@ -841,7 +841,7 @@ import Testing
         #expect(host.connection == second)
         #expect(host.source === bench.servers.last)
         #expect(bench.savedAddress == "http://second.test:8210")
-        #expect(try bench.signIns.key(for: first.address) == nil)
+        #expect(try bench.signIns.key(for: first.address) == "one", "the Marfa left stays signed in for a return")
         #expect(try bench.signIns.key(for: second.address) == "two")
         #expect(old.calls.last == "close")
         #expect(bench.hasCopy(first))

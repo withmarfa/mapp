@@ -96,6 +96,148 @@ extension LiveMarfaTests {
             await end()
         }
 
+        /// An earlier build kept this Mac's type looks under the address and synced them. The app then opens the Marfa by
+        /// its instance: the looks move first, so the Marfa keeps every row it held and takes the part only this Mac had.
+        @Test(.timeLimit(.minutes(4)))
+        func looksKeptUnderTheAddressReachTheInstanceWithoutRemovingAny() async throws {
+            try await run {
+                let address = try LiveMarfa.address()
+                let older = try await mac()
+                let earlier = #"{"marfa:\#(address)":{"core.note":{"date":"created"},"core.task":{"date":"edited"}}}"#
+                older.defaults.set(Data(earlier.utf8), forKey: TypeLooks.defaultsKey)
+                try await start(older)
+                await older.send()
+                let item = try #require(await Self.settingsItems().first)
+                older.sync.detach()
+                await older.source.close()
+                // Chosen on that build after its last sync, so only this Mac holds it.
+                let later = #"{"marfa:\#(address)":{"core.note":{"date":"created"},"core.task":{"date":"edited"},"core.event":{"date":"created"}}}"#
+                older.defaults.set(Data(later.utf8), forKey: TypeLooks.defaultsKey)
+                older.defaults.set(address, forKey: MarfaHost.addressKey)
+
+                let root = URL.temporaryDirectory.appending(path: "PreferencesSyncLive-\(UUID().uuidString)", directoryHint: .isDirectory)
+                defer { try? FileManager.default.removeItem(at: root) }
+                let signIns = ScriptedSignIns()
+                signIns.save(try LiveMarfa.key(), for: try MarfaConnection(address: address).address, scopes: [PreferencesType.vendorScope])
+                let host = MarfaHost(defaults: older.defaults, signIns: signIns, location: MarfaStoreLocation(root: root))
+                let libraries = Libraries(
+                    host: host, defaults: older.defaults, handOverPages: { $0(true) }, syncsPreferences: true,
+                    defaultsDomain: older.sync.domain)
+                await libraries.launch()
+                let source = try #require(host.source as? MarfaSource)
+                source.refresh()
+                try #require(await Self.syncs(libraries), "the settings never synced: \(libraries.preferences.standing)")
+                // A copy that has not said its instance yet names the library by its folder until it next opens.
+                let stored = try JSONSerialization.jsonObject(with: try #require(older.defaults.data(forKey: TypeLooks.defaultsKey))) as? [String: Any]
+                #expect(stored.map { Array($0.keys) } == [libraries.libraryKey])
+                #expect(libraries.libraryKey != "marfa:" + address)
+                await libraries.preferences.flush()
+                await source.flush()
+                libraries.preferences.detach()
+                await source.close()
+
+                // Opened again, the copy says its instance, and the library takes that name before it syncs.
+                let again = MarfaHost(defaults: older.defaults, signIns: signIns, location: MarfaStoreLocation(root: root))
+                let reopened = Libraries(
+                    host: again, defaults: older.defaults, handOverPages: { $0(true) }, syncsPreferences: true,
+                    defaultsDomain: older.sync.domain)
+                await reopened.launch()
+                let second = try #require(again.source as? MarfaSource)
+                second.refresh()
+                try #require(await Self.syncs(reopened), "the settings never synced again: \(reopened.preferences.standing)")
+                #expect(reopened.libraryKey == "marfa:" + (try #require(ProcessInfo.processInfo.environment["MARFA_TEST_INSTANCE_ID"])), "\(reopened.libraryKey)")
+                #expect(reopened.typeLooks.choices(for: reopened.libraryKey).count == 3)
+                await reopened.preferences.flush()
+                await second.flush()
+                reopened.preferences.detach()
+                await second.close()
+
+                let reader = try await mac()
+                reader.source.refresh()
+                let copy = WorkingCopyPreferences(copy: reader.source.copy, answers: reader.source.preferenceAnswers)
+                let look = { (type: String) in PreferenceUnit.row(.types, setting: "look", key: type) }
+                let expected: PreferenceUnits = [
+                    look("core.note"): #"{"date":"created"}"#, look("core.task"): #"{"date":"edited"}"#,
+                    look("core.event"): #"{"date":"created"}"#,
+                ]
+                let reached = await LiveMarfa.until {
+                    let held = (try? await copy.units(of: item.rawValue)) ?? [:]
+                    return expected.allSatisfy { held[$0.key] == $0.value }
+                }
+                let held = (try? await copy.units(of: item.rawValue)) ?? [:]
+                #expect(reached, "the Marfa holds \(held.filter { if case .row(.types, "look", _) = $0.key { true } else { false } })")
+                #expect(await Self.settingsItems() == [item])
+            }
+        }
+
+        /// The same, where a look kept under the address can no longer be read, so its store sets it aside as the app
+        /// starts. Opened by its folder, the looks wait; opened again by the instance, the Marfa keeps the row this Mac
+        /// synced for it and takes the part only this Mac had.
+        @Test(.timeLimit(.minutes(4)))
+        func aLookItsStoreSetsAsideAtLaunchLeavesTheMarfasRow() async throws {
+            try await run {
+                let address = try LiveMarfa.address()
+                let older = try await mac()
+                let earlier = #"{"marfa:\#(address)":{"core.note":{"date":"created"},"core.task":{"date":"edited"}}}"#
+                older.defaults.set(Data(earlier.utf8), forKey: TypeLooks.defaultsKey)
+                try await start(older)
+                await older.send()
+                let item = try #require(await Self.settingsItems().first)
+                older.sync.detach()
+                await older.source.close()
+                let later = #"{"marfa:\#(address)":{"core.note":{"date":7},"core.task":{"date":"edited"},"core.event":{"date":"created"}}}"#
+                older.defaults.set(Data(later.utf8), forKey: TypeLooks.defaultsKey)
+                older.defaults.set(address, forKey: MarfaHost.addressKey)
+
+                let root = URL.temporaryDirectory.appending(path: "PreferencesSyncLive-\(UUID().uuidString)", directoryHint: .isDirectory)
+                defer { try? FileManager.default.removeItem(at: root) }
+                let signIns = ScriptedSignIns()
+                signIns.save(try LiveMarfa.key(), for: try MarfaConnection(address: address).address, scopes: [PreferencesType.vendorScope])
+                for open in 0..<2 {
+                    let host = MarfaHost(defaults: older.defaults, signIns: signIns, location: MarfaStoreLocation(root: root))
+                    let libraries = Libraries(
+                        host: host, defaults: older.defaults, handOverPages: { $0(true) }, syncsPreferences: true,
+                        defaultsDomain: older.sync.domain)
+                    await libraries.launch()
+                    let source = try #require(host.source as? MarfaSource)
+                    source.refresh()
+                    try #require(await Self.syncs(libraries), "open \(open) never synced: \(libraries.preferences.standing)")
+                    #expect(libraries.librarySettings.unsettled.isEmpty == (open == 1), "open \(open): \(libraries.librarySettings.unsettled)")
+                    if open == 1 {
+                        let choices = libraries.typeLooks.choices(for: libraries.libraryKey)
+                        #expect(choices.mapValues(\.date) == [TypeID("core.note"): .created, TypeID("core.task"): .edited, TypeID("core.event"): .created])
+                    }
+                    await libraries.preferences.flush()
+                    await source.flush()
+                    libraries.preferences.detach()
+                    await source.close()
+                }
+
+                let reader = try await mac()
+                reader.source.refresh()
+                let copy = WorkingCopyPreferences(copy: reader.source.copy, answers: reader.source.preferenceAnswers)
+                let look = { (type: String) in PreferenceUnit.row(.types, setting: "look", key: type) }
+                let expected: PreferenceUnits = [
+                    look("core.note"): #"{"date":"created"}"#, look("core.task"): #"{"date":"edited"}"#,
+                    look("core.event"): #"{"date":"created"}"#,
+                ]
+                let reached = await LiveMarfa.until {
+                    let held = (try? await copy.units(of: item.rawValue)) ?? [:]
+                    return expected.allSatisfy { held[$0.key] == $0.value }
+                }
+                let held = (try? await copy.units(of: item.rawValue)) ?? [:]
+                #expect(reached, "the Marfa holds \(held.filter { if case .row(.types, "look", _) = $0.key { true } else { false } })")
+                #expect(await Self.settingsItems() == [item])
+            }
+        }
+
+        private static func syncs(_ libraries: Libraries) async -> Bool {
+            await LiveMarfa.until {
+                await libraries.preferences.flush()
+                return libraries.preferences.standing == .syncing
+            }
+        }
+
         @Test(.timeLimit(.minutes(3)))
         func aChangeOnOneMacReachesTheOther() async throws {
             try await run {

@@ -277,7 +277,7 @@ struct WebPageItemPage: View {
             mailChoice = nil
             let id = item.id
             pictures = SealedPictures(
-                item: id, pictures: .standard, inFeed: { [library] in library.item(id)?.tier == .feed },
+                item: id, pictures: library.pictures, inFeed: { [library] in library.item(id)?.tier == .feed },
                 saved: { [library] address in await library.openSavedPicture(of: id, at: address) })
         }
         shownID = item.id

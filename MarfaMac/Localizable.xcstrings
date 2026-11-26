@@ -869,6 +869,16 @@
         }
       }
     },
+    "%lld changes made at another address for this Marfa are kept on this Mac in %@ and are sent the next time the app connects." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld changes made at another address for this Marfa are kept on this Mac in %2$@ and are sent the next time the app connects."
+          }
+        }
+      }
+    },
     "%lld changes need attention" : {
       "localizations" : {
         "en" : {
@@ -3157,6 +3167,9 @@
     "Can’t Check Apps That Write" : {
 
     },
+    "Can’t Connect to the Server" : {
+
+    },
     "Can’t Copy Link" : {
 
     },
@@ -3188,6 +3201,9 @@
 
     },
     "Can’t Extend This Key Yet" : {
+
+    },
+    "Can’t Find the Server" : {
 
     },
     "Can’t Get This File" : {
@@ -3288,6 +3304,9 @@
     },
     "Can’t Update View" : {
       "extractionState" : "manual"
+    },
+    "Can’t Verify the Server’s Certificate" : {
+
     },
     "Can’t be read. Set it again." : {
 
@@ -3443,14 +3462,23 @@
     "Changed the settings" : {
 
     },
+    "Changes Are Waiting" : {
+
+    },
     "Changes Haven’t Been Sent" : {
       "extractionState" : "manual"
+    },
+    "Changes Still Waiting" : {
+
     },
     "Changes not yet sent are kept." : {
 
     },
     "Changes to “%@” weren’t sent" : {
       "extractionState" : "manual"
+    },
+    "Changes you made in %@ are kept on this Mac. They’re sent when you switch back to it." : {
+
     },
     "Change…" : {
 
@@ -3589,9 +3617,6 @@
 
     },
     "Choose it in Runs next time, or remove it in Terminal with %@." : {
-
-    },
-    "Choose one item to read or edit it." : {
 
     },
     "Choose the machine that runs %@ to see one." : {
@@ -8742,6 +8767,9 @@
     "Run requested" : {
 
     },
+    "Run “marfa apps list” with the command line signed in to %@ as the owner. Identify this Mac’s Marfa for Mac approval by its name and approval date. If you can identify it, run “marfa apps revoke <id>” with that entry’s ID." : {
+
+    },
     "Run “marfa apps list” with the command line signed in to %@ as the owner. Use the app name and approval date to identify this Mac’s earlier approval. If you can identify it, run “marfa apps revoke <id>” with that entry’s ID." : {
 
     },
@@ -9022,6 +9050,9 @@
 
     },
     "Settings Not Saved" : {
+
+    },
+    "Settings Not Synced" : {
 
     },
     "Settings Read When It Starts" : {
@@ -9648,9 +9679,6 @@
     "Switched Servers, but Not Everything Was Removed" : {
       "extractionState" : "manual"
     },
-    "Switched Servers, but This App May Still Be Approved on the Previous One" : {
-
-    },
     "Switched Servers, but the Copy Was Kept" : {
       "extractionState" : "manual"
     },
@@ -9931,7 +9959,13 @@
     "The app couldn’t confirm that %@ ended its earlier approval." : {
 
     },
+    "The app couldn’t connect to the server. Check the address and make sure the server is running and reachable from this Mac, then try again." : {
+
+    },
     "The app couldn’t drop a sign-in it didn’t use, so the sign-in may still be kept on this Mac and the approval may stand at %@." : {
+
+    },
+    "The app couldn’t find the server by name. Check the address and your connection, then try again." : {
 
     },
     "The app couldn’t finish removing them from %@, so you’re still connected. Disconnect anyway and they may stay there." : {
@@ -10014,9 +10048,6 @@
     },
     "The app forgot its sign-in on this Mac, but couldn’t confirm that %@ ended the approval." : {
       "extractionState" : "manual"
-    },
-    "The app forgot the previous server’s sign-in on this Mac, but couldn’t confirm that %@ ended the approval." : {
-
     },
     "The app holds %lld of the owner’s %lld permissions." : {
 
@@ -10540,12 +10571,6 @@
     "The previous server’s copy is still on this Mac. The app removes it before it connects to that server again." : {
       "extractionState" : "manual"
     },
-    "The previous server’s sign-in is still in your Keychain, and its copy is still on this Mac. Remove the sign-in in Keychain Access. The app removes the copy before it connects to that server again." : {
-      "extractionState" : "manual"
-    },
-    "The previous server’s sign-in is still in your Keychain. Remove it in Keychain Access." : {
-      "extractionState" : "manual"
-    },
     "The release changed since it was read, so the app used none of it. Try again to read it." : {
 
     },
@@ -10945,6 +10970,9 @@
     "This Link Type Is Gone" : {
 
     },
+    "This Mac couldn’t verify the server’s certificate. Check the address and ask whoever manages the server to check its certificate." : {
+
+    },
     "This Mac doesn’t have enough space to download this file." : {
       "extractionState" : "manual"
     },
@@ -11194,6 +11222,9 @@
     "This library was closed before the change could be kept." : {
       "extractionState" : "manual"
     },
+    "This library’s settings on this Mac couldn’t be brought together, so they aren’t kept in the Marfa for now. Check that this Mac has free space, then open the library again." : {
+
+    },
     "This link can’t be replaced by moving one end, because the item that stays can hold more than one." : {
       "extractionState" : "manual"
     },
@@ -11355,9 +11386,6 @@
 
     },
     "To a folder you choose." : {
-
-    },
-    "Run “marfa apps list” with the command line signed in to %@ as the owner. Identify this Mac’s Marfa for Mac approval by its name and approval date. If you can identify it, run “marfa apps revoke <id>” with that entry’s ID." : {
 
     },
     "To keep what you wrote, copy it before you discard this change." : {

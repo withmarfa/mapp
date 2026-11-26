@@ -12,6 +12,8 @@ import Testing
     private let second = try! MarfaConnection(address: "http://second.test:8210")
 
     /// Writes made while the new address's copy opens, slowly, are not discarded with the old copy.
+    /// Writes that reach the copy while the other opens stay in it, closed and kept with the Marfa's sign-in for a
+    /// return, and the person is told.
     @Test func writesMadeWhileAnotherAddressOpensKeepTheOldCopy() async throws {
         let bench = HostBench()
         let host = bench.host()
@@ -25,20 +27,13 @@ import Testing
         // Time for the change of address, held at opening, to see the old copy's report.
         try await Task.sleep(for: .milliseconds(100))
         bench.servers.slow.withLock { $0 = false }
-        let result = await change.result
-        guard case .failure(let error) = result else {
-            Issue.record("left the old copy with a write waiting")
-            return
-        }
-        #expect(error as? MarfaHost.Problem == .changesWaiting(.fake(1)))
-        #expect(host.connection == first)
-        #expect(host.source === old)
+        try await change.value
+        #expect(host.connection == second)
         #expect(bench.hasCopy(first))
         #expect(try bench.signIns.key(for: first.address) == "one")
-        #expect(try bench.signIns.key(for: second.address) == nil)
-        #expect(!old.calls.contains("close"))
-        #expect(bench.servers.opened.count == 2)
-        #expect(bench.servers.last?.calls.last == "close")
+        #expect(try bench.signIns.key(for: second.address) == "two")
+        #expect(old.calls == ["close"], "closed once, kept, never discarded")
+        #expect(host.notices.waiting.contains { $0.title == Words.changesWaitTitle })
     }
 
     @Test func aKeyThatCannotBeRemovedIsReported() async throws {
@@ -108,7 +103,8 @@ import Testing
             $0 = { seen.withLock { $0 = UserDefaults(suiteName: suite)?.dictionary(forKey: "MarfaDiscardedCopies") as? [String: [String]] ?? [:] } }
         }
         try await host.disconnect()
-        #expect(seen.withLock { $0 } == ["http://first.test:8210": []], "marked with the ids of the changes agreed to be lost")
+        let folder = bench.location.directory(for: try MarfaConnection(address: "http://first.test:8210")).lastPathComponent
+        #expect(seen.withLock { $0 } == [folder: []], "marked with the ids of the changes agreed to be lost")
         #expect(bench.defaults.dictionary(forKey: "MarfaDiscardedCopies")?.isEmpty ?? true)
         #expect(!bench.hasCopy(first))
     }

@@ -11,6 +11,11 @@ import Testing
     private let first = try! MarfaConnection(address: "http://first.test:8210")
     private let firstAddress = "http://first.test:8210"
 
+    /// The folder a mark names for the first address's copy.
+    private func firstFolder(_ bench: HostBench) -> String {
+        bench.location.directory(for: try! MarfaConnection(address: firstAddress)).lastPathComponent
+    }
+
     /// What a launch would find at one moment: the saved address and the addresses whose copy is marked to go.
     private struct Found: Equatable, Sendable {
         var address: String?
@@ -45,14 +50,14 @@ import Testing
             seen.withLock { $0["remover"] = Self.found(suite) }
             try await MarfaHost.removeStore(store, agreedToLose: agreed)
         }
-        let cleaner: MarfaHost.Cleaner = { seen.withLock { $0["cleaner"] = Self.found(suite) } }
+        let cleaner: MarfaHost.Cleaner = { _ in seen.withLock { $0["cleaner"] = Self.found(suite) } }
         let (host, source, shown) = try await connected(bench, remover: remover, cleaner: cleaner)
         source.onClose.withLock { $0 = { seen.withLock { $0["close"] = Self.found(suite) } } }
         bench.signIns.onSignOut.withLock { $0 = { seen.withLock { $0["signOut"] = Self.found(suite) } } }
 
         try await host.disconnect(.discardCopy(shown))
 
-        let marked = Found(address: nil, marked: [firstAddress])
+        let marked = Found(address: nil, marked: [firstFolder(bench)])
         #expect(seen.withLock { $0 } == ["close": marked, "cleaner": marked, "signOut": marked, "remover": marked])
         #expect(Self.found(suite) == Found(address: nil, marked: []), "the copy is gone and its mark with it")
         #expect(!bench.hasCopy(first))
@@ -67,10 +72,10 @@ import Testing
         let bench = HostBench()
         let suite = bench.suite
         let seen = Mutex<Found?>(nil)
-        let host = bench.host(cleaner: { seen.withLock { $0 = Self.found(suite) } })
+        let host = bench.host(cleaner: { _ in seen.withLock { $0 = Self.found(suite) } })
         try await host.connect(address: firstAddress, key: "k")
         try await host.disconnect()
-        #expect(seen.withLock { $0 } == Found(address: nil, marked: [firstAddress]))
+        #expect(seen.withLock { $0 } == Found(address: nil, marked: [firstFolder(bench)]))
         #expect(host.connection == nil)
         #expect(!bench.hasCopy(first))
     }
@@ -102,7 +107,7 @@ import Testing
         let seen = Mutex<Found?>(nil)
         old.onClose.withLock { $0 = { seen.withLock { $0 = Self.found(suite) } } }
         try await host.changeAddress(to: "http://second.test:8210", key: "two", choice: .discardCopy(shown))
-        #expect(seen.withLock { $0 } == Found(address: firstAddress, marked: [firstAddress]))
+        #expect(seen.withLock { $0 } == Found(address: firstAddress, marked: [firstFolder(bench)]))
         #expect(Self.found(suite) == Found(address: "http://second.test:8210", marked: []))
         #expect(!bench.hasCopy(first))
     }
