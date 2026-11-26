@@ -362,6 +362,9 @@ struct MainView: View {
 
     private var lifecycleWindow: some View {
         activeWindow
+        .keepsTitleDrafts(details) { [browser, library, order] id in
+            if let item = library.item(id) { browser.reveal(item, in: library, order: order) }
+        }
         .watchesPlace(browser, order: order)
         // The page grants its own requests, since it may not exist until the request's selection shows.
         .onChange(of: browser.focusRequest, grantFocusRequest)

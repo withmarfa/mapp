@@ -100,6 +100,11 @@ struct ItemWindow: View {
             }
         }
         .focusedSceneValue(\.detailsPresentation, details)
+        .keepsTitleDrafts(details) { refused in
+            // A title refused for an item the window has left is typed on that item's page, so the window goes back.
+            guard let current = id, refused != current else { return }
+            follow(refused)
+        }
         .toastOverlay()
         .environment(details)
         .modifier(CommandValuePanels(details: details))

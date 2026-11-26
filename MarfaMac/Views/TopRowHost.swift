@@ -334,7 +334,7 @@ private struct TopRowDragArea: View {
 }
 
 /// Reads the window a view is in.
-private struct WindowReader: NSViewRepresentable {
+struct WindowReader: NSViewRepresentable {
     @Binding var window: NSWindow?
 
     func makeNSView(context: Context) -> Reader { Reader() }

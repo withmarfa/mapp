@@ -41,7 +41,7 @@ The Swift side of the item editor. The page is in `editor/`; read `editor/AGENTS
 - **A value opens in `ValueEditPresenter` under the rectangle the page sends,** and is written through the library as in the panel. A refusal is told in the panel, never on the page.
 - **A drag's order is merged into the type's saved order** (`PagePlacements.setDraggedOrder`), so rows the item lacks keep their places.
 - **Build the header only when what it reads changes** (`EditorController.showHeader`). Reading `contentRevision` or a whole list there rebuilds it at an edit anywhere.
-- **A title is editable only where `ItemLibrary.canSetTitle(of:)` says so.** Unsaved and refused titles stay in `EditorController.titleDrafts`, and one still refused stops a quit, a library change or a close and names the item.
+- **A title is editable only where `ItemLibrary.canSetTitle(of:)` says so.** Unsaved titles stay in the window's `DetailsPresentation`, kept by `WindowTitleDrafts` with or without an editor. One refused stops a quit, a library change or a close; one whose item went goes back through `Notices.notKept`.
 - **When a window goes, `windowWent()` removes its editor from `EditorController.open`.** Whatever else keeps an editor holds it weakly, or `flushAll` visits a closed window.
 
 ## Linking to items

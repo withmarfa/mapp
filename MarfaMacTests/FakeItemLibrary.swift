@@ -445,7 +445,7 @@ final class FakeItemLibrary: ItemLibrary {
     /// Creates refused after `createItem` answered, as a server's source refuses one it cannot queue.
     var refusedCreations: Set<ItemID> = []
     func finish() {}
-    func setItemProperty(_ id: ItemID, key: String, value: PropertyValue?, undoManager: UndoManager?) -> Bool { false }
+    func setItemProperty(_ id: ItemID, key: String, value: PropertyValue?, readAt: ItemVersion?, undoManager: UndoManager?) -> Bool { false }
 
     /// Every call of `setItemProperties`, in order, with the changes as asked.
     private(set) var propertiesSet: [(id: ItemID, changes: [String: PropertyValue?], actionName: String)] = []

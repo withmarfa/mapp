@@ -93,9 +93,7 @@ private struct FileTitle: View {
                     text: Binding {
                         draft.isDirty ? draft.text : item.title
                     } set: { text in
-                        draft.text = text
-                        draft.isDirty = true
-                        draft.rejected = false
+                        drafts.typeTitle(text, of: item.id, in: library)
                     },
                     axis: .vertical
                 )
@@ -108,8 +106,7 @@ private struct FileTitle: View {
                     return .handled
                 }
                 .onKeyPress(.escape) {
-                    draft.isDirty = false
-                    draft.rejected = false
+                    drafts.discardTitle(of: item.id)
                     isFocused = false
                     return .handled
                 }

@@ -240,8 +240,10 @@ protocol ItemLibrary: AnyObject, Observable {
     /// The creates Marfa refused after `createItem` answered, before or after the library showed the item, which the
     /// library has told the person of. A library that refuses a create at once answers nil from `createItem` instead.
     var refusedCreations: Set<ItemID> { get }
+    /// Sets one property. A title typed from `readAt`, the version the person saw, is sent on that version, so a title
+    /// set elsewhere since is merged against it and never silently written over.
     @discardableResult
-    func setItemProperty(_ id: ItemID, key: String, value: PropertyValue?, undoManager: UndoManager?) -> Bool
+    func setItemProperty(_ id: ItemID, key: String, value: PropertyValue?, readAt: ItemVersion?, undoManager: UndoManager?) -> Bool
     /// Several properties of one item in one edit and one undo step named `actionName`, each given its value or, where
     /// the change is nil, taken away. Nothing is sent unless every one can be: the item takes edits and each key is a
     /// property of its type that takes the value. A change to what the item already holds is left out, so a call that
@@ -384,6 +386,12 @@ extension ItemLibrary {
 }
 
 extension ItemLibrary {
+    /// Sets one property on the version the library holds now.
+    @discardableResult
+    func setItemProperty(_ id: ItemID, key: String, value: PropertyValue?, undoManager: UndoManager?) -> Bool {
+        setItemProperty(id, key: key, value: value, readAt: nil, undoManager: undoManager)
+    }
+
     var namesRevision: Int { membershipRevision }
     func changedItems(since revision: Int) -> Set<ItemID>? { nil }
     /// Every create Marfa refused for good: those refused as they were sent, and those the copy lists as refused, on

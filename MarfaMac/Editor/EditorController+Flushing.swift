@@ -228,14 +228,29 @@ extension EditorController {
     /// Destructive transitions proceed only once every editor has handed over its current text and its window's
     /// titles. Where the window or the library goes, a title that still cannot be saved stops them as a failed
     /// capture does, since it would otherwise be lost; where they stay, as when an item is deleted, it waits.
+    /// A window's titles are tried by the window (`WindowTitleDrafts`), which a window with no editor in it has too,
+    /// and by an editor only where no window holds its drafts.
     static func flushAll(leaving: Bool = true, trace: QuitTrace? = nil, then done: @escaping (Bool) -> Void) {
         let editors = open.allObjects
-        let gate = Gate(waitingFor: editors.count, then: done)
         // One refusal is told, from the window that holds it, since that window comes forward and only one can.
         var told = false
+        trace?.begin(.titles)
+        let windows = WindowTitleDrafts.open.allObjects
+        var titlesStop = false
+        for window in windows {
+            let saved = window.save(tellingRefusal: leaving && !told)
+            if !saved, leaving {
+                told = true
+                titlesStop = true
+            }
+        }
+        trace?.end(.titles)
+        let kept = Set(windows.compactMap { $0.drafts.map(ObjectIdentifier.init) })
+        let gate = Gate(waitingFor: editors.count) { done($0 && !titlesStop) }
         for editor in editors {
             trace?.begin(.titles)
-            let titlesSaved = editor.saveTitles(tellingRefusal: leaving && !told)
+            let titlesSaved = editor.titleDrafts.map { kept.contains(ObjectIdentifier($0)) } == true
+                || editor.saveTitles(tellingRefusal: leaving && !told)
             trace?.end(.titles)
             guard titlesSaved || !leaving else {
                 told = true
@@ -282,27 +297,14 @@ extension EditorController {
         Self.open.remove(self)
     }
 
-    /// Tries every title the window holds unsaved, since a name taken before may be free now, leaving out items that
-    /// are gone or whose title cannot be set. Whether all are saved; if not, and asked to, says which is not.
+    /// Tries every title the window holds unsaved (`DetailsPresentation.saveTitles`). A refused one brings this window
+    /// forward with its item, since the draft is shown only there.
     func saveTitles(tellingRefusal: Bool) -> Bool {
         guard let drafts = titleDrafts, let library else { return true }
-        var refused: (id: ItemID, draft: String, item: String)?
-        for id in drafts.unsavedTitles {
-            guard let item = library.item(id), library.canSetTitle(of: item) else { continue }
-            if !drafts.saveTitle(of: id, in: library, undoManager: webView.window?.undoManager), refused == nil {
-                refused = (id, drafts.draft(for: id, key: "title").text, item.title)
-            }
+        let window = webView.window
+        return drafts.saveTitles(in: library, undoManager: window?.undoManager, tellingRefusal: tellingRefusal) { [self] id in
+            window?.makeKeyAndOrderFront(nil)
+            onShowRefusedTitle(id)
         }
-        guard let refused else { return true }
-        if tellingRefusal {
-            let message = refused.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                ? String(localized: "The title for “\(refused.item)” is empty. Open the item to enter a title or discard your changes.")
-                : String(localized: "The title “\(refused.draft)” for “\(refused.item)” couldn’t be saved. Open the item to change the title or discard your changes.")
-            library.notices.tell(String(localized: "Couldn’t Save Title"), message)
-            // The draft is shown only in its own window, so that window comes forward with the item.
-            webView.window?.makeKeyAndOrderFront(nil)
-            onShowRefusedTitle(refused.id)
-        }
-        return false
     }
 }

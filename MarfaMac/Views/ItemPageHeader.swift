@@ -145,24 +145,17 @@ struct ItemPageHeader: ViewModifier {
             guard let editor else { return }
             switch event {
             case .titleInput(let id, let text):
-                let draft = drafts.draft(for: id, key: "title")
-                draft.text = text
-                draft.isDirty = true
-                draft.rejected = false
+                drafts.typeTitle(text, of: id, in: library)
             case .titleCommit(let id, let text, let startWriting):
                 let draft = drafts.draft(for: id, key: "title")
                 if text != (draft.isDirty ? draft.text : library.item(id)?.title) {
-                    draft.text = text
-                    draft.isDirty = true
-                    draft.rejected = false
+                    drafts.typeTitle(text, of: id, in: library)
                 }
                 if drafts.saveTitle(of: id, in: library, undoManager: undoManager), startWriting {
                     editor.focus(id)
                 }
             case .titleDiscard(let id):
-                let draft = drafts.draft(for: id, key: "title")
-                draft.isDirty = false
-                draft.rejected = false
+                drafts.discardTitle(of: id)
             case .menu(.status, let id, let rect):
                 guard editor.isShowing(id), let item = library.item(id), let status = library.catalogue.itemTypes[item.type]?.statusField else { return }
                 editor.presentEditor(Self.request(.status(status), of: id, in: library, undoManager: undoManager, editor: editor), under: rect)
