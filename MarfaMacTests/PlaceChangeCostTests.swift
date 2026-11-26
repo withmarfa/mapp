@@ -88,7 +88,7 @@ struct PlaceChangeCostTests {
                 let opened = await eventually(within: bound) { Self.opened(layout.mode, in: browser, library: library, leaving: false) }
                 let took = Self.milliseconds(ContinuousClock.now - start)
                 stream.cancel()
-                print(String(format: "STREAM|%@|opened=%@|%.0fms|changes=%d", layout.name, opened ? "yes" : "no", took, round))
+                Self.report(String(format: "STREAM|%@|opened=%@|%.0fms|changes=%d", layout.name, opened ? "yes" : "no", took, round))
                 #expect(opened, "\(layout.name): first open within \(bound) of a steady stream of changes")
                 // The changes have stopped; the layout is brought up to date.
                 try await Task.sleep(for: .milliseconds(300))
@@ -168,6 +168,14 @@ struct PlaceChangeCostTests {
         (Layout(name: "calendar", mode: .calendar), { _ in }),
         (Layout(name: "timeline", mode: .timeline), { _ in }),
     ]
+
+    /// Prints a figure and, where `MARFA_MAC_MEASURE_OUT` names a file, appends it there, as the test host's output
+    /// does not reach `xcodebuild`'s.
+    private static func report(_ line: String) {
+        print(line)
+        guard let path = ProcessInfo.processInfo.environment["MARFA_MAC_MEASURE_OUT"], let data = (line + "\n").data(using: .utf8) else { return }
+        if let handle = FileHandle(forWritingAtPath: path) { handle.seekToEndOfFile(); handle.write(data); try? handle.close() } else { try? data.write(to: URL(fileURLWithPath: path)) }
+    }
 
     private static func sortByName(_ browser: Browser) {
         browser.tableOptions[.library, default: ItemTableOptions()].sort = [ItemTableComparator(column: .title)]
@@ -376,6 +384,7 @@ struct PlaceChangeCostTests {
             }
             Cost.resetTallies()
             let cpu = Self.threadMilliseconds()
+            let startedAt = Date().timeIntervalSince1970
             let start = ContinuousClock.now
             move()
             // The move itself holds the main actor too.
@@ -406,10 +415,10 @@ struct PlaceChangeCostTests {
             if landed == nil, await eventually(within: .seconds(60), took) { landed = ContinuousClock.now - start }
             let costs = Cost.tallies.sorted { $0.value.milliseconds > $1.value.milliseconds }.prefix(6)
                 .map { "\($0.key.rawValue)=\($0.value.count)x\(String(format: "%.1f", $0.value.milliseconds))ms" }.joined(separator: " ")
-            print(String(
-                format: "BUSY|%@|%@|main=%.0fms|busy=%.1f%%|stall=%.0fms|window=%.0fms|landed=%@|action=%.0fms|stall-at=%.0fms|moving=%.0fms|landing=%.0fms|%@", layout.name, name, main,
+            Self.report(String(
+                format: "BUSY|%@|%@|main=%.0fms|busy=%.1f%%|stall=%.0fms|window=%.0fms|landed=%@|action=%.0fms|stall-at=%.0fms|moving=%.0fms|landing=%.0fms|at=%.3f|%@", layout.name, name, main,
                 main / window * 100, stall, window, landed.map { String(format: "%.0fms", Self.milliseconds($0)) } ?? "never", action, stallAt,
-                stallMoving, stallLanding, costs))
+                stallMoving, stallLanding, startedAt, costs))
             #expect(landed != nil, "\(layout.name), \(name): the layout drew the change")
             if firstOpen { #expect(stall < 250, "\(layout.name): first open must keep the main thread responsive") }
         }
