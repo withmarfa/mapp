@@ -60,13 +60,13 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **Digest and board lanes draw by page.** Counts and Select All cover all.
 - **Several chosen items show a command capsule** (`SelectionCapsule`), a pile beside a list (`SelectionPile`). Escape clears them.
 - **⌘⌫ deletes chosen items** on a board, timeline, Digest or map (`ChosenItemDeletion`). Changing the calendar span clears selections outside it.
-- **Calendar and Timeline use each type's date** (`ItemPlacement`) or a field chosen for the view.
+- **Calendar and Timeline use each type's date** (`ItemPlacement`) or a chosen field.
 - **An event's span is one rule** (`EventSpan`); all-day events ignore the Mac's zone.
 - **Map needs both coordinate fields and valid values** (`MapLayout`). No Location lists the rest.
 - **Board lanes default to status.** Types with different status names use the four status groups.
-- **A row stays where seen until the pointer or keyboard leaves** (`RowHold`).
-- **A drop in a lane is one edit.** A drop in Not Set clears the field; Set and date lanes refuse one.
-- **Table text aligns with the title** (`TopRowSpace.titleLead`). Widths sample 120 rows (`ItemTableFit`). Name fills spare space until resized. Columns shrink to their minimums, then hide from the end (`ItemTableRoom`).
+- **A row stays where seen until the pointer or keys leave** (`RowHold`).
+- **A drop in a lane is one edit.** Not Set clears the field; Set and date lanes refuse a drop.
+- **Table text aligns with the title** (`TopRowSpace.titleLead`). Widths sample 120 rows (`ItemTableFit`). Name fills spare space until resized. A column keeps the width its words fit, up to its style's widest; the last hide whole if others do not fit (`ItemTableRoom`).
 
 ## Sub-items
 

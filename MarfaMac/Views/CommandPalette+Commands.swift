@@ -127,10 +127,13 @@ extension CommandPalette {
         let shareFile = shareID.flatMap { browser.fileURL(of: $0) }
         // Presence only. The text is read when Share is chosen, so opening the palette does not follow a keystroke.
         let canShare = shareFile != nil || (shareID.map { library.bodyText($0) != nil } ?? false)
-        if everything.count > 1 {
+        // The chosen items are counted as chosen, so one the copy no longer holds is told about, not left out unseen.
+        if browser.selection.count > 1 {
             add(String(localized: "Share…"), "square.and.arrow.up", in: .file) {
-                let ids = browser.inListOrder(Set(everything.map(\.id)), in: library)
-                Task { await ItemShare.presentLinks(of: ids, in: library, near: hasVisibleEditor ? editor.webView : nil) }
+                let ids = browser.inListOrder(browser.selection, in: library)
+                let page = hasVisibleEditor ? editor.webView : nil
+                let window = page?.window ?? NSApp.keyWindow
+                Task { await ItemShare.presentLinks(of: ids, in: library, near: page, from: window) }
             }
         } else if canShare {
             add(String(localized: "Share…"), "square.and.arrow.up", in: .file) {

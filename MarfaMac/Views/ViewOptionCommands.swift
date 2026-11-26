@@ -157,7 +157,11 @@ struct ViewOptionCommand {
     }
 
     private static func map(_ browser: Browser) -> [ViewOptionCommand] {
-        var commands = [ViewOptionCommand(title: String(localized: "Fit All Items"), systemImage: "scope") { browser.requestMapFit() }]
+        var commands = [
+            ViewOptionCommand(title: String(localized: "Zoom In"), systemImage: "plus") { browser.requestMapZoom(in: true) },
+            ViewOptionCommand(title: String(localized: "Zoom Out"), systemImage: "minus") { browser.requestMapZoom(in: false) },
+            ViewOptionCommand(title: String(localized: "Fit All Items"), systemImage: "scope") { browser.requestMapFit() },
+        ]
         commands += ItemMapStyle.allCases.filter { $0 != browser.mapStyle }.map { style in
             ViewOptionCommand(title: String(localized: "Map Style: \(style.title)"), systemImage: "square.2.layers.3d") { browser.setMapStyle(style) }
         }

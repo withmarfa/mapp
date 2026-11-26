@@ -758,6 +758,8 @@ final class Browser {
     var timelineTodayRequests = 0
     /// Counts the asks to fit every marker on the map (`requestMapFit`).
     var mapFitRequests = 0
+    /// The last ask to zoom the map by a factor (`requestMapZoom`); each ask is a new value, so the map follows every one.
+    var mapZoomRequest = MapZoomRequest(count: 0, factor: 1)
 
     /// Counts the changes to the densities this Mac keeps for places, which a list reads to know its own changed
     /// (`Browser+SavedViews`).

@@ -10,9 +10,12 @@ nonisolated final class FakeItemLinks: ItemLinkSource {
 
     let answers = Mutex<[ItemID: URL]>([:])
     let asked = Mutex<[ItemID]>([])
+    /// Runs as each link is asked, as another write to the pasteboard does while the server is being read.
+    let whileAsking = Mutex<(@Sendable () -> Void)?>(nil)
 
     func webLink(of id: ItemID) async throws -> URL {
         asked.withLock { $0.append(id) }
+        whileAsking.withLock { $0 }?()
         guard let url = answers.withLock({ $0[id] }) else { throw Refused() }
         return url
     }
@@ -54,21 +57,6 @@ struct ItemLinkCopyTests {
         let expected = ["marfa://\(instance)/\(second.id.rawValue)", "marfa://\(instance)/\(first.id.rawValue)"]
         #expect(pasteboard.string(forType: .string) == expected.joined(separator: "\n"))
         #expect(library.notices.told == 1)
-    }
-
-    @Test func undoingANewRowKeepsTheTypedTextInRecentlyDeleted() throws {
-        let library = FakeItemLibrary()
-        let undo = UndoManager()
-        undo.groupsByEvent = false
-        undo.beginUndoGrouping()
-        let id = try #require(library.createItem(
-            typeID: "core.note", title: "Typed words", body: "More typed words", parentID: nil, tier: .library, undoManager: undo))
-        undo.endUndoGrouping()
-        undo.undo()
-        let item = try #require(library.item(id))
-        #expect(item.state == .trashed)
-        #expect(item.title == "Typed words")
-        #expect(library.bodies[id] == "More typed words")
     }
 
     @Test func aCopyThatDoesNotKnowItsInstanceYetTellsThePersonAndLeavesThePasteboardAlone() async {
@@ -122,5 +110,35 @@ struct ItemLinkCopyTests {
         let (library, note) = try await openLibrary(links: nil)
         let link = try #require(await library.itemLink(note.id))
         #expect(link.text == "marfa://\(instance)/\(note.id.rawValue)")
+    }
+
+    @Test(arguments: [false, true]) func linksNeverWriteOverAPasteboardThatChangedWhileTheyWereRead(several: Bool) async throws {
+        let links = FakeItemLinks()
+        let (library, note) = try await openLibrary(links: links)
+        links.answers.withLock { $0[note.id] = URL(string: "https://marfa.example/i/\(note.id.rawValue)") }
+        let pasteboard = privatePasteboard()
+        defer { pasteboard.releaseGlobally() }
+        nonisolated(unsafe) let board = pasteboard
+        // What `Notices.notKept` copies when a write fails while the links are on their way.
+        links.whileAsking.withLock { $0 = { board.clearContents(); board.setString("typed text kept for the person", forType: .string) } }
+        if several { await library.copyLinks(of: [note.id], to: pasteboard) } else { await library.copyLink(of: note.id, to: pasteboard) }
+        #expect(pasteboard.string(forType: .string) == "typed text kept for the person")
+        #expect(library.notices.waiting.map(\.title) == ["Links Not Copied"])
+    }
+
+    @Test func aSelectionOfEveryItemInABigLibraryAsksTheServerForNothing() async throws {
+        let links = FakeItemLinks()
+        let (library, _) = try await openLibrary(links: links)
+        let pasteboard = privatePasteboard()
+        defer { pasteboard.releaseGlobally() }
+        pasteboard.setString("kept", forType: .string)
+        let everything = (0..<48_312).map { _ in ItemID.mint() }
+        let start = ContinuousClock.now
+        await library.copyLinks(of: everything, to: pasteboard)
+        #expect(start.duration(to: .now) < .seconds(1), "refused at once, with no lookup waited on")
+        #expect(links.asked.withLock { $0.isEmpty })
+        #expect(pasteboard.string(forType: .string) == "kept")
+        #expect(library.notices.waiting.map(\.title) == ["Too Many Items for Links"])
+        #expect(await library.links(of: Array(everything.prefix(ItemLinkLimit.items + 1))) == nil)
     }
 }

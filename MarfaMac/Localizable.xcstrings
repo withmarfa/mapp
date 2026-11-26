@@ -6415,6 +6415,9 @@
     "Links Between Items" : {
 
     },
+    "Links Not Copied" : {
+
+    },
     "Links in the Text" : {
 
     },
@@ -9107,6 +9110,9 @@
     "Shape" : {
 
     },
+    "Share and Copy Links take up to %lld items at once, because each link comes from the server. Choose fewer items." : {
+
+    },
     "Share…" : {
 
     },
@@ -10284,6 +10290,9 @@
     "The backup folder may not belong to this server alone." : {
 
     },
+    "The clipboard changed while the links were being found, so it was left as it is. Try again." : {
+
+    },
     "The code stopped working before it was approved. Ask for a new code and approve it sooner." : {
       "extractionState" : "manual"
     },
@@ -11456,6 +11465,9 @@
 
     },
     "Tomorrow" : {
+
+    },
+    "Too Many Items for Links" : {
 
     },
     "Too many tries. Try again in %@." : {

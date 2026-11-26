@@ -36,6 +36,8 @@ struct ItemTable: View {
 
     /// The inset style's own margin before the first column.
     static let inset: CGFloat = 16
+    /// The room between one column and the next.
+    static let columnGap: CGFloat = 2
     /// With the inset, the first column starts where the title does and leaves room for group chevrons.
     private var margin: CGFloat { max(0, titleLead - Self.inset) }
 
@@ -311,8 +313,7 @@ struct ItemTable: View {
             return ItemTableRoom.Column(id: column.id, isName: isName, minimum: least, ideal: ideal, isKept: own != nil)
         }
         // The inset style keeps its room before the first column and after the last, and the table a gap between columns.
-        let room = tableWidth - 2 * Self.inset - 2 * CGFloat(wanted.count)
-        let plan = ItemTableRoom.plan(parts, available: tableWidth > 0 ? room : 0)
+        let plan = ItemTableRoom.plan(parts, available: tableWidth > 0 ? tableWidth - 2 * Self.inset : 0, gap: Self.columnGap)
         let widths = Dictionary(uniqueKeysWithValues: plan.map { ($0.id, $0.width) })
         let shown = wanted.filter { widths[$0.id] != nil }
         resizing.widths = shown.map { widths[$0.id] ?? 0 }

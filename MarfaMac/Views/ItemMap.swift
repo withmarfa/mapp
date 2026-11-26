@@ -56,6 +56,7 @@ struct ItemMap: View {
             .filteredEmptyState(browser)
             .background(ChosenRowOpensSidebar(browser: browser))
             .onChange(of: browser.mapFitRequests) { controller.fitAll() }
+            .onChange(of: browser.mapZoomRequest) { controller.zoom(by: browser.mapZoomRequest.factor) }
             .accessibilityLabel("Map")
     }
 }

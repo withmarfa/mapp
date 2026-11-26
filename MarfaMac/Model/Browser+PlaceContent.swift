@@ -167,11 +167,12 @@ extension Browser {
         mapWork.cancel()
     }
 
-    /// The items in the order the window last drew them: the table's rows in the table, else the list's or gallery's
-    /// sections, with whatever the place lists after them (a board, a timeline) in its own order.
+    /// The items in the order the window last drew them: the table's rows as it draws them (group by group, a sub-item
+    /// under its parent), else the list's or gallery's sections, with whatever the place lists after them (a board, a
+    /// timeline) in its own order.
     func onScreenOrder(in library: any ItemLibrary) -> [ItemID] {
         if viewMode == .digest { return digestOrder }
-        let drawn = viewMode == .table ? tableMemo?.content.rows.map(\.item.id) : sectionsWork.held?.value.ids
+        let drawn = viewMode == .table ? tableMemo?.content.allDrawnIDs : sectionsWork.held?.value.ids
         return (drawn ?? []) + placeItems(in: library).map(\.id)
     }
 

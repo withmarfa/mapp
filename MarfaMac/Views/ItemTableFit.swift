@@ -42,9 +42,9 @@ enum ItemTableFit {
             let content = widest > 0 ? widest + (chrome + room) * scale : 0
             // A column with no words to measure (links, tags) keeps its style's width.
             let ideal = content > 0 ? min(max(content, headed, limits.min), limits.max) : limits.ideal
-            // Words that fit under the style's widest keep their whole width: the column is hidden before they are cut.
-            let whole = content > 0 && content <= limits.max
-            fitted[column.id] = Width(minimum: whole ? ideal : min(limits.min, ideal), ideal: ideal)
+            // A column with words keeps the width they fit, up to the style's widest, whatever one long value needs: it is
+            // hidden before its words are cut.
+            fitted[column.id] = Width(minimum: content > 0 ? ideal : min(limits.min, ideal), ideal: ideal)
         }
         return fitted
     }
@@ -102,13 +102,14 @@ nonisolated enum ItemTableRoom {
     }
 
     /// The columns that stay, with their starting widths, in order. The name's own width is the table's to fill, so its
-    /// entry is its least. A width of 0 or less is an unmeasured table, which hides nothing.
-    static func plan(_ columns: [Column], available: CGFloat) -> [(id: String, width: CGFloat)] {
+    /// entry is its least. `gap` is the room each column that stays takes beside its width, so a column that is hidden
+    /// takes none. A width of 0 or less is an unmeasured table, which hides nothing.
+    static func plan(_ columns: [Column], available: CGFloat, gap: CGFloat = 0) -> [(id: String, width: CGFloat)] {
         guard available > 0 else { return columns.map { ($0.id, $0.ideal) } }
         var kept = columns
         while true {
             let others = kept.filter { !$0.isName }
-            let room = available - (kept.first { $0.isName }?.minimum ?? 0)
+            let room = available - gap * CGFloat(kept.count) - (kept.first { $0.isName }?.minimum ?? 0)
             let leastNeeded = others.reduce(0) { $0 + ($1.isKept ? $1.ideal : $1.minimum) }
             if leastNeeded <= room || others.isEmpty {
                 let idealNeeded = others.reduce(0) { $0 + $1.ideal }

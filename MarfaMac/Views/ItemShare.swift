@@ -28,9 +28,10 @@ struct ItemShare {
         Self.show(fileURL.map { [$0] } ?? text.map { [$0] } ?? [], near: page)
     }
 
-    /// Tell the person about missing links before offering the rest to the picker.
-    @MainActor static func presentLinks(of ids: [ItemID], in library: any ItemLibrary, near page: NSView?) async {
-        let found = await library.links(of: ids)
+    /// Tells the person about missing links, then offers the rest to the picker, hung from the window Share was chosen in
+    /// (`window`, taken when it was chosen): if that window closes while the links are read, nothing is shown.
+    @MainActor static func presentLinks(of ids: [ItemID], in library: any ItemLibrary, near page: NSView?, from window: NSWindow?) async {
+        guard let found = await library.links(of: ids) else { return }
         guard !found.links.isEmpty else {
             library.notices.tell(
                 String(localized: "Can’t Share"),
@@ -42,11 +43,12 @@ struct ItemShare {
                 String(localized: "Some Links Not Shared"),
                 String(localized: "\(found.missing) of the items don’t have a link yet, so only the others are shared."))
         }
-        show(found.links.map(\.url), near: page)
+        guard let window, window.isVisible || window.isMiniaturized else { return }
+        show(found.links.map(\.url), near: page?.window === window ? page : nil, in: window)
     }
 
-    private static func show(_ items: [Any], near page: NSView?) {
-        let anchor = page.flatMap { $0.window != nil ? $0 : nil } ?? NSApp.keyWindow?.contentView
+    private static func show(_ items: [Any], near page: NSView?, in window: NSWindow? = nil) {
+        let anchor = page.flatMap { $0.window != nil ? $0 : nil } ?? (window ?? NSApp.keyWindow)?.contentView
         guard let anchor else { return }
         let bounds = anchor.bounds
         let rect = NSRect(x: bounds.midX - 1, y: anchor.isFlipped ? bounds.minY + 40 : bounds.maxY - 40, width: 2, height: 2)
@@ -71,7 +73,8 @@ struct ItemShareLink: View {
         if chosen.count > 1, let library, let browser {
             Button {
                 let ids = browser.inListOrder(chosen, in: library)
-                Task { await ItemShare.presentLinks(of: ids, in: library, near: nil) }
+                let window = NSApp.keyWindow
+                Task { await ItemShare.presentLinks(of: ids, in: library, near: nil, from: window) }
             } label: { label }
         } else {
             single

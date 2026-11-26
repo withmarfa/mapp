@@ -92,6 +92,9 @@ final class ItemTableContent {
         return groups.flatMap { drawn($0.rows, groupNestings[$0.id] ?? .flat) }
     }
 
+    /// Every row in the order drawn with every parent open, so a sub-item a closed parent hides stands under it.
+    var allDrawnIDs: [ItemID] { drawnIDs(expanded: Set(nestings.flatMap { $0.children.keys })) }
+
     /// The first row drawn: the first group's with rows, where grouped.
     var firstDrawnID: ItemID? {
         func first(_ rows: [ItemTableRow], _ nesting: ItemNesting) -> ItemID? { nesting.isFlat ? rows.first?.id : nesting.firstDrawn }
