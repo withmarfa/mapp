@@ -127,6 +127,11 @@ extension Browser {
         let membership: Int
         let viewRevision: Int?
         let preview: LibraryViewQuery?
+
+        /// The same place listed the same way, whatever the library's revisions.
+        @Sendable static func isSameAsk(_ a: Self, _ b: Self) -> Bool {
+            a.library == b.library && a.place == b.place && a.listing == b.listing && a.preview == b.preview
+        }
     }
 
     /// The place's ordered items. Nil while the first ordering, or a whole reread, is under way.
@@ -525,11 +530,26 @@ extension Browser {
         let token = UUID()
         let from = update.map { (made: $0.content.made, wants: $0.content.wants, earlier: $0.content.earlierOffMainActor, changed: $0.changed) }
         let viewRevision = place.savedView == nil ? nil : library.viewRevision
+        let ends = arrangementEnds
         func isCurrent(_ browser: Browser) -> Bool {
-            guard browser.isLive(token, key, place, searching) else { return false }
+            // A first table the library has outrun a few times lands as it is, for the choices still asked; the next
+            // arrangement then brings it up to date.
+            if browser.insistingArrangement == token {
+                return browser.arrangementEnds == ends && browser.shown == place && browser.isSearching == searching
+            }
             // The first answer must match the copy even if the layout has yet to ask again after a sync.
-            return earlier != nil || (library.contentRevision == key.basis.content
-                && (viewRevision == nil || library.viewRevision == viewRevision))
+            if browser.isLive(token, key, place, searching),
+               earlier != nil || (library.contentRevision == key.basis.content
+                && (viewRevision == nil || library.viewRevision == viewRevision)) { return true }
+            guard earlier == nil, browser.arrangementEnds == ends, browser.shown == place, browser.isSearching == searching,
+                  browser.askedTable?.choices == key.choices else { return false }
+            guard browser.tableOutrun >= Outrun.limit else {
+                browser.tableOutrun += 1
+                return false
+            }
+            browser.tableOutrun = 0
+            browser.insistingArrangement = token
+            return true
         }
         let task = Task { [weak self] in
             if settles { try? await Task.sleep(for: Browser.arrangeSettling) }
@@ -580,7 +600,9 @@ extension Browser {
                 content.land(ordered)
             }
             Cost.record(.tableArrange, since: start)
-            self.arranging = nil
+            if self.arranging?.token == token { self.arranging = nil }
+            if self.insistingArrangement == token { self.insistingArrangement = nil }
+            self.tableOutrun = 0
             if plan == nil { self.placeWorkCounts.tablesMade += 1 } else { self.placeWorkCounts.tablesUpdated += 1 }
             self.tableMemo = (key, content)
             if searching { self.heldSearch = (key, content) } else { self.hold((key, content), for: place) }
@@ -600,6 +622,7 @@ extension Browser {
     /// was replaced finds another's record and leaves it. With no token, ends whichever is under way, which a table
     /// taken in its place makes older.
     private func endArranging(_ token: UUID? = nil) {
+        if token == nil { arrangementEnds += 1; tableOutrun = 0 }
         guard let arranging, token == nil || arranging.token == token else { return }
         if token == nil { arranging.task.cancel() }
         self.arranging = nil
@@ -660,6 +683,11 @@ extension Browser {
         let table: Int?
         /// The library's revision, where the items are the place's own.
         let content: Int?
+
+        /// The same choices over the same place, whatever the library's revision or the table's serial.
+        @Sendable static func isSameAsk(_ a: Self, _ b: Self) -> Bool {
+            a.derived == b.derived && a.shape == b.shape && a.choice == b.choice && (a.table == nil) == (b.table == nil)
+        }
     }
 
     /// What the calendar places its items by, besides the items.
@@ -758,6 +786,11 @@ extension Browser {
         let table: Int?
         /// The library's revision, where the sections are made from the place's items.
         let content: Int?
+
+        /// The same choices, whatever the library's revision or the table's serial.
+        @Sendable static func isSameAsk(_ a: Self, _ b: Self) -> Bool {
+            a.choices == b.choices && (a.table == nil) == (b.table == nil)
+        }
     }
 
     /// The revisions a table was made at, which a change of items moves and an update follows.

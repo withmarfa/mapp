@@ -1,5 +1,10 @@
 import Foundation
 
+/// How many answers for a place a changing library may outrun before the next lands as it is (`PlaceWork`, the table).
+nonisolated enum Outrun {
+    static let limit = 3
+}
+
 /// What a window works out from a large place's items off the main actor for one of its layouts (`Browser.sections`,
 /// `Browser.boardLanes`, the calendar's and the timeline's placings). The answer for the key last asked is held, and
 /// stands until the next lands, so a layout never shows nothing while it is worked out again.
@@ -7,8 +12,22 @@ import Foundation
 /// One rule decides what lands: a run's answer carries the key it was worked out for, and is held only if that key is
 /// still the one last asked when it lands. One run works at a time: a newer one waits for the run before it, cancelled
 /// or not, to end.
+///
+/// One exception bounds the wait: under a steady stream of changes every answer is outrun before it lands. An answer
+/// that has been turned away `Outrun.limit` times because the library moved on, with nothing landed since, is held as it
+/// is, and the window asks again for the answer that is current.
 @MainActor
 final class PlaceWork<Key: Equatable & Sendable, Value: Sendable> {
+    /// Whether the first key is the second's ask apart from what the library holds, so that an answer for it is a
+    /// fair stand-in for the newer one. A key for another choice (a sort, a filter) is never one.
+    private let isSameAsk: @Sendable (Key, Key) -> Bool
+    /// The answers turned away since one last landed.
+    private var outrun = 0
+
+    init(isSameAsk: @escaping @Sendable (Key, Key) -> Bool = { _, _ in true }) {
+        self.isSameAsk = isSameAsk
+    }
+
     private(set) var held: (key: Key, value: Value)?
     /// The key the window asked for last, which a run's answer must be for to land.
     private var asked: Key?
@@ -35,6 +54,7 @@ final class PlaceWork<Key: Equatable & Sendable, Value: Sendable> {
         running?.task.cancel()
         running = nil
         asked = key
+        outrun = 0
         held = (key, value)
     }
 
@@ -56,14 +76,26 @@ final class PlaceWork<Key: Equatable & Sendable, Value: Sendable> {
             await previous?.value
             guard !Task.isCancelled else { return }
             let value = await Task.detached(priority: .userInitiated) { make() }.value
-            guard let self, !Task.isCancelled, self.running?.token == token else { return }
-            self.running = nil
-            guard self.asked == key else { return }
+            guard let self else { return }
+            let isLatest = !Task.isCancelled && self.running?.token == token
+            if isLatest { self.running = nil }
+            // The window has left the place, so nothing lands.
+            guard let asked = self.asked else { return }
+            if isLatest, asked == key, accepts() {
+                self.outrun = 0
+                self.held = (key, value)
+                return landed()
+            }
+            guard self.isSameAsk(key, asked) else { return }
+            self.outrun += 1
+            if self.outrun > Outrun.limit {
+                self.outrun = 0
+                self.held = (key, value)
+                return landed()
+            }
             // An answer the library outran is not held, but the window is told, so it asks again with what it holds
             // now instead of waiting on a run that will never land.
-            guard accepts() else { return landed() }
-            self.held = (key, value)
-            landed()
+            if isLatest { landed() }
         }
         last = task
         running = (key, token, task)
@@ -74,6 +106,7 @@ final class PlaceWork<Key: Equatable & Sendable, Value: Sendable> {
         running?.task.cancel()
         running = nil
         asked = nil
+        outrun = 0
     }
 
     /// Forgets what is held and asked and ends the run under way, as when the window changes library.

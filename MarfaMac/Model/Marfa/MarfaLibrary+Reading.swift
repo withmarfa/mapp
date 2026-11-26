@@ -116,7 +116,13 @@ extension MarfaLibrary {
             if let positions { return Self.orderMembers(items, at: positions) }
             return Self.ordered(items)
         }, take: { [weak self] items in
-            guard let self, contentRevision == content, membershipRevision == membership else { return }
+            guard let self else { return }
+            if contentRevision != content || membershipRevision != membership {
+                // A listing the library outran is kept only where nothing newer is listed and what changed since can
+                // patch it, so a place that keeps changing still opens, and is then brought up to date.
+                let isCollection: Bool = if case .collection = key.place { true } else { false }
+                guard !isCollection, listed[key] == nil, changedItems(since: content) != nil else { return }
+            }
             listed[key] = Listing(membership: membership, content: content, ids: items.map(\.id), items: items)
         })
     }
