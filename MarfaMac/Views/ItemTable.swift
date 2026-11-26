@@ -260,7 +260,9 @@ struct ItemTable: View {
                 browser.tableOptions[browser.shown] ?? ItemTableOptions(), columns: columns, keepsGivenOrder: browser.keepsPlaceOrder,
                 listsByOrigin: browser.listsByOrigin)
         } set: { sort in
-            if !sort.isEmpty { browser.orderSearch(byRelevance: false) }
+            // The table sends an empty sort as its columns change, which is not a choice: stored, it would arrange the place.
+            guard !sort.isEmpty else { return }
+            browser.orderSearch(byRelevance: false)
             browser.tableOptions[browser.shown, default: .init()].sort = Array(sort.prefix(ViewDraft.maxSortKeys))
         }
     }
