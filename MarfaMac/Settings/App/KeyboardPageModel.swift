@@ -58,6 +58,7 @@ final class KeyboardPageModel {
     /// each takes the key presses first.
     var searchesByKeys = false {
         didSet {
+            if !searchesByKeys { pressed = nil }
             if searchesByKeys, recording != nil { recording = nil }
             updateListening()
         }

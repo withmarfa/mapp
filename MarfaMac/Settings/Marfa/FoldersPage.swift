@@ -205,13 +205,16 @@ private struct FolderDetail: View {
                         .disabled(model.sending.contains(setting))
                 }
             }
-            if let typed = draft.wrappedValue {
+            if draft.wrappedValue != nil {
                 SettingsRow("Name or Pattern", error: model.errors[setting]) {
                     SettingsField(
-                        title: "Name or Pattern", text: Binding { typed } set: { draft.wrappedValue = $0 }, prompt: "*.tmp",
+                        title: "Name or Pattern",
+                        text: Binding { draft.wrappedValue ?? "" } set: { if draft.wrappedValue != nil { draft.wrappedValue = $0 } },
+                        prompt: "*.tmp",
                         isError: model.errors[setting] != nil, isMonospaced: true,
                         onSubmit: { Task { await model.addPattern(to: setting) } },
                         onEndEditing: { Task { await model.addPattern(to: setting, explicitly: false) } })
+                    .onExitCommand { model.endAdding(setting) }
                 }
             } else {
                 if let error = model.errors[setting] { SettingsRow("Not Changed", error: error) }
