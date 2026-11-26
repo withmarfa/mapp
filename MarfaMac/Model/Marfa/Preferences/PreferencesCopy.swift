@@ -100,10 +100,8 @@ nonisolated struct WorkingCopyPreferences: PreferencesCopy {
         return readiness
     }
 
-    /// Whether every settings table of each of `items` is listed and held whole. Only the items outside the bin
-    /// count: the copy never fills a binned item's tables, and a table of another type's item may share a name. A
-    /// table the copy does not list is not whole: once the tables are chosen it lists an owed row for every table of
-    /// every item it holds of the type, so a missing one means the choice has not reached the item yet.
+    /// The core records an owed entry for each chosen table the item's type declares. The caller excludes binned
+    /// items because the core skips their fills.
     static func tablesWhole(_ held: [HeldTable], of items: Set<String>) -> Bool {
         let wanted = Set(PreferencesTable.allCases.map(\.rawValue))
         var whole: [String: Set<String>] = [:]

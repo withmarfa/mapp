@@ -466,18 +466,14 @@ import Testing
         #expect(!WorkingCopyPreferences.tablesWhole(whole + binned, of: ["kept", "binned"]))
     }
 
-    /// A settings item the copy lists no table of is not whole: the copy lists an owed row for every table of an item
-    /// it holds once the tables are chosen, so none listed means the choice has not reached the item.
     @Test func anItemWithNoTableListedIsNotWhole() {
         #expect(!WorkingCopyPreferences.tablesWhole([], of: ["kept"]))
         let other = HeldTable(itemId: "other-type", table: PreferencesTable.commands.rawValue, state: .whole, rows: 0)
         #expect(!WorkingCopyPreferences.tablesWhole([other], of: ["kept"]))
-        // One item whole does not stand for another with none listed.
         let whole = PreferencesTable.allCases.map { HeldTable(itemId: "kept", table: $0.rawValue, state: .whole, rows: 0) }
         #expect(!WorkingCopyPreferences.tablesWhole(whole, of: ["kept", "unlisted"]))
     }
 
-    /// An item is whole only with every one of the settings' tables listed, each whole.
     @Test func anItemMissingOneTableIsNotWhole() {
         let tables = PreferencesTable.allCases
         let all = tables.map { HeldTable(itemId: "kept", table: $0.rawValue, state: .whole, rows: 0) }
@@ -485,7 +481,6 @@ import Testing
         #expect(!WorkingCopyPreferences.tablesWhole(Array(all.dropLast()), of: ["kept"]))
     }
 
-    /// No item outside the bin is nothing to wait on: the sync makes the item.
     @Test func noItemIsWhole() {
         #expect(WorkingCopyPreferences.tablesWhole([], of: []))
     }
