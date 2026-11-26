@@ -24,6 +24,13 @@ struct PlaceChangeCostTests {
                 setUp(browser)
                 try await step("idle", nil) {}
                 try await step("open (\(library.items(in: .library).count))", nil) { browser.viewMode = layout.mode }
+                if layout.mode == .calendar {
+                    // The month of the latest item the rounds edit, so the calendar draws the change. The sample's items
+                    // without a date stand on their creation, all in a few days of 1970.
+                    let targets = Set(library.items(in: .library).prefix(Self.changed).map(\.id))
+                    let entry = try #require(browser.calendarWork.held?.value.entries.filter { targets.contains($0.id) }.max { $0.start < $1.start })
+                    try await step("show \(entry.start.formatted(.iso8601.year().month()))", nil) { browser.calendarDay = entry.start }
+                }
                 for (round, name) in [(1, "2000 edited"), (2, "2000 edited again")] {
                     let edited = Self.edited(library, round: round)
                     let expected = try await Self.drawn(after: Self.upserting(edited, in: library), like: browser, mode: layout.mode)
@@ -70,8 +77,7 @@ struct PlaceChangeCostTests {
         (Layout(name: "list by name", mode: .list), { sortByName($0) }),
         (Layout(name: "gallery", mode: .gallery), { _ in }),
         (Layout(name: "board", mode: .board), { _ in }),
-        // On the month the sample's dates fall in, so the calendar draws items.
-        (Layout(name: "calendar", mode: .calendar), { $0.calendarDay = Date(timeIntervalSince1970: 1_780_000_000) }),
+        (Layout(name: "calendar", mode: .calendar), { _ in }),
         (Layout(name: "timeline", mode: .timeline), { _ in }),
     ]
 
