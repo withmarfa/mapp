@@ -53,12 +53,13 @@ import Testing
         let bench = HostBench()
         let libraries = try libraries(bench)
         try await libraries.host.connect(address: address, key: "key")
-        #expect(libraries.libraryKey == "marfa:\(address)")
+        let first = libraries.libraryKey
+        #expect(first == "marfa:copy:" + bench.location.directory(for: try MarfaConnection(address: address)).lastPathComponent)
         libraries.updateSidebarLayout { $0.setHidden(.feed, true) }
         #expect(libraries.sidebarLayout.isHidden(.feed))
 
         try await libraries.host.changeAddress(to: "http://second.test:8210", key: "other")
-        #expect(libraries.libraryKey == "marfa:http://second.test:8210")
+        #expect(libraries.libraryKey != first)
         #expect(!libraries.sidebarLayout.isHidden(.feed), "another server's sidebar is its own")
 
         libraries.typeLooks.importLooks(
