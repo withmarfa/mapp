@@ -89,12 +89,16 @@ struct PlaceChangeCostTests {
         }
     }
 
+    /// `changed` new items, made and edited after every other, so the first page drawn by any order shows them.
     private static func added(round: Int) -> [Item] {
         (0..<changed).map { index in
             let title = String(format: "0 Added %04d", index)
-            return LibraryFixture.item(
+            var item = LibraryFixture.item(
                 ItemID("added-\(round)-\(index)"), BigLibrary.note, title, age: index,
                 properties: [Property(key: "title", value: .string(title))])
+            item.created = Date(timeIntervalSince1970: 1_000_000 + Double(changed - index))
+            item.modified = Date(timeIntervalSince1970: 1_790_100_000 - Double(index))
+            return item
         }
     }
 
