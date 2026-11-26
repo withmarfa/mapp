@@ -105,4 +105,17 @@ struct ItemNestingTests {
         paging.reveal([ItemID("child")], rows: rows, nesting: nesting, groups: nil, collapsed: [], expanded: [ItemID("r59")], size: .fifty)
         #expect(paging.pages == 2)
     }
+
+    @Test func theListNestsWithinASectionAndHidesAClosedParentsSubItems() {
+        let rows = Self.rows([("p", nil), ("c", "p"), ("q", nil), ("elsewhere", "q")])
+        let today = ItemSection(group: .today, items: [rows[0].item, rows[1].item, rows[2].item])
+        let earlier = ItemSection(group: .yesterday, items: [rows[3].item])
+        let arrangement = ListArrangement(sections: [today, earlier], sorted: nil, content: nil)
+        let closed = arrangement.nested(expanded: [])
+        #expect(closed.ids.map(\.rawValue) == ["p", "q", "elsewhere"], "a child in another section stands at its top")
+        #expect(closed.nesting[ItemID("p")]?.children == 1)
+        let open = arrangement.nested(expanded: [ItemID("p")])
+        #expect(open.ids.map(\.rawValue) == ["p", "c", "q", "elsewhere"])
+        #expect(open.nesting[ItemID("c")]?.depth == 1)
+    }
 }
