@@ -7,18 +7,21 @@ struct ChipLine: View {
     let more: Int
     /// The item whose status chip opens its panel, where the row's item takes a change to its status.
     var statusItem: ItemID?
+    private let typeFont: Font?
     @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
 
-    init(content: RowContent, statusItem: ItemID? = nil) {
+    init(content: RowContent, statusItem: ItemID? = nil, typeFont: Font? = nil) {
         chips = content.chips
         more = content.more
         self.statusItem = content.editsStatus ? statusItem : nil
+        self.typeFont = typeFont
     }
 
     init(chips: [RowContent.Chip], more: Int, statusItem: ItemID? = nil) {
         self.chips = chips
         self.more = more
         self.statusItem = statusItem
+        typeFont = nil
     }
 
     var body: some View {
@@ -27,7 +30,7 @@ struct ChipLine: View {
             ForEach(Array(chips.enumerated()), id: \.offset) { _, chip in
                 switch chip {
                 case .type(let icon, let label):
-                    MarkedName(text: label, icon: icon, size: .row)
+                    MarkedName(text: label, icon: icon, size: .row, textFont: typeFont)
                 case .status(let symbol, let label):
                     if let statusItem {
                         StatusChipButton(id: statusItem, symbol: symbol, label: label)
