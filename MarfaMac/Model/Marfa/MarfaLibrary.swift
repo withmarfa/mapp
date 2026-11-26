@@ -169,7 +169,7 @@ import Observation
     @ObservationIgnored var index = MarfaItemIndex()
     @ObservationIgnored var listed: [ListingKey: Listing] = [:]
     @ObservationIgnored var listedDeleted: Listing?
-    @ObservationIgnored var orderedView: (content: Int, hits: [ItemID], items: [Item])?
+    @ObservationIgnored var orderedView: (content: Int, hits: [ItemID], items: [Item], isProvisional: Bool)?
     @ObservationIgnored var counted: [Place: (revision: Int, counts: ScopeCounts)] = [:]
     @ObservationIgnored var countedAlone: (revision: Int, counts: StandaloneCounts)?
     @ObservationIgnored var searches: [SearchKey: SearchRun] = [:]
@@ -305,6 +305,9 @@ import Observation
         var items: [Item] = []
         /// Where each id stands in `ids`, kept between patches while the ids stay (`MarfaLibrary.listing`).
         var positions: [ItemID: Int]?
+        /// A listing the library outran, kept so a place that keeps changing still opens. Its order is only as good as a
+        /// patch makes it, so a whole listing follows (`deferredListing`).
+        var isProvisional = false
     }
 
     /// A text save the source has not answered.

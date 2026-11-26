@@ -220,6 +220,8 @@ final class Browser {
     @ObservationIgnored var tableOutrun = 0
     /// The arrangement that lands as it is, whatever the library has done since it began.
     @ObservationIgnored var insistingArrangement: UUID?
+    /// Whether the listing under way has an earlier one the window shows meanwhile (`DeferredListing.showsEarlier`).
+    @ObservationIgnored var listingShowsEarlier = false
     /// How often arrangements were ended outright, which an arrangement that insists must not outlast.
     @ObservationIgnored var arrangementEnds = 0
     /// Counts the arrangements that landed, which a view reads through `tableContent(in:)` to draw the new one.

@@ -25,6 +25,7 @@ struct WindowSplitTests {
         let window: NSWindow
         let browser: Browser
         let library: MarfaLibrary
+        let source: FakeItemSource
         let details: DetailsPresentation
 
         func turn() {
@@ -41,7 +42,7 @@ struct WindowSplitTests {
 
     private func hosted(_ script: (Hosted) async throws -> Void) async throws {
         #if DEBUG
-        let (library, _) = try await BigLibrary.loaded()
+        let (library, source) = try await BigLibrary.loaded()
         let browser = Browser()
         browser.inPlace.drafts = NewItemDrafts(file: nil)
         browser.quickAdd.drafts = browser.inPlace.drafts
@@ -56,7 +57,7 @@ struct WindowSplitTests {
             .environment(libraries))
         window.makeKeyAndOrderFront(nil)
         defer { window.performClose(nil); window.contentView = nil }
-        let host = Hosted(window: window, browser: browser, library: library, details: details)
+        let host = Hosted(window: window, browser: browser, library: library, source: source, details: details)
         try await host.settle()
         try await script(host)
         #endif
@@ -84,31 +85,46 @@ struct WindowSplitTests {
         }
     }
 
-    /// What was typed in a row for a new item is kept while the layout, or the place, changes under it, and the table
-    /// brings the row back with its text when it appears again.
-    @Test func aChangeOfLayoutOrPlaceKeepsATypedNewRow() async throws {
+    /// A New row typed in the table belongs to the table's slot alone: it stays the table's through a board, a list and
+    /// another place, the board never makes a row of it, and it adds one item, never two.
+    @Test func aTypedTableRowStaysTheTablesThroughALayoutAndPlaceChangeAndAddsOneItem() async throws {
         try await hosted { host in
             let browser = host.browser
+            let library = host.library
             let typed = "Half typed"
             // A draft is kept for one instance, which this library has not yet read.
-            host.library.serverKey = "test-instance"
+            library.serverKey = "test-instance"
             browser.viewMode = .table
             try await host.settle()
-            try #require(browser.beginInPlace(.table(group: nil), in: host.library), "the table has a row to type in")
+            try #require(browser.beginInPlace(.table(group: nil), in: library), "the table has a row to type in")
             browser.inPlace.change { $0.title = typed }
             let place = browser.shown
             let slot = InPlaceRow.slot(.table(group: nil), in: place)
-            for mode in [ItemViewMode.board, .list, .table] {
+            #expect(browser.inPlace.slot == slot)
+            #expect(slot != InPlaceRow.slot(.lane(.option("todo")), in: place), "the board's row has a slot of its own")
+            for mode in [ItemViewMode.board, .list] {
                 browser.viewMode = mode
                 try await host.settle()
-                #expect(browser.inPlace.drafts.holdsDraft(slot, in: host.library.serverKey) || browser.inPlace.draft?.title == typed, "\(mode.rawValue): the typed text is kept")
+                #expect(browser.inPlace.draft == nil, "\(mode.rawValue): no row of that layout takes the table's draft")
+                #expect(browser.inPlace.drafts.holdsDraft(slot, in: library.serverKey), "\(mode.rawValue): the table's slot keeps the typed text")
             }
-            #expect(await eventually { browser.inPlace.draft?.title == typed }, "the table brings the row back with its text")
+            browser.viewMode = .table
+            try await host.settle()
+            #expect(await eventually { browser.inPlace.slot == slot && browser.inPlace.draft?.title == typed }, "the table's row comes back with its text")
             browser.showing = .library
             try await host.settle()
-            #expect(browser.inPlace.drafts.holdsDraft(slot, in: host.library.serverKey), "another place keeps the draft")
+            #expect(browser.inPlace.drafts.holdsDraft(slot, in: library.serverKey), "another place keeps the draft")
             browser.showing = place
             #expect(await eventually { browser.inPlace.draft?.title == typed }, "the place brings the row back with its text")
+
+            func creates() -> [ItemDraft] {
+                host.source.writes.compactMap { write in if case .create(_, let draft) = write { draft } else { nil } }
+            }
+            #expect(creates().isEmpty)
+            #expect(await browser.addInPlace(in: library, undoManager: nil, next: false) != nil, "the row adds its item")
+            #expect(creates().map(\.title) == [typed], "one create, with the typed title")
+            #expect(await browser.addInPlace(in: library, undoManager: nil, next: false) == nil, "a second add makes nothing")
+            #expect(creates().count == 1, "never two")
         }
     }
 }

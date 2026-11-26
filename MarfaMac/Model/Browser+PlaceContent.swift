@@ -145,7 +145,7 @@ extension Browser {
             content: library.contentRevision, membership: library.membershipRevision,
             viewRevision: shown.savedView == nil ? nil : library.viewRevision, preview: preview)
         _ = listingWork.value(for: key)
-        if listingWork.runningKey == key { return nil }
+        if listingWork.runningKey == key { return listingShowsEarlier ? placeItems(in: library) : nil }
         guard let work = library.deferredListing(in: shown, listing: listing, preview: preview, above: Self.arrangesAlongsideAbove) else {
             return placeItems(in: library)
         }
@@ -158,7 +158,8 @@ extension Browser {
             listingWork.reset()
             placeWorkLanded += 1
         })
-        return nil
+        listingShowsEarlier = work.showsEarlier
+        return listingShowsEarlier ? placeItems(in: library) : nil
     }
 
     func stopPlaceWork() {
@@ -426,6 +427,11 @@ extension Browser {
                 clock: ClockDay(now: library.now(), calendar: library.calendar()),
                 tokens: narrowingSearchTokens),
             basis: TableBasis(content: library.contentRevision, membership: library.membershipRevision, counts: library.counts.revision))
+        // A change of choices starts a fresh ask, with its own count of how often the library has outrun it.
+        if askedTable?.choices != key.choices {
+            tableOutrun = 0
+            insistingArrangement = nil
+        }
         askedTable = key
         // Returning to a cached sort supersedes the sort the person just left.
         func isReady(_ content: ItemTableContent) -> Bool {
@@ -533,7 +539,7 @@ extension Browser {
             // A first table the library has outrun a few times lands as it is, for the choices still asked; the next
             // arrangement then brings it up to date.
             if browser.insistingArrangement == token {
-                return browser.arrangementEnds == ends && browser.shown == place && browser.isSearching == searching
+                return browser.mayLandInsisting(key, place: place, searching: searching, ends: ends)
             }
             // The first answer must match the copy even if the layout has yet to ask again after a sync.
             if browser.isLive(token, key, place, searching),
@@ -608,6 +614,12 @@ extension Browser {
         }
         lastArrangement = task
         arranging = (key, token, task)
+    }
+
+    /// Whether a first table the library outran lands as it is: only for the place, the search and the choices still
+    /// asked, so a filter changed meanwhile never lets it show.
+    func mayLandInsisting(_ key: TableKey, place: PlaceView, searching: Bool, ends: Int) -> Bool {
+        arrangementEnds == ends && shown == place && isSearching == searching && askedTable?.choices == key.choices
     }
 
     /// Whether the arrangement of `token` is still the one under way, for the table last asked, the place and the search it

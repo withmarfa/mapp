@@ -104,7 +104,8 @@ extension MarfaLibrary {
         let key = listingKey(for: place, listing: listing)
         let content = contentRevision
         let membership = membershipRevision
-        if let held = listed[key], held.content == content || canPatch(key, since: held.content) { return nil }
+        if let held = listed[key], !held.isProvisional, held.content == content || canPatch(key, since: held.content) { return nil }
+        let showsEarlier = listed[key]?.isProvisional == true
         let ids = members(of: key)
         guard ids.count > limit else { return nil }
         let snapshots = index.items
@@ -117,14 +118,15 @@ extension MarfaLibrary {
             return Self.ordered(items)
         }, take: { [weak self] items in
             guard let self else { return }
-            if contentRevision != content || membershipRevision != membership {
-                // A listing the library outran is kept only where nothing newer is listed and what changed since can
-                // patch it, so a place that keeps changing still opens, and is then brought up to date.
-                let isCollection: Bool = if case .collection = key.place { true } else { false }
-                guard !isCollection, listed[key] == nil, changedItems(since: content) != nil else { return }
-            }
-            listed[key] = Listing(membership: membership, content: content, ids: items.map(\.id), items: items)
-        })
+            let isOutrun = contentRevision != content || membershipRevision != membership
+            // A listing the library outran is kept only where nothing newer is listed and what changed since can
+            // patch it, so a place that keeps changing still opens. A collection's order is not the patch's, so it is
+            // provisional until a whole listing lands.
+            if isOutrun { guard listed[key] == nil, changedItems(since: content) != nil else { return } }
+            let isCollection: Bool = if case .collection = key.place { true } else { false }
+            listed[key] = Listing(
+                membership: membership, content: content, ids: items.map(\.id), items: items, isProvisional: isOutrun && isCollection)
+        }, showsEarlier: showsEarlier)
     }
 
     func listed(_ ids: Set<ItemID>, in place: PlaceView, listing: PlaceListing) -> Set<ItemID> {
@@ -151,7 +153,7 @@ extension MarfaLibrary {
         if let held = listed[key], held.content == content { return held.items }
         // A collection's order falls back on titles, so it changes with any edit, not only with membership.
         let isCollection: Bool = if case .collection = key.place { true } else { false }
-        if !isCollection, var listing = listed[key], let changed = changedItems(since: listing.content) {
+        if !isCollection || listed[key]?.isProvisional == true, var listing = listed[key], let changed = changedItems(since: listing.content) {
             Cost.measure(.listingPatch) { patch(&listing, of: key, changed: changed, membershipMoved: listing.membership != membership) }
             listing.membership = membership
             listing.content = content
@@ -173,10 +175,12 @@ extension MarfaLibrary {
     /// keep.
     private func patch(_ listing: inout Listing, of key: ListingKey, changed: Set<ItemID>, membershipMoved: Bool) {
         let positions = listing.positions ?? Dictionary(uniqueKeysWithValues: listing.ids.enumerated().map { ($1, $0) })
+        // A collection's members are worked out whole, so once for every changed item.
+        let collectionMembers: Set<ItemID>? = if case .collection = key.place, membershipMoved { members(of: key) } else { nil }
         var leaving: Set<ItemID> = []
         var joining: [Item] = []
         for id in changed {
-            let isMember = membershipMoved ? isMember(id, of: key) : positions[id] != nil
+            let isMember = membershipMoved ? collectionMembers?.contains(id) ?? isMember(id, of: key) : positions[id] != nil
             if let position = positions[id] {
                 guard isMember, let item = records[id]?.item else { leaving.insert(id); continue }
                 if item.created == listing.items[position].created {
@@ -201,7 +205,7 @@ extension MarfaLibrary {
     }
 
     /// Two lists each in the listing's order (`ordered`), as one.
-    private static func merged(_ a: [Item], _ b: [Item]) -> [Item] {
+    static func merged(_ a: [Item], _ b: [Item]) -> [Item] {
         guard !b.isEmpty else { return a }
         var merged: [Item] = []
         merged.reserveCapacity(a.count + b.count)

@@ -85,9 +85,23 @@ extension MarfaLibrary {
     private func listed(_ hits: [ItemID]) -> [Item] {
         let content = contentRevision
         if let held = orderedView, held.content == content, held.hits == hits { return held.items }
+        // A list the library outran stands, brought up to date by what changed, until a whole one lands.
+        if let held = orderedView, held.isProvisional {
+            let items = broughtUp(held.items, toHits: hits)
+            orderedView = (content, hits, items, true)
+            return items
+        }
         let items = Self.ordered(hits.compactMap(viewItem))
-        orderedView = (content, hits, items)
+        orderedView = (content, hits, items, false)
         return items
+    }
+
+    private func broughtUp(_ items: [Item], toHits hits: [ItemID]) -> [Item] {
+        let hitSet = Set(hits)
+        let staying = items.compactMap { hitSet.contains($0.id) ? viewItem($0.id) : nil }
+        let had = Set(items.map(\.id))
+        let joining = Self.ordered(hits.lazy.filter { !had.contains($0) }.compactMap { viewItem($0) })
+        return Self.merged(staying, joining)
     }
 
     private func viewItem(_ id: ItemID) -> Item? {
@@ -100,7 +114,8 @@ extension MarfaLibrary {
         guard hits.count > limit else { return nil }
         let content = contentRevision
         let revision = viewRevision
-        if let held = orderedView, held.content == content, held.hits == hits { return nil }
+        if let held = orderedView, !held.isProvisional, held.content == content, held.hits == hits { return nil }
+        let showsEarlier = orderedView?.isProvisional == true
         let snapshots = index.items
         return DeferredListing(make: {
             Self.ordered(hits.compactMap { id in
@@ -108,9 +123,12 @@ extension MarfaLibrary {
                 return item
             })
         }, take: { [weak self] items in
-            guard let self, contentRevision == content, viewRevision == revision else { return }
-            orderedView = (content, hits, items)
-        })
+            guard let self else { return }
+            // A list the library outran is kept where nothing newer is held, so a view that keeps changing still opens.
+            let isOutrun = contentRevision != content || viewRevision != revision
+            if isOutrun, let held = orderedView, held.content >= content { return }
+            orderedView = (content, hits, items, isOutrun)
+        }, showsEarlier: showsEarlier)
     }
 
     /// Answers from the copy's own reading of the query, as `items(inView:)` does of the view's: until it returns,
