@@ -39,7 +39,6 @@ paths:
 ## The first launch against a Marfa
 
 - **Nothing is decided from a partial copy.** The defaults stay as they are until hydration completes, the sign-in reaches the type and every table is whole.
-- **The tables are chosen before the hydration that takes the type** (`MarfaSync`), so the follow fills them. A table chosen once the copy is whole fills at once, and a follow that starts meanwhile stops for minutes (withmarfa/marfa#3606).
 - **No item, and this Mac never adopted a Marfa:** the item is made from this Mac's settings.
 - **No item, and this Mac adopted another Marfa:** the shared settings start from the app's defaults, so a new Marfa does not take another's arrangement.
 - **An item exists:** it wins, and what it lacks is filled from this Mac once.
