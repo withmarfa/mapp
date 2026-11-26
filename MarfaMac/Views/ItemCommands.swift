@@ -92,12 +92,12 @@ struct ItemCommandContext {
 /// once here: its title, symbol, shortcut, when it applies and what it does. A menu shows every one of them and
 /// dims the ones that do not apply, so the two menus never differ in what they offer or when.
 enum ItemCommand: CaseIterable {
-    case open, openBesideList, openAsModal, openAsFullPage, quickLook, openInNewWindow, openOutside, copyLink, addAttachment, toggleSource, toggleReader, toggleFormats, toggleFocus, print, exportPDF
+    case open, openBesideList, openAsModal, openAsFullPage, quickLook, openInNewWindow, openOutside, copyLink, copyFilePath, addAttachment, toggleSource, toggleReader, toggleFormats, toggleFocus, print, exportPDF
 
     /// The menu bar group also determines where ⌘K lists the command.
     var paletteGroup: PaletteSections.CommandGroup {
         switch self {
-        case .copyLink, .addAttachment: .edit
+        case .copyLink, .copyFilePath, .addAttachment: .edit
         case .toggleSource, .toggleReader, .toggleFormats, .toggleFocus: .view
         case .open, .openBesideList, .openAsModal, .openAsFullPage, .quickLook, .openInNewWindow, .openOutside, .print, .exportPDF: .file
         }
@@ -116,6 +116,7 @@ enum ItemCommand: CaseIterable {
         case .openOutside:
             if let name = context.openTarget.flatMap({ PageOpener.appName(for: $0) }) { LocalizedStringResource("Open in \(name)") } else { LocalizedStringResource("Open") }
         case .copyLink: context.ids.count > 1 ? "Copy Links" : "Copy Link"
+        case .copyFilePath: context.ids.count > 1 ? "Copy File Paths" : "Copy File Path"
         case .addAttachment: "Add Attachment…"
         case .toggleSource: (sourceMode ?? context.showsSource) ? "Show Formatted Text" : "Show Markdown Source"
         case .toggleReader: context.pageLook?.mode == .original ? "Show Reader" : "Show Original"
@@ -136,6 +137,7 @@ enum ItemCommand: CaseIterable {
         case .openInNewWindow: "macwindow"
         case .openOutside: "arrow.up.forward.app"
         case .copyLink: "link"
+        case .copyFilePath: "doc.on.clipboard"
         case .addAttachment: "paperclip"
         case .toggleSource: "doc.plaintext"
         case .toggleReader: "text.page"
@@ -158,6 +160,7 @@ enum ItemCommand: CaseIterable {
         case .openInNewWindow: .openInNewWindow
         case .openOutside: .openOutside
         case .copyLink: .copyLink
+        case .copyFilePath: .copyFilePath
         case .addAttachment: .addAttachment
         case .toggleSource: .toggleSource
         case .toggleReader: .toggleReader
@@ -178,6 +181,7 @@ enum ItemCommand: CaseIterable {
         case .quickLook, .openInNewWindow: context.hasBrowser && !context.ids.isEmpty
         case .openOutside: context.openTarget != nil
         case .copyLink: !context.ids.isEmpty
+        case .copyFilePath: context.library?.holdsFile(among: context.ids) == true
         case .addAttachment: context.editableItem != nil
         case .toggleSource, .print, .exportPDF: context.visibleItem != nil
         case .toggleReader: context.pageLook != nil
@@ -205,6 +209,9 @@ enum ItemCommand: CaseIterable {
             } else if let id = context.item?.id {
                 Task { await library.copyLink(of: id) }
             }
+        case .copyFilePath:
+            let ids = context.browser.map { $0.inListOrder(context.ids, in: library) } ?? Array(context.ids)
+            Task { await library.copyFilePaths(of: ids) }
         case .addAttachment: editor?.isChoosingImages = true
         case .toggleSource: editor.map { $0.setSourceMode(!$0.caret.sourceMode) }
         case .toggleReader: context.pageLook.map { $0.choose($0.mode == .reader ? .original : .reader) }

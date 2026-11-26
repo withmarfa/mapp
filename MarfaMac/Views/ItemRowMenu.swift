@@ -56,6 +56,13 @@ struct ItemRowMenu<LayoutActions: View>: View {
                     Task { await library.copyLinks(of: ordered) }
                 }
             }
+        case .copyFilePath:
+            if library.holdsFile(among: ids) {
+                Button(ids.count > 1 ? "Copy File Paths" : "Copy File Path", systemImage: "doc.on.clipboard") {
+                    let ordered = browser.inListOrder(ids, in: library)
+                    Task { await library.copyFilePaths(of: ordered) }
+                }
+            }
         case .favorite: FavoriteButton(ids: ids, undoManager: undoManager, inMenu: true)
         case .tag: AddTagButton(ids: ids, details: details, undoManager: undoManager)
         case .collection: CollectionActions(selection: ids, details: details, undoManager: undoManager)

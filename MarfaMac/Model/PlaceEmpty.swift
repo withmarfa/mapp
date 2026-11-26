@@ -13,7 +13,7 @@ nonisolated struct PlaceEmpty: Equatable {
     static let lineLimit = 40
 
     /// `offered` is the types a person can make (`QuickAdd.types`), empty while the library cannot be written to or is
-    /// not read yet. Only a type's own place has a button, and only for a type that is offered.
+    /// not read yet. Only a type's own place and the Collections index have a button, and only for a type that is offered.
     static func of(_ place: PlaceView, in catalogue: Catalogue, offered: [String]) -> PlaceEmpty {
         func plain(_ title: String, _ line: String? = nil) -> PlaceEmpty {
             PlaceEmpty(title: title, line: line, makes: nil, buttonTitle: nil)
@@ -49,7 +49,10 @@ nonisolated struct PlaceEmpty: Equatable {
         case .types:
             return plain(String(localized: "No Types"), String(localized: "Types that hold items show here."))
         case .collections:
-            return plain(String(localized: "No Collections"), String(localized: "Collections you make show here."))
+            let makes = offered.first { catalogue.isCollection(TypeID($0)) }
+            return PlaceEmpty(
+                title: String(localized: "No Collections"), line: String(localized: "Collections you make show here."),
+                makes: makes, buttonTitle: makes.map { String(localized: "New \(catalogue.label(for: TypeID($0)))") })
         case .sources:
             return plain(String(localized: "No Sources"), String(localized: "Sources show where items came from."))
         }

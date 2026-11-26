@@ -358,6 +358,7 @@ private struct MoreMenu: View {
                     item: item, fileURL: fileURL, library: library, showsIcon: false, chosen: ids.count > 1 && browser != nil ? ids : [],
                     browser: browser)
                 command(.copyLink)
+                command(.copyFilePath)
                 Divider()
                 ItemOrganizeActions(ids: ids, undoManager: undoManager, keepsPlace: true)
                 CollectionActions(selection: ids, details: details, undoManager: undoManager)

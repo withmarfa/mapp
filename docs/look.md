@@ -68,7 +68,7 @@ Neutral washes are white at the same strength, hairlines white at 12%, and a ton
 ## Selection
 
 - **A chosen row is soft gray and a row under the pointer is lighter**, in every list (`SoftSelection`). Neither is blue.
-- **A chosen card has a soft ring and no fill**, because a fill would cover its picture.
+- **A chosen card has a 13% ring (26% in dark)**, never a fill over the picture.
 - **A heading, a date line and a group's header get no hover mark**, because they cannot be clicked. Only a group's chevron reacts.
 - **A cell that can be edited keeps its own tint** over the row's.
 - **A chosen row in a value panel, filter panel or calendar is the same gray** (`SelectionLooks`), never the accent.

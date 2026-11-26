@@ -214,8 +214,9 @@ private struct GalleryThumbnail: View {
     }
 }
 
-/// The soft ring around a selected card's picture: 3 points wide in the grey of a chosen row, touching the card. It reads the selection itself, so a selection that moves redraws the rings and no card.
+/// The soft ring around a selected card's picture: 3 points wide, touching the card, in the ring grey of `SelectionLooks`. It reads the selection itself, so a selection that moves redraws the rings and no card.
 private struct GalleryRing: View {
+    @Environment(\.colorScheme) private var scheme
     let browser: Browser
     let id: ItemID
     let shape: GalleryShape
@@ -223,7 +224,7 @@ private struct GalleryRing: View {
     var body: some View {
         if browser.selection.contains(id) {
             shape
-                .strokeBorder(Color(nsColor: .labelColor).opacity(0.08), lineWidth: 3)
+                .strokeBorder(SelectionLooks.cardRing(for: scheme), lineWidth: 3)
                 .padding(-3)
         }
     }
