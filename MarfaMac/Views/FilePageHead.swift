@@ -2,8 +2,7 @@ import SwiftUI
 
 /// What a file's viewer needs of the page's head, which is its first inset: the viewer keeps its own scroller, starts
 /// its content below the toolbar and the head, and reports how far it has moved so the head, drawn over that space,
-/// moves up with it (`ScrollingHeader`). Every kind of file page takes this the same way, so a later kind (audio, video)
-/// is one more viewer that honors it.
+/// moves up with it (`ScrollingHeader`).
 struct FileHeadSpace {
     /// The toolbar's height, which the page runs under.
     var toolbar: CGFloat
