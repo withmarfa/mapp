@@ -496,10 +496,7 @@ import Testing
         #expect(aside().count == 2)
     }
 
-    /// A binned settings item's tables, which the copy never fills, and another type's tables, do not keep the
-    /// settings from being judged whole.
-    /// A record written before set-aside counts were kept holds none: what a store set aside before the first step since
-    /// is still no removal of the person's.
+    /// On the first sync after an update, an older record has no counts for rows a store has already set aside.
     @Test func aRowSetAsideBeforeTheFirstStepOfAnOlderRecordStaysInTheMarfa() async throws {
         let shortcut = PreferenceUnit.row(.commands, setting: "shortcut", key: "newItem")
         let later = #""a shape a later version of the app writes""#
