@@ -40,14 +40,14 @@ extension LiveMarfaTests {
 
                 try await host.changeAddress(to: first.address.absoluteString, via: .browser)
                 try await Self.settled(host, at: first)
-                #expect(await eventuallyAsking(within: .seconds(90)) { await Self.status(of: firstChange, at: first.address, key: firstKey) == 200 })
+                #expect(try await eventuallyAsking(within: .seconds(90)) { await Self.status(of: firstChange, at: first.address, key: firstKey) == 200 })
                 #expect(await Self.status(of: firstChange, at: second.address, key: secondKey) == 404, "never sent to the other instance")
 
                 let secondChange = try await Self.queueChange(in: bench.location.store(for: second), naming: "second")
                 made.append((secondChange, second.address, secondKey))
                 try await host.changeAddress(to: second.address.absoluteString, via: .browser)
                 try await Self.settled(host, at: second)
-                #expect(await eventuallyAsking(within: .seconds(90)) { await Self.status(of: secondChange, at: second.address, key: secondKey) == 200 })
+                #expect(try await eventuallyAsking(within: .seconds(90)) { await Self.status(of: secondChange, at: second.address, key: secondKey) == 200 })
                 #expect(await Self.status(of: secondChange, at: first.address, key: firstKey) == 404, "never sent to the other instance")
 
                 #expect(!bench.signIns.calls.contains { $0.hasPrefix("browser") || $0.hasPrefix("code") }, "\(bench.signIns.calls)")
