@@ -89,11 +89,15 @@ nonisolated enum SampleCastell {
     /// The types the library holds that the sample's base catalogue and the gallery's do not.
     static let extraTypes: [Marfa.ItemType] = [
         ItemType(
-            id: Kind.highlight, label: "Highlight", description: "A passage worth keeping.",
+            id: Kind.highlight, label: "Highlight", description: "A passage you highlighted, with any note you added.",
             fields: [
-                TypeField(name: "body", type: "string", declaredBy: Kind.highlight),
-                TypeField(name: "title", type: "string", declaredBy: Kind.highlight),
-            ], titleField: "title", bodyField: "body", icon: "lucide:highlighter"),
+                TypeField(name: "text", type: "string", declaredBy: Kind.highlight),
+                TypeField(name: "note", type: "string", declaredBy: Kind.highlight),
+                TypeField(
+                    name: "color", type: "enum", declaredBy: Kind.highlight,
+                    definition: ["enum_values": ["yellow", "blue", "green", "pink", "orange", "purple"]]),
+                TypeField(name: "start_location", type: "string", declaredBy: Kind.highlight),
+            ], bodyField: "text", nameFromBody: false, icon: "lucide:highlighter"),
         ItemType(
             id: Kind.article, label: "Article", description: "Something written to read.",
             fields: [
@@ -108,11 +112,13 @@ nonisolated enum SampleCastell {
                 TypeField(name: "body", type: "string", declaredBy: Kind.book),
             ], titleField: "title", bodyField: "body", icon: "lucide:book-open"),
         ItemType(
-            id: Kind.message, label: "Message", description: "A message from someone.",
+            id: Kind.message, label: "Message", description: "A message you sent or received, such as a text or a chat message.",
             fields: [
-                TypeField(name: "title", type: "string", declaredBy: Kind.message),
                 TypeField(name: "body", type: "string", declaredBy: Kind.message),
-            ], titleField: "title", bodyField: "body", icon: "lucide:message-square"),
+                TypeField(name: "from", type: "string", required: true, declaredBy: Kind.message),
+                TypeField(
+                    name: "to", type: "array", declaredBy: Kind.message, definition: ["items_type": "string"]),
+            ], bodyField: "body", icon: "lucide:message-square"),
         ItemType(
             id: Kind.place, label: "Place", description: "Somewhere you go.", parent: "core.entity",
             fields: [
@@ -120,7 +126,61 @@ nonisolated enum SampleCastell {
                 TypeField(name: "address", type: "string", declaredBy: Kind.place),
                 TypeField(name: "latitude", type: "number", declaredBy: Kind.place),
                 TypeField(name: "longitude", type: "number", declaredBy: Kind.place),
+                TypeField(name: "phone", type: "string", declaredBy: Kind.place),
+                TypeField(name: "url", type: "string", declaredBy: Kind.place),
+                TypeField(name: "notes", type: "string", declaredBy: Kind.place),
             ], titleField: "title", icon: "lucide:map-pin"),
+        ItemType(
+            id: Kind.event, label: "Event", description: "Something that happens at a time.",
+            fields: [
+                TypeField(name: "title", type: "string", required: true, declaredBy: Kind.event),
+                TypeField(name: "description", type: "string", declaredBy: Kind.event),
+                TypeField(name: "starts_at", type: "datetime", declaredBy: Kind.event),
+                TypeField(name: "ends_at", type: "datetime", declaredBy: Kind.event),
+                TypeField(name: "all_day", type: "boolean", declaredBy: Kind.event),
+                TypeField(name: "timezone", type: "string", declaredBy: Kind.event),
+                TypeField(name: "place", type: "string", declaredBy: Kind.event),
+                TypeField(name: "url", type: "string", declaredBy: Kind.event),
+                TypeField(
+                    name: "status", type: "enum", declaredBy: Kind.event,
+                    definition: ["enum_values": ["tentative", "confirmed", "canceled"]]),
+                TypeField(
+                    name: "attendees", type: "array", declaredBy: Kind.event,
+                    definition: ["items_type": "object", "items_fields": [
+                        "name": ["type": "string"], "email": ["type": "email"],
+                        "response": ["type": "enum", "enum_values": ["needs_action", "accepted", "declined", "tentative"]],
+                    ]]),
+            ], titleField: "title", bodyField: "description", icon: "lucide:calendar"),
+        ItemType(
+            id: Kind.person, label: "Person", plural: "People", description: "Someone you know.", parent: "core.entity",
+            fields: [
+                TypeField(name: "title", type: "string", required: true, declaredBy: "core.entity"),
+                TypeField(name: "organization", type: "string", declaredBy: Kind.person),
+                TypeField(name: "job_title", type: "string", declaredBy: Kind.person),
+                TypeField(
+                    name: "emails", type: "array", declaredBy: "core.entity",
+                    definition: ["items_type": "object", "items_fields": [
+                        "value": ["type": "email", "required": true, "label": "Email"], "label": ["type": "string", "label": "Label"],
+                    ]]),
+                TypeField(
+                    name: "phones", type: "array", declaredBy: "core.entity",
+                    definition: ["items_type": "object", "items_fields": [
+                        "value": ["type": "string", "required": true, "label": "Phone"], "label": ["type": "string", "label": "Label"],
+                    ]]),
+                TypeField(name: "address", type: "string", declaredBy: Kind.person),
+                TypeField(name: "notes", type: "string", declaredBy: "core.entity"),
+            ], titleField: "title", icon: "lucide:user"),
+        ItemType(
+            id: Kind.bookmark, label: "Bookmark", description: "A saved web page.",
+            fields: [
+                TypeField(name: "title", type: "string", declaredBy: Kind.bookmark),
+                TypeField(name: "url", type: "string", declaredBy: Kind.bookmark),
+                TypeField(name: "description", type: "string", declaredBy: Kind.bookmark),
+                TypeField(name: "author", type: "string", declaredBy: Kind.bookmark),
+                TypeField(name: "published_at", type: "datetime", declaredBy: Kind.bookmark),
+                TypeField(name: "image_url", type: "string", declaredBy: Kind.bookmark),
+                TypeField(name: "body", type: "string", declaredBy: Kind.bookmark),
+            ], titleField: "title", bodyField: "body", icon: "lucide:bookmark"),
         ItemType(
             id: Kind.issue, label: "GitHub Issue", description: "An issue on GitHub.",
             fields: [
@@ -147,9 +207,10 @@ nonisolated enum SampleCastell {
             ], titleField: "title", bodyField: "body", icon: "lucide:terminal"),
     ]
 
-    /// The catalogue's types for a Castell Studio library: the sample's own, the gallery's file, image and bookmark, and these.
+    /// The catalogue's types for a Castell Studio library: the sample's own and the gallery's, with these replacing any of the same name.
     static var itemTypes: [Marfa.ItemType] {
-        SampleLibrary.itemTypes + SampleGallery.types + extraTypes
+        let own = Set(extraTypes.map(\.id))
+        return (SampleLibrary.itemTypes + SampleGallery.types).filter { !own.contains($0.id) } + extraTypes
     }
 
     // MARK: The source names the sample answers with
@@ -247,7 +308,14 @@ nonisolated extension SampleCastell {
         mutating func add(_ spec: Spec) {
             var properties = spec.props
             if let title = spec.title { properties["title"] = .string(title) }
-            if !spec.body.isEmpty { properties["body"] = .string(spec.body) }
+            if !spec.body.isEmpty {
+                let key = switch spec.type {
+                case Kind.highlight: "text"
+                case Kind.event: "description"
+                default: "body"
+                }
+                properties[key] = .string(spec.body)
+            }
             if let due = spec.due { properties["due_at"] = .string(Self.stamp(start + due * 86_400 + 16 * 3600)) }
             let created = Self.stamp(epoch(day: spec.day, time: spec.time))
             items.append(Marfa.Item(
@@ -444,9 +512,10 @@ nonisolated extension SampleCastell {
                 return ["title": .string(name), "body": .string("About the \(topic.lowercased())."), "status": .string(statuses[n % 4]), "priority": .string(priorities[n % 3])]
             case Kind.bookmark, Kind.article:
                 return ["title": .string(name), "url": .string("https://example.com/\(Self.short(type))/\(index)"), "body": .string(quote)]
-            case Kind.highlight: return ["body": .string(quote + (n >= quotes.count ? " (\(n / quotes.count + 1))" : ""))]
+            case Kind.highlight: return ["text": .string(quote + (n >= quotes.count ? " (\(n / quotes.count + 1))" : ""))]
             case Kind.book: return ["title": .string("\(name), by \(people[n % people.count]) \(surnames[n % surnames.count])")]
-            case Kind.message: return ["title": .string(name), "body": .string("\(quote) Sent about the \(topic.lowercased()).")]
+            case Kind.message:
+                return ["from": .string(people[n % people.count] + " " + surnames[n % surnames.count]), "body": .string("\(name). \(quote) Sent about the \(topic.lowercased()).")]
             case Kind.file: return ["title": .string(name), "mime_type": "application/pdf", "size_bytes": .number(Double(20_000 + n * 97 % 900_000))]
             case Kind.image: return ["title": .string("IMG_\(4_000 + index).HEIC"), "mime_type": "image/heic", "size_bytes": .number(Double(2_000_000 + n * 313 % 4_000_000))]
             case Kind.event:

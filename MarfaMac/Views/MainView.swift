@@ -448,6 +448,11 @@ struct MainView: View {
                     try? await Task.sleep(for: .seconds(1))
                     browser.selection = Set(browser.items(in: library).prefix(count).map(\.id))
                 }
+                // Opening the place chose its first item, so an item asked for by id is chosen after it.
+                if let id = launchSelection, SampleLibrary.launchPlace != nil {
+                    try? await Task.sleep(for: .seconds(1))
+                    if library.item(id) != nil { browser.selection = [id] }
+                }
                 #endif
                 isRestored = true
                 takeItemLink()

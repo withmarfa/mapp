@@ -85,6 +85,9 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     /// priority, by rank (`OptionTone.tone(of:in:isPriority:)`). Empty for any other row, whose values take the color
     /// of their words (`OptionTone.tone(for:)`).
     var optionTones: [TypeTone] = []
+    /// What each person of a `people` row answers, such as an attendee's response, in the order of the names; empty where
+    /// the list holds no answers. The page draws it in grey after the name.
+    var answers: [String] = []
     /// The symbol beside the label where it is not the one the value's kind gives: a Location's pin, whose value is text.
     var symbol: String?
     /// Text that may run to a second line before it is cut.
@@ -110,7 +113,12 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
         switch value {
         case .status, .parent, .empty: return ""
         case .items(let targets): return targets.map(\.title).joined(separator: ", ")
-        case .people(let words), .options(let words), .tags(let words): return words.joined(separator: ", ")
+        case .people(let names):
+            // Each person with what follows their name on the page: the address, or an attendee's answer.
+            return names.enumerated().map { index, name in
+                answers.indices.contains(index) && !answers[index].isEmpty ? "\(name) (\(answers[index]))" : name
+            }.joined(separator: ", ")
+        case .options(let words), .tags(let words): return words.joined(separator: ", ")
         case .when(let time, let note): return "\(time), \(note)"
         case .date(let text), .text(let text), .url(let text), .email(let text), .phone(let text): return text
         case .boolean(let flag): return flag ? String(localized: "Yes") : String(localized: "No")
@@ -138,10 +146,10 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     /// describes, read only, under their own heading. A field, a link or the tags with no value is a row too, read as Empty, which opens its editor where the
     /// item can take the edit. The keys in `hidden` are what the page shows another way, such as the title and the
     /// text. With `showsCoordinates`, the latitude and longitude are rows of their own beside the Location that stands
-    /// for them.
+    /// for them. A message's `from` and `to` are people (`isMessage`); no other type's field of that name is.
     static func candidates(
         of item: Item, type: ItemTypeInfo?, hidden: Set<String>, links: [RelationField], format: DateFormat, tags: [String],
-        showsCoordinates: Bool = false, isPriority: (ItemTypeInfo.Field) -> Bool = { _ in false }, icon: (ItemID) -> String?,
+        showsCoordinates: Bool = false, isMessage: Bool = false, isPriority: (ItemTypeInfo.Field) -> Bool = { _ in false }, icon: (ItemID) -> String?,
         isPerson: (ItemID) -> Bool, label: (String) -> String? = { _ in nil }
     ) -> [PropertyRow] {
         let parentField = PagePlacement.parent
@@ -168,6 +176,8 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
                 var row = PropertyRow(
                     id: field.key, label: field.label, value: value, numberToCall: numberToCall(of: field, in: item), editable: edits,
                     optionTones: optionTones(of: field, in: item, isPriority: isPriority(field)))
+                row.answers = personAnswers(of: field, in: item)
+                if isMessage, let sender = senders(of: field, in: item) { (row.value, row.answers) = sender }
                 if case .text(let text) = value { row.long = text.count > longestText || text.contains(where: \.isNewline) }
                 // A number to call opens the phone, as an address opens its page.
                 if let number = row.numberToCall { row.value = .phone(number) }
@@ -261,6 +271,30 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     static func numberToCall(of field: ItemTypeInfo.Field, in item: Item) -> String? {
         guard case .list(let shape) = field.kind, let main = ListEntries.main(of: item.value(of: field.key)) else { return nil }
         return shape.numberToCall(in: main)
+    }
+
+    /// A message's sender and recipients as people, for its page: each written as `Name <address>` or as a name, drawn
+    /// as the name with the address in grey. Nil for any other field. A list's rows and cells keep the text.
+    static func senders(of field: ItemTypeInfo.Field, in item: Item) -> (Value, [String])? {
+        let texts: [String]
+        switch (field.key, item.value(of: field.key)) {
+        case (MarfaMapping.fromField, .string(let text)?): texts = [text]
+        case (MarfaMapping.toField, .array(let values)?): texts = values.compactMap(\.string)
+        default: return nil
+        }
+        let people = texts.compactMap(PersonAddress.init)
+        guard !people.isEmpty else { return nil }
+        return (.people(people.map(\.name)), people.map { $0.address ?? "" })
+    }
+
+    /// What each person `field` names answers, one for each name `value(of:in:format:)` shows, or empty where no entry
+    /// answers: an attendee's response.
+    static func personAnswers(of field: ItemTypeInfo.Field, in item: Item) -> [String] {
+        guard case .list(let shape) = field.kind, shape.holdsPeople, case .array(let entries)? = item.value(of: field.key) else { return [] }
+        let answers = entries.compactMap(ListEntries.object).compactMap { entry in
+            shape.personName(of: entry).map { _ in shape.answer(of: entry) ?? "" }
+        }
+        return answers.contains { !$0.isEmpty } ? answers : []
     }
 
     /// The color of each option `field` holds in `item`, for a field that colors its options by rank; empty for any other.

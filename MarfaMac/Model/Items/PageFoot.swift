@@ -171,12 +171,13 @@ nonisolated struct PageFoot: Equatable, Sendable, Encodable {
             return seen.count - 1
         }
 
-        /// The active items that hold a link to `id` in any relationship but a sub-item's, once each, the most recently
-        /// edited first.
+        /// The active items that hold a link to `id` in any relationship but a sub-item's or a collection's member's, which
+        /// each have a place, once each, the most recently edited first.
         func mentions(of id: ItemID, in relationships: [ItemRelationship]) -> [Item] {
             var seen: Set<ItemID> = [id]
             var found: [Item] = []
-            for relationship in relationships where relationship.field.hasPrefix(RelationField.inversePrefix) && relationship.field != PagePlacement.subItems {
+            for relationship in relationships where relationship.field.hasPrefix(RelationField.inversePrefix) && relationship.field != PagePlacement.subItems
+                && relationship.field != RelationField.inversePrefix + MarfaMapping.collectionEdge {
                 for target in relationship.targets {
                     guard let other = target.itemID, !target.isDeleted, let held = library.headerItem(other), held.state == .active,
                           seen.insert(other).inserted else { continue }

@@ -50,6 +50,14 @@ nonisolated enum SampleGallery {
                 TypeField(name: "size_bytes", type: "integer", declaredBy: "core.file"),
             ], titleField: "title", icon: "lucide:file-image"),
         ItemType(
+            id: "core.file.webpage", label: "Web Page", description: "A web page saved as an HTML file, such as a report an agent wrote.",
+            parent: "core.file", fields: [
+                TypeField(name: "title", type: "string", declaredBy: "core.file"),
+                TypeField(name: "blob_ref", type: "string", declaredBy: "core.file"),
+                TypeField(name: "mime_type", type: "string", declaredBy: "core.file"),
+                TypeField(name: "size_bytes", type: "integer", declaredBy: "core.file"),
+            ], titleField: "title", icon: "lucide:globe"),
+        ItemType(
             id: "core.bookmark", label: "Bookmark", description: "A saved web page.",
             fields: [
                 TypeField(name: "title", type: "string", declaredBy: "core.bookmark"),
@@ -75,10 +83,28 @@ nonisolated enum SampleGallery {
                  favorite: false, daysAgo: 3, attachedTo: nil),
             File(id: "video-resize", title: "Live resize at 120 Hz", type: "core.file", mime: "video/mp4",
                  data: await video(top: (0.2, 0.35, 0.55), bottom: (0.85, 0.6, 0.35)), favorite: false, daysAgo: 4, attachedTo: nil),
+            File(id: "page-vans", title: "Hiring a van for a print fair", type: "core.file.webpage", mime: "text/html",
+                 data: webPage, favorite: false, daysAgo: 1, attachedTo: nil),
             File(id: "cover-bm", title: "cover.png", type: "core.file.image", mime: "image/png",
                  data: picture(top: (0.35, 0.5, 0.75), bottom: (0.12, 0.2, 0.4)), favorite: false, daysAgo: 4, attachedTo: "bm-desk"),
         ]
     }
+
+    /// A small saved article, for a Web Page's Reader and Original.
+    private static let webPage = Data("""
+        <!doctype html><html><head><meta charset="utf-8"><title>Hiring a van for a print fair</title>
+        <style>body{font:16px/1.5 Georgia,serif;margin:0;background:#f4efe6;color:#2b2620}header{background:#2b4a5a;color:#f4efe6;padding:32px 40px}
+        header p{margin:0;font:13px system-ui;opacity:.7}main{max-width:620px;margin:0 auto;padding:24px 40px}h1{margin:6px 0 0;font-size:30px}
+        h2{margin-top:28px}nav{font:13px system-ui;padding:12px 40px;border-bottom:1px solid #d8cfbf}</style></head><body>
+        <nav>The Print Fair Handbook &middot; Logistics &middot; Vans</nav>
+        <header><p>Logistics</p><h1>Hiring a van for a print fair</h1></header>
+        <main><p>A long wheelbase takes two trestle tables flat, and flat is how paper travels best. Book it a month ahead: every other stall holder has the same idea.</p>
+        <h2>What to ask the hire company</h2><p>Ask for the return time first. A van that must be back by nine on Monday decides how late the stall can stay open on Sunday.</p>
+        <ul><li>The deposit, and when it comes off the card.</li><li>Whether a second driver is covered.</li><li>The height of the roof, for the loading bay at the venue.</li></ul>
+        <h2>On the day</h2><p>Load the heavy boxes first and the framed prints last, upright, between two blankets. Keep the card reader in your pocket, not the van.</p>
+        <p>Unload in the order you will set up: tables, then the cloth, then the boxes of zines, then the price cards. A stall that is half built by the time the doors open sells more than one that is still being carried in, and the first visitors are usually the serious ones.</p>
+        <p>When the fair ends, pack the same way in reverse, and photograph the van before you hand it back. A dated picture of an unmarked wing mirror saves an argument about the deposit, and costs nothing.</p></main></body></html>
+        """.utf8)
 
     static func rows(now: Date, files: [File]) -> [Marfa.Item] {
         var rows = files.map { file -> Marfa.Item in

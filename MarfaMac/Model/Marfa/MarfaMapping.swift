@@ -52,6 +52,7 @@ nonisolated enum MarfaMapping {
     /// the others (`project`, `category`) are what a connector's or a person's type may carry. A type that has
     /// none of them has an empty place, never a guess.
     static let fromField = "from"
+    static let toField = "to"
     static let projectField = "project"
     static let repositoryField = "repository"
     static let placeField = "place"

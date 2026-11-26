@@ -215,6 +215,91 @@ body:has(> #item-header:not([hidden])) {
   display: none;
 }
 
+/* A page whose text leads (a highlight's passage): the passage is drawn at the title's size where a title would be, and
+   the rows follow it at the start of the footer. It is the same text, edited as text. */
+body[data-lead='on'] {
+  --inkkit-padding-top: 0px;
+}
+
+/* On the text's own element, since the page's line spacing setting is set on the body and would otherwise win. */
+body[data-lead='on'] #editor {
+  --inkkit-font-size: var(--page-title-size);
+  --inkkit-line-height: calc(30 / 24.7);
+}
+
+body[data-lead='on'] #editor .ProseMirror {
+  font-weight: 600;
+  letter-spacing: -0.022em;
+}
+
+body[data-lead='on'] #item-header {
+  padding-bottom: calc(var(--step) * 2);
+}
+
+body[data-lead='on'] #item-footer {
+  padding-top: 0;
+}
+
+body[data-lead='on'] #item-footer > .item-rows {
+  margin-top: calc(var(--step) * 2);
+}
+
+body[data-lead='on'] #item-footer > .item-rows + .item-foot-lists {
+  margin-top: calc(var(--step) * 6);
+}
+
+/* A place's map: a still picture of the column's width, cropped about its point, with its corners rounded. */
+.item-map {
+  position: relative;
+  height: calc(var(--interface-text-size) * 260 / 13);
+  border: 1px solid var(--separator);
+  border-radius: calc(var(--interface-text-size) * 10 / 13);
+  overflow: hidden;
+  background: var(--fill-tertiary);
+}
+
+.item-map[hidden] {
+  display: none;
+}
+
+.item-map-picture,
+.item-map picture,
+.item-map img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Apple Maps' attribution and legal link over the picture's foot. The page draws them, so they stay whole at any column
+   width, on a fill that reads over either map. */
+.item-map-credit {
+  position: absolute;
+  inset: auto 0 0 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: calc(var(--interface-text-size) * 8 / 13);
+  padding: calc(var(--interface-text-size) * 3 / 13) calc(var(--interface-text-size) * 8 / 13);
+  font-size: var(--interface-caption-size);
+  color: var(--label-secondary);
+  background: color-mix(in srgb, Canvas 72%, transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.item-map-credit .item-link {
+  color: var(--label-secondary);
+  text-decoration: underline;
+}
+
+.item-map img {
+  object-fit: cover;
+}
+
+.item-map:not([hidden]) + .item-foot-lists {
+  margin-top: calc(var(--interface-text-size) * 30 / 13);
+}
+
 /* What follows the text: a collection's contents and Linked From, on the header's margins and type. */
 #item-footer {
   --interface-text-size: 13px;
@@ -485,8 +570,10 @@ button.item-kicker-type:focus-visible {
    `TypeTone`): the sizes and fills as `--chip-*`, and each tone's colors as `--tone-<name>`. A chip names its tone and
    the page forwards the name; no color is chosen here. Each size is the app's value in points, scaled by
    `--chip-scale`, the interface text size over 13, so chips follow the text size as the rest of the header does.
-   The sizes are the same for every kind, so chips side by side always line up. */
-#item-header {
+   The sizes are the same for every kind, so chips side by side always line up. They are set on the footer too, because
+   a page whose text leads draws its rows there. */
+#item-header,
+#item-footer {
   --chip-scale: 1;
   --c-height: calc(var(--chip-height, 22px) * var(--chip-scale));
   --c-radius: calc(var(--chip-radius, 7px) * var(--chip-scale));

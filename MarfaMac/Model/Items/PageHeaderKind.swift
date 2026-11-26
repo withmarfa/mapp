@@ -14,6 +14,12 @@ nonisolated enum PageHeaderKind: String, Sendable {
     case place
     /// `core.bookmark` and `core.media`: something to read, with an original to open.
     case reading
+    /// `core.message`: its `from` and `to` are people, drawn as a name with the address in grey. Another type's field of
+    /// that name is drawn as its own kind says.
+    case message
+    /// `core.highlight`: a passage with no title, which the page draws large, ahead of its rows. The text is the
+    /// passage and stays the only text; the leading look is a display of it (`PageHeader.textLeads`).
+    case highlight
     /// `core.file.webpage`: the page itself. A file has no text to edit, so SwiftUI draws the head above the HTML
     /// (`WebPageItemPage`), from the same `PageHead` as the editor's.
     case webpage
@@ -26,6 +32,8 @@ nonisolated enum PageHeaderKind: String, Sendable {
         TypeID("core.event"): .event,
         TypeID("core.entity.person"): .person,
         TypeID("core.entity.place"): .place,
+        TypeID("core.message"): .message,
+        TypeID("core.highlight"): .highlight,
         TypeID("core.bookmark"): .reading,
         TypeID("core.media"): .reading,
         TypeID("core.file.webpage"): .webpage,

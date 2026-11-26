@@ -91,6 +91,18 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
         }
     }
 
+    /// A place's map as a still picture for each appearance, nil while it is being made, with what VoiceOver reads for it.
+    struct Map: Encodable, Equatable, Sendable {
+        var light: String?
+        var dark: String?
+        var label: String
+        /// Apple Maps' attribution and its legal link, which a snapshot carries none of: the page draws both on the picture,
+        /// whatever its width.
+        var attribution: String
+        var legal: String
+        var legalAddress: String
+    }
+
     var item: String
     /// The page is in Focus: the head is hidden, and the footer stays as it is.
     var focused = false
@@ -102,6 +114,9 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
     var editable: Bool
     /// False where the item is titled by the first line of its text, which the page already shows as its text.
     var showsTitle = true
+    /// The item's text is drawn large in the title's place and its rows follow it, as a highlight's passage is. The text
+    /// is the same text, edited as text, so only its look and its place against the rows change.
+    var textLeads = false
     var kicker: Kicker
     /// The status menu, for the status row or pin, which holds it; nil where the item holds no status.
     var status: Pin?
@@ -115,6 +130,8 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
     var showMore: String
     /// What is listed under the text: the item's sub-items, and the items that link to it.
     var foot: PageFoot
+    /// A place's map, drawn between its rows and its foot; nil for an item with no point to show.
+    var map: Map?
     /// Whether the page has text to write. A collection with no text shows nothing to type into.
     var showsText: Bool
     var interfaceTextSize: Int
@@ -159,6 +176,8 @@ extension PropertyRow: Encodable {
     private struct Listed: Encodable {
         let title: String
         let initials: String?
+        /// What the person answers, in grey after the name.
+        let note: String?
     }
     private struct Option: Encodable {
         let label: String
@@ -183,7 +202,9 @@ extension PropertyRow: Encodable {
             }
         case .people(let names):
             try container.encode("people", forKey: .kind)
-            try container.encode(names.map { Listed(title: $0, initials: PersonInitials.of($0)) }, forKey: .people)
+            try container.encode(names.enumerated().map { index, name in
+                Listed(title: name, initials: PersonInitials.of(name), note: answers.indices.contains(index) && !answers[index].isEmpty ? answers[index] : nil)
+            }, forKey: .people)
         case .options(let options):
             try container.encode("options", forKey: .kind)
             try container.encode(

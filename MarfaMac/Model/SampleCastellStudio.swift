@@ -20,11 +20,11 @@ nonisolated extension SampleCastell.Maker {
         func make(
             _ id: String, _ type: String, _ title: String?, _ source: String, _ day: Int, _ time: String = "09:00",
             tier: Marfa.Tier = .library, state: Marfa.ItemState = .active, body: String = "", parent: String? = nil,
-            due: Int? = nil, props: JSONObject = [:], collections: [String] = [], favorite: Bool = false
+            due: Int? = nil, props: JSONObject = [:], collections: [String] = [], favorite: Bool = false, tags: [String] = []
         ) {
             specs.append(Spec(
                 id: id, type: type, title: title, body: body, source: source, day: day, time: time, tier: tier, state: state,
-                tags: favorite ? [ItemTag.favorite] : [], props: props, due: due, parent: parent, collections: collections))
+                tags: (favorite ? [ItemTag.favorite] : []) + tags, props: props, due: due, parent: parent, collections: collections))
         }
         func task(
             _ id: String, _ title: String, _ source: String, _ day: Int, _ time: String = "10:00", priority: String = "medium",
@@ -68,8 +68,16 @@ nonisolated extension SampleCastell.Maker {
         task("t-shop", "Move the shop page to the new template", mfm, 5, parent: "t-pages-tidy", state: .archived)
         task("t-appendix", "Cut the appendix to four pages", mfm, 5, parent: "t-printer", state: .trashed)
         make("note-paper", Kind.note, "Paper for the zine", mfm, 17, "10:00", parent: Self.lisbon)
-        make("event-feira", Kind.event, "Feira Gráfica, the Lisbon print fair", mfm, 20, "09:00", parent: Self.lisbon,
-             props: ["starts_at": .string(Self.stamp(start + 100 * 86_400 + 10 * 3600))])
+        make("event-feira", Kind.event, "Feira Gráfica, the Lisbon print fair", mfm, 20, "09:00",
+             body: "Three days at LX Factory, with a stall shared with Ines. Doors open to the trade on Friday and to everyone at the weekend.\n\n## Getting there\n\nFly out on Thursday and back on Monday. The zines go ahead by courier, two boxes, to arrive by Wednesday.\n\n## The stall\n\nTable 41, in the long hall. Two metres of table, one wall and no power. Bring the cloth and the clip lights.\n\n## What to bring\n\n- 200 zines, and the 50 with the hand-stamped cover.\n- The card reader, charged, and a float in euros.\n- Price cards in Portuguese and English.", parent: Self.lisbon,
+             props: [
+                 "starts_at": .string(Self.stamp(start + 100 * 86_400)), "ends_at": .string(Self.stamp(start + 103 * 86_400)),
+                 "all_day": .bool(true), "place": "LX Factory, Rua Rodrigues de Faria 103, Lisbon", "url": "https://feiragrafica.example/2027",
+                 "status": "confirmed",
+                 "attendees": [["name": "Ines Barros", "email": "ines@barroslima.example", "response": "accepted"]],
+             ])
+        make("event-lisbon-call", Kind.event, "Call with the Lisbon printer", mfm, 3, "10:00",
+             props: ["starts_at": .string(Self.stamp(start + 4 * 86_400 + 14 * 3600)), "timezone": "Europe/Lisbon"])
 
         // The board's Library list, in order.
         make("note-glaze-workshop", Kind.note, "Notes from the glaze workshop", raycast, 0, "09:40",
@@ -80,20 +88,61 @@ nonisolated extension SampleCastell.Maker {
              body: "Start with green wood and a straight knife. A spoon is three cuts repeated a few hundred times, and the first twenty spoons are for the fire.\n\nBirch and sycamore forgive the most. Keep the blank in a bag between sessions, so it dries as slowly as you carve.",
              props: ["url": "https://greenwoodjournal.example/spoon-carving-for-beginners"])
         make("note-trust-wants", Kind.note, "What the trust wants from the report", claude, 0, "07:02")
+        make("bm-guide", Kind.bookmark, "A guide to paper weights, and what each one costs", raycast, 1, "15:31",
+             props: ["url": "https://calverts.example/guides/paper-weights"])
+        make("bm-type", Kind.bookmark, "Setting type on screens for older eyes", readwise, 6, "09:00",
+             body: "> Set the measure first. Everything else on the page is a consequence of it. Sixteen pixels is a floor and not a size, and a line longer than seventy characters asks an older eye to find its way back alone.\n\nUse this for the trust’s report on screen. Their readers are mostly over sixty, and the PDF will be read on a tablet more than on paper.\n\nThree things to carry over: an 18 pixel body, a measure near 62 characters, and no grey lighter than the one this article uses for captions.",
+             props: ["url": "https://readableweb.example/type-for-older-eyes", "author": "Tomás Reyes", "published_at": .string(Self.stamp(start - 60 * 86_400)),
+                     "description": "Why sixteen pixels is a floor, how long a line can be, and what low contrast costs a reader over sixty."],
+             collections: ["collection-reading"], tags: ["typography", "accessibility", "lewes-trust"])
+        for (index, text) in ["Set the measure first. Everything else on the page is a consequence of it.", "Sixteen pixels is a floor and not a size.",
+                              "Contrast is the cheapest kindness a page can offer.", "A caption is still text, and deserves to be read."].enumerated() {
+            make("hl-type-\(index)", Kind.highlight, nil, readwise, 5, "1\(index):00", body: text)
+            link("hl-type-\(index)", "bm-type", MarfaMapping.excerptEdge)
+        }
+        link("note-trust-comments", "bm-type", "references")
+        link("note-paper", "bm-type", "references")
         make("bm-planes", Kind.bookmark, "Bench planes, sharpened properly", rss, 1, "08:00", props: ["url": "https://example.com/bench-planes"])
         make("img-4821", Kind.image, "IMG_4821.HEIC", mfm, 1, "09:10", props: ["mime_type": "image/heic"])
         make("article-chalk", Kind.article, "Chalk streams of the South Downs", readwise, 1, "08:40", props: ["url": "https://example.com/chalk-streams"])
         make("note-uncoated", Kind.note, "Ask Calverts whether the uncoated stock comes in a heavier weight", raycast, 1, "08:20")
-        make("msg-proofs", Kind.message, "Re: proofs, second round", studio, 1, "07:30", body: "The second proofs are ready at the trade counter.")
+        make("msg-proofs", Kind.message, nil, studio, 1, "07:30",
+             body: "The second proofs are much better. The blacks hold on the uncoated stock now, and the cover photograph has kept its warmth.\n\nTwo small things on page 14. The caption has lost its last line, and the rule under the title is a hair heavier than on the other openers.\n\nAfter that I think we can tell Calverts to go. I am in the studio until six if you want to talk it through.\n\nInes",
+             props: ["from": "Ines Barros <ines@barroslima.example>",
+                     "to": ["Mira Castell <mira@castell.studio>", "Ruth Hart <ruth@lewes-trust.example>", "Sam Okonjo <sam@calverts.example>"]])
+        make("msg-proofs-2", Kind.message, nil, studio, 4, "16:10", body: "Thank you, I will look at page 14 tonight.", props: ["from": "Mira Castell <mira@castell.studio>"])
+        make("msg-proofs-3", Kind.message, nil, studio, 5, "11:00", body: "Can you send the page 14 caption again?", props: ["from": "Ines Barros <ines@barroslima.example>"])
+        make("msg-proofs-4", Kind.message, nil, studio, 12, "09:00", body: "First proofs attached.", props: ["from": "Mira Castell <mira@castell.studio>"])
+        for id in ["msg-proofs", "msg-proofs-2", "msg-proofs-3", "msg-proofs-4"] { link(id, "t-ines", MarfaMapping.threadEdge) }
+        make("msg-neighbour", Kind.message, nil, studio, 1, "11:52",
+             body: "Your paper samples were left with the neighbour at number 12.", props: ["from": "Calverts Deliveries"])
         make("hl-chalk", Kind.highlight, nil, readwise, 1, "07:00", body: "A chalk stream is rain that fell on the hill thirty years ago.")
+        link("hl-chalk", "article-chalk", MarfaMapping.excerptEdge)
+        make("hl-glaze", Kind.highlight, nil, readwise, 4, "10:00",
+             body: "A glaze is a glass that has been persuaded to stay where it was put. Heat wants it to run, gravity agrees, and the potter’s whole art is a negotiation between a surface that must melt and a shape that must not.",
+             props: ["note": "The clearest sentence on why the celadon pooled in the foot ring. Open the zine’s glaze page with its first line.", "color": "yellow", "start_location": "112"], tags: ["glazes", "quotes-to-reuse"])
+        link("hl-glaze", "book-cliff", MarfaMapping.excerptEdge)
+        join("hl-glaze", "collection-reading")
         make("event-ruth", Kind.event, "Planning call with Ruth", mfm, 2, "10:00",
-             props: ["starts_at": .string(Self.stamp(start - 2 * 86_400 + 15 * 3600))])
+             props: ["starts_at": .string(Self.stamp(start - 2 * 86_400 + 15 * 3600)),
+                     "ends_at": .string(Self.stamp(start - 2 * 86_400 + 15 * 3600 + 1800)), "timezone": "Europe/London"])
         make("note-kiln-14", Kind.note, "Kiln log, firing 14", studio, 2, "09:00")
         make("img-drawers", Kind.image, "Harbour Joinery: drawer fronts", mfm, 4, "11:00")
         make("bm-finishes", Kind.bookmark, "Wood finishes compared", readwise, 5, "09:00", props: ["url": "https://example.com/finishes"])
         make("note-trust-comments", Kind.note, "Lewes Trust: comments on the draft", claude, 6, "09:00")
-        make("person-ines", Kind.person, "Ines Barros", mfm, 7, "09:00", props: ["job_title": "Illustrator"])
-        make("place-calverts", Kind.place, "Calverts, the printers", mfm, 9, "09:00", props: ["address": "Calverts, 31 Cliffe High Street, Lewes", "latitude": .number(50.8747), "longitude": .number(0.0121)])
+        make("person-ines", Kind.person, "Ines Barros", mfm, 7, "09:00",
+             props: ["organization": "Barros & Lima", "job_title": "Illustrator",
+                     "emails": [["value": "ines@barroslima.example"], ["value": "ines@studiolima.example"]],
+                     "phones": [["value": "+351 21 555 0142"]], "address": "Rua das Flores 28, 1200-195 Lisbon",
+                     "notes": "Draws the zine’s cover and the six chapter openers. One round of roughs, then one of colour. Invoices in euros, thirty days."])
+        make("person-name", Kind.person, "Tomás Reyes", mfm, 8, "09:00")
+        make("place-calverts", Kind.place, "Calverts, the printers", mfm, 9, "09:00",
+             props: ["address": "Unit 4, Phoenix Works, North Street, Lewes BN7 2PE", "latitude": .number(50.8747), "longitude": .number(0.0121),
+                     "phone": "01273 555 0119", "url": "https://calverts.example",
+                     "notes": "Ask for Sam at the trade counter. Proofs are ready after two on weekdays. Two bays by the roller door, for loading only."],
+             tags: ["printers", "suppliers"])
+        make("place-yard", Kind.place, "Harbour Joinery yard", mfm, 10, "09:00", props: ["address": "The yard behind the harbour, Newhaven"])
+        make("place-name", Kind.place, "The Pells pool", mfm, 11, "09:00")
         make("book-cliff", Kind.book, "The cliff path, by Alice Tarrant", readwise, 14, "09:00")
         make("pr-photos", Kind.pullRequest,
              "Load large photos in steps, so the gallery never waits for the largest one before it shows the rest", github, 6, "09:48",
@@ -122,10 +171,12 @@ nonisolated extension SampleCastell.Maker {
              body: "All three are thin coats wiped back after twenty minutes. Linseed yellows, tung takes a week to cure, and Danish oil is mostly varnish, which is why it is the one that survives a kitchen.")
         make("feed-dovetails", Kind.bookmark, "A sharper way to cut dovetails", rss, 0, "08:30", tier: .feed,
              body: "Saw to the waste side of the line and stop paring so early. Most gaps in a dovetail come from the chisel, and the saw is blamed for them.")
-        make("feed-van", Kind.message, "Re: van hire for the print fair", studio, 1, "15:27", tier: .feed,
-             body: "The long wheelbase is free that weekend and takes both tables flat. They want it back by nine on Monday, and the deposit comes off the card when the keys go back.\n\nCollection is from the yard on Davey's Lane, any time after eight on the Friday.")
-        make("feed-van-first", Kind.message, "Van hire for the print fair", studio, 2, "14:00", tier: .feed,
-             body: "Can we fit both tables flat in the long wheelbase?")
+        make("feed-van", Kind.message, nil, studio, 1, "15:27", tier: .feed,
+             body: "The long wheelbase is free that weekend and takes both tables flat. They want it back by nine on Monday, and the deposit comes off the card when the keys go back.\n\nCollection is from the yard on Davey's Lane, any time after eight on the Friday.",
+             props: ["from": "Dan Okafor <dan@harbourvans.example>", "to": ["Mira Castell <mira@castell.studio>"]])
+        make("feed-van-first", Kind.message, nil, studio, 2, "14:00", tier: .feed,
+             body: "Can we fit both tables flat in the long wheelbase?",
+             props: ["from": "Mira Castell <mira@castell.studio>", "to": ["Dan Okafor <dan@harbourvans.example>"]])
         link("feed-van", "note-fair-layout", MarfaMapping.threadEdge)
         link("feed-van-first", "note-fair-layout", MarfaMapping.threadEdge)
         make("feed-fold", Kind.highlight, nil, readwise, 1, "11:00", tier: .feed, body: "Paper remembers every fold, so make the first one the one you meant.")
@@ -162,7 +213,8 @@ nonisolated extension SampleCastell.Maker {
         make("old-open-studio", Kind.event, "Open studio weekend, September", mfm, 54, state: .archived)
         make("old-sketches", Kind.image, "Harbour Joinery: first sketches", mfm, 54, state: .archived)
         make("old-post", Kind.bookmark, "A cheaper way to post zines abroad", rss, 62, tier: .feed, state: .archived)
-        make("old-quote", Kind.message, "Re: quote for last year's report", studio, 75, tier: .feed, state: .archived)
+        make("old-quote", Kind.message, nil, studio, 75, tier: .feed, state: .archived,
+             body: "Re: quote for last year's report", props: ["from": "Ruth Hart <ruth@lewes-trust.example>"])
         make("old-cards-xmas", Kind.task, "Post the Christmas cards", raycast, 82, state: .archived, props: ["priority": "low", "status": "completed"])
         make("old-business", Kind.task, "Order business cards from Calverts", mfm, 82, state: .archived, props: ["priority": "low", "status": "completed"])
         make("old-riso", Kind.event, "Risograph workshop at Kiln House", mfm, 91, state: .archived)
@@ -214,6 +266,14 @@ nonisolated extension SampleCastell.Maker {
         let loose = items.filter { $0.type == Kind.task && $0.state == .active && $0.id.hasPrefix("f-") }.map(\.id)
         for (index, task) in loose.enumerated() where index % 2 == 0 {
             link(projects[index / 2 % projects.count], task, "parent-of")
+        }
+
+        // The pages that list what names them: 143 items name Ines, 14 name Calverts, and 37 highlights are from one book.
+        let spread = items.filter { $0.tier == .library && $0.state == .active && $0.id.hasPrefix("f-") }
+        for item in spread.prefix(143) { link(item.id, "person-ines", "references") }
+        for item in spread.dropFirst(143).prefix(14) { link(item.id, "place-calverts", "references") }
+        for item in items.filter({ $0.type == Kind.highlight && $0.id.hasPrefix("f-") }).prefix(37) {
+            link(item.id, "book-cliff", MarfaMapping.excerptEdge)
         }
 
         // Reading for the report gathers the articles, books and highlights.

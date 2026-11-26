@@ -179,6 +179,12 @@ nonisolated struct ListShape: Hashable, Sendable {
         members.prefix(2).lazy.compactMap { text(of: $0, in: entry) }.first
     }
 
+    /// What a person's entry answers, shown in grey after the name: the entry's choice after the name and the address,
+    /// such as an attendee's response, as the choice's label. Read from the shape alone, and nil where the entry holds none.
+    func answer(of entry: [String: PropertyValue]) -> String? {
+        members.dropFirst(2).first { if case .choice = $0.kind { true } else { false } }.flatMap { text(of: $0, in: entry) }
+    }
+
     /// The number to call an entry holds, or nil. Marfa declares no phone format, so this reads the definition: only
     /// a list whose first declared member is required plain text (an entry is that value first, labelled after) can
     /// hold one, and only that member's own text is read. A list whose members are all optional, such as an address,

@@ -49,7 +49,11 @@ struct ItemPageHeader: ViewModifier {
     static func heldHeader(of editor: EditorController, in library: any ItemLibrary, drafts: DetailsPresentation) -> () -> PageHeader? {
         { [weak editor] in
             guard let id = editor?.heldItemID else { return nil }
-            return Cost.measure(.pageHeader) { header(of: id, in: library, drafts: drafts, footLimits: editor?.footLimits ?? [:]) }
+            return Cost.measure(.pageHeader) {
+                header(
+                    of: id, in: library, drafts: drafts, footLimits: editor?.footLimits ?? [:],
+                    refreshMap: { [weak editor] in editor?.refreshHeader() })
+            }
         }
     }
 
@@ -57,7 +61,8 @@ struct ItemPageHeader: ViewModifier {
     static func header(
         of id: ItemID, in library: any ItemLibrary, drafts: DetailsPresentation, placements: PagePlacements = .stored(),
         pinsProperties: Bool = PinsProperties.stored(), titleLines: Int = TitleLines.stored(), dateFormat: DateFormat = .stored(),
-        showsCoordinates: Bool = ShowsCoordinates.stored(), footLimits: PageFoot.Limits = [:]
+        showsCoordinates: Bool = ShowsCoordinates.stored(), footLimits: PageFoot.Limits = [:],
+        refreshMap: (@MainActor () -> Void)? = nil
     ) -> PageHeader? {
         guard let item = library.headerItem(id) else { return nil }
         let draft = drafts.draft(for: item.id, key: "title")
@@ -84,6 +89,7 @@ struct ItemPageHeader: ViewModifier {
             titleRefusal: library.titleRefusal,
             editable: library.canSetTitle(of: item),
             showsTitle: item.titleRule != .firstLine,
+            textLeads: showsText && item.titleRule == .firstLine && PageHeaderKind.of(item.type, in: library.catalogue) == .highlight,
             kicker: PageHeader.Kicker(head.kicker),
             status: status.flatMap { field in
                 guard let value = PageHead.statusValue(of: item, in: field) else { return nil }
@@ -103,11 +109,31 @@ struct ItemPageHeader: ViewModifier {
             rows: head.rows,
             showMore: head.showMore,
             foot: foot,
+            map: Self.map(of: item, in: library, refresh: refreshMap),
             showsText: showsText,
             interfaceTextSize: UserDefaults.standard.object(forKey: InterfaceKey.textSize) as? Int ?? InterfaceStyle.defaultTextSize,
             titleLines: titleLines,
             chips: .init()
         )
+    }
+
+    /// A place's map: its pictures, or none yet, for the point the place holds. Nil for an item that is no place, has no
+    /// point or whose map MapKit cannot give, which draws nothing, not an empty box. Without a way to be told when the
+    /// pictures are made, none is asked of MapKit.
+    private static func map(of item: Item, in library: any ItemLibrary, refresh: (@MainActor () -> Void)?) -> PageHeader.Map? {
+        guard PageHeaderKind.of(item.type, in: library.catalogue) == .place,
+              let location = ItemLocation.of(library.catalogue.itemTypes[item.type]),
+              case .point(let point) = location.reading(of: item), let refresh else { return nil }
+        let answer = PlaceMapImages.shared.pictures(for: point, whenMade: refresh)
+        var pictures: PlaceMapImages.Pictures?
+        switch answer {
+        case .unavailable: return nil
+        case .made(let made): pictures = made
+        case .waiting: break
+        }
+        return PageHeader.Map(
+            light: pictures?.light, dark: pictures?.dark, label: item.displayTitle, attribution: String(localized: "Apple Maps"),
+            legal: String(localized: "Legal"), legalAddress: "https://www.apple.com/legal/internet-services/maps/")
     }
 
     /// Carries out what the page asks, for the item it names, which may be one the page has just left: a title draft
