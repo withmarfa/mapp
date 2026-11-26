@@ -1,5 +1,6 @@
 import AuthenticationServices
 import AppKit
+import Darwin
 import Foundation
 import Marfa
 import Testing
@@ -31,6 +32,44 @@ import Testing
             for word in Self.raw { #expect(!told.contains(word), "“\(told)” shows “\(word)” for \(error)") }
             #expect(notice.message.hasSuffix("."))
             #expect(!notice.title.isEmpty)
+        }
+    }
+
+    @Test(arguments: [false, true])
+    func discoveryFailuresReachTheNotice(usingBrowser: Bool) async throws {
+        // Reserve a loopback port without listening so no other test can take it.
+        let socket = Darwin.socket(AF_INET, SOCK_STREAM, 0)
+        try #require(socket >= 0)
+        defer { close(socket) }
+        var local = sockaddr_in()
+        local.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+        local.sin_family = sa_family_t(AF_INET)
+        local.sin_addr.s_addr = inet_addr("127.0.0.1")
+        var length = socklen_t(MemoryLayout<sockaddr_in>.size)
+        try withUnsafeMutablePointer(to: &local) { pointer in
+            try pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { address in
+                try #require(bind(socket, address, length) == 0)
+                try #require(getsockname(socket, address, &length) == 0)
+            }
+        }
+        let anchor = NSWindow()
+        let signIns = SystemSignIns(bundleIdentifier: "com.withmarfa.marfa.tests", anchor: { anchor })
+        for (address, title) in [
+            ("https://marfa.invalid", "Can’t Find the Server"),
+            ("http://127.0.0.1:\(UInt16(bigEndian: local.sin_port))", "Can’t Connect to the Server"),
+        ] {
+            let connection = try MarfaConnection(address: address)
+            do {
+                if usingBrowser {
+                    _ = try await signIns.signInWithBrowser(to: connection)
+                } else {
+                    _ = try await signIns.startCodeSignIn(to: connection)
+                }
+                Issue.record("Discovery unexpectedly succeeded for \(address)")
+            } catch {
+                let notice = MarfaSettingsModel.notice(for: .signIn(SignInOutcome(error)))
+                #expect(notice?.title == title, "Discovery at \(address) failed with \(error)")
+            }
         }
     }
 
