@@ -6,7 +6,7 @@ struct CalendarChoicesTests {
     private let type = TypeID("test.event")
 
     private func field(_ key: String) -> ItemTypeInfo.Field {
-        ItemTypeInfo.Field(key: key, label: key, kind: .date, declaredBy: type)
+        ItemTypeInfo.Field(key: key, label: key, kind: .date(includesTime: false), declaredBy: type)
     }
 
     @Test func aChoiceThatIsNoLongerAFieldFallsBackWithoutBeingRewritten() {
