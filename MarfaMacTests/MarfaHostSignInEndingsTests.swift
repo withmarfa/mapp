@@ -136,25 +136,19 @@ import Testing
         #expect(approvalAt == nil)
     }
 
-    /// After Use a Different Server, the words are about the server left, not the one now open.
-    @Test func aSwitchThatLeavesAnApprovalNamesThePreviousServer() async throws {
+    /// After moving the same Marfa to another address, whose copy goes with it, the words are about the address left,
+    /// not the one now open.
+    @Test func aMoveThatLeavesAnApprovalNamesThePreviousServer() async throws {
         let bench = HostBench()
-        bench.servers.storedWrites.withLock { $0 = 2 }
-        let host = bench.host(remover: { _, _ in throw MarfaError.storeBusy(message: "Busy.") })
+        let first = try MarfaConnection(address: "http://first.test:8210")
+        let second = try MarfaConnection(address: "http://second.test:8210")
+        bench.servers.instances.withLock { $0 = [first: "same", second: "same"] }
+        let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "k")
-        try #require(bench.servers.last).report.set(SyncReport(waiting: 2, queueRead: true))
-        #expect(await eventually { host.waitingChanges == 2 })
         bench.signIns.script(signOut: .success(.notConfirmed))
 
-        let asked = await problem { () throws(MarfaHost.Problem) in
-            try await host.changeAddress(to: "http://second.test:8210", via: host.scripted("k"), choice: nil)
-        }
-        guard case .changesWaiting(let shown?)? = asked else {
-            Issue.record("\(String(describing: asked))")
-            return
-        }
         let told = try #require(await problem { () throws(MarfaHost.Problem) in
-            try await host.changeAddress(to: "http://second.test:8210", via: host.scripted("k"), choice: .discardCopy(shown))
+            try await host.changeAddress(to: "http://second.test:8210", via: host.scripted("k"))
         })
         let notice = try #require(MarfaSettingsModel.notice(for: told, reached: .switched))
         #expect(notice.message.contains("previous server"), "\(notice.message)")

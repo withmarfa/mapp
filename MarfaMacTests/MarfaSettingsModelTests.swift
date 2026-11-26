@@ -192,7 +192,8 @@ import Testing
 
     /// A switch that is done but for removing the old server's sign-in says it switched rather than disconnected, and tells
     /// the person where to remove what is left.
-    @Test func aSwitchThatLeavesTheOldSignInBehindSaysItSwitched() async throws {
+    /// A switch keeps the Marfa it leaves signed in, so no sign-out runs and none can fail.
+    @Test func aSwitchSignsOutOfNothing() async throws {
         let bench = HostBench()
         let (model, _) = model(bench)
         await connect(model)
@@ -203,9 +204,8 @@ import Testing
 
         #expect(model.host.connection == second)
         #expect(model.otherAddress == "")
-        let notice = try #require(model.notice)
-        #expect(notice.title.contains("Switched"))
-        #expect(notice.message.contains("Keychain Access"))
+        #expect(model.notice == nil)
+        #expect(!bench.signIns.calls.contains { $0.hasPrefix("signOut") })
     }
 
     // MARK: Leaving a copy
