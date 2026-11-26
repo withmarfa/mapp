@@ -494,8 +494,8 @@ enum TopRowMetrics {
     static let lead: CGFloat = 40
     /// The same in a list column beside a page, where the title's text stands where the rows' text does.
     static let listLead: CGFloat = 16
-    /// The pills start a little before the title so their words line up under it.
-    static let pillsLead: CGFloat = 29
+    /// What the row of views keeps clear at its trailing edge. Its first pill stands where the title does, capsule edge to edge.
+    static let pillsTrail: CGFloat = 29
     static let pillHeight: CGFloat = 28
     /// The title's line at the least: the toolbar's usual height, which stands in full screen while the toolbar is hidden.
     static let lineHeight: CGFloat = 52

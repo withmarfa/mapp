@@ -118,10 +118,9 @@ struct ItemModal: View {
                             if let following, browser.modalItem == id { browser.moveModal(to: following) }
                         }
                         .buttonStyle(.borderless)
-                        .foregroundStyle(.primary)
                         .padding(.horizontal, 14)
                         .frame(height: Self.buttonHeight)
-                        .glassEffect(.regular, in: .capsule)
+                        .windowGlass(in: .capsule)
                     }
                 }
                 capsule {
@@ -155,7 +154,6 @@ struct ItemModal: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .labelStyle(.iconOnly)
-        .foregroundStyle(.primary)
-        .glassEffect(.regular, in: .capsule)
+        .windowGlass(in: .capsule)
     }
 }

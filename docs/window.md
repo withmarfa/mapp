@@ -32,7 +32,6 @@ paths:
 - **Search and New, the Library and the Feed, then Pinned, Types and the person's sections** (`SidebarLayout`). A row whose thing is gone keeps its place.
 - **Pinned holds views, collections and items;** a saved view until taken out.
 - **Five types show, then "N More",** each counting its kinds' items too.
-- **Under the pointer** a row has a ground, a type, kind or collection a plus for its count, and a heading Add and More. Sections never fold.
 - **Customize Sidebar works in place:** each faint place is a menu of what fits.
 - **Go lists the same places, views and types** (`GoMenu`), and the Archive.
 
@@ -46,12 +45,13 @@ paths:
 
 ## Foot
 
-- **The foot is one button that opens the Marfa's panel** (`SidebarFoot`, `MarfaPanel`). Refresh, Settings and a warning line are separate buttons; that line opens Settings › Connection.
+- **The foot is one button that opens the Marfa's panel** (`SidebarFoot`, `MarfaPanel`). Refresh, Settings and a warning line are separate buttons; the line opens Settings › Connection.
 
 ## Toolbar
 
 - **The top row is drawn in the content under a title the window hides** (`TopRowFrame`); a plain `toolbar` holds only the buttons.
 - **The views are a radio group;** VoiceOver reads every view, folded or not.
+- **The first pill's capsule starts on the title's left edge,** not its text.
 - **The row folds by the room it has** (`ToolbarRoomProbe`) into N More, with hidden pills and New View…, and holds no width. One view makes no row.
 - **An on button is gray, never the accent.** An item that cannot act dims.
 - **Trap:** hide the title on the window (`hidesWindowTitle`), or it returns in full screen. Read the row's line from `TopRowSpace`, never a safe area: full screen hides the toolbar.
@@ -63,12 +63,12 @@ paths:
 ## Smallest window
 
 - **The main window goes down to 760 by 520,** set once on its content. The panel folds under 1000 wide, the sidebar under 900 (only what folded reopens), and under 800 the views are one pill beside the title.
-- **The panel is 300 wide** (`PanelWidth`).
-- **The page beside a layout gives way first,** 372 to 300, then the table drops columns whole, then the panel and sidebar fold (`BesideColumn`).
+- **The page beside a layout gives way first,** 372 to 300, then the table drops columns whole, then the panel and sidebar fold (`BesideColumn`). Their line runs up through the toolbar.
 
 ## Corner
 
 - **The corner holds only controls for viewing** the page or list in front (`WindowCorner`, `PageCorner`): formats, text size, focus, zoom, pages. A control turned off in Settings is in More instead.
+- **Glass the content draws dims with the window,** as the toolbar's does (`windowGlass`).
 - **The modal has no corner,** and the column beside a layout has Open as Page alone.
 
 ## Menus and palettes
@@ -83,7 +83,7 @@ paths:
 - **Open, Return, a double click and a link follow Open Items** (`ItemOpening`).
 - **Beside the List is the standard:** a layout that spans the window shows the chosen item's page beside it, and a new row replaces it once the selection rests (`BesideSettler`).
 - **A column, a modal and a full page show one item** with the window's one editor, one at a time. New Window takes several and asks first above a limit (`ItemWindows`).
-- **The modal** (`ItemModal`) has Close, Up and Down, Keep on a Feed item, Favorite, Share, More and Open as Page, and no panel. Escape, Close and a click outside save and close it. Up and down follow the list behind it (`ListNeighbors`), Keep moves on once queued, and a followed link stays in it.
+- **The modal** (`ItemModal`) has Close, Up and Down, Keep on a Feed item, Favorite, Share, More and Open as Page, and no panel. Escape, Close and a click outside save and close it. Up and down follow the list behind it (`ListNeighbors`); Keep moves on once queued, and a followed link stays in it.
 - **An item's window has the modal's controls and the panel** (`ItemWindowToolbar`); Back and Forward walk its links (`ItemWindow.go`).
 - **A full page's Back returns to the layout**, without view options.
 

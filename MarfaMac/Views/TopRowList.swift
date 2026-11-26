@@ -62,16 +62,16 @@ private struct TopRowOverList: ViewModifier {
                             .padding(.leading, lead)
                             .padding(.trailing, room.titleTrail)
                     }
-                } rest: {
+                } rest: { lead in
                     if isCompact {
                         TopRowTitleLine(
                             browser: browser, content: row, showsViews: row.hasViews, opensPlaces: true, isSmall: isSmall)
                             .padding(.leading, TopRowMetrics.listLead)
-                            .padding(.trailing, TopRowMetrics.pillsLead)
+                            .padding(.trailing, TopRowMetrics.pillsTrail)
                     } else {
                         TopRowViewsLine(browser: browser, content: row)
-                            .padding(.leading, TopRowMetrics.pillsLead)
-                            .padding(.trailing, TopRowMetrics.pillsLead)
+                            .padding(.leading, lead)
+                            .padding(.trailing, TopRowMetrics.pillsTrail)
                     }
                 })
     }
@@ -93,7 +93,7 @@ private struct TopRowOverPage: ViewModifier {
                 }
                 .padding(.leading, lead)
                 .padding(.trailing, room.titleTrail)
-            } rest: {
+            } rest: { _ in
                 EmptyView()
             })
     }

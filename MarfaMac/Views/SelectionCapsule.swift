@@ -132,7 +132,7 @@ struct SelectionCapsule: View {
         .buttonStyle(CapsuleSegmentStyle())
         .padding(.horizontal, 3)
         .frame(height: height)
-        .glassEffect(.regular, in: .capsule)
+        .windowGlass(in: .capsule)
     }
 
     /// One symbol of the group; its word is its help tag and its label for VoiceOver.
@@ -215,7 +215,7 @@ private struct CapsuleSegmentStyle: ButtonStyle {
             let scale = InterfaceStyle.scale(for: textSize)
             configuration.label
                 .font(.system(size: 14 * scale, weight: .regular))
-                .foregroundStyle(isEnabled ? .primary : .tertiary)
+                .controlForeground(isEnabled: isEnabled)
                 .frame(width: 34 * scale)
                 .frame(maxHeight: .infinity)
                 .background {

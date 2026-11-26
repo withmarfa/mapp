@@ -45,7 +45,9 @@ struct BesideColumn: ViewModifier {
             // comes from the width measured instead.
             content.frame(minWidth: 0, maxWidth: .infinity)
             if isShown {
-                Divider()
+                // The line runs up through the toolbar's height as the boards draw it, as the right panel's does
+                // (`panelEdgeThroughToolbar`); the layout and the page keep their own tops under the toolbar.
+                Divider().ignoresSafeArea(.container, edges: .top)
                 // One container, so the column's frame, its corner and its accessibility element each apply once, to the
                 // column and not to each branch. The corner is pinned to the column's foot whatever the page's height.
                 ZStack {
