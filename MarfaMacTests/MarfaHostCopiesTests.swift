@@ -135,6 +135,7 @@ import Testing
         let store = try await makeCopy(bench, in: folder, unsent: 1)
         let holder = try await WorkingCopy.open(store: store)
         bench.servers.instances.withLock { $0 = [bare: "instance-y"] }
+        bench.servers.copiesSayInstance.withLock { $0 = false }
         let host = bench.host()
         try await host.connect(address: bare.address.absoluteString, key: "k")
         await holder.close()
