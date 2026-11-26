@@ -23,7 +23,8 @@ struct KeyboardPage: View {
             HStack {
                 Spacer(minLength: 0)
                 SettingsShortcutSearch(
-                    text: $model.search, byKeys: $model.searchesByKeys, pressed: model.pressed?.display
+                    text: $model.search, byKeys: $model.searchesByKeys, pressed: model.pressed?.display,
+                    clearPressed: { model.pressed = nil }
                 ) { event in
                     if let shortcut = Shortcut(event: event) { model.pressed = shortcut }
                 }

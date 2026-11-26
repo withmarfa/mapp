@@ -112,6 +112,7 @@ struct SettingsShortcutSearch: View {
     @Binding var byKeys: Bool
     /// The keys pressed last, as written in a menu, while searching by keys.
     let pressed: String?
+    let clearPressed: () -> Void
     let press: (NSEvent) -> Void
     @State private var monitor = SettingsKeyMonitor()
 
@@ -125,7 +126,9 @@ struct SettingsShortcutSearch: View {
             .help("Search by Pressing a Shortcut")
             .accessibilityIdentifier("ShortcutSearchByKeys")
             if byKeys {
-                SettingsSearchField(prompt: String(localized: "Press a Shortcut"), text: .constant(pressed ?? ""), identifier: "ShortcutSearch")
+                SettingsSearchField(
+                    prompt: String(localized: "Press a Shortcut"),
+                    text: .constant(pressed ?? ""), identifier: "ShortcutSearch", onClear: clearPressed)
             } else {
                 SettingsSearchField(prompt: String(localized: "Search Shortcuts"), text: $text, identifier: "ShortcutSearch")
             }

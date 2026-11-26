@@ -238,17 +238,20 @@ struct SettingsField: View {
     var onSubmit: () -> Void = {}
     /// Run when the field loses focus, so a value typed and left is kept as one that was submitted.
     var onEndEditing: (() -> Void)?
+    var onCancel: (() -> Void)?
     @FocusState private var isFocused: Bool
+    @State private var cancelMonitor = SettingsKeyMonitor()
+    @State private var cancelAnchor = NSView()
     @Environment(\.settingsTextScale) private var scale
 
     init(
         title: LocalizedStringKey, text: Binding<String>, prompt: String? = nil, isError: Bool = false, isSecure: Bool = false,
         isMonospaced: Bool = false, width: CGFloat? = SettingsTokens.Metric.controlWidth, onSubmit: @escaping () -> Void = {},
-        onEndEditing: (() -> Void)? = nil
+        onEndEditing: (() -> Void)? = nil, onCancel: (() -> Void)? = nil
     ) {
         self.init(
             label: Text(title), text: text, prompt: prompt, isError: isError, isSecure: isSecure, isMonospaced: isMonospaced, width: width,
-            onSubmit: onSubmit, onEndEditing: onEndEditing)
+            onSubmit: onSubmit, onEndEditing: onEndEditing, onCancel: onCancel)
     }
 
     /// For a title the server or a plugin wrote, which is never looked up as a key.
@@ -264,7 +267,7 @@ struct SettingsField: View {
 
     private init(
         label: Text, text: Binding<String>, prompt: String?, isError: Bool, isSecure: Bool, isMonospaced: Bool, width: CGFloat?,
-        onSubmit: @escaping () -> Void, onEndEditing: (() -> Void)?
+        onSubmit: @escaping () -> Void, onEndEditing: (() -> Void)?, onCancel: (() -> Void)? = nil
     ) {
         title = label
         _text = text
@@ -275,6 +278,7 @@ struct SettingsField: View {
         self.width = width
         self.onSubmit = onSubmit
         self.onEndEditing = onEndEditing
+        self.onCancel = onCancel
     }
 
     var body: some View {
@@ -293,9 +297,32 @@ struct SettingsField: View {
         .focused($isFocused)
         .appFocusRing(isFocused: isFocused)
         .onSubmit(onSubmit)
-        .onChange(of: isFocused) { if !$1 { onEndEditing?() } }
+        .onChange(of: isFocused) { _, focused in
+            if focused, let onCancel {
+                let anchor = cancelAnchor
+                cancelMonitor.start { [weak anchor] event in
+                    guard let window = anchor?.window, event.windowNumber == window.windowNumber, event.isEscape else { return false }
+                    onCancel()
+                    return true
+                }
+            } else if !focused {
+                cancelMonitor.stop()
+                onEndEditing?()
+            }
+        }
+        .onDisappear { cancelMonitor.stop() }
+        .background {
+            if onCancel != nil { CancelAnchor(view: cancelAnchor).allowsHitTesting(false) }
+        }
         .frame(width: width)
         .settingsErrorRing(isError)
+    }
+
+    private struct CancelAnchor: NSViewRepresentable {
+        let view: NSView
+
+        func makeNSView(context: Context) -> NSView { view }
+        func updateNSView(_ view: NSView, context: Context) {}
     }
 }
 
