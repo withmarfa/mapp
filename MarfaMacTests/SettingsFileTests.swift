@@ -36,7 +36,9 @@ import Testing
         let library = libraries.libraryKey
         for setting in PreferencesMap.inFiles {
             guard case .member(let field) = setting.place else { continue }
-            setting.write([.member(field, setting.key): #""chosen""#], to: defaults, library: library)
+            // A member whose store reads only its own words takes one of them.
+            let value = setting.key == DateFormat.key ? PreferenceJSON.text(DateFormat(date: .long).rawValue) ?? "" : #""chosen""#
+            setting.write([.member(field, setting.key): value], to: defaults, library: library)
         }
         libraries.shortcuts.set(refresh, for: .refresh)
         #expect(libraries.anyAppShortcuts.set(hotKey, for: .commandPalette) == nil)
