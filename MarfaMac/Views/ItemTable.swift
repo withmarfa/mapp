@@ -29,6 +29,8 @@ struct ItemTable: View {
     @State private var widthCache = ColumnWidthCache()
     /// Whether a person is dragging a column's divider, the only time the table stores a width.
     @State private var resizing = ColumnResizing()
+    /// Where each row was last drawn, which the row under the pointer or the keyboard's is held at (`RowHold`).
+    @State private var drawn = DrawnRows()
 
     /// The inset style's own margin before the first column.
     static let inset: CGFloat = 16
@@ -54,9 +56,13 @@ struct ItemTable: View {
             scale: CGFloat(textSize) / CGFloat(InterfaceStyle.defaultTextSize))
         let _ = setStartingWidths(shown, fit: fit)
         let (allRows, rows) = (content.allRows, content.rows)
-        let pages = Pages(content: content, paging: browser.tablePaging, size: browser.tablePageSize, expanded: browser.expandedHere)
+        let _ = browser.rowHoldReleases
+        let pages = Pages(
+            content: content, paging: browser.tablePaging, size: browser.tablePageSize, expanded: browser.expandedHere,
+            hold: &browser.rowHold)
+        let _ = drawn.take(pages.anchors)
 
-        return ItemTableSelection(browser: browser, content: content) { selection in
+        return ItemTableSelection(browser: browser, content: content, drawn: drawn) { selection in
             table(selection: selection, columns: content.columns, fit: fit, pages: pages, grouping: content.grouping, collapsed: content.collapsed)
         }
             .padding(.horizontal, margin)
@@ -82,6 +88,9 @@ struct ItemTable: View {
                 if !browser.isSearchExpanded { browser.focusRequest = .list }
             }
             .onChange(of: allRows.count) { browser.revealSelectionInTable(content) }
+            .background { PointerHold(hover: hover, browser: browser, drawn: drawn) }
+            .onAppear { browser.restoreInPlace(.table(group: nil), in: library) }
+            .onChange(of: browser.shown) { browser.restoreInPlace(.table(group: nil), in: library) }
     }
 
     /// The table's content, with its rows holding the links of the columns the person shows. A link column that was hidden
@@ -106,14 +115,15 @@ struct ItemTable: View {
         } rows: {
             if let grouping {
                 ForEach(pages.groups) { groupRows($0, grouping: grouping, collapsed: collapsed) }
-                if pages.remaining > 0 {
-                    loadMoreRow(remaining: pages.remaining)
-                }
             } else {
                 ForEach(pages.slice.rows) { TableRow($0) }
-                if pages.slice.remaining > 0 {
-                    loadMoreRow(remaining: pages.slice.remaining)
-                }
+            }
+            ForEach(pages.trailing) { TableRow($0) }
+            if browser.typesInPlace {
+                newRow()
+            }
+            if pages.remaining > 0 {
+                loadMoreRow(remaining: pages.remaining)
             }
         }
         .tableStyle(.inset)
@@ -204,6 +214,16 @@ struct ItemTable: View {
             }
         } header: {
             ItemTableGroupHeader(group: page.group, column: grouping, isCollapsed: isCollapsed) { toggle(id, collapsed: collapsed) }
+        }
+    }
+
+    /// The table's last row, New, which a new item is typed in (`InPlaceRow`).
+    @TableRowBuilder<ItemTableRow>
+    private func newRow() -> some TableRowContent<ItemTableRow> {
+        Section {
+            ForEach([ItemTableRow]()) { TableRow($0) }
+        } header: {
+            InPlaceTableRow(browser: browser, library: library, undoManager: undoManager)
         }
     }
 
@@ -503,12 +523,41 @@ private struct ItemTableGroupHeader: View {
 private struct ItemTableSelection<Content: View>: View {
     @Bindable var browser: Browser
     let content: ItemTableContent
+    let drawn: DrawnRows
     let table: (Binding<Set<ItemID>>) -> Content
 
     var body: some View {
         table($browser.selection)
-            .onChange(of: browser.selection, initial: true) { browser.revealSelectionInTable(content) }
+            .onChange(of: browser.selection, initial: true) {
+                browser.revealSelectionInTable(content)
+                // The one row the keyboard chose stays where it is drawn until another is chosen.
+                let single = browser.selection.count == 1 ? browser.selection.first : nil
+                browser.holdKeyboard(single.flatMap { drawn.anchors[$0] })
+            }
     }
+}
+
+/// Holds the row under the pointer where it is drawn until the pointer goes to another (`RowHold`). A view of its own,
+/// so a pointer that moves runs this body and not the table's.
+private struct PointerHold: View {
+    let hover: ItemTableHover
+    let browser: Browser
+    let drawn: DrawnRows
+
+    var body: some View {
+        Color.clear
+            .onChange(of: hover.row) { _, row in
+                if let row { browser.holdPointer(drawn.anchors[row]) }
+            }
+    }
+}
+
+/// Where each row of the table was last drawn, kept apart from what the table observes, so a pointer that moves draws
+/// nothing.
+private final class DrawnRows {
+    private(set) var anchors: [ItemID: HeldRow] = [:]
+
+    func take(_ anchors: [ItemID: HeldRow]) { self.anchors = anchors }
 }
 
 /// Widths decoded for one place's stored columns. A class, so keeping the decoded value does not refresh the table.
@@ -534,26 +583,43 @@ private struct Pages {
     let remaining: Int
     /// Where each row drawn stands among its parents, where any nests (`ItemNesting`).
     let places: [ItemID: ItemNesting.Place]
+    /// The items typed in place in a grouped table, which stand after the groups, where they were typed, until the row is
+    /// left. An ungrouped table holds them at the end of `slice`.
+    let trailing: [ItemTableRow]
+    /// Where each row is drawn, which a row is held at (`RowHold`).
+    let anchors: [ItemID: HeldRow]
 
+    /// The page, with every held row put back where it was seen (`RowHold.holding`).
     @MainActor
-    init(content: ItemTableContent, paging: TablePaging, size: TablePageSize, expanded: Set<ItemID>) {
+    init(content: ItemTableContent, paging: TablePaging, size: TablePageSize, expanded: Set<ItemID>, hold: inout RowHold) {
+        var anchors: [ItemID: HeldRow] = [:]
         if content.grouping == nil {
-            slice = paging.slice(content.rows, nesting: content.nesting, expanded: expanded, size: size)
+            let cut = paging.slice(content.rows, nesting: content.nesting, expanded: expanded, size: size)
+            let held = hold.holding(cut.rows, group: nil, row: content.row)
+            slice = TablePaging.Slice(rows: held, remaining: cut.remaining, places: cut.places)
             groups = []
             remaining = slice.remaining
-            places = Dictionary(slice.places.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            places = Dictionary(cut.places.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            trailing = []
+            for (index, row) in held.enumerated() { anchors[row.id] = HeldRow(id: row.id, group: nil, index: index) }
         } else {
             let drawn = paging.slice(
                 groups: content.groups, nestings: content.groupNestings, collapsed: content.collapsed, expanded: expanded, size: size)
             slice = TablePaging.Slice(rows: [], remaining: 0)
-            groups = drawn.groups.map { GroupPage(group: $0.group, rows: $0.rows) }
+            groups = drawn.groups.map { page in
+                let held = hold.holding(page.rows, group: page.group.id, row: content.row)
+                for (index, row) in held.enumerated() { anchors[row.id] = HeldRow(id: row.id, group: page.group.id, index: index) }
+                return GroupPage(group: page.group, rows: held)
+            }
             remaining = drawn.remaining
             places = Dictionary(drawn.groups.flatMap(\.places).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            trailing = hold.added.compactMap(content.row)
         }
+        self.anchors = anchors
     }
 
     var shownIDs: [String] {
-        (slice.rows.map(\.id.rawValue) + groups.flatMap { $0.rows.map(\.id.rawValue) })
+        (slice.rows.map(\.id.rawValue) + groups.flatMap { $0.rows.map(\.id.rawValue) } + trailing.map(\.id.rawValue))
     }
 
     /// Where the groups' header rows fall among the table's rows: each group's header, then its rows unless it is folded.

@@ -32,6 +32,10 @@ struct CalendarWeekView: View {
     @State private var pinchHeight: CGFloat?
     @State private var isReady = false
     @State private var tracker = WeekTracker()
+    @CurrentLibrary private var library
+    @Environment(\.undoManager) private var undoManager
+    /// The block being dragged out on a day, in minutes from its start, before it becomes a new item's (`InPlaceRow`).
+    @State private var dragging: (day: Date, from: Int, to: Int)?
 
     private static let margin: CGFloat = 56
     private static let headerHeight: CGFloat = 40
@@ -110,6 +114,8 @@ struct CalendarWeekView: View {
             if isReady { position.scrollTo(x: CGFloat(tracker.settledIndex) * column, y: keyboard.offsetY) }
         }
         .onChange(of: firstDay) { _, day in go(to: day) }
+        .onAppear { browser.restoreCalendarBlock(in: library) }
+        .onChange(of: browser.shown) { browser.restoreCalendarBlock(in: library) }
         .accessibilityLabel("Week")
     }
 
@@ -320,6 +326,10 @@ struct CalendarWeekView: View {
             ForEach(0..<24, id: \.self) { hourOfDay in
                 Rectangle().fill(.separator).frame(height: 0.5).offset(y: CGFloat(hourOfDay) * hour)
             }
+            // A drag on the day leaves a block, typed in where it stands.
+            Color.clear
+                .contentShape(.rect)
+                .gesture(newBlockDrag(on: day.date, hour: hour))
             ForEach(day.blocks) { block in
                 let slot = (width - 6) / CGFloat(block.columns)
                 let top = CGFloat(block.startMinute) / 60 * hour
@@ -334,6 +344,21 @@ struct CalendarWeekView: View {
                 }
                 .offset(x: 3 + slot * CGFloat(block.column), y: top)
             }
+            if let dragging, dragging.day == day.date {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.primary.opacity(0.14))
+                    .frame(width: width - 6, height: max(CGFloat(dragging.to - dragging.from) / 60 * hour, 12))
+                    .offset(x: 3, y: CGFloat(dragging.from) / 60 * hour)
+                    .allowsHitTesting(false)
+            }
+            if browser.inPlace.place == browser.shown, case .block(let start, let end)? = browser.inPlace.spot,
+               calendar.isDate(start, inSameDayAs: day.date) {
+                let from = CGFloat(calendar.dateComponents([.minute], from: day.date, to: start).minute ?? 0)
+                let minutes = CGFloat(max(15, calendar.dateComponents([.minute], from: start, to: end).minute ?? 60))
+                InPlaceBlock(browser: browser, library: library, undoManager: undoManager, start: start, end: end)
+                    .frame(width: width - 6, height: max(minutes / 60 * hour, 36))
+                    .offset(x: 3, y: from / 60 * hour)
+            }
             if let line = run.nowMinute(now: now, calendar: calendar), line.day == day.date {
                 NowLine().offset(y: CGFloat(line.minute) / 60 * hour)
             }
@@ -342,6 +367,33 @@ struct CalendarWeekView: View {
         .background(day.isWeekend ? Color.primary.opacity(0.03) : .clear)
         .overlay(alignment: .leading) { Rectangle().fill(.separator).frame(width: 0.5) }
         .clipped()
+    }
+}
+
+extension CalendarWeekView {
+    /// The quarter hour a drag stands at, `y` points down a day whose hours are `hour` points tall.
+    nonisolated static func quarter(at y: CGFloat, hour: CGFloat) -> Int {
+        let minutes = Int((y / hour * 60 / 15).rounded()) * 15
+        return min(max(minutes, 0), 24 * 60)
+    }
+
+    /// Drags out a block on `day`, by quarter hours, which becomes a new item's row where the drag ends: an hour where
+    /// the drag was shorter than a quarter.
+    fileprivate func newBlockDrag(on day: Date, hour: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 6)
+            .onChanged { drag in
+                let a = Self.quarter(at: drag.startLocation.y, hour: hour)
+                let b = Self.quarter(at: drag.location.y, hour: hour)
+                dragging = (day, min(a, b), max(a, b))
+            }
+            .onEnded { _ in
+                guard let drag = dragging else { return }
+                dragging = nil
+                let to = drag.to > drag.from ? drag.to : min(drag.from + 60, 24 * 60)
+                guard let start = calendar.date(byAdding: .minute, value: drag.from, to: day),
+                      let end = calendar.date(byAdding: .minute, value: to, to: day) else { return }
+                browser.beginInPlace(.block(start: start, end: end), in: library)
+            }
     }
 }
 

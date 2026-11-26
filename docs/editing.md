@@ -9,6 +9,9 @@ paths:
   - MarfaMac/Model/Items/ItemWrite*.swift
   - MarfaMac/Model/FileImport.swift
   - MarfaMac/Views/WindowFiles.swift
+  - MarfaMac/Model/InPlaceRow.swift
+  - MarfaMac/Model/Browser+InPlace.swift
+  - MarfaMac/Views/InPlaceRowViews.swift
 ---
 
 # Making and editing
@@ -36,21 +39,21 @@ Every editor asks `Item.allows(_:)` for the `ItemChange` it writes (`ValueEditKi
 - **A required field the form cannot set is named at once** (`QuickAdd.unsettableRequired`). The line hands a draft missing a required value to the text form.
 - **The title may be left out** where the kind does not require it and the draft holds something else.
 
+### In place
+
+- **New puts the caret in a table's last row or a board's first lane** (`Browser.beginInPlace`); so do a lane's plus and a calendar drag. Elsewhere New opens the line.
+- **A row holds what its place implies** (`Browser.inPlaceValues`), joining the group under the pointer, or the first.
+- **Return adds and starts the next row; leaving adds; Escape keeps only typed text.** Each add is one undo step, standing where typed until the row is left (`RowHold`).
+
 ### The line
 
 - **Keys:** Tab moves the kind, `#` a tag, `@` a parent, `/` a property. Rows offer the most recent first.
 - **Add (↩) keeps the line open with the same kind,** with an Undo. ⌘↩ adds and opens; ⇧↩ opens the text form.
 - **Words stay in the title until Add or ⇧↩ take out what was read** (`QuickAdd.finishLine`); chips show it (`QuickAdd.lineChips`).
-- **Delete on a chip stops it being read** (`QuickAdd.Draft.decline`).
-- An offer chosen for a typed word keeps the word (`QuickAdd.Mark`).
-- **A tag is `#` and a letter at a word's start** (`NewItemText.tags`); reserved tags are never read.
-- **A day becomes the due day, else the start day** (`QuickAdd.dayField`), in the person's locale.
-- **A web address pasted into an empty line makes a bookmark** (`QuickAdd.bookmarkKind`).
-- **A kind change keeps the title and sets aside values it cannot hold** (`QuickAdd.tellSetAside`).
 
 ### Typed text is never lost
 
-`NewItemDrafts` keeps each unadded new item through a closed window, quit or refusal (kept at once), by slot (`Slot.line`, `Slot.inPlace(_:)`) and instance (`serverKey`). A sent draft is frozen; edits make a new one. One cut off by a quit returns unless its item is in the copy; its Add asks first (`QuickAdd.mayBeInMarfa`).
+`NewItemDrafts` keeps each unadded new item through a closed window, quit or refusal (kept at once), by slot (`Slot.line`, `Slot.inPlace(_:)`, `InPlaceRow.slot`) and instance (`serverKey`). A sent draft is frozen; edits make a new one. One cut off by a quit returns unless its item is in the copy; its Add asks first (`QuickAdd.mayBeInMarfa`).
 
 | Call | Does |
 | --- | --- |

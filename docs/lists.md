@@ -10,6 +10,7 @@ paths:
   - MarfaMac/Model/Items/*Group*.swift
   - MarfaMac/Model/Items/ItemPlacement.swift
   - MarfaMac/Model/Items/ItemNesting.swift
+  - MarfaMac/Model/RowHold.swift
   - MarfaMac/Views/Filter*.swift
   - MarfaMac/Views/ItemTable*.swift
   - MarfaMac/Views/ItemBoard*.swift
@@ -60,9 +61,9 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **Several chosen items show a command capsule** (`SelectionCapsule`), a pile beside a list (`SelectionPile`). Escape clears them.
 - **⌘⌫ deletes chosen items shown in a board, timeline, Digest, or map** (`ChosenItemDeletion`). Changing the calendar span drops old events.
 - **Calendar and Timeline use each type's date** (`ItemPlacement`) or a field chosen for the view.
-- **An event's span is one rule** (`EventSpan`): all-day events sit on the days they are lived in, whatever the Mac's zone.
 - **Map places items with two valid coordinates** (`MapLayout`); No Location lists the rest. A listed type declares both fields.
 - **A board always has lanes.** With no grouping chosen it takes the status. Types with different words make the four status groups.
+- **A row stays where it was seen until the pointer or the keyboard leaves it** (`RowHold`).
 - **A drop in a lane is one edit.** A drop in Not Set clears the field; Set and date lanes refuse one.
 - **Item table text starts where the title does** (`TopRowSpace.titleLead`). Unset widths sample 120 rows (`ItemTableFit`). Name fills the remaining space until resized.
 

@@ -17,6 +17,7 @@ struct ItemBoard: View {
 
     var body: some View {
         let _ = daysSeen
+        let _ = browser.rowHoldReleases
         // The lanes are the place's group (`Browser.boardGrouping`), so a saved view's group is its lanes.
         let lanes = browser.boardLanes(in: library)
         VStack(spacing: 0) {
@@ -46,7 +47,11 @@ struct ItemBoard: View {
         .onChange(of: browser.isSearchExpanded) {
             if !browser.isSearchExpanded { browser.focusRequest = .list }
         }
-        .onChange(of: browser.shown) { cursor = nil; anchor = nil }
+        .onChange(of: browser.shown) {
+            cursor = nil
+            anchor = nil
+            restoreInPlace(lanes: browser.boardLanes(in: library))
+        }
         .onChange(of: cursor.flatMap { lanes?.positions[$0] }) { _, position in
             if position == nil { cursor = nil }
         }
@@ -54,6 +59,19 @@ struct ItemBoard: View {
             if position == nil { anchor = nil }
         }
         .onClockChange { daysSeen += 1 }
+        .onAppear { restoreInPlace(lanes: browser.boardLanes(in: library)) }
+    }
+
+    /// Brings back a card typed in place and left, in the lane whose value it holds, or the first that takes a card.
+    private func restoreInPlace(lanes: Browser.BoardLanes?) {
+        guard let lanes else { return }
+        let shown = browser.shownBoardLanes(lanes).filter(isDestination)
+        guard let first = shown.first else { return }
+        browser.restoreInPlace(.lane(first.id), in: library)
+        guard browser.inPlace.place == browser.shown, let draft = browser.inPlace.draft else { return }
+        if case .string(let word)? = draft.properties[lanes.key], let lane = shown.first(where: { $0.id == .option(word) }) {
+            browser.inPlace.begin(.lane(lane.id), in: browser.shown, library: library) { nil }
+        }
     }
 
     /// Set in the View panel's Board section (`ViewPanelLayoutRows`).
@@ -120,6 +138,7 @@ struct ItemBoard: View {
                 return .handled
             }
             .onChange(of: activeLane) { if let activeLane { proxy.scrollTo(activeLane) } }
+            .background { KeyboardHold(browser: browser, lanes: lanes) }
         }
         .dragContainer(for: ItemReference.self) { ids in ids.map(library.dragReference(of:)) }
         .dragsSelection(of: browser)
@@ -135,22 +154,47 @@ struct ItemBoard: View {
                 Text(verbatim: lane.title)
                     .interfaceFont(.body.weight(.semibold))
                     .lineLimit(1)
+                    .accessibilityAddTraits(.isHeader)
                 Text(lane.items.count, format: .number)
                     .interfaceFont(.callout)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 0)
+                if isDestination(lane), browser.typesInPlace {
+                    Button {
+                        browser.beginInPlace(.lane(lane.id), in: library)
+                    } label: {
+                        Image(systemName: "plus")
+                            .imageScale(.small)
+                            .frame(width: 22, height: 22)
+                            .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .help(Text("New Item in \(lane.title)"))
+                    .accessibilityLabel(Text("New Item in \(lane.title)"))
+                }
             }
             .padding(.horizontal, 4)
             .padding(.top, 12)
             .padding(.bottom, 10)
-            .accessibilityElement(children: .combine)
-            .accessibilityAddTraits(.isHeader)
+            .accessibilityElement(children: .contain)
+            let typing = browser.inPlace.place == browser.shown && browser.inPlace.spot == .lane(lane.id)
+            // A held card the filters now leave out is still drawn where it was seen (`RowHold`); only a lane holding
+            // one looks past its own cards.
+            let group = ItemBoardLane.holdKey(lane.id)
+            let cards = browser.rowHold.ids.isEmpty
+                ? lane.items : browser.rowHold.holding(lane.items, group: group, atTop: true, row: library.item)
             BoardLaneCards(
-                items: lane.items, looks: looks, list: list, shape: CardShape(leaving: key, groupsByStatus: grouped),
-                compact: compact, position: position
-            ) { item, content in
+                items: cards, looks: looks, list: list, shape: CardShape(leaving: key, groupsByStatus: grouped),
+                compact: compact, position: position, showsNoItems: !typing
+            ) {
+                if typing { InPlaceCard(browser: browser, library: library, undoManager: undoManager) }
+            } card: { index, item, content in
                 card(item, content: content, lane: lane, lanes: lanes, key: key, grouped: grouped, ids: ids)
+                    .onHover { inside in
+                        browser.holdPointer(inside ? HeldRow(id: item.id, group: group, index: index) : nil)
+                    }
             }
         }
         .padding(.horizontal, 8)
@@ -257,7 +301,7 @@ struct ItemBoard: View {
 }
 
 /// Each lane builds card contents only for the pages it draws.
-private struct BoardLaneCards<Card: View>: View {
+private struct BoardLaneCards<Top: View, Card: View>: View {
     @CurrentLibrary private var library
     let items: [Item]
     let looks: [TypeID: TypeLook]
@@ -265,7 +309,12 @@ private struct BoardLaneCards<Card: View>: View {
     let shape: CardShape
     let compact: Bool
     let position: Int?
-    @ViewBuilder let card: (Item, RowContent) -> Card
+    /// Whether an empty lane says so, which it does not while a card is typed into it.
+    var showsNoItems = true
+    /// What stands above the cards: the card typed in place.
+    @ViewBuilder let top: () -> Top
+    /// A card, given where it stands in `items`.
+    @ViewBuilder let card: (Int, Item, RowContent) -> Card
     @State private var paging = ListDrawn()
     @State private var cardContents = CardContents()
 
@@ -279,16 +328,17 @@ private struct BoardLaneCards<Card: View>: View {
         ScrollViewReader { scroll in
             ScrollView {
                 LazyVStack(spacing: compact ? 8 : 10) {
+                    top()
                     ForEach(parts, id: \.run) { part in
-                        ForEach(items[part.items]) { item in
-                            if let content = contents[item.id] { card(item, content).id(item.id) }
+                        ForEach(part.items.map { (index: $0, item: items[$0]) }, id: \.item.id) { drawn in
+                            if let content = contents[drawn.item.id] { card(drawn.index, drawn.item, content).id(drawn.item.id) }
                         }
                         if part.endsRun {
                             Color.clear.frame(height: 1).accessibilityHidden(true)
                                 .onAppear { paging.drawMore(after: part.run) }
                         }
                     }
-                    if items.isEmpty {
+                    if items.isEmpty, showsNoItems {
                         Text("No Items")
                             .interfaceFont(.callout)
                             .foregroundStyle(.tertiary)
@@ -339,6 +389,25 @@ private struct BoardCell<Actions: View>: View {
         .accessibilityAction(named: Text("Open")) { open() }
         .contextMenu { menu(browser.selection) }
         .draggable(containerItemID: item.id)
+    }
+}
+
+/// Holds the one card the keyboard chose where it is drawn until another is chosen (`RowHold`). A view of its own, so a
+/// selection that moves runs this body and not the board's.
+private struct KeyboardHold: View {
+    let browser: Browser
+    let lanes: [ItemBoardLane]
+
+    var body: some View {
+        Color.clear
+            .onChange(of: browser.selection) { _, chosen in
+                guard chosen.count == 1, let id = chosen.first else { return browser.holdKeyboard(nil) }
+                for lane in lanes {
+                    if let index = lane.items.firstIndex(where: { $0.id == id }) {
+                        return browser.holdKeyboard(HeldRow(id: id, group: ItemBoardLane.holdKey(lane.id), index: index))
+                    }
+                }
+            }
     }
 }
 

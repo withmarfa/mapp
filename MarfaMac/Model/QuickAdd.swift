@@ -746,6 +746,8 @@ extension Browser {
     func openNewItem(kind: String? = nil, title: String = "", form: QuickAdd.Form? = nil, in library: any ItemLibrary) {
         // A draft is kept for one instance, so none is begun before the library knows which it reads.
         guard QuickAdd.isAvailable(in: library) else { return }
+        // A table or a board has a row to type in, which plain New puts the caret in; elsewhere New opens the line.
+        if kind == nil, title.isEmpty, form == nil, !quickAdd.isPresented, beginInPlace(in: library) { return }
         let interval = Telemetry.begin(.navigation, "quickAdd.open")
         defer { interval.end() }
         palette = nil
