@@ -299,8 +299,9 @@ struct SettingsField: View {
         .onSubmit(onSubmit)
         .onChange(of: isFocused) { _, focused in
             if focused, let onCancel {
-                cancelMonitor.start { [weak cancelAnchor] event in
-                    guard let window = cancelAnchor?.window, event.windowNumber == window.windowNumber, event.isEscape else { return false }
+                let anchor = cancelAnchor
+                cancelMonitor.start { [weak anchor] event in
+                    guard let window = anchor?.window, event.windowNumber == window.windowNumber, event.isEscape else { return false }
                     onCancel()
                     return true
                 }
