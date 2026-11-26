@@ -249,7 +249,7 @@ final class Browser {
     @ObservationIgnored var looksMemo: (key: LooksKey, looks: [TypeID: TypeLook])?
     /// Held by `paletteIndex(in:)`.
     @ObservationIgnored var paletteMemo: (key: PaletteIndexKey, index: PaletteIndex)?
-    var compactBoards: PlaceMemory<Bool> = [:]
+    var placeBoards: PlaceMemory<BoardChoices> = [:]
     /// The date field each place's timeline shows its items by, where the person chose one. A view's own comes from
     /// its day grouping (`followView`).
     var timelineFields: PlaceMemory<String> = [:]
@@ -560,7 +560,7 @@ final class Browser {
         placeCalendarScales = [:]
         calendarDay = nil
         showsCalendarMonth = false
-        compactBoards = [:]
+        placeBoards = [:]
         timelineFields = [:]
         selection = []
         history = SelectionHistory()

@@ -99,6 +99,7 @@ enum SavedViews {
         var settings = browser.shown.savedView.map { browser.macSettings(for: $0) } ?? ViewMacSettings()
         if browser.shown.savedView == nil { settings.map = browser.placeMaps[browser.shown] }
         if browser.shown.savedView == nil { settings.digest = browser.placeDigests[browser.shown] }
+        if browser.shown.savedView == nil { settings.board = browser.placeBoards[browser.shown] }
         settings.layout = browser.viewPanelLayout
         settings.cards = browser.cards
         settings.density = browser.density

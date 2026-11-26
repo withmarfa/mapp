@@ -236,4 +236,14 @@ struct ItemBoardTests {
         #expect(keys == ["reading_status", "state"])
         #expect(ItemBoardLayout.invalidValueKey(of: items[0], key: "state", groupsByStatus: false, catalogue: catalogue) == "state")
     }
+
+    @Test func aStoredLaneOrderPutsNewValuesLastAndIgnoresValuesThatAreGone() {
+        func lane(_ word: String) -> ItemBoardLane { ItemBoardLane(id: .option(word), title: word, items: []) }
+        let lanes = ["todo", "doing", "done", "review"].map(lane)
+        // "review" is new here, and "waiting" and a renamed "in progress" are values this copy does not have.
+        let order = ["done", "waiting", "todo", "in progress"]
+        let arranged = ItemBoardLayout.arranged(lanes, order: order, hidden: nil, hidesEmpty: false)
+        #expect(arranged.map(\.title) == ["done", "todo", "doing", "review"])
+        #expect(ItemBoardLayout.arranged(lanes, order: [], hidden: nil, hidesEmpty: false).map(\.title) == ["todo", "doing", "done", "review"])
+    }
 }

@@ -54,7 +54,7 @@ struct PlaceDefaultsTests {
         first.viewMode = .table
         first.timelineFields[first.shown] = "due_at"
         first.choicesChanged()
-        first.setCompactBoard(true, in: first.shown)
+        first.changeBoard { $0.compact = true }
         first.changeCards { $0.size = .large }
         first.changeCalendarScale(.month)
 
@@ -66,7 +66,7 @@ struct PlaceDefaultsTests {
         #expect(options?.grouping == ItemTableOptions.Grouping.none)
         #expect(second.viewMode == .table)
         #expect(second.timelineFields[second.shown] == "due_at")
-        #expect(second.compactBoards[second.shown] == true)
+        #expect(second.boardChoices.isCompact)
         #expect(second.cards.size == .large)
         #expect(second.calendarScale == .month)
         // Opening is not the person's change: it makes no step of Undo and no write.

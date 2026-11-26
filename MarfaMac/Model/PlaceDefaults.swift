@@ -75,7 +75,7 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
     var matchesAny = false
     /// The date field the timeline places its items on.
     var timelineField: String?
-    var compactBoard = false
+    var board: BoardChoices?
     var cards = ViewCards()
     var calendarScale: CalendarScale?
     /// What shows after the title in every layout; empty is the types' looks.
@@ -110,7 +110,7 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
         filter = try container.decodeIfPresent([FilterClause].self, forKey: .filter) ?? []
         matchesAny = try container.decodeIfPresent(Bool.self, forKey: .matchesAny) ?? false
         timelineField = try container.decodeIfPresent(String.self, forKey: .timelineField)
-        compactBoard = try container.decodeIfPresent(Bool.self, forKey: .compactBoard) ?? false
+        board = try container.decodeIfPresent(BoardChoices.self, forKey: .board)
         cards = try container.decodeIfPresent(ViewCards.self, forKey: .cards) ?? ViewCards()
         calendarScale = try container.decodeIfPresent(CalendarScale.self, forKey: .calendarScale)
         properties = try container.decodeIfPresent(ViewProperties.self, forKey: .properties) ?? ViewProperties()
@@ -139,7 +139,7 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
         if !hidesEmptyGroups { filled.hidesEmptyGroups = other.hidesEmptyGroups }
         if filter.isEmpty, !matchesAny { (filled.filter, filled.matchesAny) = (other.filter, other.matchesAny) }
         filled.timelineField = timelineField ?? other.timelineField
-        if !compactBoard { filled.compactBoard = other.compactBoard }
+        filled.board = board ?? other.board
         if cards == ViewCards() { filled.cards = other.cards }
         filled.calendarScale = calendarScale ?? other.calendarScale
         if properties == ViewProperties() { filled.properties = other.properties }
