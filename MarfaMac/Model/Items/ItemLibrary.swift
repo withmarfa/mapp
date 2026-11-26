@@ -33,6 +33,8 @@ protocol ItemLibrary: AnyObject, Observable {
     /// False where the action is not offered for the problem.
     func resolve(_ problem: SyncProblemEntry.ID, by action: SyncAction) async throws -> Bool
     var now: () -> Date { get }
+    /// The calendar and time zone dates are grouped and named in, read at each ask, as the system's change.
+    var calendar: () -> Calendar { get }
 
     // MARK: Reading
 
@@ -47,6 +49,9 @@ protocol ItemLibrary: AnyObject, Observable {
     /// this and `membershipRevision` rather than `contentRevision`, which a published keystroke moves. A library that
     /// bumps `membershipRevision` for every item change may leave this as that.
     var namesRevision: Int { get }
+    /// IDs of items changed since the given content revision, including both ends of affected links. Returns nil
+    /// when the library cannot identify every affected item, such as after a catalogue change.
+    func changedItems(since revision: Int) -> Set<ItemID>?
     /// Names the Marfa the library reads by its instance id, never its address, so what this Mac keeps for it, such
     /// as an item typed and not yet added, waits for it and goes to no other, even a server that later takes its
     /// address. Empty until the copy has read its instance, and where there is no server.
@@ -349,6 +354,7 @@ protocol ItemLibrary: AnyObject, Observable {
 
 extension ItemLibrary {
     var namesRevision: Int { membershipRevision }
+    func changedItems(since revision: Int) -> Set<ItemID>? { nil }
     /// Every create Marfa refused for good: those refused as they were sent, and those the copy lists as refused, on
     /// their own or with a write they went with, such as a file's upload.
     var refusedCreates: Set<ItemID> {

@@ -1,6 +1,6 @@
 import Foundation
 
-/// The pages of the table a window has loaded (`TablePaging`).
+/// The pages of the table a window has loaded (`TablePaging`), and how much of a long list or timeline it draws.
 extension Browser {
     private var pagingKey: TablePagingKey {
         TablePagingKey(place: shown, search: searchText, byRelevance: ordersByRelevance, options: tableOptions[shown] ?? ItemTableOptions())
@@ -43,5 +43,31 @@ extension Browser {
             selection, rows: content.rows, groups: content.grouping == nil ? nil : content.groups,
             collapsed: content.collapsed, size: tablePageSize)
         if paging != tablePaging { pagingState = (pagingKey, paging) }
+    }
+
+    /// How many items a list or a timeline draws at first, and adds as its end comes into view. SwiftUI goes through every
+    /// row it is given at each change, so a place of tens of thousands of items is drawn a page at a time.
+    nonisolated static let listPage = 250
+
+    /// Which items the list, the gallery or the timeline draws: a page again whenever the place, the search, the order, the
+    /// filters or the grouping has changed since more were drawn.
+    var listDrawn: ListDrawn {
+        guard let held = listPagingState, held.key == pagingKey else { return ListDrawn() }
+        return held.drawn
+    }
+
+    /// Draws another page after the run of items whose end came into view (`ListDrawn.Part.run`).
+    func drawMoreOfList(after run: Int = 0) {
+        var drawn = listDrawn
+        drawn.drawMore(after: run)
+        listPagingState = (pagingKey, drawn)
+    }
+
+    /// Draws the item at `position`, such as one reached by Back, a link or a new item, or one a change moved: the pages up
+    /// to it where it stands just past them, else a page around it.
+    func drawList(showing position: Int) {
+        var drawn = listDrawn
+        drawn.show(position)
+        if drawn != listDrawn { listPagingState = (pagingKey, drawn) }
     }
 }

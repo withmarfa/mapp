@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// A place's items by day. Choosing a row runs the list that holds the selection, not this body, which places every
-/// item, so a selection does not place them again.
+/// A place's items by day, in the order the browser calculated.
 struct ItemTimeline: View {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
@@ -18,16 +17,19 @@ struct ItemTimeline: View {
         let fields = browser.timelineFieldChoices(in: library)
         // Chosen in the View panel's Timeline section (`ViewPanelLayoutRows`).
         let field = ItemTimelineLayout.selectedField(browser.timelineFields[browser.shown], fields: fields)
-        let looks = browser.looks(in: library)
         let now = library.now()
-        let groups = ItemTimelineLayout.groups(
-            for: items, field: field, looks: looks, catalogue: library.catalogue, today: now)
+        // Worked out off the main actor for a large place (`Browser.placed`); only a page of it is drawn, as the list's is.
+        let placing = browser.timelinePlacing(in: library, field: field, now: now)
+        let days = placing.drawn(browser.listDrawn)
+        let groups = days.map(\.group)
         let list = RowList(
-            mixesTypes: Set(items.map(\.type)).count > 1, date: .look, format: dateFormat, datesApart: true, placedField: field, marksFeed: browser.listing.scope == .all, day: Calendar.current.startOfDay(for: now))
+            mixesTypes: placing.types.count > 1, date: .look, format: dateFormat, datesApart: true, placedField: field, marksFeed: browser.listing.scope == .all, day: Calendar.current.startOfDay(for: now))
         let contents = rowContents.contents(
-            of: items, in: library, looks: browser.propertyLooks(in: library), list: list, shape: CardShape(leaving: field))
+            of: groups.flatMap { $0.rows.map(\.item) }, in: library, looks: browser.propertyLooks(in: library), list: list,
+            shape: CardShape(leaving: field))
 
-        timeline(groups, contents: contents, now: now)
+        // Select All chooses every item, those not drawn yet too.
+        timeline(days, contents: contents, now: now) { browser.selection = Set(placing.positions.keys) }
         .topRowScrolls()
         .clearsSeveralOnEscape(browser)
         .deletesChosen(browser) { Set(items.map(\.id)) }
@@ -46,9 +48,8 @@ struct ItemTimeline: View {
         .onChange(of: browser.isSearchExpanded) {
             if !browser.isSearchExpanded { browser.focusRequest = .list }
         }
-        .task {
-            for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) { daysSeen += 1 }
-        }
+        .onClockChange { daysSeen += 1 }
+        .background(ChosenItemDrawn(browser: browser, positions: placing.positions))
     }
 
     /// One line of a day's list: a row, or the line that marks the present moment.
@@ -82,20 +83,24 @@ struct ItemTimeline: View {
         return lines
     }
 
-    private func timeline(_ groups: [ItemTimelineGroup], contents: [ItemID: RowContent], now: Date) -> some View {
+    private func timeline(
+        _ days: [Browser.DrawnDay], contents: [ItemID: RowContent], now: Date, selectAll: @escaping () -> Void
+    ) -> some View {
         ScrollViewReader { proxy in
-            list(groups, contents: contents, now: now)
+            list(days, contents: contents, now: now)
+                .selectsAll(selectAll)
                 // The days run from today on and then back, so today's agenda is the first line of the first group.
                 .onChange(of: browser.timelineTodayRequests) {
-                    guard let first = groups.first.flatMap({ lines(of: $0, now: now).first }) else { return }
+                    guard let first = days.first.flatMap({ lines(of: $0.group, now: now).first }) else { return }
                     withAnimation { proxy.scrollTo(first.id, anchor: .top) }
                 }
         }
     }
 
-    private func list(_ groups: [ItemTimelineGroup], contents: [ItemID: RowContent], now: Date) -> some View {
+    private func list(_ days: [Browser.DrawnDay], contents: [ItemID: RowContent], now: Date) -> some View {
         SelectableTimeline(browser: browser) {
-            ForEach(groups) { group in
+            ForEach(days) { day in
+                let group = day.group
                 ForEach(lines(of: group, now: now)) { line in
                     switch line {
                     case .row(let row, let startsDay, let endsDay):
@@ -146,11 +151,19 @@ struct ItemTimeline: View {
                         .accessibilityLabel(Text("Now"))
                     }
                 }
+                if day.part.endsRun {
+                    // Drawn only to come into view, which draws the next page of the run.
+                    Color.clear.frame(height: 1)
+                        .selectionDisabled()
+                        .listRowSeparator(.hidden)
+                        .accessibilityHidden(true)
+                        .onAppear { browser.drawMoreOfList(after: day.part.run) }
+                }
             }
         }
         .listStyle(.inset)
         .scrollContentBackground(.hidden)
-        .softSelection(rows: groups.flatMap { $0.rows.map(\.id.rawValue) }, hovers: true, inert: inertRows(groups, contents: contents, now: now), selection: { browser.selection })
+        .softSelection(rows: days.flatMap { $0.group.rows.map(\.id.rawValue) }, hovers: true, inert: inertRows(days, contents: contents, now: now), selection: { browser.selection })
         .focused(pane, equals: .list)
         .takesKeyboardOnClick { browser.focusRequest = .list }
         .accessibilityLabel("Timeline")
@@ -163,13 +176,13 @@ struct ItemTimeline: View {
         .onKeyPress(.return) { browser.openSelection() ? .handled : .ignored }
     }
 
-    /// The places in the list of the rows that are not items: the Earlier heading and the line for now. An item with no
-    /// content yet makes no row, so it takes no place.
-    private func inertRows(_ groups: [ItemTimelineGroup], contents: [ItemID: RowContent], now: Date) -> Set<Int> {
+    /// The places in the list of the rows that are not items: the Earlier heading, the line for now and the lines that draw
+    /// more. An item with no content yet makes no row, so it takes no place.
+    private func inertRows(_ days: [Browser.DrawnDay], contents: [ItemID: RowContent], now: Date) -> Set<Int> {
         var inert: Set<Int> = []
         var place = 0
-        for group in groups {
-            for line in lines(of: group, now: now) {
+        for day in days {
+            for line in lines(of: day.group, now: now) {
                 switch line {
                 case .row(let row, _, _):
                     if contents[row.id] != nil { place += 1 }
@@ -177,6 +190,10 @@ struct ItemTimeline: View {
                     inert.insert(place)
                     place += 1
                 }
+            }
+            if day.part.endsRun {
+                inert.insert(place)
+                place += 1
             }
         }
         return inert
@@ -246,8 +263,7 @@ struct ItemTimeline: View {
     }
 }
 
-/// The list, apart from the timeline's body: a list reads its selection as it is made, so a change of selection runs
-/// this body rather than the timeline's, which places every item the place holds.
+/// Binds the native list's selection to the window.
 private struct SelectableTimeline<Content: View>: View {
     @Bindable var browser: Browser
     @ViewBuilder var content: Content
@@ -257,8 +273,7 @@ private struct SelectableTimeline<Content: View>: View {
     }
 }
 
-/// Opens the right sidebar when a row is chosen. It reads the selection itself, so the timeline's body does not, and a
-/// change of selection does not work out every row again. The calendar uses it too.
+/// Opens the right sidebar when the person chooses a single item in the timeline or calendar.
 struct ChosenRowOpensSidebar: View {
     /// The window's, which the right sidebar is shown through.
     @Environment(DetailsPresentation.self) private var details: DetailsPresentation?

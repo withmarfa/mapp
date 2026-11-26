@@ -91,6 +91,9 @@ nonisolated struct MarfaItemIndex {
         attachments.isEmpty ? ids : ids.filter { !isAttachedToHeldItem($0) }
     }
 
+    /// Whether `standalone` keeps the item.
+    func isStandalone(_ id: ItemID) -> Bool { !isAttachedToHeldItem(id) }
+
     private func isAttachedToHeldItem(_ id: ItemID) -> Bool {
         attachments[id]?.contains { edge in links[edge].map { held[$0.to] != nil } ?? false } ?? false
     }

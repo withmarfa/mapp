@@ -112,7 +112,7 @@ A filter is a `FilterClause`: a field, a `FilterOp` and values, shown as a chip.
 - **Library › Types, Collections, and Sources** (`PlaceIndex`) show places, searched by name, with no View button.
 - **Types nest kinds under their type.** Made By waits for the package's provenance; a type has no link to copy.
 - **Source kind** shows App for `oauth:` codes and Connector for `GET /plugins` sources (`SourceKind`).
-- **A table of more than 2,000 items is made off the main actor** (`Browser.arrange`), its last table showing meanwhile. A search's table is held apart.
+- **Above 2,000 items, layout updates run off the main actor.** Tables and lists reuse unchanged rows. Search keeps its own table.
 - **Trap:** a table's body must not read the choice, or choosing a row draws every row.
 - **A row's count is of what the place lists.** A file attached to an item shows on its page, so no list or count but search takes it. The Feed's row has none.
 

@@ -25,16 +25,18 @@ struct ItemList: View, Equatable {
         // Reading the counter ties the dates and sections to the day changing, so "Today" moves at midnight.
         let _ = daysSeen
         let now = library.now()
-        let sections = browser.sections(in: library, order: order, now: now)
+        // Worked out off the main actor for a large place, with the ids and types read here, so the body makes no pass over it.
+        let arrangement = browser.arrangement(in: library, order: order, now: now)
         // A folded section lists its heading alone.
-        let items: [Item] = sections.flatMap { $0.isCollapsed ? [] : $0.items }
-        let ids: [ItemID] = items.map(\.id)
+        let ids = arrangement.shownIDs
+        // Only a page of a long list is drawn, and the next as its end comes into view (`Browser.listDrawn`).
+        let lines = ListLine.lines(of: arrangement.drawn(browser.listDrawn, countsFolded: false))
+        let drawnIDs = lines.compactMap(\.itemID)
         // Each row's content is worked out once for the item as it is and held by the browser, so a change of selection or
         // of one item makes the content of that row alone, and a row's body looks nothing up.
-        let lines = ListLine.lines(of: sections)
         let _ = placeDensities
         let density = browser.density ?? settingsDensity
-        let list = browser.rowList(of: items, in: library, order: order, now: now, format: dateFormat, density: density)
+        let list = browser.rowList(of: arrangement.types, in: library, order: order, now: now, format: dateFormat, density: density)
         let contents = browser.rowContents.contents(of: lines.compactMap(\.entry), in: library, looks: browser.propertyLooks(in: library), list: list)
         let results = browser.searchResults(in: library)
         let excerpts = results?.excerpts ?? [:]
@@ -43,7 +45,7 @@ struct ItemList: View, Equatable {
         // Headings are rows of their own rather than section headers: a list of sections leaves every row at
         // the table's default height, and its first header floats into the toolbar's edge, whose line then runs
         // the list's full width.
-        listContent(lines: lines, ids: ids, contents: contents, density: density, excerpts: excerpts, title: title)
+        listContent(lines: lines, ids: ids, drawnIDs: drawnIDs, contents: contents, density: density, excerpts: excerpts, title: title)
         .onDeleteCommand(perform: deleteSelection)
         .clearsSeveralOnEscape(browser)
         .quickLooksOnSpace(browser)
@@ -80,6 +82,7 @@ struct ItemList: View, Equatable {
         .onChange(of: ids) { old, new in
             browser.keepSelection(from: old, to: new, isPending: isPending)
         }
+        .background(ChosenItemDrawn(browser: browser, positions: arrangement.shownPositions))
         // An answer that lists what the waiting list listed (nothing, most often) changes no ids.
         .onChange(of: isPending) { _, isPending in
             if !isPending { browser.keepHeldSelection(in: ids) }
@@ -93,7 +96,7 @@ struct ItemList: View, Equatable {
 
     /// The list and its row traits, apart from `body` so that neither is too long for the compiler to check.
     private func listContent(
-        lines: [ListLine], ids: [ItemID], contents: [ItemID: RowContent], density: Density,
+        lines: [ListLine], ids: [ItemID], drawnIDs: [ItemID], contents: [ItemID: RowContent], density: Density,
         excerpts: [ItemID: SearchExcerpt], title: String
     ) -> some View {
         SelectableList(browser: browser) {
@@ -104,10 +107,12 @@ struct ItemList: View, Equatable {
                 let row = ListLineRow(
                     line: line, content: contents[line.id], density: density, excerpt: excerpts[line.id],
                     fold: browser.listShape?.arranged == true ? { browser.toggleGroup($0, in: library) } : nil)
-                .selectionDisabled(line.isHeading)
-                .listRowSeparator(line.isHeading ? .hidden : .automatic, edges: .top)
-                .listRowSeparator(line.endsSection ? .hidden : .automatic, edges: .bottom)
-                if !line.isHeading {
+                .selectionDisabled(line.itemID == nil)
+                .listRowSeparator(line.itemID == nil ? .hidden : .automatic, edges: .top)
+                .listRowSeparator(line.endsSection || line.drawsMore != nil ? .hidden : .automatic, edges: .bottom)
+                if let run = line.drawsMore {
+                    row.onAppear { browser.drawMoreOfList(after: run) }
+                } else if !line.isHeading {
                     row.draggable(containerItemID: line.id)
                         .dropsInto(collection: line.collectionID(in: library.catalogue), browser: browser, order: order)
                 } else {
@@ -117,7 +122,7 @@ struct ItemList: View, Equatable {
         }
         .listStyle(.inset)
         .scrollContentBackground(.hidden)
-        .softSelection(rows: ids, hovers: true, inert: Set(lines.indices.filter { lines[$0].isHeading })) { browser.selection }
+        .softSelection(rows: drawnIDs, hovers: true, inert: Set(lines.indices.filter { lines[$0].itemID == nil })) { browser.selection }
         .remembersScroll(in: browser.listMemory)
         .selectsAll { browser.selection = Set(ids) }
         // While the toolbar re-places its items, the list is briefly measured narrower than its column can be.
@@ -135,9 +140,7 @@ struct ItemList: View, Equatable {
     }
 }
 
-/// The list, apart from the item list's body: a list reads its selection as it is made, so a change of selection
-/// runs this body rather than the item list's, which lists every item the place holds, and hands the list the same
-/// rows as before, which SwiftUI does not go through again.
+/// Binds the native list's selection to the window.
 private struct SelectableList<Content: View>: View {
     @Bindable var browser: Browser
     @ViewBuilder let content: Content
@@ -180,6 +183,9 @@ private struct ListLineRow: View {
                 }
             }
             .padding(.top, isFirst ? 0 : 10)
+        case .more:
+            // Drawn only to come into view, which draws the next page.
+            Color.clear.frame(height: 1).accessibilityHidden(true)
         case .item:
             if let content {
                 ItemRow(content: content, density: density, excerpt: excerpt, itemID: line.id)
@@ -193,6 +199,8 @@ private struct ListLineRow: View {
 private enum ListLine: Identifiable {
     case heading(ItemGroup, isFirst: Bool, isCollapsed: Bool)
     case item(Item, group: ItemGroup?, endsSection: Bool)
+    /// The line after a run of a list drawn in part, which draws the next page of the run as it comes into view.
+    case more(run: Int)
 
     /// An item's line is known by the item, so the list's selection is its items; a heading takes an identifier
     /// of its own, never selected.
@@ -200,11 +208,22 @@ private enum ListLine: Identifiable {
         switch self {
         case .heading(let group, _, _): ItemID("heading:\(group)")
         case .item(let item, _, _): item.id
+        case .more(let run): ItemID("more:\(run)")
         }
     }
 
     var isHeading: Bool {
         if case .heading = self { true } else { false }
+    }
+
+    /// The run the line draws more of, where it is the line after one.
+    var drawsMore: Int? {
+        if case .more(let run) = self { run } else { nil }
+    }
+
+    /// The item of an item's line.
+    var itemID: ItemID? {
+        if case .item(let item, _, _) = self { item.id } else { nil }
     }
 
     /// The item's identity where it is a collection, which items and files dropped on its row join.
@@ -223,13 +242,19 @@ private enum ListLine: Identifiable {
         if case .item(_, _, let endsSection) = self { endsSection } else { false }
     }
 
-    static func lines(of sections: [ItemSection]) -> [ListLine] {
+    /// The lines of the parts of a list drawn (`ListArrangement.drawn`), with a `more` line after each run that has items
+    /// after it.
+    static func lines(of parts: [DrawnSection]) -> [ListLine] {
         var lines: [ListLine] = []
-        for section in sections {
-            if let group = section.group { lines.append(.heading(group, isFirst: lines.isEmpty, isCollapsed: section.isCollapsed)) }
+        for part in parts {
+            let section = part.section
+            if part.part.startsSection, let group = section.group {
+                lines.append(.heading(group, isFirst: lines.isEmpty, isCollapsed: section.isCollapsed))
+            }
             for item in section.isCollapsed ? [] : section.items {
                 lines.append(.item(item, group: section.group, endsSection: item.id == section.items.last?.id))
             }
+            if part.part.endsRun { lines.append(.more(run: part.part.run)) }
         }
         return lines
     }
@@ -257,4 +282,26 @@ private enum ListLine: Identifiable {
     .listStyle(.inset)
     .interfaceTextStyle()
     .frame(width: 340, height: 460)
+}
+
+/// Tracks the cursor or selection in a separate view so a selection change can extend the page
+/// without making the layout observe the selection.
+struct ChosenItemDrawn: View {
+    let browser: Browser
+    /// Where each item of the layout stands, counting from its first, as the layout counts what it draws (`ListDrawn`).
+    let positions: [ItemID: Int]
+    /// The gallery's keyboard cursor, which a new single choice made elsewhere, such as a link, ends.
+    var cursor: Binding<ItemID?>?
+
+    var body: some View {
+        let single = browser.selection.count == 1 ? browser.selection.first : nil
+        let id = cursor?.wrappedValue.flatMap { single == nil || single == $0 ? $0 : nil } ?? single
+        Color.clear
+            .onChange(of: id.flatMap { positions[$0] }, initial: true) { _, position in
+                if let position { browser.drawList(showing: position) }
+            }
+            .onChange(of: single) { _, single in
+                if let cursor, let single, cursor.wrappedValue != nil, cursor.wrappedValue != single { cursor.wrappedValue = nil }
+            }
+    }
 }

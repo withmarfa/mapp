@@ -56,7 +56,17 @@ extension MarfaLibrary {
 
     /// Keeps the records the views already observe, so a second load tells each of them what changed.
     private func load(_ snapshot: SourceSnapshot) {
-        catalogue = holdingChosenIcons(snapshot.catalogue)
+        let catalogue = holdingChosenIcons(snapshot.catalogue)
+        // The copy read whole again on the same catalogue is taken as what changed, so a place re-places only those items.
+        if isLoaded, catalogue == self.catalogue {
+            take(snapshot.views)
+            let present = Set(snapshot.items.map(\.id))
+            take(ItemChanges(
+                upserted: snapshot.items, removed: records.keys.filter { !present.contains($0) }, bodies: Array(snapshot.bodies.values)))
+            Task { await readServerKey() }
+            return
+        }
+        self.catalogue = catalogue
         take(snapshot.views)
         let present = Set(snapshot.items.map(\.id))
         var renamed = false
@@ -99,41 +109,67 @@ extension MarfaLibrary {
 
     /// One step of the source, taken in at once, so each revision moves at most once for it.
     private func take(_ changes: ItemChanges) {
-        var changed = false
         var moved = false
         var renamed = false
+        // Each changed item and every item at the far end of one of its links, before and after, since a row shows the
+        // titles of its links and a file attached to an item leaves the lists with it (`ItemLibrary.changedItems(since:)`).
+        var touched: Set<ItemID> = []
+        func touch(_ item: Item) {
+            touched.insert(item.id)
+            for link in index.links(touching: item.id) { touched.insert(link.from); touched.insert(link.to) }
+            for edge in item.edgesOut { if case .item(let other) = edge.to { touched.insert(other) } }
+        }
         for id in changes.removed {
             guard let record = records.removeValue(forKey: id) else { continue }
+            touch(record.item)
             index.remove(record.item)
             record.isHeld = false
             noteLinks(touching: record.item)
-            changed = true
             moved = true
         }
-        for item in changes.upserted {
+        // Every old value leaves the index before any new one joins it. An edge keeps its id when its from end moves to
+        // another item, so the new holder taking it in before the old one let it go would lose it.
+        var updated: [(record: ItemRecord, old: Item, new: Item)] = []
+        var added: [Item] = []
+        // An item named twice takes its last value, as it would one step after another.
+        let last = Dictionary(changes.upserted.enumerated().map { ($1.id, $0) }, uniquingKeysWith: { _, later in later })
+        for (position, item) in changes.upserted.enumerated() where last[item.id] == position {
             if let record = records[item.id] {
                 let old = record.item
                 guard old != item else { continue }
-                if old.title != item.title || old.name != item.name { renamed = true }
-                // The index is current before the stamps move, so a reader told by a stamp sees the new edges.
+                touch(old)
                 index.remove(old)
-                index.insert(item, catalogue: catalogue)
-                record.item = item
-                if old.edgesOut != item.edgesOut {
-                    noteLinks(touching: old)
-                    noteLinks(touching: item)
-                }
-                if Self.placesDiffer(old, item) { moved = true }
+                updated.append((record, old, item))
             } else {
-                records[item.id] = ItemRecord(item)
-                index.insert(item, catalogue: catalogue)
-                if !item.edgesOut.isEmpty { noteLinks(touching: item) }
-                moved = true
+                added.append(item)
             }
-            changed = true
+        }
+        // The index is current before the stamps move, so a reader told by a stamp sees the new edges.
+        for (_, _, item) in updated { index.insert(item, catalogue: catalogue) }
+        for item in added {
+            records[item.id] = ItemRecord(item)
+            index.insert(item, catalogue: catalogue)
+        }
+        for (record, old, item) in updated {
+            if old.title != item.title || old.name != item.name { renamed = true }
+            touch(item)
+            record.item = item
+            if old.edgesOut != item.edgesOut {
+                noteLinks(touching: old)
+                noteLinks(touching: item)
+            }
+            if Self.placesDiffer(old, item) { moved = true }
+        }
+        for item in added {
+            touch(item)
+            if !item.edgesOut.isEmpty { noteLinks(touching: item) }
+            moved = true
         }
         hold(changes.bodies)
-        if changed { contentRevision += 1 }
+        if !touched.isEmpty {
+            contentRevision += 1
+            changeLog.record(touched, at: contentRevision)
+        }
         if moved { membershipRevision += 1 }
         if renamed { namesRevision += 1 }
         // A copy still filling may not have its instance yet; each step it takes in may bring it.
@@ -179,6 +215,7 @@ extension MarfaLibrary {
         index = MarfaItemIndex()
         for record in records.values { index.insert(record.item, catalogue: catalogue) }
         contentRevision += 1
+        changeLog.restart(at: contentRevision)
         membershipRevision += 1
     }
 

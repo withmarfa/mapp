@@ -60,7 +60,8 @@ nonisolated extension RowContent {
 final class CardContents {
     private struct Basis: Equatable {
         let library: ObjectIdentifier
-        let membership: Int
+        /// Which types there are and what they are called, which a row shows.
+        let catalogue: Catalogue
         let looks: [TypeID: TypeLook]
         let list: RowList
         let shape: CardShape
@@ -73,6 +74,8 @@ final class CardContents {
     }
 
     private var basis: Basis?
+    /// The library's and the counts' revisions at the last pass, from which only the items that changed are read again.
+    private var revisions: (content: Int, counts: Int)?
     private var held: [ItemID: Held] = [:]
     /// The content of each held item, kept beside `held` so a pass that changes nothing answers without building it again.
     private var made: [ItemID: RowContent] = [:]
@@ -83,16 +86,20 @@ final class CardContents {
     func contents(
         of items: [Item], in library: any ItemLibrary, looks: [TypeID: TypeLook], list: RowList, shape: CardShape
     ) -> [ItemID: RowContent] {
-        let next = Basis(library: ObjectIdentifier(library), membership: library.membershipRevision, looks: looks, list: list, shape: shape)
+        let next = Basis(library: ObjectIdentifier(library), catalogue: library.catalogue, looks: looks, list: list, shape: shape)
         if next != basis {
             basis = next
             held = [:]
             made = [:]
+            revisions = nil
         }
+        let changed = changes(in: library)
         // A type's look without what a card leaves out, and the links it asks for: worked out once for each type in the pass.
         var shaped: [TypeID: (look: TypeLook, wanted: Set<Relation>, counts: Set<CountFact>)] = [:]
         for item in items {
             let id = item.id
+            // The layout can still supply the old item after the library reports a change.
+            if let changed, !changed.contains(id), held[id]?.item == item { continue }
             let own: (look: TypeLook, wanted: Set<Relation>, counts: Set<CountFact>)
             if let known = shaped[item.type] {
                 own = known
@@ -117,5 +124,14 @@ final class CardContents {
             }
         }
         return made
+    }
+
+    /// The items whose content may differ since the last pass: those the library or the counts say changed. Nil where
+    /// every item is checked again, as at the first pass and where the library cannot say.
+    private func changes(in library: any ItemLibrary) -> Set<ItemID>? {
+        let now = (content: library.contentRevision, counts: library.counts.revision)
+        defer { revisions = now }
+        guard let revisions, let items = library.changedItems(since: revisions.content) else { return nil }
+        return library.counts.changedItems(since: revisions.counts).map { items.union($0) }
     }
 }

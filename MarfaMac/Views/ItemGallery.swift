@@ -39,16 +39,21 @@ struct ItemGallery: View {
 
     var body: some View {
         let _ = daysSeen
-        let sections = browser.sections(in: library, order: order, now: library.now())
-        let ids = Cost.measure(.galleryBody) { sections.flatMap { $0.items.map(\.id) } }
+        let arrangement = browser.arrangement(in: library, order: order, now: library.now())
+        let sections = arrangement.sections
+        let ids = arrangement.ids
         let title = browser.pageTitle(in: library)
         // The picture's opening lines are drawn on the card when the preview allows them, so the line under the title
         // does not say them again.
         let shape = CardShape(dropsOpening: browser.cards.preview == .pictureOrText || browser.cards.preview == .text)
         let list = RowList(date: .look, format: dateFormat, marksFeed: browser.listing.scope == .all, day: Calendar.current.startOfDay(for: library.now()))
-        let contents = cardContents.contents(of: sections.flatMap(\.items), in: library, looks: browser.propertyLooks(in: library), list: list, shape: shape)
-        let attachments = CardAttachments.of(sections.flatMap(\.items), in: library, showsPicture: browser.cards.preview.showsPicture)
-        keyboardCollection(sections, ids: ids, plan: plan(for: browser.cards, contents: contents, attachments: attachments))
+        // Only a page of a large place is drawn, and the next as its end comes into view (`Browser.listDrawn`).
+        let columns = plan(for: browser.cards, contents: [:], attachments: [:]).columns
+        let drawn = arrangement.drawn(browser.listDrawn, countsFolded: true, columns: columns)
+        let drawnItems = drawn.flatMap(\.section.items)
+        let contents = cardContents.contents(of: drawnItems, in: library, looks: browser.propertyLooks(in: library), list: list, shape: shape)
+        let attachments = CardAttachments.of(drawnItems, in: library, showsPicture: browser.cards.preview.showsPicture)
+        keyboardCollection(sections, drawn: drawn, ids: ids, plan: plan(for: browser.cards, contents: contents, attachments: attachments))
         .searchStatus(browser)
         .accessibilityLabel(title)
         .onChange(of: browser.isSearchExpanded) {
@@ -58,6 +63,8 @@ struct ItemGallery: View {
             if let cursor, !new.contains(cursor) { self.cursor = nil }
             if let anchor, !new.contains(anchor) { self.anchor = nil }
         }
+        // The arrow keys move the cursor, with Shift too, so it is drawn wherever it goes.
+        .background(ChosenItemDrawn(browser: browser, positions: arrangement.positions, cursor: $cursor))
         .overlay {
             if ids.isEmpty {
                 if browser.listHidesEveryGroup(in: library) {
@@ -74,12 +81,16 @@ struct ItemGallery: View {
         .dragsSelection(of: browser)
     }
 
-    private func collection(_ sections: [ItemSection], ids: [ItemID], plan: Plan) -> some View {
+    private func collection(_ parts: [DrawnSection], ids: [ItemID], plan: Plan) -> some View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 24) {
-                    ForEach(sections) { section in
-                        sectionGrid(section, ids: ids, plan: plan)
+                    ForEach(parts) { part in
+                        sectionGrid(part.section, heading: part.part.startsSection, ids: ids, plan: plan)
+                        if part.part.endsRun {
+                            // Drawn only to come into view, which draws the next page of the run.
+                            Color.clear.frame(height: 1).accessibilityHidden(true).onAppear { browser.drawMoreOfList(after: part.part.run) }
+                        }
                     }
                 }
                 .padding(Self.inset)
@@ -115,9 +126,9 @@ struct ItemGallery: View {
         }
     }
 
-    private func sectionGrid(_ section: ItemSection, ids: [ItemID], plan: Plan) -> some View {
+    private func sectionGrid(_ section: ItemSection, heading: Bool, ids: [ItemID], plan: Plan) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            if let group = section.group {
+            if heading, let group = section.group {
                 Text(group.title())
                     .interfaceFont(.body.weight(.semibold))
                     .accessibilityAddTraits(.isHeader)
@@ -132,8 +143,8 @@ struct ItemGallery: View {
         }
     }
 
-    private func keyboardCollection(_ sections: [ItemSection], ids: [ItemID], plan: Plan) -> some View {
-        collection(sections, ids: ids, plan: plan)
+    private func keyboardCollection(_ sections: [ItemSection], drawn: [DrawnSection], ids: [ItemID], plan: Plan) -> some View {
+        collection(drawn, ids: ids, plan: plan)
         .onKeyPress(keys: [.leftArrow, .rightArrow, .upArrow, .downArrow], phases: .down) { key in
             let current = cursor ?? ids.first(where: browser.selection.contains)
             let destination: ItemID?

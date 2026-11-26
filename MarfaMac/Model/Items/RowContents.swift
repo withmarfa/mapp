@@ -16,7 +16,8 @@ final class RowContents {
 
     private struct Basis: Equatable {
         let library: ObjectIdentifier
-        let membership: Int
+        /// Which types there are and what they are called, which a row shows.
+        let catalogue: Catalogue
         let looks: [TypeID: TypeLook]
         let list: RowList
     }
@@ -31,6 +32,8 @@ final class RowContents {
     }
 
     private var basis: Basis?
+    /// The library's and the counts' revisions at the last pass, from which only the items that changed are read again.
+    private var revisions: (content: Int, counts: Int)?
     private var held: [ItemID: Held] = [:]
     /// The content of each held item, kept beside `held` so a pass that changes nothing answers without building it again.
     private var made: [ItemID: RowContent] = [:]
@@ -41,16 +44,22 @@ final class RowContents {
     func contents(
         of entries: [Entry], in library: any ItemLibrary, looks: [TypeID: TypeLook], list: RowList
     ) -> [ItemID: RowContent] {
-        let next = Basis(library: ObjectIdentifier(library), membership: library.membershipRevision, looks: looks, list: list)
+        let next = Basis(library: ObjectIdentifier(library), catalogue: library.catalogue, looks: looks, list: list)
         if next != basis {
             basis = next
             held = [:]
             made = [:]
+            revisions = nil
         }
+        let changed = changes(in: library)
         // The links a type's look asks for, worked out once for each type in the pass.
         var wanted: [TypeID: (relations: Set<Relation>, counts: Set<CountFact>)] = [:]
         for entry in entries {
             let id = entry.item.id
+            // The list can still supply the old item after the library reports a change.
+            if let changed, !changed.contains(id), let known = held[id], known.showsTime == entry.showsTime, known.item == entry.item {
+                continue
+            }
             let look = looks[entry.item.type] ?? .empty
             let asked = wanted[entry.item.type] ?? { let asked = (look.relations, look.counts); wanted[entry.item.type] = asked; return asked }()
             // A linked item's title, or its coming or going, or a count's answer coming, changes this row though this item is the same.
@@ -74,5 +83,14 @@ final class RowContents {
             }
         }
         return made
+    }
+
+    /// The items whose content may differ since the last pass: those the library or the counts say changed. Nil where
+    /// every item is checked again, as at the first pass and where the library cannot say.
+    private func changes(in library: any ItemLibrary) -> Set<ItemID>? {
+        let now = (content: library.contentRevision, counts: library.counts.revision)
+        defer { revisions = now }
+        guard let revisions, let items = library.changedItems(since: revisions.content) else { return nil }
+        return library.counts.changedItems(since: revisions.counts).map { items.union($0) }
     }
 }

@@ -63,6 +63,8 @@ final class ItemCounts {
 
     /// Counts the answers that changed, which a view reads to be told when to draw again.
     private(set) var revision = 0
+    /// Which items each step of `revision` answered anew (`changedItems(since:)`).
+    @ObservationIgnored private var changeLog = ItemChangeLog()
 
     @ObservationIgnored private let answering: Answering
     @ObservationIgnored private var answers: [Key: ItemCountAnswer] = [:]
@@ -123,6 +125,7 @@ final class ItemCounts {
             unheld = []
             // Cached table rows can still contain an evicted answer.
             revision += 1
+            changeLog.restart(at: revision)
         }
     }
 
@@ -193,16 +196,23 @@ final class ItemCounts {
 
     /// Keeps what Marfa answered for the counts still wanted. One let go while it was asked is dropped.
     private func take(_ got: [ItemID: ItemCountAnswer]?, for ids: [ItemID], _ query: CountQuery) {
-        var changed = false
+        var changed: Set<ItemID> = []
         for id in ids {
             let key = Key(id: id, query: query)
             guard wanted[key] != nil else { continue }
             if let answer = got?[id] {
-                if answers.updateValue(answer, forKey: key) != answer { changed = true }
+                if answers.updateValue(answer, forKey: key) != answer { changed.insert(id) }
             } else if answers.removeValue(forKey: key) != nil {
-                changed = true
+                changed.insert(id)
             }
         }
-        if changed { revision += 1 }
+        guard !changed.isEmpty else { return }
+        revision += 1
+        changeLog.record(changed, at: revision)
+    }
+
+    /// The items whose answers changed after `revision`, or nil where that cannot be said, as after answers were let go.
+    func changedItems(since revision: Int) -> Set<ItemID>? {
+        changeLog.changes(since: revision, now: self.revision)
     }
 }

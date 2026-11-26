@@ -48,6 +48,11 @@ nonisolated struct ItemTableOptions: Hashable, Sendable {
         var mode: GroupMode {
             if case .column(_, let mode) = self { mode } else { .value }
         }
+
+        /// Whether the groups are a date's spans, whose names may say Today.
+        var groupsByDate: Bool {
+            if case .bucket = mode { true } else { false }
+        }
     }
 
     var grouping = Grouping.automatic
@@ -372,6 +377,49 @@ nonisolated enum ItemTableLayout {
             }
         }
         return order.map { rows[$0] }
+    }
+
+    /// `kept` and `fresh` as one list in the order `sorted` gives, where each is already in that order and `positions`
+    /// says where each row stands among the rows given, the last tie-break. An update re-places only the rows that
+    /// changed this way, rather than sorting the place again.
+    static func merged(
+        _ kept: [ItemTableRow], _ fresh: [ItemTableRow], by sort: [ItemTableComparator], positions: [ItemID: Int]
+    ) -> [ItemTableRow] {
+        guard !fresh.isEmpty else { return kept }
+        guard !kept.isEmpty else { return fresh }
+        func values(of row: ItemTableRow) -> [ItemTableValue.Sort?] { sort.map { $0.column.sortValue(of: row) } }
+        func precedes(_ a: ItemTableRow, _ aValues: [ItemTableValue.Sort?], _ b: ItemTableRow, _ bValues: [ItemTableValue.Sort?]) -> Bool {
+            for (position, comparator) in sort.enumerated() {
+                switch comparator.compareValues(aValues[position], bValues[position]) {
+                case .orderedAscending: return true
+                case .orderedDescending: return false
+                case .orderedSame: continue
+                }
+            }
+            switch a.item.displayTitle.localizedStandardCompare(b.item.displayTitle) {
+            case .orderedAscending: return true
+            case .orderedDescending: return false
+            case .orderedSame: return (positions[a.id] ?? 0) < (positions[b.id] ?? 0)
+            }
+        }
+        var merged: [ItemTableRow] = []
+        merged.reserveCapacity(kept.count + fresh.count)
+        var (i, j) = (0, 0)
+        var (keptValues, freshValues) = (values(of: kept[0]), values(of: fresh[0]))
+        while i < kept.count, j < fresh.count {
+            if precedes(fresh[j], freshValues, kept[i], keptValues) {
+                merged.append(fresh[j])
+                j += 1
+                if j < fresh.count { freshValues = values(of: fresh[j]) }
+            } else {
+                merged.append(kept[i])
+                i += 1
+                if i < kept.count { keptValues = values(of: kept[i]) }
+            }
+        }
+        merged.append(contentsOf: kept[i...])
+        merged.append(contentsOf: fresh[j...])
+        return merged
     }
 
     /// The rows in groups by `column` as `mode` says, in the grouping's own order, with the rows that hold no value

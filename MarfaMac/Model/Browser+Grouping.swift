@@ -163,7 +163,7 @@ extension Browser {
 extension Browser {
     /// A board's lanes: every lane in order, hidden ones too, the field a card moved between them changes, and whether
     /// they are Marfa's status groups, which each card reads by its own type's status.
-    struct BoardLanes {
+    nonisolated struct BoardLanes: Sendable {
         var all: [ItemBoardLane]
         var key: String
         var byStatusGroups: Bool
@@ -171,32 +171,50 @@ extension Browser {
         var isOwn: Bool
     }
 
+    /// What a board's lanes are made by, besides the items and the table.
+    nonisolated struct BoardChoice: Equatable, Sendable {
+        let column: ItemTableColumn
+        let mode: GroupMode
+        let own: Bool
+        let groupOrder: [String]?
+        let asMarfa: Bool
+        /// Lanes by date may say Today.
+        let clock: ClockDay?
+    }
+
     /// The open board's lanes, by `boardGrouping`: a choice or status by its words with every option a lane and a card
     /// moved between them taking the word, status groups as the board of mixed types has them, and any other grouping by
     /// its groups, of which only Not Set takes a card. The place's order applies where the lanes are its own grouping.
+    /// A large place's are worked out off the main actor (`placed`).
     func boardLanes(in library: any ItemLibrary) -> BoardLanes? {
         guard let grouping = boardGrouping(in: library), case .column(let id, let mode) = grouping else { return nil }
         let content = tableContent(in: library)
         guard let column = content.columns.first(where: { $0.id == id && $0.groups(by: mode) }) else { return nil }
-        let items = filteredItems(in: library)
-        let order = boardCardOrder(in: library)
-        let key = column.field?.key ?? ""
-        let lanes: [ItemBoardLane]
-        if mode == .statusGroups {
-            lanes = ItemBoardLayout.lanes(
-                items: items, key: key, catalogue: library.catalogue, order: order, statusGroups: true, asMarfa: isViewPlace)
-        } else if mode == .value, let field = column.field, ItemBoardLayout.isCompatible(field) {
-            lanes = ItemBoardLayout.lanes(items: items, key: key, catalogue: library.catalogue, order: order, asMarfa: isViewPlace)
-        } else {
-            let groups = ItemTableLayout.groups(
-                of: content.kept, by: column, mode: mode, catalogue: library.catalogue, declared: true, asMarfa: isViewPlace,
-                calendar: content.calendar, now: library.now())
-            lanes = ItemBoardLayout.lanes(of: groups, mode: mode, order: order)
-        }
         let options = tableOptions[shown]
         let own = options?.grouping == grouping
-        let all = ItemBoardLayout.arranged(lanes, order: own ? options?.groupOrder : nil, hidden: nil, hidesEmpty: false)
-        return BoardLanes(all: all, key: key, byStatusGroups: mode == .statusGroups, isOwn: own)
+        let choice = BoardChoice(
+            column: column, mode: mode, own: own, groupOrder: own ? options?.groupOrder : nil, asMarfa: isViewPlace,
+            clock: grouping.groupsByDate ? ClockDay(now: library.now(), calendar: library.calendar()) : nil)
+        // The cards follow the place's sort where the person or the view set one, else their titles.
+        let rows = options?.sort?.isEmpty == false ? content.rows : nil
+        let kept = content.kept
+        let (catalogue, calendar, now) = (library.catalogue, content.calendar, library.now())
+        return placed(boardWork, choice: choice, table: content, in: library) { items in
+            let order = rows.map { Dictionary($0.enumerated().map { ($1.item.id, $0) }, uniquingKeysWith: { first, _ in first }) }
+            let key = column.field?.key ?? ""
+            let lanes: [ItemBoardLane]
+            if mode == .statusGroups {
+                lanes = ItemBoardLayout.lanes(items: items, key: key, catalogue: catalogue, order: order, statusGroups: true, asMarfa: choice.asMarfa)
+            } else if mode == .value, let field = column.field, ItemBoardLayout.isCompatible(field) {
+                lanes = ItemBoardLayout.lanes(items: items, key: key, catalogue: catalogue, order: order, asMarfa: choice.asMarfa)
+            } else {
+                let groups = ItemTableLayout.groups(
+                    of: kept, by: column, mode: mode, catalogue: catalogue, declared: true, asMarfa: choice.asMarfa, calendar: calendar, now: now)
+                lanes = ItemBoardLayout.lanes(of: groups, mode: mode, order: order)
+            }
+            let all = ItemBoardLayout.arranged(lanes, order: choice.groupOrder, hidden: nil, hidesEmpty: false)
+            return BoardLanes(all: all, key: key, byStatusGroups: mode == .statusGroups, isOwn: own)
+        }
     }
 
     /// The lanes the board shows: less the hidden ones, and the empty ones where Hide Empty Groups is on.

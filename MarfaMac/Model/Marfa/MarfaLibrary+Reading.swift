@@ -76,6 +76,10 @@ extension MarfaLibrary {
         return item.isFile ? keys.union(MarfaMapping.fileFacts) : keys
     }
 
+    func changedItems(since revision: Int) -> Set<ItemID>? {
+        changeLog.changes(since: revision, now: contentRevision)
+    }
+
     /// The items held among `ids`, observed as the lists are, for reads that gather many items at once.
     func heldItems(_ ids: some Sequence<ItemID>) -> [Item] {
         _ = contentRevision
@@ -96,12 +100,87 @@ extension MarfaLibrary {
         if let held = listed[key], held.content == content { return held.items }
         // A collection's order falls back on titles, so it changes with any edit, not only with membership.
         let isCollection: Bool = if case .collection = key.place { true } else { false }
-        var listing = listed[key].flatMap { $0.membership == membership && !isCollection ? $0 : nil }
-            ?? Listing(membership: membership, ids: listingOrder(of: key))
+        if !isCollection, var listing = listed[key], let changed = changedItems(since: listing.content) {
+            Cost.measure(.listingPatch) { patch(&listing, of: key, changed: changed, membershipMoved: listing.membership != membership) }
+            listing.membership = membership
+            listing.content = content
+            listed[key] = listing
+            return listing.items
+        }
+        // Where the change history no longer reaches the listing, its order may be out of date too (a creation time
+        // changes with no membership move), so it is made whole.
+        var listing = Listing(membership: membership, ids: listingOrder(of: key))
         listing.content = content
         listing.items = listing.ids.compactMap { records[$0]?.item }
+        listing.positions = nil
         listed[key] = listing
         return listing.items
+    }
+
+    /// Brings `listing` up to date with only the `changed` items: each takes its new value where it stays, and, where
+    /// membership moved or its creation time changed, leaves or joins in the listing's order (`ordered`), which the others
+    /// keep.
+    private func patch(_ listing: inout Listing, of key: ListingKey, changed: Set<ItemID>, membershipMoved: Bool) {
+        let positions = listing.positions ?? Dictionary(uniqueKeysWithValues: listing.ids.enumerated().map { ($1, $0) })
+        var leaving: Set<ItemID> = []
+        var joining: [Item] = []
+        for id in changed {
+            let isMember = membershipMoved ? isMember(id, of: key) : positions[id] != nil
+            if let position = positions[id] {
+                guard isMember, let item = records[id]?.item else { leaving.insert(id); continue }
+                if item.created == listing.items[position].created {
+                    listing.items[position] = item
+                } else {
+                    // The server can give a queued creation a different timestamp.
+                    leaving.insert(id)
+                    joining.append(item)
+                }
+            } else if isMember, let item = records[id]?.item {
+                joining.append(item)
+            }
+        }
+        guard !leaving.isEmpty || !joining.isEmpty else {
+            listing.positions = positions
+            return
+        }
+        let staying = leaving.isEmpty ? listing.items : listing.items.filter { !leaving.contains($0.id) }
+        listing.items = Self.merged(staying, Self.ordered(joining))
+        listing.ids = listing.items.map(\.id)
+        listing.positions = nil
+    }
+
+    /// Two lists each in the listing's order (`ordered`), as one.
+    private static func merged(_ a: [Item], _ b: [Item]) -> [Item] {
+        guard !b.isEmpty else { return a }
+        var merged: [Item] = []
+        merged.reserveCapacity(a.count + b.count)
+        var (i, j) = (0, 0)
+        while i < a.count, j < b.count {
+            if precedes(b[j], a[i]) { merged.append(b[j]); j += 1 } else { merged.append(a[i]); i += 1 }
+        }
+        merged.append(contentsOf: a[i...])
+        merged.append(contentsOf: b[j...])
+        return merged
+    }
+
+    private static func precedes(_ a: Item, _ b: Item) -> Bool {
+        a.created != b.created ? a.created > b.created : a.id.rawValue < b.id.rawValue
+    }
+
+    /// Whether the item is one `members(of:)` lists, asked of one item. A collection's members are worked out whole.
+    private func isMember(_ id: ItemID, of key: ListingKey) -> Bool {
+        guard records[id] != nil, index.isStandalone(id) else { return false }
+        if key.favorites { return index.favorites.contains(id) && index.listed.contains(id, in: key.scope, key.archived) }
+        switch key.place {
+        case .library: return index.listed.contains(id, in: .library, key.archived)
+        case .feed: return index.listed.contains(id, in: .feed, key.archived)
+        case .archive: return index.listed.contains(id, in: .all, .only)
+        case .types, .sources, .collections: return false
+        case .source(let code): return index.bySource[code]?.contains(id, in: key.scope, key.archived) == true
+        case .type(let type):
+            return kinds(of: type, including: key.includingKinds).contains { index.byType[$0]?.contains(id, in: key.scope, key.archived) == true }
+        case .collection: return members(of: key).contains(id)
+        }
     }
 
     var deletedItems: [Item] {
@@ -196,7 +275,11 @@ extension MarfaLibrary {
 
     /// Newest first, as the source paints them; the views sort as the person chose.
     static func ordered(_ items: [Item]) -> [Item] {
-        items.sorted { $0.created != $1.created ? $0.created > $1.created : $0.id.rawValue < $1.id.rawValue }
+        // The keys are read once, and positions sorted rather than items, which are large to move.
+        let keys = items.map { (created: $0.created, id: $0.id.rawValue) }
+        return items.indices.sorted { a, b in
+            keys[a].created != keys[b].created ? keys[a].created > keys[b].created : keys[a].id < keys[b].id
+        }.map { items[$0] }
     }
 
     /// A file attached to an item the library holds appears on that item's page. A file whose parent is missing still

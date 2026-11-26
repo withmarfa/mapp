@@ -124,14 +124,6 @@ final class Browser {
         let emptyViewLayout: ItemViewMode?
     }
 
-    /// Where each item stands in the sort the board's cards follow: the place's sort where the person or the view set
-    /// one, else nil, which keeps the cards by title.
-    func boardCardOrder(in library: any ItemLibrary) -> [ItemID: Int]? {
-        guard tableOptions[shown]?.sort?.isEmpty == false else { return nil }
-        let rows = tableContent(in: library).rows
-        return Dictionary(rows.enumerated().map { ($0.element.item.id, $0.offset) }, uniquingKeysWith: { first, _ in first })
-    }
-
     /// How a field's column is named among the table's columns (`ItemTableLayout.columns`).
     nonisolated static let fieldColumnPrefix = "field."
 
@@ -184,6 +176,8 @@ final class Browser {
     /// The pages of the table the person has loaded, with what they belong to. Held apart from the table's content,
     /// which a page never makes again, and read as one page once the key has changed (`tablePaging`).
     var pagingState: (key: TablePagingKey, paging: TablePaging)?
+    /// Which items the list, the gallery or the timeline draws, with what they belong to (`listDrawn`).
+    var listPagingState: (key: TablePagingKey, drawn: ListDrawn)?
     /// The items the listed types may have as a parent, held for the types and what the library holds.
     @ObservationIgnored var parentMemo: (key: ParentKey, options: [SearchOffers.Option])?
     /// The search's offers for the last key they were worked out for (`searchOffers`).
@@ -197,11 +191,24 @@ final class Browser {
     /// The arrangement under way, what it is for, and the token its task ends it by, so a task that was replaced never
     /// ends its successor's record.
     @ObservationIgnored var arranging: (key: TableKey, token: UUID, task: Task<Void, Never>)?
+    /// The table last asked for, which an arrangement must be for to land, as `PlaceWork`'s runs must.
+    @ObservationIgnored var askedTable: TableKey?
+    /// The last arrangement begun, ended or not, which the next waits for.
+    @ObservationIgnored var lastArrangement: Task<Void, Never>?
     /// Counts the arrangements that landed, which a view reads through `tableContent(in:)` to draw the new one.
     var tableArrangements = 0
     /// The rows of Types, Collections or Sources, held while what they read stands (`Browser+PlaceIndex`).
     @ObservationIgnored var indexRowsMemo: (key: IndexRowsKey, rows: [IndexRow])?
-    @ObservationIgnored var sectionsMemo: (key: SectionsKey, sections: [ItemSection])?
+    /// The list's sections, worked out off the main actor for a large place (`sections(in:order:now:)`).
+    @ObservationIgnored var sectionsWork = PlaceWork<SectionsKey, ListArrangement>()
+    /// Counts what landed from work off the main actor besides the table, which a layout reads to draw it.
+    var placeWorkLanded = 0
+    /// How often the window worked a place's table or list out whole, and how often it updated one, which tests read.
+    @ObservationIgnored var placeWorkCounts = PlaceWorkCounts()
+    /// The board's lanes, the calendar's entries and the timeline's days, worked out off the main actor for a large place (`placed`).
+    @ObservationIgnored var boardWork = PlaceWork<PlacingKey<BoardChoice>, BoardLanes>()
+    @ObservationIgnored var calendarWork = PlaceWork<PlacingKey<CalendarChoice>, CalendarPlacing>()
+    @ObservationIgnored var timelineWork = PlaceWork<PlacingKey<TimelineChoice>, TimelinePlacing>()
     @ObservationIgnored private var viewModesMemo: (key: ViewModesKey, modes: [ItemViewMode])?
     @ObservationIgnored private var fieldsMemo: FieldsMemo?
     /// The last Group by offer, while the table's content and the layout it was made for stand (`Browser+Grouping`).
@@ -472,15 +479,20 @@ final class Browser {
         let isFirst = libraryID == nil
         libraryID = id
         pagingState = nil
+        listPagingState = nil
         tableMemo = nil
         heldTables = [:]
         heldSearch = nil
         arranging?.task.cancel()
         arranging = nil
+        askedTable = nil
         indexRowsMemo = nil
         offerMemo = nil
         parentMemo = nil
-        sectionsMemo = nil
+        sectionsWork.reset()
+        boardWork.reset()
+        calendarWork.reset()
+        timelineWork.reset()
         viewModesMemo = nil
         fieldsMemo = nil
         paletteMemo = nil

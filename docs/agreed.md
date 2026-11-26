@@ -45,7 +45,6 @@ Read only the row you are building. A row says what was agreed; the boards it na
 
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
-| Gate | A list of 50,000 items stays quick to change. Nesting, Digest and Map come after it. | `Browser`, `ItemTable.swift` | `Rethink-Library-Heavy` |
 | Digest | Items read in place: a white card each, with its type, source, title and some lines. What belongs together (a thread, one book's highlights) is a pile under its newest. An older copy of the app reads an unknown layout as a list. | `ItemViewMode`, a new file in `MarfaMac/Views/` | `Rethink-Inbox`, `Rethink-Inbox-View` |
 | Table | Sub-items nest under their parent. A last row, New, is the row a person types in. | `ItemTable.swift`, `ItemTableCells.swift` | `Rethink-Library`, `Rethink-Library-Heavy` |
 | List beside a page | The entries of every list beside a page, the same in every place. | `ItemList.swift`, `ItemRow.swift` | `Rethink-Notes`, `Rethink-Highlights` |

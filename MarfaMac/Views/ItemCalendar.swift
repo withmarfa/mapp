@@ -3,7 +3,7 @@ import SwiftUI
 
 /// The calendar layout: a week of day columns with hours, or a month of days, with each item where its type's date puts
 /// it (`CalendarLayout`). Choosing an item opens the right sidebar, as the timeline does. A selection that moves runs
-/// the bodies of the cells that wrap an item and of no calendar: the layout is worked out here from the items alone.
+/// the bodies of the cells that wrap an item and of no calendar: the browser works the layout out from the items alone.
 struct ItemCalendar: View {
     @CurrentLibrary private var library
     @Bindable var browser: Browser
@@ -21,8 +21,8 @@ struct ItemCalendar: View {
         let now = library.now()
         let anchor = browser.calendarDay ?? now
         let firstShown = CalendarLayout.firstDayShown(browser.calendarDay, now: now, calendar: calendar)
-        let placed = CalendarLayout.entries(for: items, looks: browser.looks(in: library), catalogue: library.catalogue, calendar: calendar,
-            marksFeed: browser.listing.scope == .all)
+        // Worked out off the main actor for a large place (`Browser.placed`).
+        let placed = browser.calendarPlacing(in: library, calendar: calendar)
         let scale = browser.calendarScale
         let visible = scale == .week
             ? DateInterval(start: firstShown, end: calendar.date(byAdding: .day, value: 7, to: firstShown) ?? firstShown)

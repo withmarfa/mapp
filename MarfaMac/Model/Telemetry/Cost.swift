@@ -8,6 +8,8 @@ import Synchronization
 nonisolated enum Cost: String, CaseIterable, Sendable {
     /// `Browser.items(in:)`, the place's items or the search's.
     case items
+    /// A place's listing brought up to date with the items that changed alone (`MarfaLibrary.listing`).
+    case listingPatch
     case sections
     case viewModes
     /// One `ItemTableContent` made, whatever it was asked for afterwards.
@@ -17,8 +19,12 @@ nonisolated enum Cost: String, CaseIterable, Sendable {
     /// taking them as they land. The rows are made, filtered and sorted off it.
     case tableArrange
     case tableGroups
-    /// One run of the gallery's own body, timed over its listing of every item the place holds.
-    case galleryBody
+    /// Every row of a table made from its items (`ItemTableContent.Made`), wherever it runs.
+    case tableMade
+    /// A table's rows kept, with only those of the items that changed made again (`ItemTableContent.Made`).
+    case tableUpdated
+    /// A large list's sections worked out off the main actor, whole or for the items that changed (`Browser.sections`).
+    case sectionsArranged
     /// What one gallery card derives from its item, the catalogue and the files it embeds (`GalleryCardFacts`).
     case galleryCard
     /// One placing of the soft selection's marks on a list or table.

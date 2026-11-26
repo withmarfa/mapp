@@ -110,9 +110,12 @@ import Observation
     /// nothing the old one's library kept (`ItemLibrary.serverKey`).
     var serverKey = ""
     let now: () -> Date
+    let calendar: () -> Calendar
 
     /// Bumped when any item changes, for the lists and search.
     var contentRevision = 0
+    /// Which items each step of `contentRevision` changed (`changedItems(since:)`).
+    @ObservationIgnored var changeLog = ItemChangeLog()
     /// Bumped only when an item comes, goes or changes which places hold it, or the catalogue changes, for the counts.
     var membershipRevision = 0
     /// Bumped when an item's title or the name the core gives it changes. A link shows that name. A keystroke that
@@ -284,6 +287,8 @@ import Observation
         var content = -1
         var ids: [ItemID]
         var items: [Item] = []
+        /// Where each id stands in `ids`, kept between patches while the ids stay (`MarfaLibrary.listing`).
+        var positions: [ItemID: Int]?
     }
 
     /// A text save the source has not answered.
@@ -389,6 +394,7 @@ import Observation
         typeIcons: (any TypeIconSource)? = nil, typeSchemas: (any TypeSchemaSource)? = nil, config: (any InstanceConfigSource)? = nil,
         sourceNames: (any SourceNameSource)? = nil, links: (any ItemLinkSource)? = nil,
         now: @escaping () -> Date = Date.init,
+        calendar: @escaping () -> Calendar = { .current },
         textPause: TextPause = .typing,
         cameOnline: @escaping () -> Void = {}) {
         self.source = source
@@ -402,6 +408,7 @@ import Observation
         self.links = links
         self.notices = notices
         self.now = now
+        self.calendar = calendar
         syncReport = source.syncReport
         connection = source.connectionState
         let changes = source.changes()

@@ -59,6 +59,39 @@ nonisolated enum ItemGroup: Hashable {
         }
     }
 
+    /// `group(for:now:calendar:)` for many dates. The recent groups' first days are worked out once, and a month's
+    /// bounds once for its run of dates, so a list of tens of thousands of items asks the calendar little.
+    struct Grouper {
+        private let now: Date
+        private let calendar: Calendar
+        private let today: Date
+        private let yesterday: Date
+        private let week: Date
+        private let month: Date
+        private var last: (interval: DateInterval, group: ItemGroup)?
+
+        init(now: Date, calendar: Calendar = .current) {
+            self.now = now
+            self.calendar = calendar
+            let today = calendar.startOfDay(for: now)
+            self.today = today
+            yesterday = calendar.date(byAdding: .day, value: -1, to: today) ?? today
+            week = calendar.date(byAdding: .day, value: -7, to: today) ?? today
+            month = calendar.date(byAdding: .day, value: -30, to: today) ?? today
+        }
+
+        mutating func group(for date: Date) -> ItemGroup {
+            if date >= today { return .today }
+            if date >= yesterday { return .yesterday }
+            if date >= week { return .previous7Days }
+            if date >= month { return .previous30Days }
+            if let last, last.interval.start <= date, date < last.interval.end { return last.group }
+            let group = ItemGroup.group(for: date, now: now, calendar: calendar)
+            if let interval = calendar.dateInterval(of: .month, for: date) { last = (interval, group) }
+            return group
+        }
+    }
+
     /// Sorts the items and splits them into sections. Favorites lead unless `favoritesFirst` is off, and date
     /// sections follow only when grouping by date and the list is sorted by a date.
     static func sections(
@@ -69,7 +102,13 @@ nonisolated enum ItemGroup: Hashable {
         now: Date,
         calendar: Calendar = .current
     ) -> [ItemSection] {
-        let items = sort.sorted(items)
+        sections(ofSorted: sort.sorted(items), sort: sort, favoritesFirst: favoritesFirst, groupsByDate: groupsByDate, now: now, calendar: calendar)
+    }
+
+    /// The sections of items already in `sort`'s order.
+    static func sections(
+        ofSorted items: [Item], sort: ItemSort, favoritesFirst: Bool, groupsByDate: Bool, now: Date, calendar: Calendar = .current
+    ) -> [ItemSection] {
         var sections: [ItemSection] = []
         var rest = items
         if favoritesFirst {
@@ -81,8 +120,9 @@ nonisolated enum ItemGroup: Hashable {
             if !rest.isEmpty { sections.append(ItemSection(group: nil, items: rest)) }
             return sections
         }
+        var grouper = Grouper(now: now, calendar: calendar)
         for item in rest {
-            let group = group(for: sort.date(of: item), now: now, calendar: calendar)
+            let group = grouper.group(for: sort.date(of: item))
             if sections.last?.group == group {
                 sections[sections.count - 1].items.append(item)
             } else {

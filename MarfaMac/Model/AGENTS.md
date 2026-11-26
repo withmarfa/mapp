@@ -37,8 +37,8 @@ Keep SwiftUI out. `ItemLibrary` is the app's whole view of the working copy; `Ma
 - **A type counts its kinds, by tier, from the index** (`MarfaItemIndex.byType`). Include Kinds changes what the list shows (`Browser.listing(in:)`) and what a saved view is given (`ViewDraft.query`).
 - **`Browser.choicesChanged()` is the one funnel for a place's choices.** It registers one undo step and, in a saved view, writes Marfa's part at once, on the version last read. A failed write keeps the window's choice, a conflict shows the view, and both are told.
 - **A window whose filters differ from its view's lists a preview** (`ItemLibrary.previewItems(ofView:query:)`).
-- **Ask the browser for a place's content** (`Browser.tableContent(in:)`, `sections`, `paletteIndex`). Never build an `ItemTableContent` or read the library's items in a view, because that repeats the work at every draw.
-- **A new `ItemLibrary` must bump** `contentRevision` when items or the catalogue change, `membershipRevision` when places do, and `namesRevision` when a name does.
+- **Ask the browser for a place's content** (`Browser.tableContent(in:)`, `arrangement`, `placed`, `paletteIndex`). Never build an `ItemTableContent` or read the library's items in a view, because that repeats the work at every draw.
+- **A new `ItemLibrary` must bump** `contentRevision` when items or the catalogue change, `membershipRevision` when places do, and `namesRevision` when a name does. Where it can, it says which items changed (`changedItems(since:)`), so a place re-places only those.
 - **Names, previews, labels, dates and excerpts are the core's** (`Item.name`, `Item.displayTitle`, `Marfa.ItemDate`); `title` is only what the app writes. The app parses and filters none. Relationship names are Marfa's (`EdgeType.label`), never reworded.
 - **A result list from a copy that is filling or behind** (`isIncomplete`) never says nothing matches. An excerpt shows only while it describes the item.
 
