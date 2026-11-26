@@ -113,8 +113,14 @@ struct CalendarWeekView: View {
         .simultaneousGesture(pinch)
         .opacity(isReady ? 1 : 0)
         .task(id: size.width > 0) { await start() }
+        // Once the strip has its new width: scrolled before it, the offset is held at the old strip's end and the week rests
+        // between two days after the inspector or the sidebar opens or closes.
         .onChange(of: column) {
-            if isReady { position.scrollTo(x: CGFloat(tracker.settledIndex) * column, y: keyboard.offsetY) }
+            guard isReady else { return }
+            Task {
+                await Task.yield()
+                position.scrollTo(x: CGFloat(tracker.settledIndex) * columnWidth, y: keyboard.offsetY)
+            }
         }
         .onChange(of: firstDay) { _, day in go(to: day) }
         .onAppear { browser.restoreCalendarBlock(in: library) }
@@ -323,13 +329,24 @@ struct CalendarWeekView: View {
         .frame(width: lead + CGFloat(strip.count - range.lowerBound) * column, height: height, alignment: .leading)
         .overlay(alignment: .topLeading) {
             ZStack(alignment: .topTrailing) {
+                // The time of now stands in the gutter at the line, in place of the hour labels it would cover.
+                let nowAt = run.nowMinute(now: now, calendar: calendar)?.minute
                 ForEach(1..<24, id: \.self) { hourOfDay in
                     Text(verbatim: DateDisplay.hourLabel(hourOfDay, format: format, locale: calendar.locale ?? .current))
+                        .opacity(nowAt.map { abs($0 - hourOfDay * 60) < 20 } == true ? 0 : 1)
                         .interfaceFont(.system(size: 10.5))
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
                         .padding(.trailing, 8)
                         .offset(y: CGFloat(hourOfDay) * hour - 7)
+                }
+                if let nowAt {
+                    Text(verbatim: DateDisplay.timeOfDay(of: now, format: format, calendar: calendar))
+                        .interfaceFont(.system(size: 10.5, weight: .medium))
+                        .monospacedDigit()
+                        .foregroundStyle(Color.calendarToday)
+                        .padding(.trailing, 8)
+                        .offset(y: CGFloat(nowAt) / 60 * hour - 7)
                 }
             }
             .frame(width: margin, height: height, alignment: .topTrailing)

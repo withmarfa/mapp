@@ -12,6 +12,7 @@ struct ItemCalendar: View {
     @State private var keyboard = CalendarKeyboard()
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
     @AppStorage(WeekStart.key) private var weekStart = 0
+    @Environment(\.topRowSpace) private var topRow
 
     var body: some View {
         let _ = daysSeen
@@ -55,6 +56,9 @@ struct ItemCalendar: View {
                 CalendarMonthView(month: month, browser: browser, calendar: calendar, format: dateFormat, choose: choose, open: open)
             }
         }
+        // The top row's room: at the smallest window the title and views have the row under the toolbar, which the calendar's
+        // header, with its own pinned names, must stand below.
+        .padding(.top, topRow.restHeight + topRow.uncovered)
         .focusable()
         .focusEffectDisabled()
         .focused(pane, equals: .list)
