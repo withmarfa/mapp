@@ -213,8 +213,8 @@ private struct FolderDetail: View {
                         prompt: "*.tmp",
                         isError: model.errors[setting] != nil, isMonospaced: true,
                         onSubmit: { Task { await model.addPattern(to: setting) } },
-                        onEndEditing: { Task { await model.addPattern(to: setting, explicitly: false) } })
-                    .onExitCommand { model.endAdding(setting) }
+                        onEndEditing: { Task { await model.addPattern(to: setting, explicitly: false) } },
+                        onCancel: { model.endAdding(setting) })
                 }
             } else {
                 if let error = model.errors[setting] { SettingsRow("Not Changed", error: error) }

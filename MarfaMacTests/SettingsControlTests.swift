@@ -6,8 +6,10 @@ import Testing
 
 @MainActor @Suite(.serialized, .hangLimit)
 struct SettingsControlTests {
-    @Test(arguments: [0, 1])
-    func escapeCancelsFolderPattern(section: Int) async throws {
+    enum Finish: CaseIterable { case escape, submit, blur }
+
+    @Test(arguments: [0, 1], Finish.allCases)
+    func finishFolderPattern(section: Int, finish: Finish) async throws {
         let folder = OwnerFolder(id: "folder", title: "Sample Folder")
         let calls = FakeOwnerCalls()
         calls.state.withLock {
@@ -33,17 +35,53 @@ struct SettingsControlTests {
         let field = try #require(fields(in: window.contentView).first { $0.placeholderString == "*.tmp" })
         try #require(window.makeFirstResponder(field))
         let editor = try #require(field.currentEditor() as? NSTextView)
-        editor.insertText("cancel-this", replacementRange: editor.selectedRange())
-        let escape = try #require(NSEvent.keyEvent(
-            with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber,
-            context: nil, characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}", isARepeat: false, keyCode: 53))
-        NSApp.sendEvent(escape)
-        #expect(await eventually(within: .seconds(2)) {
+        let pattern = "*.sample"
+        editor.insertText(pattern, replacementRange: editor.selectedRange())
+        #expect(editor.string == pattern)
+        switch finish {
+        case .escape:
+            try sendKey("\u{1b}", code: 53, in: window)
+            window.makeFirstResponder(nil)
+        case .submit:
+            try sendKey("\r", code: 36, in: window)
+        case .blur:
+            window.makeFirstResponder(nil)
+        }
+        #expect(await eventually(within: .seconds(3)) {
             window.contentView?.layoutSubtreeIfNeeded()
             return fields(in: window.contentView).allSatisfy { $0.placeholderString != "*.tmp" }
         })
-        window.makeFirstResponder(nil)
-        #expect(folders.changes.isEmpty)
+        let expected: [FolderSettingChange] = finish == .escape ? [] : [section == 0 ? .ignore([pattern]) : .include([pattern])]
+        #expect(folders.changes.map(\.change) == expected)
+    }
+
+    @Test func ordinaryTextSearchStillFiltersAndClears() async throws {
+        let defaults = ThrowawayDefaults.make("SettingsControlTests")
+        let libraries = Libraries(host: HostBench().host(), defaults: defaults, handOverPages: { $0(true) })
+        let model = KeyboardPageModel(bindings: libraries.shortcuts, anyApp: libraries.anyAppShortcuts)
+        let window = host(KeyboardPage(libraries: libraries, model: model))
+        defer { window.contentView = nil; window.close() }
+        window.contentView?.layoutSubtreeIfNeeded()
+        let field = try #require(fields(in: window.contentView).compactMap { $0 as? NSSearchField }.first)
+        try #require(window.makeFirstResponder(field))
+        let editor = try #require(field.currentEditor() as? NSTextView)
+        editor.insertText("zzzzzz", replacementRange: editor.selectedRange())
+        try #require(await eventually(within: .seconds(3)) { model.search == "zzzzzz" && !model.hasResults })
+        try clickClear(in: field)
+        #expect(await eventually(within: .seconds(3)) { !model.isSearching && model.hasResults })
+    }
+
+    private func sendKey(_ characters: String, code: UInt16, in window: NSWindow) throws {
+        let event = try #require(NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber,
+            context: nil, characters: characters, charactersIgnoringModifiers: characters, isARepeat: false, keyCode: code))
+        NSApp.sendEvent(event)
+    }
+
+    private func clickClear(in field: NSSearchField) throws {
+        let cell = try #require(field.cell as? NSSearchFieldCell)
+        let cancel = try #require(cell.cancelButtonCell)
+        cancel.performClick(withFrame: cell.cancelButtonRect(forBounds: field.bounds), in: field)
     }
 
     @Test(arguments: [false, true])
@@ -69,10 +107,7 @@ struct SettingsControlTests {
             try #require(await eventually(within: .seconds(3)) { model.searchesByKeys })
         } else {
             let field = try #require(fields(in: window.contentView).compactMap { $0 as? NSSearchField }.first)
-            let cell = try #require(field.cell as? NSSearchFieldCell)
-            let cancel = try #require(cell.cancelButtonCell)
-            let action = try #require(cancel.action)
-            try #require(NSApp.sendAction(action, to: cancel.target, from: cancel))
+            try clickClear(in: field)
         }
         #expect(await eventually(within: .seconds(3)) { !model.isSearching })
     }
