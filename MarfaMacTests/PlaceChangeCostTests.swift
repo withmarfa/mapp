@@ -15,12 +15,17 @@ struct PlaceChangeCostTests {
     /// How long after a move the main thread is watched, as the issue's Time Profiler run watched a sync.
     private static let watched = Duration.seconds(5)
     private static let changed = 2_000
+    /// The longest the main thread may stall in a first open from another place that keeps the window's split view, in
+    /// milliseconds. Measured 160 to 270 ms with 48,750 items.
+    private static let keepsSplitStallBound = 350.0
+    /// The longest it may stall where the window makes its split view again, measured 320 to 430 ms.
+    private static let remakesSplitStallBound = 600.0
 
     @Test func firstOpenInEachLayout() async throws {
         let named = ProcessInfo.processInfo.environment["MARFA_MAC_MEASURE_LAYOUTS"].map { Set($0.split(separator: ",").map(String.init)) }
         let layouts = Self.layouts + [(Layout(name: "map", mode: .map), { (_: Browser) in })]
         for (layout, setUp) in layouts where named?.contains(layout.name) ?? true {
-            try await hosted(layout, startsAtIndex: true) { browser, library, _, step in
+            try await hosted(layout, startsAt: .types) { browser, library, _, step in
                 setUp(browser)
                 browser.updatePlaceDefault(.library) {
                     $0.layout = layout.mode
@@ -30,6 +35,73 @@ struct PlaceChangeCostTests {
                     browser.viewMode = layout.mode
                     browser.show(.library, in: library, order: browser.storedOrder)
                 }
+            }
+        }
+    }
+
+    /// The Library's first open from a small place (a type of 1,125 items) shown in `from`, where the window already has a
+    /// split view: the same layout, as a sidebar choice makes it, and another one. A move to or from the list makes the
+    /// split view again, as the list has a column of its own; the others keep it. Each has its own measured bound.
+    @Test func firstOpenFromAnotherPlace() async throws {
+        let named = ProcessInfo.processInfo.environment["MARFA_MAC_MEASURE_LAYOUTS"].map { Set($0.split(separator: ",").map(String.init)) }
+        let small = PlaceView.type(BigLibrary.project)
+        let moves: [(from: ItemViewMode, Layout)] = [
+            (.table, Layout(name: "table", mode: .table)), (.list, Layout(name: "list", mode: .list)),
+            (.table, Layout(name: "list", mode: .list)), (.list, Layout(name: "table", mode: .table)),
+            (.table, Layout(name: "board", mode: .board)), (.list, Layout(name: "board", mode: .board)),
+        ]
+        for (from, layout) in moves where named?.contains(layout.name) ?? true {
+            let label = Layout(name: "\(from.rawValue) to \(layout.name)", mode: layout.mode)
+            let remakes = (from == .list) != (layout.mode == .list)
+            try await hosted(label, startsAt: small, startsIn: from, stallBound: remakes ? Self.remakesSplitStallBound : Self.keepsSplitStallBound) { browser, library, _, step in
+                browser.updatePlaceDefault(.library) { $0.layout = layout.mode }
+                try await step("first open", nil) {
+                    browser.show(.library, in: library, order: browser.storedOrder)
+                }
+            }
+        }
+    }
+
+    /// The Library's first open while the library keeps changing, as one still syncing does: fifty items change every
+    /// 120 ms, which is faster than a first answer is worked out. The place must open within `bound`, and then show the
+    /// copy as it stands once the changes stop.
+    @Test func firstOpenUnderASteadyStreamOfChanges() async throws {
+        let named = ProcessInfo.processInfo.environment["MARFA_MAC_MEASURE_LAYOUTS"].map { Set($0.split(separator: ",").map(String.init)) }
+        let bound = Duration.seconds(10)
+        let layouts = Self.layouts.filter { ["table", "list", "board", "timeline"].contains($0.0.name) }
+        for (layout, setUp) in layouts where named?.contains(layout.name) ?? true {
+            try await hosted(layout, startsAt: .types) { browser, library, source, _ in
+                setUp(browser)
+                browser.updatePlaceDefault(.library) { $0.layout = layout.mode; $0.keep(browser.tableOptions[.library]) }
+                try await Task.sleep(for: .seconds(1))
+                let batch = Array(library.items(in: .library).prefix(50))
+                var round = 0
+                let stream = Task { @MainActor in
+                    while !Task.isCancelled {
+                        round += 1
+                        source.send(.upserted(batch.enumerated().map { index, item in
+                            var item = item
+                            item.title = String(format: "0 Stream %d %04d", round, index)
+                            item.name = item.title
+                            item.modified = Date(timeIntervalSince1970: 1_790_000_000 + Double(round * 1_000 + index))
+                            return item
+                        }))
+                        try? await Task.sleep(for: .milliseconds(120))
+                    }
+                }
+                let start = ContinuousClock.now
+                browser.viewMode = layout.mode
+                browser.show(.library, in: library, order: browser.storedOrder)
+                let opened = await eventually(within: bound) { Self.opened(layout.mode, in: browser, library: library, leaving: false) }
+                let took = Self.milliseconds(ContinuousClock.now - start)
+                stream.cancel()
+                Self.report(String(format: "STREAM|%@|opened=%@|%.0fms|changes=%d", layout.name, opened ? "yes" : "no", took, round))
+                #expect(opened, "\(layout.name): first open within \(bound) of a steady stream of changes")
+                // The changes have stopped; the layout is brought up to date.
+                try await Task.sleep(for: .milliseconds(300))
+                let expected = try await Self.drawn(after: library.records.values.map(\.item), like: browser, mode: layout.mode)
+                let current = await eventually(within: .seconds(60)) { Self.drawn(in: browser, mode: layout.mode, library: library) == expected }
+                #expect(current, "\(layout.name): the layout shows the copy as it stands once the changes stop")
             }
         }
     }
@@ -103,6 +175,14 @@ struct PlaceChangeCostTests {
         (Layout(name: "calendar", mode: .calendar), { _ in }),
         (Layout(name: "timeline", mode: .timeline), { _ in }),
     ]
+
+    /// Prints a figure and, where `MARFA_MAC_MEASURE_OUT` names a file, appends it there, as the test host's output
+    /// does not reach `xcodebuild`'s.
+    private static func report(_ line: String) {
+        print(line)
+        guard let path = ProcessInfo.processInfo.environment["MARFA_MAC_MEASURE_OUT"], let data = (line + "\n").data(using: .utf8) else { return }
+        if let handle = FileHandle(forWritingAtPath: path) { handle.seekToEndOfFile(); handle.write(data); try? handle.close() } else { try? data.write(to: URL(fileURLWithPath: path)) }
+    }
 
     private static func sortByName(_ browser: Browser) {
         browser.tableOptions[.library, default: ItemTableOptions()].sort = [ItemTableComparator(column: .title)]
@@ -232,10 +312,12 @@ struct PlaceChangeCostTests {
         }
     }
 
-    private static func opened(_ mode: ItemViewMode, in browser: Browser, library: any ItemLibrary) -> Bool {
+    private static func opened(_ mode: ItemViewMode, in browser: Browser, library: any ItemLibrary, leaving smallPlace: Bool) -> Bool {
         guard mode == browser.viewMode else { return false }
         if mode == .calendar { return browser.calendarWork.held?.value.isEmpty == false }
-        return drawn(in: browser, mode: mode, library: library)?.isEmpty == false
+        guard let items = drawn(in: browser, mode: mode, library: library) else { return false }
+        // Not the small place a first open may leave: its items are Projects, which the Library draws among others.
+        return smallPlace ? items.contains { !$0.id.rawValue.hasPrefix(BigLibrary.project.rawValue) } : !items.isEmpty
     }
 
     private static func scroll(by points: CGFloat) {
@@ -270,14 +352,18 @@ struct PlaceChangeCostTests {
 
     /// Hosts the real window on the Library, in `layout`, and hands `script` the browser, the library, the source and `step`.
     private func hosted(
-        _ layout: Layout, startsAtIndex: Bool = false,
+        _ layout: Layout, startsAt start: PlaceView = .library, startsIn startMode: ItemViewMode? = nil, stallBound: Double = 250,
         _ script: (Browser, MarfaLibrary, FakeItemSource, (String, [DrawnItem]?, () -> Void) async throws -> Void) async throws -> Void
     ) async throws {
         #if DEBUG
         let (library, source) = try await BigLibrary.loaded(scale: 75, withLocations: layout.mode == .map)
         let browser = Browser()
         browser.adopt(library)
-        browser.showing = startsAtIndex ? .types : .library
+        browser.showing = start
+        if let startMode {
+            browser.updatePlaceDefault(start) { $0.layout = startMode }
+            browser.viewMode = startMode
+        }
         let libraries = ItemPreviewFixtures.libraries(named: "MarfaMac.PlaceChangeCost")
         let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 1280, height: 800), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
@@ -296,7 +382,7 @@ struct PlaceChangeCostTests {
             try await Task.sleep(for: .seconds(1))
             let firstOpen = name == "first open"
             func took() -> Bool {
-                if firstOpen { return Self.opened(layout.mode, in: browser, library: library) }
+                if firstOpen { return Self.opened(layout.mode, in: browser, library: library, leaving: startMode != nil) }
                 return expected.map { Self.drawn(in: browser, mode: layout.mode, library: library) == $0 } ?? true
             }
             if let expected {
@@ -305,12 +391,15 @@ struct PlaceChangeCostTests {
             }
             Cost.resetTallies()
             let cpu = Self.threadMilliseconds()
+            let startedAt = Date().timeIntervalSince1970
             let start = ContinuousClock.now
             move()
             // The move itself holds the main actor too.
             let action = Self.milliseconds(ContinuousClock.now - start)
             var stall = action
             var stallAt = 0.0
+            // The longest stall in the first 150 ms, which is the window's remaking, and the longest after, which is the answer's first draw.
+            var stallMoving = action, stallLanding = 0.0
             var landed: Duration? = expected == nil && !firstOpen ? .zero : nil
             var checked = start
             while ContinuousClock.now - start < Self.watched {
@@ -321,6 +410,7 @@ struct PlaceChangeCostTests {
                     stall = gap
                     stallAt = Self.milliseconds(before - start)
                 }
+                if Self.milliseconds(before - start) < 150 { stallMoving = max(stallMoving, gap) } else { stallLanding = max(stallLanding, gap) }
                 // Checked four times a second, so reading what the layout draws costs the main thread little.
                 if landed == nil, ContinuousClock.now - checked >= .milliseconds(250) {
                     checked = ContinuousClock.now
@@ -332,11 +422,12 @@ struct PlaceChangeCostTests {
             if landed == nil, await eventually(within: .seconds(60), took) { landed = ContinuousClock.now - start }
             let costs = Cost.tallies.sorted { $0.value.milliseconds > $1.value.milliseconds }.prefix(6)
                 .map { "\($0.key.rawValue)=\($0.value.count)x\(String(format: "%.1f", $0.value.milliseconds))ms" }.joined(separator: " ")
-            print(String(
-                format: "BUSY|%@|%@|main=%.0fms|busy=%.1f%%|stall=%.0fms|window=%.0fms|landed=%@|action=%.0fms|stall-at=%.0fms|%@", layout.name, name, main,
-                main / window * 100, stall, window, landed.map { String(format: "%.0fms", Self.milliseconds($0)) } ?? "never", action, stallAt, costs))
+            Self.report(String(
+                format: "BUSY|%@|%@|main=%.0fms|busy=%.1f%%|stall=%.0fms|window=%.0fms|landed=%@|action=%.0fms|stall-at=%.0fms|moving=%.0fms|landing=%.0fms|at=%.3f|%@", layout.name, name, main,
+                main / window * 100, stall, window, landed.map { String(format: "%.0fms", Self.milliseconds($0)) } ?? "never", action, stallAt,
+                stallMoving, stallLanding, startedAt, costs))
             #expect(landed != nil, "\(layout.name), \(name): the layout drew the change")
-            if firstOpen { #expect(stall < 250, "\(layout.name): first open must keep the main thread responsive") }
+            if firstOpen { #expect(stall < stallBound, "\(layout.name): first open must keep the main thread responsive") }
         }
 
         try await script(browser, library, source, step)

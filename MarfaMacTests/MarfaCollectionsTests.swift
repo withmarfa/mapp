@@ -52,6 +52,41 @@ import Testing
         return (library, source)
     }
 
+    /// A large collection whose listing the library outran is still taken, so a collection the library keeps changing
+    /// opens. It lists the changes meanwhile, and a whole listing follows.
+    @Test func aCollectionListingTheLibraryOutranIsKeptAndThenMadeWhole() async throws {
+        let members = (0..<(Browser.arrangesAlongsideAbove + 500)).map { index in
+            F.item(ItemID("big\(index)"), F.note, "Member \(index)", age: index, edges: [Self.member("big-edge\(index)", ItemID("big\(index)"), of: Self.holiday)])
+        }
+        let source = FakeItemSource()
+        let library = MarfaLibrary(source: source, notices: Notices())
+        source.send(.loaded(SourceSnapshot(items: Self.items + members, catalogue: F.catalogue)))
+        try #require(await eventually { library.isLoaded })
+        let place = PlaceView(.collection(Self.holiday))
+        let listing = PlaceListing()
+        func listed() -> [Item] { library.items(in: .collection(Self.holiday), scope: listing.scope, archived: listing.archived, includingKinds: true) }
+
+        let outrun = try #require(library.deferredListing(in: place, listing: listing, preview: nil, above: Browser.arrangesAlongsideAbove))
+        #expect(!outrun.showsEarlier)
+        let made = outrun.make()
+        let revision = library.contentRevision
+        var edited = members[7]
+        edited.title = "Edited member"
+        edited.name = edited.title
+        edited.modified = edited.modified.addingTimeInterval(60)
+        source.send(.upserted([edited]))
+        try #require(await eventually { library.contentRevision != revision })
+
+        outrun.take(made)
+        #expect(listed().first { $0.id == edited.id }?.title == "Edited member", "the listing the library outran shows what changed since")
+        #expect(listed().count == members.count + 3, "and holds every member")
+        let whole = try #require(library.deferredListing(in: place, listing: listing, preview: nil, above: Browser.arrangesAlongsideAbove))
+        #expect(whole.showsEarlier, "a whole listing is still made")
+        whole.take(whole.make())
+        #expect(listed().first { $0.id == edited.id }?.title == "Edited member")
+        #expect(library.deferredListing(in: place, listing: listing, preview: nil, above: Browser.arrangesAlongsideAbove) == nil, "and when it lands the place is whole")
+    }
+
     @Test func addingWritesOneEdgeAfterTheLastPosition() async throws {
         let (library, source) = try await loaded()
         let undo = UndoManager()

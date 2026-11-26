@@ -17,7 +17,7 @@ Windows, panes, toolbars and commands. Settings is a window of its own, in `Marf
 
 ## One split view at a time
 
-- **`MainView` mounts one `NavigationSplitView` and changes the workspace's identity to switch.** Never change the column count of one that is mounted: give the workspace another identity.
+- **`MainView` mounts one `NavigationSplitView` and changes the workspace's identity to switch.** Never change the column count of one that is mounted: give the workspace another identity. Layouts that share a column count share the split view, so a change between them keeps the panel's width and costs no new split view; give them no identity of their own.
 - **Keep above it the state a person would notice:** browser, editor, undo, columns, the sidebar's scroll.
 
 ## Large lists

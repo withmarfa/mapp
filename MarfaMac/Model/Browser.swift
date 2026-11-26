@@ -27,9 +27,7 @@ final class Browser {
             viewPanelPlaceChanged()
         }
     }
-    /// Whether the sidebar's Types block lists every type rather than the first few. The window mounts its split view
-    /// afresh when the place changes shape (list, gallery, index, Settings), which drops the sidebar's own state, so
-    /// this is kept here, where Show More stays open through that.
+    /// Whether the sidebar's Types block lists every type. Kept here so Show More survives a new split view.
     var sidebarShowsAllTypes = false
     /// Whether this window is arranging its sidebar in place. The layout is shared by every window of the library, but
     /// arranging is this window's: Done ends it only here.
@@ -217,14 +215,23 @@ final class Browser {
     @ObservationIgnored var askedTable: TableKey?
     /// The last arrangement begun, ended or not, which the next waits for.
     @ObservationIgnored var lastArrangement: Task<Void, Never>?
+    /// The first tables the library outran since a table last landed, as `PlaceWork` counts its answers; past
+    /// `Outrun.limit` the next lands as it is.
+    @ObservationIgnored var tableOutrun = 0
+    /// The arrangement that lands as it is, whatever the library has done since it began.
+    @ObservationIgnored var insistingArrangement: UUID?
+    /// Whether the listing under way has an earlier one the window shows meanwhile (`DeferredListing.showsEarlier`).
+    @ObservationIgnored var listingShowsEarlier = false
+    /// How often arrangements were ended outright, which an arrangement that insists must not outlast.
+    @ObservationIgnored var arrangementEnds = 0
     /// Counts the arrangements that landed, which a view reads through `tableContent(in:)` to draw the new one.
     var tableArrangements = 0
     /// The rows of Types, Collections or Sources, held while what they read stands (`Browser+PlaceIndex`).
     @ObservationIgnored var indexRowsMemo: (key: IndexRowsKey, rows: [IndexRow])?
     /// The list's sections, worked out off the main actor for a large place (`sections(in:order:now:)`).
-    @ObservationIgnored var sectionsWork = PlaceWork<SectionsKey, ListArrangement>()
-    @ObservationIgnored var listingWork = PlaceWork<ListingRequest, [Item]>()
-    @ObservationIgnored var digestWork = PlaceWork<SectionsKey, ListArrangement>()
+    @ObservationIgnored var sectionsWork = PlaceWork<SectionsKey, ListArrangement>(isSameAsk: SectionsKey.isSameAsk)
+    @ObservationIgnored var listingWork = PlaceWork<ListingRequest, [Item]>(isSameAsk: ListingRequest.isSameAsk)
+    @ObservationIgnored var digestWork = PlaceWork<SectionsKey, ListArrangement>(isSameAsk: SectionsKey.isSameAsk)
     /// The list's sections as last nested for the parents open, by the sections they were nested from (`arrangement`).
     @ObservationIgnored var nestedListMemo: (made: UUID, expanded: Set<ItemID>, value: ListArrangement)?
     /// Counts what landed from work off the main actor besides the table, which a layout reads to draw it.
@@ -232,10 +239,10 @@ final class Browser {
     /// How often the window worked a place's table or list out whole, and how often it updated one, which tests read.
     @ObservationIgnored var placeWorkCounts = PlaceWorkCounts()
     /// The board's lanes, the calendar's entries and the timeline's days, worked out off the main actor for a large place (`placed`).
-    @ObservationIgnored var boardWork = PlaceWork<PlacingKey<BoardChoice>, BoardLanes>()
-    @ObservationIgnored var calendarWork = PlaceWork<PlacingKey<CalendarChoice>, CalendarPlacing>()
-    @ObservationIgnored var timelineWork = PlaceWork<PlacingKey<TimelineChoice>, TimelinePlacing>()
-    @ObservationIgnored var mapWork = PlaceWork<PlacingKey<Catalogue>, MapLayout.Placing>()
+    @ObservationIgnored var boardWork = PlaceWork<PlacingKey<BoardChoice>, BoardLanes>(isSameAsk: PlacingKey.isSameAsk)
+    @ObservationIgnored var calendarWork = PlaceWork<PlacingKey<CalendarChoice>, CalendarPlacing>(isSameAsk: PlacingKey.isSameAsk)
+    @ObservationIgnored var timelineWork = PlaceWork<PlacingKey<TimelineChoice>, TimelinePlacing>(isSameAsk: PlacingKey.isSameAsk)
+    @ObservationIgnored var mapWork = PlaceWork<PlacingKey<Catalogue>, MapLayout.Placing>(isSameAsk: PlacingKey.isSameAsk)
     @ObservationIgnored private var viewModesMemo: (key: ViewModesKey, modes: [ItemViewMode])?
     @ObservationIgnored private var fieldsMemo: FieldsMemo?
     /// The last Group by offer, while the table's content and the layout it was made for stand (`Browser+Grouping`).

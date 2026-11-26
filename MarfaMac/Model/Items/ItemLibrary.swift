@@ -365,6 +365,9 @@ protocol ItemLibrary: AnyObject, Observable {
 struct DeferredListing {
     let make: @Sendable () -> [Item]
     let take: ([Item]) -> Void
+    /// Whether the library already lists the place from an earlier listing it brings up to date, which the window shows
+    /// until this one lands.
+    var showsEarlier = false
 }
 
 extension ItemLibrary {

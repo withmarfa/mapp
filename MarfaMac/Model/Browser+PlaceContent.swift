@@ -127,6 +127,11 @@ extension Browser {
         let membership: Int
         let viewRevision: Int?
         let preview: LibraryViewQuery?
+
+        /// The same place listed the same way, whatever the library's revisions.
+        @Sendable static func isSameAsk(_ a: Self, _ b: Self) -> Bool {
+            a.library == b.library && a.place == b.place && a.listing == b.listing && a.preview == b.preview
+        }
     }
 
     /// The place's ordered items. Nil while the first ordering, or a whole reread, is under way.
@@ -140,7 +145,7 @@ extension Browser {
             content: library.contentRevision, membership: library.membershipRevision,
             viewRevision: shown.savedView == nil ? nil : library.viewRevision, preview: preview)
         _ = listingWork.value(for: key)
-        if listingWork.runningKey == key { return nil }
+        if listingWork.runningKey == key { return listingShowsEarlier ? placeItems(in: library) : nil }
         guard let work = library.deferredListing(in: shown, listing: listing, preview: preview, above: Self.arrangesAlongsideAbove) else {
             return placeItems(in: library)
         }
@@ -153,7 +158,8 @@ extension Browser {
             listingWork.reset()
             placeWorkLanded += 1
         })
-        return nil
+        listingShowsEarlier = work.showsEarlier
+        return listingShowsEarlier ? placeItems(in: library) : nil
     }
 
     func stopPlaceWork() {
@@ -421,6 +427,11 @@ extension Browser {
                 clock: ClockDay(now: library.now(), calendar: library.calendar()),
                 tokens: narrowingSearchTokens),
             basis: TableBasis(content: library.contentRevision, membership: library.membershipRevision, counts: library.counts.revision))
+        // A change of choices starts a fresh ask, with its own count of how often the library has outrun it.
+        if askedTable?.choices != key.choices {
+            tableOutrun = 0
+            insistingArrangement = nil
+        }
         askedTable = key
         // Returning to a cached sort supersedes the sort the person just left.
         func isReady(_ content: ItemTableContent) -> Bool {
@@ -504,11 +515,9 @@ extension Browser {
         heldTables = kept
     }
 
-    /// Makes the table for `key` off the main actor, from `update`'s table where one is given, which then makes only the rows
-    /// of the items that changed again, and shows it once it is still the one asked for. The main actor only reads the links
-    /// of the rows it makes, and takes the table as it lands. One arrangement works off the main actor at a time: a newer one
-    /// waits for the one before it to end, ended or not, which it does at its next step, so a steady run of edits never piles
-    /// sorts up. Like `PlaceWork`'s runs, it lands only while `key` is still the table asked for.
+    /// Makes the table off the main actor, reusing rows that did not change. A newer arrangement waits for the one
+    /// before it so edits cannot pile up sorts. A first table can land from an earlier revision after the library
+    /// overtakes `Outrun.limit` attempts.
     private func arrange(
         _ key: TableKey, items: [Item], after earlier: (key: TableKey, content: ItemTableContent)?,
         updating update: (content: ItemTableContent, changed: Set<ItemID>)?, in library: any ItemLibrary
@@ -525,11 +534,26 @@ extension Browser {
         let token = UUID()
         let from = update.map { (made: $0.content.made, wants: $0.content.wants, earlier: $0.content.earlierOffMainActor, changed: $0.changed) }
         let viewRevision = place.savedView == nil ? nil : library.viewRevision
+        let ends = arrangementEnds
         func isCurrent(_ browser: Browser) -> Bool {
-            guard browser.isLive(token, key, place, searching) else { return false }
+            // A first table the library has outrun a few times lands as it is, for the choices still asked; the next
+            // arrangement then brings it up to date.
+            if browser.insistingArrangement == token {
+                return browser.mayLandInsisting(key, place: place, searching: searching, ends: ends)
+            }
             // The first answer must match the copy even if the layout has yet to ask again after a sync.
-            return earlier != nil || (library.contentRevision == key.basis.content
-                && (viewRevision == nil || library.viewRevision == viewRevision))
+            if browser.isLive(token, key, place, searching),
+               earlier != nil || (library.contentRevision == key.basis.content
+                && (viewRevision == nil || library.viewRevision == viewRevision)) { return true }
+            guard earlier == nil, browser.arrangementEnds == ends, browser.shown == place, browser.isSearching == searching,
+                  browser.askedTable?.choices == key.choices else { return false }
+            guard browser.tableOutrun >= Outrun.limit else {
+                browser.tableOutrun += 1
+                return false
+            }
+            browser.tableOutrun = 0
+            browser.insistingArrangement = token
+            return true
         }
         let task = Task { [weak self] in
             if settles { try? await Task.sleep(for: Browser.arrangeSettling) }
@@ -580,7 +604,9 @@ extension Browser {
                 content.land(ordered)
             }
             Cost.record(.tableArrange, since: start)
-            self.arranging = nil
+            if self.arranging?.token == token { self.arranging = nil }
+            if self.insistingArrangement == token { self.insistingArrangement = nil }
+            self.tableOutrun = 0
             if plan == nil { self.placeWorkCounts.tablesMade += 1 } else { self.placeWorkCounts.tablesUpdated += 1 }
             self.tableMemo = (key, content)
             if searching { self.heldSearch = (key, content) } else { self.hold((key, content), for: place) }
@@ -588,6 +614,12 @@ extension Browser {
         }
         lastArrangement = task
         arranging = (key, token, task)
+    }
+
+    /// Whether a first table the library outran lands as it is: only for the place, the search and the choices still
+    /// asked, so a filter changed meanwhile never lets it show.
+    func mayLandInsisting(_ key: TableKey, place: PlaceView, searching: Bool, ends: Int) -> Bool {
+        arrangementEnds == ends && shown == place && isSearching == searching && askedTable?.choices == key.choices
     }
 
     /// Whether the arrangement of `token` is still the one under way, for the table last asked, the place and the search it
@@ -600,6 +632,7 @@ extension Browser {
     /// was replaced finds another's record and leaves it. With no token, ends whichever is under way, which a table
     /// taken in its place makes older.
     private func endArranging(_ token: UUID? = nil) {
+        if token == nil { arrangementEnds += 1; tableOutrun = 0 }
         guard let arranging, token == nil || arranging.token == token else { return }
         if token == nil { arranging.task.cancel() }
         self.arranging = nil
@@ -660,6 +693,11 @@ extension Browser {
         let table: Int?
         /// The library's revision, where the items are the place's own.
         let content: Int?
+
+        /// The same choices over the same place, whatever the library's revision or the table's serial.
+        @Sendable static func isSameAsk(_ a: Self, _ b: Self) -> Bool {
+            a.derived == b.derived && a.shape == b.shape && a.choice == b.choice && (a.table == nil) == (b.table == nil)
+        }
     }
 
     /// What the calendar places its items by, besides the items.
@@ -763,6 +801,11 @@ extension Browser {
         let table: Int?
         /// The library's revision, where the sections are made from the place's items.
         let content: Int?
+
+        /// The same choices, whatever the library's revision or the table's serial.
+        @Sendable static func isSameAsk(_ a: Self, _ b: Self) -> Bool {
+            a.choices == b.choices && (a.table == nil) == (b.table == nil)
+        }
     }
 
     /// The revisions a table was made at, which a change of items moves and an update follows.

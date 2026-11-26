@@ -503,6 +503,28 @@ import UniformTypeIdentifiers
         #expect(list.sections(in: library, order: created, now: Self.now) == sections)
     }
 
+    /// A first table the library has outrun often enough to land as it is still answers only the choices asked: a filter
+    /// changed meanwhile ends the insisting and starts a fresh count, so the old table never shows under the new filter.
+    @Test func aFilterChangedWhileAnOutrunTableLandsAsItIsStopsItLanding() async throws {
+        let (library, _) = try await BigLibrary.loaded(scale: 12)
+        #expect(library.items(in: Self.tasks.place).count > Browser.arrangesAlongsideAbove)
+        let table = browser(library, showing: Self.tasks)
+        _ = table.readyTable(in: library)
+        let running = try #require(table.arranging, "the first table is under way")
+        table.tableOutrun = Outrun.limit
+        table.insistingArrangement = running.token
+        #expect(table.mayLandInsisting(running.key, place: Self.tasks, searching: false, ends: table.arrangementEnds), "as asked, it lands")
+
+        table.tableOptions[Self.tasks] = ItemTableOptions(filter: FilterState(is: ["field.status": ["todo"]]))
+        _ = table.readyTable(in: library)
+        #expect(!table.mayLandInsisting(running.key, place: Self.tasks, searching: false, ends: table.arrangementEnds), "under another filter, it does not")
+        #expect(table.insistingArrangement == nil, "the new filter is a fresh ask")
+        #expect(table.tableOutrun == 0, "with its own count")
+        // The table for the new filter lands, and the old one never does.
+        let landed = try await settled(table, in: library)
+        #expect(landed.rows.count < landed.allRows.count, "the filter's table shows")
+    }
+
     /// A board whose lanes it chose itself by a date, left open across a change of time zone, puts each card in the day of
     /// the new zone, as a window opened then does. The zone is the library's (`ItemLibrary.calendar`), not the process's.
     @Test func automaticDateLanesFollowTheTimeZone() async throws {

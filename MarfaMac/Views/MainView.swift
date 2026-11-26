@@ -71,11 +71,11 @@ struct MainView: View {
     }
 
     private var shownPresentation: WorkspacePresentation { workspacePresentation }
-    private var shownViewMode: ItemViewMode { browser.viewMode }
 
     private var activeWindow: some View {
         // Release the outgoing toolbar providers before changing the column count.
         // Browser, editor, drafts, and column preferences remain above this presentation identity.
+        // Layouts that share a presentation share its split view, so a change between them keeps the panel's width.
         dialogsWindow.id(shownPresentation)
         .onChange(of: workspacePresentation) {
             editor.flush()
@@ -251,9 +251,6 @@ struct MainView: View {
                     .modifier(itemInspector)
                     .toolbar { windowToolbar() }
                 }
-                // Each view has its own split view: swapped inside one, the next squeezes the right sidebar to its
-                // minimum. Only the split is remade, as the dialogs above it watch the view for a saved view's layout.
-                .id(shownViewMode)
             } else {
                 splitView
             }
@@ -581,7 +578,7 @@ private struct ItemInspectorColumn: ViewModifier {
     let browser: Browser
     let details: DetailsPresentation
     let editor: EditorController
-    /// Read once, as the window remakes this column when its layout changes and the column's own width goes with it.
+    /// The starting width for a new split view. The mounted inspector keeps its own width.
     /// Kept out of the state as it changes, so a drag is not fed back into the column it is resizing.
     @State private var width = UserDefaults.standard.object(forKey: InterfaceKey.inspectorWidth) as? Double ?? PanelWidth.standard
 
