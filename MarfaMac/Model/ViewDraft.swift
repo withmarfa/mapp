@@ -518,6 +518,7 @@ nonisolated enum ViewDraft {
             let agrees = window.timelineDate.map { options.grouping == .column(Browser.fieldColumnPrefix + $0, by: .bucket(.day)) }
                 ?? (options.grouping.columnID == nil)
             var target: LibraryViewGroup??
+            var ordersGroups = false
             if redated && (showsTimeline || !regrouped || agrees) {
                 if let key = window.timelineDate {
                     if isPropertyName(key) {
@@ -538,13 +539,24 @@ nonisolated enum ViewDraft {
             } else {
                 let group = group(window.grouping, mode: window.groupMode)
                 // A grouping the view cannot hold leaves the view's own as it is.
-                if group.unkept.isEmpty { target = .some(group.group) }
+                if group.unkept.isEmpty { target = .some(group.group); ordersGroups = !redated }
                 unkept += group.unkept
                 if redated { unkept.append(.group(column: String(localized: "Timeline date"))) }
             }
             if let target {
                 let held = view.group.flatMap { $0.field == target?.field ? $0 : nil } ?? target.flatMap { replaced[$0.field] }
-                change.group = kept(target, from: held).map { .set($0) } ?? .clear
+                var group = kept(target, from: held)
+                // A board's first lane drag on a grouping the view lacks sets the grouping and the order together;
+                // a grouping chosen alone starts its groups afresh (`Browser.startGroupsAfresh`), so a set order is the person's.
+                if ordersGroups, group != nil, let column = window.grouping {
+                    if let order = options.groupOrder, order != seed.groupOrder ?? [] {
+                        group?.order = json(order, of: column, mode: window.groupMode)
+                    }
+                    if let hidden = options.hiddenGroups, hidden != seed.hiddenGroups ?? [] {
+                        group?.hidden = json(hidden.sorted(), of: column, mode: window.groupMode)
+                    }
+                }
+                change.group = group.map { .set($0) } ?? .clear
             }
         } else if reorders(options, from: seed), var group = view.group, let column = window.grouping {
             // The same grouping with other groups first or left out: Marfa's `group.order` and `group.hidden`.

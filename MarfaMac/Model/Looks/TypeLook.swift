@@ -98,6 +98,13 @@ nonisolated extension TypeLook {
         return relations
     }
 
+    /// The look with the counts of an item's sub-items left out, so the facts that remain fill the room.
+    var withoutSubItemCounts: TypeLook {
+        var look = self
+        look.facts.removeAll { if case .count(.children) = $0 { true } else if case .count(.progress) = $0 { true } else { false } }
+        return look
+    }
+
     /// The counts the look asks for, which a view asks Marfa for only for the types that show them.
     var counts: Set<CountFact> {
         Set(facts.compactMap { fact -> CountFact? in if case .count(let count) = fact { count } else { nil } })

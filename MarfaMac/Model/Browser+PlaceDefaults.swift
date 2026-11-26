@@ -71,26 +71,36 @@ extension Browser {
         return placeBoards[shown] ?? BoardChoices()
     }
 
-    /// Changes the board's choices. A saved view's are kept in the app's settings as they are made, and a place's in its
+    /// Changes the board's choices: the member `change` touches, on what is stored now, so a choice another Mac or window
+    /// made to another member stays. A saved view's are kept in the app's settings as they are made, and a place's in its
     /// default view. Undo takes either back.
-    func changeBoard(_ change: (inout BoardChoices) -> Void) {
-        var choices = boardChoices
-        change(&choices)
+    func changeBoard(_ change: @escaping (inout BoardChoices) -> Void) {
         if let id = shown.savedView {
-            changeViewSettings(id) { $0.board = choices.kept }
+            changeViewSettings(id) {
+                var choices = $0.board ?? BoardChoices()
+                change(&choices)
+                $0.board = choices.kept
+            }
         } else {
-            setPlaceBoard(choices.kept, in: shown)
+            setPlaceBoard(change, in: shown)
         }
     }
 
-    private func setPlaceBoard(_ stored: BoardChoices?, in place: PlaceView) {
-        let before = placeBoards[place]
+    private func setPlaceBoard(_ change: (inout BoardChoices) -> Void, in place: PlaceView) {
+        let writes = Self.hasDefaultView(place) && viewPanel?.isNew != true
+        let before = writes ? PlaceDefaults.stored(in: defaults).default(for: place)?.board : placeBoards[place]
+        var choices = before ?? BoardChoices()
+        change(&choices)
+        setPlaceBoard(choices.kept, from: before, in: place)
+    }
+
+    private func setPlaceBoard(_ stored: BoardChoices?, from before: BoardChoices?, in place: PlaceView) {
         guard before != stored else { return }
         placeBoards[place] = stored
         updatePlaceDefault(place) { $0.board = stored }
         registerUndo(String(localized: "Change View")) { browser in
             guard browser.shown.isSame(place) else { return }
-            browser.setPlaceBoard(before, in: place)
+            browser.setPlaceBoard(before, from: stored, in: place)
         }
     }
 

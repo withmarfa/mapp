@@ -91,7 +91,9 @@ struct ItemBoard: View {
     private func board(
         _ lanes: [ItemBoardLane], key: String, grouped: Bool, list: RowList, positions: [ItemID: Int]
     ) -> some View {
-        let looks = browser.propertyLooks(in: library)
+        // Sub-Items off: a card leaves out the counts of its sub-items before it chooses its facts, and does not ask Marfa for them.
+        let owned = browser.propertyLooks(in: library)
+        let looks = browser.boardChoices.showsSubItems ? owned : owned.mapValues(\.withoutSubItemCounts)
         func ids() -> [ItemID] { lanes.flatMap { $0.items.map(\.id) } }
         func cursorLane() -> ItemBoardLane.ID? {
             guard let cursor, let position = positions[cursor] else { return nil }
@@ -213,12 +215,6 @@ struct ItemBoard: View {
     private func card(
         _ item: Item, content: RowContent, lane: ItemBoardLane, lanes: [ItemBoardLane], key: String, grouped: Bool, ids: @escaping () -> [ItemID]
     ) -> some View {
-        var content = content
-        // Sub-Items off: a card leaves out the counts of its sub-items and does not ask Marfa for them.
-        if !browser.boardChoices.showsSubItems {
-            content.chips.removeAll { if case .count = $0 { true } else { false } }
-            content.countQueries = []
-        }
         let invalid = lane.id == .invalid
             ? item.value(of: ItemBoardLayout.invalidValueKey(of: item, key: key, groupsByStatus: grouped, catalogue: library.catalogue)).map(ItemValueText.string)
             : nil

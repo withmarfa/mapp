@@ -162,7 +162,11 @@ extension Browser {
     /// `group.order` in a saved view, the place's own otherwise.
     func moveGroup(_ key: String, onto other: String, in library: any ItemLibrary) {
         adoptBoardGrouping(in: library)
-        let order = groupRows(in: library).map(\.key).filter { $0 != GroupKey.notApplicable }
+        let drawn = groupRows(in: library).map(\.key).filter { $0 != GroupKey.notApplicable }
+        // A large board's lanes are drawn from earlier work while another Mac's order may already be the place's own, so
+        // the order moved is the place's current one with any lane it does not name after.
+        let current = (tableOptions[shown]?.groupOrder ?? []).filter(drawn.contains)
+        let order = current.isEmpty ? drawn : current + drawn.filter { !current.contains($0) }
         let moved = Reordering.moving(key, onto: other, in: order)
         guard moved != order else { return }
         tableOptions[shown, default: .init()].groupOrder = moved

@@ -73,6 +73,18 @@ struct PlaceDefaultsTests {
         #expect(second.liveChoices == second.observedChoices[second.shown])
     }
 
+    @Test func aBoardChoiceChangesOnlyItsOwnMemberOfWhatIsStored() {
+        let defaults = ViewPanelTests.defaults()
+        let library = Self.library()
+        let first = Self.window(defaults, library: library)
+        let second = Self.window(defaults, library: library)
+        first.changeBoard { $0.hidesSubItems = true }
+        second.changeBoard { $0.compact = true }
+        let stored = PlaceDefaults.stored(in: defaults).default(for: Self.tasks)?.board
+        #expect(stored?.compact == true)
+        #expect(stored?.hidesSubItems == true)
+    }
+
     @Test func anotherPlaceKeepsItsOwnAndAPlaceNobodyChangedKeepsNothing() {
         let defaults = ViewPanelTests.defaults()
         let library = Self.library()
