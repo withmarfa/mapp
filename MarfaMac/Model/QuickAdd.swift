@@ -178,13 +178,13 @@ final class QuickAdd {
             if !chips.contains(chip) { chips.append(chip) }
         }
 
-        /// Puts the item under `parent` and shows the chip for it.
         /// Gives the draft a value the place implies, which is not the person's work, as a kind's own is not.
         mutating func imply(_ key: String, _ value: PropertyValue) {
             properties[key] = value
             prefilled[key] = value
         }
 
+        /// Puts the item under `parent` and shows the chip for it.
         mutating func setParent(_ parent: ItemID) {
             parentID = parent
             add(.parent)

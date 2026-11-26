@@ -59,7 +59,6 @@ Every editor asks `Item.allows(_:)` for the `ItemChange` it writes (`ValueEditKi
 
 `NewItemDrafts` keeps each unadded new item through a closed window, quit or refusal (kept at once), by slot (`NewItemDrafts.Slot`) and instance (`serverKey`). A sent draft is frozen; edits make a new one. One cut off by a quit returns unless its item is in the copy; its Add asks first (`QuickAdd.mayBeInMarfa`).
 
-
 ### Dropping
 
 - **Files dropped on a list join the place in view** (`Browser.fileDropTarget`): a collection, the Feed, else the Library.
