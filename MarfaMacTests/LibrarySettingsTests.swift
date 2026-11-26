@@ -312,7 +312,8 @@ import Testing
         bench.defaults.set(Data(#"{"\#(bareKey)":7,"\#(portKey)":{"hidden":["feed"]}}"#.utf8), forKey: SidebarLayouts.defaultsKey)
         let host = bench.host()
         host.bindOrigin(of: bare)
-        try bench.location.copies.change { $0.instances[bench.location.directory(for: bare).lastPathComponent] = "instance-x" }
+        let folder = bench.location.directory(for: bare).lastPathComponent
+        try bench.location.copies.change { $0.instances[folder] = "instance-x" }
         let key = "marfa:instance-x"
 
         // What the bare spelling synced last.
@@ -371,7 +372,8 @@ import Testing
         try olderSettings(bench)
         let host = bench.host()
         host.bindOrigin(of: bare)
-        try bench.location.copies.change { $0.instances[bench.location.directory(for: bare).lastPathComponent] = "instance-x" }
+        let folder = bench.location.directory(for: bare).lastPathComponent
+        try bench.location.copies.change { $0.instances[folder] = "instance-x" }
         let settings = LibrarySettings(defaults: bench.defaults, aside: aside, lastOpen: nil)
         let remove = { TypeLooks(defaults: bench.defaults).restore(TypeID("core.note"), in: self.bareKey) }
         if removedFirst {
@@ -416,7 +418,8 @@ import Testing
         try olderSettings(bench)
         let host = bench.host()
         host.bindOrigin(of: bare)
-        try bench.location.copies.change { $0.instances[bench.location.directory(for: bare).lastPathComponent] = "instance-x" }
+        let folder = bench.location.directory(for: bare).lastPathComponent
+        try bench.location.copies.change { $0.instances[folder] = "instance-x" }
         let settings = LibrarySettings(defaults: bench.defaults, aside: aside, lastOpen: nil)
         TypeLooks(defaults: bench.defaults).restore(TypeID("core.note"), in: portKey)
         try writeLook(bench, portKey, "core.note", "occurred")
@@ -430,7 +433,8 @@ import Testing
         try olderSettings(bench)
         let host = bench.host()
         host.bindOrigin(of: bare)
-        try bench.location.copies.change { $0.instances[bench.location.directory(for: bare).lastPathComponent] = "instance-x" }
+        let folder = bench.location.directory(for: bare).lastPathComponent
+        try bench.location.copies.change { $0.instances[folder] = "instance-x" }
         let settings = LibrarySettings(defaults: bench.defaults, aside: aside, lastOpen: nil)
         var object = try stored(bench, TypeLooks.defaultsKey)
         object[bareKey] = "written by a later version"
@@ -450,7 +454,8 @@ import Testing
         try olderSettings(bench)
         let host = bench.host()
         host.bindOrigin(of: bare)
-        try bench.location.copies.change { $0.instances[bench.location.directory(for: bare).lastPathComponent] = "instance-x" }
+        let folder = bench.location.directory(for: bare).lastPathComponent
+        try bench.location.copies.change { $0.instances[folder] = "instance-x" }
         _ = LibrarySettings(defaults: bench.defaults, aside: aside, lastOpen: nil)
         // Between launches, an earlier name's looks went with nothing seeing them go.
         try writeLook(bench, bareKey, "core.note", nil)
