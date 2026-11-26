@@ -13,6 +13,9 @@ paths:
   - MarfaMac/Views/Item*Inspector*.swift
   - MarfaMac/Views/ItemCorner.swift
   - MarfaMac/Views/PageOpener.swift
+  - MarfaMac/Views/FilePageHead.swift
+  - MarfaMac/Views/FileItemContent.swift
+  - MarfaMac/Views/ItemFileView.swift
   - MarfaMac/Model/Items/PageOpenTarget.swift
   - MarfaMac/Views/WebPageItemPage.swift
   - MarfaMac/Views/VersionHistory*.swift
@@ -132,6 +135,8 @@ Quiet lines at the top of the column say what is not ordinary (`PageNotice.all`)
 - **A right-click on a picture of an item offers Open Item and Copy Link,** then Open and Show in Finder.
 - **Every look of a link reads the same under the pointer** (`LinkLook`); a link to nothing keeps its dashes.
 - **An address that may not be opened**, such as a script, is refused; the rest of the link's menu stays.
+- **A picture's and a PDF's head is the first inset of their own scroller** (`FileHeadSpace`). The title is text, not edited there; rows open their editor (`FilePageHead`).
+- **Fit:** a picture whole, never past its size; a PDF 600 points wide or the column's width, on gray or white (`PDFBackground`).
 - **Removing a link keeps its words.**
 
 ## Files and saved web pages
