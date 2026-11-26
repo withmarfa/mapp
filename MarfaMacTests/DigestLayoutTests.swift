@@ -22,6 +22,29 @@ struct DigestLayoutTests {
         #expect(DigestLayout.sections([ItemSection(items: items)], stacking: false).first?.piles.map(\.newest.id) == items.map(\.id))
     }
 
+    @MainActor
+    @Test func choosingAnEarlierItemOpensItsPile() throws {
+        let earlier = item("earlier", day: 1, edge: "in-thread", target: "thread", source: "mail")
+        let newest = item("newest", day: 2, edge: "in-thread", target: "thread", source: "mail")
+        let sections = DigestLayout.sections([ItemSection(items: [newest, earlier])], stacking: true)
+        let pile = try #require(sections.first?.piles.first)
+        let browser = Browser()
+        browser.selection = [earlier.id]
+        browser.viewMode = .digest
+        browser.digestDisplay = DigestLayout.Display(place: browser.shown, sections: sections)
+
+        #expect(browser.selection == [earlier.id])
+        #expect(browser.expandedDigestPiles == [pile.id])
+        #expect(browser.digestOrder == [newest.id, earlier.id])
+
+        browser.toggleDigestPile(pile)
+        #expect(browser.selection == [newest.id])
+        #expect(browser.digestOrder == [newest.id])
+
+        browser.selection = [earlier.id]
+        #expect(browser.digestOrder == [newest.id, earlier.id])
+    }
+
     private func item(_ name: String, day: Int, edge: String? = nil, target: String = "", source: String) -> Item {
         let id = ItemID(name)
         let date = Date(timeIntervalSince1970: TimeInterval(day * 86_400))

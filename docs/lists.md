@@ -55,7 +55,8 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 
 - **The Library opens as a table, and as a list while it holds ten items or fewer** (`Browser.naturalLayout`). It and the Archive, reached from the Library's row and Go, list Name, Type, Source and Edited, latest first (`listsByOrigin`).
 - **The Feed opens in Digest, newest created first.** Every item list offers it. Cards show type, source, title, text and pictures.
-- **Digest stacks messages by `in-thread` and excerpts by `excerpt-of`** (`DigestLayout`). A pile spans sources, sits at its newest visible member and opens in place.
+- **Digest stacks messages by `in-thread` and excerpts by `excerpt-of`** (`DigestLayout`). Piles span sources and sit at their newest visible member. Choosing an earlier card opens its pile.
+- **Digest draws by page.** Select All reaches every page.
 - **Several chosen items show a command capsule** (`SelectionCapsule`), a pile beside a list (`SelectionPile`). Escape clears them.
 - **⌘⌫ deletes chosen items shown in a board, timeline, Digest, or map** (`ChosenItemDeletion`). Changing the calendar span drops old events.
 - **Calendar and Timeline use each type's date** (`ItemPlacement`) or a field chosen for the view.

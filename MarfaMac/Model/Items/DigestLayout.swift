@@ -50,26 +50,74 @@ nonisolated enum DigestLayout {
         var earlier: [Item] = []
     }
 
-    struct Section: Identifiable, Sendable {
+    struct Section: Sendable {
         let group: ItemGroup?
         let piles: [Pile]
-        var id: ItemGroup? { group }
     }
 
     struct Display: Sendable {
+        let id = UUID()
         let place: PlaceView
         let sections: [Section]
+        let counts: [Int]
         let topItems: [ItemID]
         let itemOrder: [ItemID]
-        let itemIDs: Set<ItemID>
+        /// Earlier cards share their pile's position for paging.
+        let positions: [ItemID: Int]
+        let earlierMembers: [ItemID: Pile.ID]
 
         init(place: PlaceView, sections: [Section]) {
             self.place = place
             self.sections = sections
-            topItems = sections.flatMap { $0.piles.map(\.newest.id) }
-            itemOrder = sections.flatMap { $0.piles.flatMap { [$0.newest.id] + $0.earlier.map(\.id) } }
-            itemIDs = Set(itemOrder)
+            counts = sections.map { $0.piles.count }
+            var topItems: [ItemID] = []
+            var itemOrder: [ItemID] = []
+            var positions: [ItemID: Int] = [:]
+            var earlierMembers: [ItemID: Pile.ID] = [:]
+            for pile in sections.lazy.flatMap(\.piles) {
+                let position = topItems.count
+                topItems.append(pile.newest.id)
+                itemOrder.append(pile.newest.id)
+                positions[pile.newest.id] = position
+                for item in pile.earlier {
+                    itemOrder.append(item.id)
+                    positions[item.id] = position
+                    earlierMembers[item.id] = pile.id
+                }
+            }
+            self.topItems = topItems
+            self.itemOrder = itemOrder
+            self.positions = positions
+            self.earlierMembers = earlierMembers
         }
+
+        func shows(_ id: ItemID, expanded: Set<Pile.ID>) -> Bool {
+            guard positions[id] != nil else { return false }
+            return earlierMembers[id].map(expanded.contains) ?? true
+        }
+
+        func visibleIDs(expanded: Set<Pile.ID>) -> [ItemID] {
+            guard !expanded.isEmpty, !earlierMembers.isEmpty else { return topItems }
+            return itemOrder.filter { earlierMembers[$0].map(expanded.contains) ?? true }
+        }
+
+        func drawn(_ drawn: ListDrawn) -> [DrawnPart] {
+            drawn.parts(of: counts).map { part in
+                let section = sections[part.section]
+                return DrawnPart(group: section.group, piles: section.piles[part.items], part: part)
+            }
+        }
+    }
+
+    struct DrawnPart: Identifiable, Sendable {
+        let group: ItemGroup?
+        let piles: ArraySlice<Pile>
+        let part: ListDrawn.Part
+
+        var id: String { "\(part.run):\(part.section)" }
+        var startsSection: Bool { part.startsSection }
+        var endsRun: Bool { part.endsRun }
+        var run: Int { part.run }
     }
 
     /// Each pile takes the place of its newest member in the list's order. The relationship is its identity, so

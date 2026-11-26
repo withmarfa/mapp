@@ -12,6 +12,28 @@ extension Browser {
         digestDisplay?.place == shown ? digestDisplay : nil
     }
 
+    var digestOrder: [ItemID] {
+        currentDigest?.visibleIDs(expanded: expandedDigestPiles) ?? []
+    }
+
+    /// An item reached through a link or restored selection remains the chosen item.
+    func revealDigestSelection() {
+        guard let digest = currentDigest, !digest.earlierMembers.isEmpty else { return }
+        let piles = selection.compactMap { digest.earlierMembers[$0] }
+        if !expandedDigestPiles.isSuperset(of: piles) { expandedDigestPiles.formUnion(piles) }
+    }
+
+    func toggleDigestPile(_ pile: DigestLayout.Pile) {
+        if expandedDigestPiles.remove(pile.id) == nil {
+            expandedDigestPiles.insert(pile.id)
+        } else {
+            let hidden = Set(pile.earlier.map(\.id))
+            if !selection.isDisjoint(with: hidden) {
+                selectAutomatically(selection.subtracting(hidden).union([pile.newest.id]))
+            }
+        }
+    }
+
     var digestChoices: DigestChoices {
         if let id = shown.savedView { return macSettings(for: id).digest ?? DigestChoices() }
         return placeDigests[shown] ?? DigestChoices()

@@ -122,6 +122,7 @@ extension Browser {
     /// The items in the order the window last drew them: the table's rows in the table, else the list's or gallery's
     /// sections, with whatever the place lists after them (a board, a timeline) in its own order.
     func onScreenOrder(in library: any ItemLibrary) -> [ItemID] {
+        if viewMode == .digest { return digestOrder }
         let drawn = viewMode == .table ? tableMemo?.content.rows.map(\.item.id) : sectionsWork.held?.value.ids
         return (drawn ?? []) + placeItems(in: library).map(\.id)
     }
@@ -148,64 +149,89 @@ extension Browser {
 
     /// The list's sections with what a layout reads of them, worked out with them (`sections(in:order:now:)`).
     func arrangement(in library: any ItemLibrary, order: ItemOrder, now: Date) -> ListArrangement {
+        listArrangement(in: library, order: order, now: now, work: sectionsWork)
+    }
+
+    func digestArrangement(in library: any ItemLibrary, now: Date) -> DigestLayout.Display? {
+        listArrangement(in: library, order: DigestLayout.order, now: now, work: digestWork, stacking: digestChoices.stacks).digest
+    }
+
+    private func listArrangement(
+        in library: any ItemLibrary, order: ItemOrder, now: Date, work: PlaceWork<SectionsKey, ListArrangement>, stacking: Bool? = nil
+    ) -> ListArrangement {
         _ = placeWorkLanded
         let derived = derivedKey(in: library)
         let shape = listShape
         let choices = SectionsChoices(
             derived: derived.key, order: order, clock: ClockDay(now: now, calendar: library.calendar()), shape: shape,
-            hidesEmpty: shape != nil && hidesEmptyGroups)
-        // A filtered or arranged place takes its rows, and where it is arranged its order and groups, from the table.
-        let content = shape.map { _ in tableContent(in: library) }
+            hidesEmpty: shape != nil && hidesEmptyGroups, digestStacking: stacking)
+        let shown = work.held.flatMap { $0.key.choices.derived.isSamePlace(as: derived.key) ? $0.value : nil }
+        // A filtered or arranged place takes its rows, order and groups from the table.
+        let content: ItemTableContent?
+        if shape == nil {
+            content = nil
+        } else if let table = requestTable(in: library, deferringFirstArrangement: stacking != nil) {
+            content = table
+        } else {
+            _ = work.value(for: SectionsKey(choices: choices, table: nil, content: nil))
+            return shown ?? .empty
+        }
         let key = SectionsKey(choices: choices, table: content?.serial, content: content == nil ? library.contentRevision : nil)
-        if let held = sectionsWork.value(for: key) { return held }
+        if let held = work.value(for: key) { return held }
         // A list of the place's own items that no change touched stands as it is.
-        if content == nil, let held = sectionsWork.held, held.key.choices == choices, let since = held.value.content,
+        if content == nil, let held = work.held, held.key.choices == choices, let since = held.value.content,
            let changed = library.changedItems(since: since),
            (derived.items ?? items(in: library)).count == held.value.ids.count, !changed.contains(where: { held.value.positions[$0] != nil }) {
             let kept = held.value.at(library.contentRevision)
-            sectionsWork.hold(kept, for: key)
+            work.hold(kept, for: key)
             return kept
         }
-        let work = sectionsMaking(content, items: derived.items, in: library, order: order, now: now, choices: choices)
-        if case .list(_, let earlier, _, _) = work.source, !work.ordersItself {
+        let earlier = content == nil ? work.held.flatMap { $0.key.choices == choices && $0.value.content != nil ? $0.value : nil } : nil
+        let making = sectionsMaking(content, items: derived.items, in: library, now: now, choices: choices, earlier: earlier)
+        if case .list(_, let earlier, _, _) = making.source, !making.ordersItself {
             if earlier == nil { placeWorkCounts.listsSorted += 1 } else { placeWorkCounts.listsUpdated += 1 }
         }
-        let count = content?.allRows.count ?? work.count
-        let shown = sectionsWork.held.flatMap { $0.key.choices.derived.isSamePlace(as: derived.key) ? $0.value : nil }
-        guard count > Self.arrangesAlongsideAbove, let shown else {
-            let made = Cost.measure(.sections) { work.make() }
-            sectionsWork.hold(made, for: key)
+        let count = content?.allRows.count ?? making.count
+        let place = self.shown
+        let make: @Sendable () -> ListArrangement = {
+            var arrangement = making.make()
+            if let stacking {
+                arrangement.digest = DigestLayout.Display(place: place, sections: DigestLayout.sections(arrangement.sections, stacking: stacking))
+            }
+            return arrangement
+        }
+        guard count > Self.arrangesAlongsideAbove, shown != nil || stacking != nil else {
+            let made = Cost.measure(.sections, make)
+            work.hold(made, for: key)
             return made
         }
-        let settles = sectionsWork.held?.key.choices == choices
-        sectionsWork.start(key, settling: settles ? Self.arrangeSettling : nil, {
-            Cost.measure(.sectionsArranged) { work.make() }
+        let settles = work.held?.key.choices == choices
+        work.start(key, settling: settles ? Self.arrangeSettling : nil, {
+            Cost.measure(.sectionsArranged, make)
         }, landed: { [weak self] in self?.placeWorkLanded += 1 })
-        return shown
+        return shown ?? .empty
     }
 
     /// What the sections are made of, read on the main actor: the table's rows where it arranges the place, else what the
     /// list orders, with the sections last made for the same choices, which it re-places the changed items in.
     private func sectionsMaking(
-        _ content: ItemTableContent?, items: [Item]?, in library: any ItemLibrary, order: ItemOrder, now: Date, choices: SectionsChoices
+        _ content: ItemTableContent?, items: [Item]?, in library: any ItemLibrary, now: Date, choices: SectionsChoices, earlier: ListArrangement?
     ) -> ListSections {
         let ordersItself = keepsPlaceOrder || ordersByRelevance
-        let favoritesFirst = !isSearching && !showsOnlyFavorites
+        let favoritesFirst = choices.digestStacking == nil && !isSearching && !showsOnlyFavorites
         if let content, choices.shape?.arranged == true, !ordersByRelevance {
             return ListSections(
                 source: .table(TableSections(
                     rows: content.rows, groups: content.groups, kept: content.keptItems, grouping: content.grouping,
                     groupMode: content.groupMode, collapsed: content.collapsed, groupsByOwnGroup: choices.shape?.options.grouping.columnID != nil)),
-                order: order, now: now, ordersItself: ordersItself, favoritesFirst: favoritesFirst)
+                order: choices.order, now: now, ordersItself: ordersItself, favoritesFirst: favoritesFirst)
         }
         let listed = content?.keptItems ?? items ?? self.items(in: library)
         // Only a list of the place's own items follows the library's revisions; the table's rows follow the table.
-        let earlier = content == nil
-            ? sectionsWork.held.flatMap { $0.key.choices == choices && $0.value.content != nil ? $0.value : nil } : nil
         let changed = earlier?.content.flatMap { library.changedItems(since: $0) }
         return ListSections(
             source: .list(listed, earlier: changed == nil ? nil : earlier, changed: changed, content: content == nil ? library.contentRevision : nil),
-            order: order, now: now, ordersItself: ordersItself, favoritesFirst: favoritesFirst)
+            order: choices.order, now: now, ordersItself: ordersItself, favoritesFirst: favoritesFirst)
     }
 
     /// What the list's sections depend on besides the items: the filters, and the sort and grouping where they are
@@ -273,7 +299,7 @@ extension Browser {
     /// own empty result (`SearchEmptyState`).
     func filtersHideEverything(in library: any ItemLibrary) -> Bool {
         guard tableOptions[shown]?.isFiltering == true, !hasSearchTokens else { return false }
-        let content = tableContent(in: library)
+        guard let content = requestTable(in: library, deferringFirstArrangement: viewMode == .digest) else { return false }
         return content.kept.isEmpty && !content.allRows.isEmpty
     }
 
@@ -294,6 +320,11 @@ extension Browser {
     /// choice of the person's or an item gone is arranged at once. The chosen row keeps its place through a re-sort until
     /// the person chooses another, so a sort by Edited does not carry the row they are editing from under them.
     func tableContent(in library: any ItemLibrary) -> ItemTableContent {
+        // Only requests that defer the first arrangement can return before there is a table.
+        requestTable(in: library, deferringFirstArrangement: false)!
+    }
+
+    private func requestTable(in library: any ItemLibrary, deferringFirstArrangement: Bool) -> ItemTableContent? {
         // Read, so whoever asks is told when an arrangement lands.
         _ = tableArrangements
         // Not held: the options are those of every source, whose table comes back as it was once one is ticked.
@@ -312,24 +343,29 @@ extension Browser {
             basis: TableBasis(content: library.contentRevision, membership: library.membershipRevision, counts: library.counts.revision))
         askedTable = key
         // Returning to a cached sort supersedes the sort the person just left.
-        if let held = tableMemo, held.key == key {
+        func isReady(_ content: ItemTableContent) -> Bool {
+            !deferringFirstArrangement || content.allRows.count <= Self.arrangesAlongsideAbove || content.hasOrdered
+        }
+        if let held = tableMemo, held.key == key, isReady(held.content) {
             if arranging.map({ $0.key != key }) == true { endArranging() }
             return held.content
         }
         // A search's table is held apart, so its results never show the Library's table nor drop it.
         let searching = isSearching
-        let held = (searching ? heldSearch : heldTables[shown]).flatMap { $0.key.choices.derived.isSamePlace(as: key.choices.derived) ? $0 : nil }
+        let held = (searching ? heldSearch : heldTables[shown]).flatMap {
+            $0.key.choices.derived.isSamePlace(as: key.choices.derived) && isReady($0.content) ? $0 : nil
+        }
         // The table the place held is the one asked for again, as when a search ends on the place it began on.
         if let held, held.key == key {
             if arranging.map({ $0.key != key }) == true { endArranging() }
             tableMemo = held
             return held.content
         }
-        if let held, arranging?.key == key { return held.content }
+        if arranging?.key == key, held != nil || deferringFirstArrangement { return held?.content }
         let listed = derived.items ?? items(in: library)
         let isLarge = listed.count > Self.arrangesAlongsideAbove
         // The table last made for these choices, which a change of items updates rather than makes again.
-        let earlier = [tableMemo, held].compactMap { $0 }.first { $0.key.choices == key.choices }
+        let earlier = [tableMemo, held].compactMap { $0 }.first { $0.key.choices == key.choices && isReady($0.content) }
         let changed = earlier.flatMap { changes(since: $0.key.basis, in: library) }
         if let earlier, let changed, earlier.content.isUntouched(by: changed, listing: listed.count) {
             // Whatever is under way is for another choice or an older revision.
@@ -337,10 +373,10 @@ extension Browser {
             take((key, earlier.content), searching: searching, isLarge: isLarge)
             return earlier.content
         }
-        if let held, isLarge {
+        if isLarge, held != nil || deferringFirstArrangement {
             let update = earlier.flatMap { earlier in changed.map { (earlier.content, $0) } }
             arrange(key, items: listed, after: held, updating: update, in: library)
-            return held.content
+            return held?.content
         }
         endArranging()
         let content: ItemTableContent
@@ -394,14 +430,14 @@ extension Browser {
     /// waits for the one before it to end, ended or not, which it does at its next step, so a steady run of edits never piles
     /// sorts up. Like `PlaceWork`'s runs, it lands only while `key` is still the table asked for.
     private func arrange(
-        _ key: TableKey, items: [Item], after earlier: (key: TableKey, content: ItemTableContent),
+        _ key: TableKey, items: [Item], after earlier: (key: TableKey, content: ItemTableContent)?,
         updating update: (content: ItemTableContent, changed: Set<ItemID>)?, in library: any ItemLibrary
     ) {
         arranging?.task.cancel()
         let place = shown
-        let sameChoices = key.choices == earlier.key.choices
+        let sameChoices = key.choices == earlier?.key.choices
         // Only the items' own changes settle: a membership change may have taken an item away, which must not stay chosen.
-        let settles = sameChoices && key.basis.membership == earlier.key.basis.membership
+        let settles = sameChoices && key.basis.membership == earlier?.key.basis.membership
         // The arrangement before ends once the work it has off the main actor ends.
         let previous = lastArrangement
         let options = tableOptions[shown] ?? ItemTableOptions()
@@ -450,9 +486,12 @@ extension Browser {
             start = ContinuousClock.now
             // The chosen row is read as the table lands, where the held table shows it now. The held table's rows are
             // read only for that row, since reading them sorts them on the main actor where they were never asked for.
-            let pinned = sameChoices && self.selection.count == 1 ? self.selection.first : nil
-            let shownRows = pinned == nil ? nil : ((searching ? self.heldSearch : self.heldTables[place])?.content.rows ?? earlier.content.rows)
-            content.land(ordered, rows: Browser.holding(pinned, in: ordered.rows, as: shownRows))
+            if sameChoices, self.viewMode != .digest, self.selection.count == 1, let pinned = self.selection.first {
+                let shownRows = (searching ? self.heldSearch : self.heldTables[place])?.content.rows ?? earlier?.content.rows
+                content.land(ordered, rows: Browser.holding(pinned, in: ordered.rows, as: shownRows))
+            } else {
+                content.land(ordered)
+            }
             Cost.record(.tableArrange, since: start)
             self.arranging = nil
             if plan == nil { self.placeWorkCounts.tablesMade += 1 } else { self.placeWorkCounts.tablesUpdated += 1 }
@@ -617,6 +656,7 @@ extension Browser {
         let shape: ListShape?
         /// Hide Empty Groups, which only an arranged list's groups read and which is kept apart from the place's options.
         let hidesEmpty: Bool
+        let digestStacking: Bool?
     }
 
     nonisolated struct SectionsKey: Equatable, Sendable {
@@ -723,7 +763,9 @@ nonisolated struct ListSections: Sendable {
 /// A list's sections, what a layout reads of them without a pass over the place, and the items in the list's order they
 /// were made of, which the next change re-places items in.
 nonisolated struct ListArrangement: Sendable {
+    static let empty = ListArrangement(sections: [], sorted: nil, content: nil)
     let sections: [ItemSection]
+    var digest: DigestLayout.Display?
     /// Every item of the sections, in order, the folded ones too.
     let ids: [ItemID]
     /// The items the list shows, in order: those of the sections not folded away.

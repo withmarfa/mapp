@@ -5,9 +5,9 @@ struct ItemDigest: View {
     @CurrentLibrary private var library
     @Bindable var browser: Browser
     var pane: FocusState<Browser.Pane?>.Binding
-    @State private var expanded: Set<DigestLayout.Pile.ID> = []
     @State private var cursor: ItemID?
     @State private var anchor: ItemID?
+    @State private var keyboardTarget: ItemID?
 
     var body: some View {
         let choices = browser.digestChoices
@@ -16,22 +16,26 @@ struct ItemDigest: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 12) {
                     if let current {
-                        ForEach(current.sections) { section in
-                            if let group = section.group {
+                        ForEach(current.drawn(browser.listDrawn)) { part in
+                            if part.startsSection, let group = part.group {
                                 Text(group.title())
                                     .interfaceFont(.body.weight(.semibold))
                                     .accessibilityAddTraits(.isHeader)
                             }
-                            ForEach(section.piles) { pile in
+                            ForEach(part.piles) { pile in
                                 DigestPileView(
                                     pile: pile, choices: choices, browser: browser,
-                                    isExpanded: expanded.contains(pile.id),
-                                    toggle: { toggle(pile) },
+                                    isExpanded: browser.expandedDigestPiles.contains(pile.id),
+                                    toggle: { browser.toggleDigestPile(pile) },
                                     choose: { id in
+                                        keyboardTarget = nil
                                         let modifiers = NSApp.currentEvent?.modifierFlags ?? []
-                                        select(id, extending: modifiers.contains(.shift), toggling: modifiers.contains(.command), in: current)
+                                        select(id, extending: modifiers.contains(.shift), toggling: modifiers.contains(.command))
                                     })
-                                .id(pile.newest.id)
+                            }
+                            if part.endsRun {
+                                Color.clear.frame(height: 1).accessibilityHidden(true)
+                                    .onAppear { browser.drawMoreOfList(after: part.run) }
                             }
                         }
                     }
@@ -49,32 +53,47 @@ struct ItemDigest: View {
             .focused(pane, equals: .list)
             .onKeyPress(keys: [.upArrow, .downArrow], phases: .down) { key in
                 guard let current else { return .ignored }
-                let ids = visibleIDs(in: current)
-                let selected = cursor ?? ids.first(where: browser.selection.contains)
+                let ids = browser.digestOrder
+                let selected = cursor.flatMap { current.shows($0, expanded: browser.expandedDigestPiles) ? $0 : nil }
+                    ?? ids.first(where: browser.selection.contains)
                 let offset = key.key == .upArrow ? -1 : 1
                 guard let next = GallerySelection.moving(from: selected, among: ids, by: offset) else { return .ignored }
-                select(next, extending: key.modifiers.contains(.shift), toggling: false, in: current)
-                scroll.scrollTo(next)
+                select(next, extending: key.modifiers.contains(.shift), toggling: false)
+                keyboardTarget = next
                 return .handled
             }
             .onKeyPress(.return) { browser.openSelection() ? .handled : .ignored }
-            .selectsAll { if let current { browser.selection = Set(visibleIDs(in: current)) } }
+            .selectsAll { browser.selection = Set(browser.digestOrder) }
+            .background {
+                if let current {
+                    DigestChosenCard(browser: browser, current: current, cursor: cursor, keyboardTarget: keyboardTarget, scroll: scroll)
+                }
+            }
         }
         .accessibilityIdentifier("ItemDigest")
         .accessibilityLabel(browser.pageTitle(in: library))
-        .deletesChosen(browser) { Set(current.map(visibleIDs) ?? []) }
+        .deletesChosen(browser) {
+            guard let current else { return [] }
+            return browser.selection.filter { current.shows($0, expanded: browser.expandedDigestPiles) }
+        }
         .clearsSeveralOnEscape(browser)
         .quickLooksOnSpace(browser)
         .searchStatus(browser)
         .dragContainer(for: ItemReference.self) { ids in ids.map(library.dragReference(of:)) }
         .dragsSelection(of: browser)
         .onChange(of: browser.shown) {
-            expanded.removeAll()
             cursor = nil
             anchor = nil
+            keyboardTarget = nil
         }
-        .onChange(of: cursor.map { current?.itemIDs.contains($0) == true }) { _, stillListed in
-            if stillListed == false { cursor = nil }
+        .onChange(of: current?.id) {
+            if let cursor, current?.positions[cursor] == nil { self.cursor = nil }
+            if let anchor, current?.positions[anchor] == nil { self.anchor = nil }
+        }
+        .onChange(of: browser.expandedDigestPiles) {
+            let selected = browser.selection.count == 1 ? browser.selection.first : nil
+            if let cursor, current?.shows(cursor, expanded: browser.expandedDigestPiles) == false { self.cursor = selected }
+            if let anchor, current?.shows(anchor, expanded: browser.expandedDigestPiles) == false { self.anchor = selected }
         }
         .overlay {
             if let current, current.sections.isEmpty {
@@ -86,34 +105,37 @@ struct ItemDigest: View {
         .filteredEmptyState(browser)
     }
 
-    private func toggle(_ pile: DigestLayout.Pile) {
-        if expanded.remove(pile.id) == nil {
-            expanded.insert(pile.id)
-        } else {
-            let hidden = Set(pile.earlier.map(\.id))
-            let selected = browser.selection
-            if !selected.isDisjoint(with: hidden) {
-                browser.selection = selected.subtracting(hidden).union([pile.newest.id])
-            }
-            if let cursor, hidden.contains(cursor) { self.cursor = pile.newest.id }
-            if let anchor, hidden.contains(anchor) { self.anchor = pile.newest.id }
-        }
-    }
-
-    private func visibleIDs(in layout: DigestLayout.Display) -> [ItemID] {
-        guard !expanded.isEmpty else { return layout.topItems }
-        return layout.sections.flatMap { section in
-            section.piles.flatMap { pile in [pile.newest.id] + (expanded.contains(pile.id) ? pile.earlier.map(\.id) : []) }
-        }
-    }
-
-    private func select(_ id: ItemID, extending: Bool, toggling: Bool, in layout: DigestLayout.Display) {
+    private func select(_ id: ItemID, extending: Bool, toggling: Bool) {
         browser.selection = extending || toggling
-            ? GallerySelection.selecting(id, among: visibleIDs(in: layout), current: browser.selection, anchor: anchor, extending: extending, toggling: toggling)
+            ? GallerySelection.selecting(id, among: browser.digestOrder, current: browser.selection, anchor: anchor, extending: extending, toggling: toggling)
             : [id]
         if !extending || anchor == nil { anchor = id }
         cursor = id
         pane.wrappedValue = .list
+    }
+}
+
+/// Scrolls after the page around a choice has been drawn, without making the card layout read the selection.
+private struct DigestChosenCard: View {
+    let browser: Browser
+    let current: DigestLayout.Display
+    let cursor: ItemID?
+    let keyboardTarget: ItemID?
+    let scroll: ScrollViewProxy
+
+    var body: some View {
+        let single = browser.selection.count == 1 ? browser.selection.first : nil
+        let moving = keyboardTarget.flatMap { browser.selection.contains($0) ? $0 : nil }
+        let target = single != nil && single != cursor ? single : moving
+        let position = (target ?? single).flatMap { current.positions[$0] }
+        let isDrawn = position.map { position in
+            browser.listDrawn.runs(of: current.topItems.count).contains { $0.contains(position) }
+        } ?? false
+        Color.clear
+            .onChange(of: position, initial: true) { if let position { browser.drawList(showing: position) } }
+            .onChange(of: isDrawn ? target : nil, initial: true) { _, target in
+                if let target { scroll.scrollTo(target) }
+            }
     }
 }
 
@@ -125,30 +147,27 @@ struct DigestWatch: View {
 
     var body: some View {
         let _ = daysSeen
-        let request = DigestRequest(
-            key: browser.digestKey(in: library), stacking: browser.digestChoices.stacks,
-            isPending: browser.searchResults(in: library)?.isPending == true)
+        let next = browser.digestArrangement(in: library, now: library.now())
+        let isPending = browser.searchResults(in: library)?.isPending == true
         Color.clear.frame(width: 0, height: 0)
             .accessibilityHidden(true)
             .allowsHitTesting(false)
             .onClockChange { daysSeen += 1 }
-            .task(id: request) {
-                guard let next = await browser.digestSections(in: library, stacking: request.stacking), !Task.isCancelled else { return }
+            .onChange(of: next?.id, initial: true) {
+                guard let next else { return }
                 let previous = browser.currentDigest
                 browser.digestDisplay = next
-                if let previous, !browser.selection.isEmpty, !browser.selection.isSubset(of: next.itemIDs) {
-                    browser.keepSelection(from: previous.itemOrder, to: next.itemOrder, isPending: request.isPending)
-                } else if !request.isPending {
-                    browser.keepHeldSelection(in: next.itemOrder)
+                if browser.selection.contains(where: { next.positions[$0] == nil }) {
+                    let old = previous?.visibleIDs(expanded: browser.expandedDigestPiles) ?? []
+                    browser.keepSelection(from: old, to: browser.digestOrder, isPending: isPending)
+                } else if !isPending {
+                    browser.keepHeldSelection(in: browser.digestOrder)
                 }
             }
+            .onChange(of: isPending) {
+                if !isPending, next != nil { browser.keepHeldSelection(in: browser.digestOrder) }
+            }
     }
-}
-
-private struct DigestRequest: Equatable {
-    let key: Browser.SectionsKey
-    let stacking: Bool
-    let isPending: Bool
 }
 
 private struct DigestPileView: View {
@@ -161,10 +180,11 @@ private struct DigestPileView: View {
     let choose: (ItemID) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        LazyVStack(alignment: .leading, spacing: 12) {
             DigestCard(
                 item: pile.newest, choices: choices, browser: browser, choose: choose,
                 more: moreLabel, isExpanded: isExpanded, toggle: toggle)
+                .id(pile.newest.id)
             if isExpanded {
                 ForEach(pile.earlier) { item in
                     DigestCard(item: item, choices: choices, browser: browser, choose: choose)

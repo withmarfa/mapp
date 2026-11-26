@@ -85,7 +85,7 @@ extension Browser {
     /// layout the list's sections, which follow the filters and the sort.
     func orderBehind(in library: any ItemLibrary, order: ItemOrder) -> [ItemID] {
         if viewMode == .digest {
-            return currentDigest?.itemOrder ?? []
+            return digestOrder
         }
         if viewMode == .table {
             let content = tableContent(in: library)
