@@ -39,9 +39,8 @@ An item's page is its head (a kicker, the title and rows) and its text. One page
 - **Rows show what has a value, six at most, then Show N More,** which lists every property in the type's order, Empty where unset, hidden ones grey. It is offered on every page; on read-only and deleted ones nothing opens.
 - **A type that keeps no text shows its first six rows,** empty or not.
 - **A row is dragged by its name.** A drag or Move Up or Down moves only that row in the type's one order.
-- **An event's time is one row, When,** always first, with how far off it is or All Day in grey. A list of people draws each as a person and, in grey after the name, what the entry answers (an attendee's response).
-- **A highlight's passage leads.** The passage is the item's text, drawn at the title's size where a title would be, and its rows follow it at the start of the foot (`PageHeaderKind.highlight`, `PageHeader.textLeads`). It is the same text, edited as text; Focus hides the rows with the head. A highlight has no title.
-- **A message has no title either, and its text follows its rows.** From and To are people: the name, then the address in grey (`PersonAddress`), as `Name <address>` is written.
+- **An event's time is one row, When,** always first, with how far off it is or All Day in grey. A person in a list can carry a grey answer or address (`PersonAddress`).
+- **A highlight's passage leads,** at the title's size, with its rows after it (`PageHeader.textLeads`).
 - **Long text stops after two lines;** an email, a phone and a number to call open.
 - **A value is cut, never reworded,** and a linked item that cannot be read, is gone or is in the bin shows nothing, never an id.
 - **Once the head is out of sight** the page says so with the item, title and mark (`DetailsPresentation.scrolledHead`).
@@ -50,7 +49,7 @@ An item's page is its head (a kicker, the title and rows) and its text. One page
 
 `PageFoot` lists Sub-Items (nested, counting everything beneath) on any item that has them, and a person's or a place's mentions as a Timeline, newest first. Other items' mentions are Linked From, where Settings › Layouts puts it on the page. A list shows 30 rows and Show More adds 30, each nested list by itself.
 
-A place with a point has a map between its rows and its Timeline: a still picture of Apple's map with the point marked, one for each appearance (`PlaceMapImages`). It cannot be moved or clicked; the corner's Open takes the person to Maps. A place with no point, or only one number of it, has no map and no empty box.
+A place with a point has a still map above its Timeline (`PlaceMapImages`).
 
 ## The card
 
@@ -95,13 +94,13 @@ Quiet lines at the top of the column say what is not ordinary (`PageNotice.all`)
 | Been deleted | Recover |
 | A copy saved beside it | Open Copy |
 | Text that could not be read | None; the reason stands where the text would |
-| A write held in the copy | None; Show Changes opens the Settings page that lists a held write's text where one was too large |
+| A write held in the copy | None; Show Changes opens the Settings page that lists it |
 | Values that could not be read | None |
 | No file in Marfa | None |
 | Pictures not loaded | Load Pictures, and a close for the page |
 
 - **The first row that holds leads,** and a write that only waits says nothing. Unreadable text, a held write and a missing file are never hidden: each has its line under the first.
-- **An action carries its item from the app,** and none writes or drops text. A write refused as too large never tells the person to shorten the older text: the latest is kept in the copy.
+- **An action carries its item from the app,** and none writes or drops text. A write refused as too large keeps the latest text in the copy.
 
 ## The corner
 
@@ -119,7 +118,7 @@ Quiet lines at the top of the column say what is not ordinary (`PageNotice.all`)
 | An item in the modal | None |
 | The column beside a layout | Open as Page |
 
-- **Every control in the corner is also a command in the View menu**, and the corner's own menus bind no keys, because a key registered twice works for neither.
+- **Every control in the corner is also a command in the View menu**, and the corner's own menus bind no keys, (a key registered twice works for neither).
 - **Open leads wherever the page has somewhere outside the app** (`PageOpenTarget`): the browser, a file's app or Maps, named in its help.
 - **A person can turn off formats, text size and Focus** (`PageCornerChoice`). One turned off is in the page's More menu.
 - **Zoom keys size the file or the text, never both** (`FileViewCommands`, `TextZoomCommands`).
@@ -132,8 +131,8 @@ Quiet lines at the top of the column say what is not ordinary (`PageNotice.all`)
 - **A plain click on a link places the caret**, because the page is for writing. Command-click, or Open Link at the caret, opens it.
 - **A link to an item opens as Settings says** (`ItemOpening`), and one followed in the modal stays there. So does a link in a row, the foot, a panel or a file's page (`EditorController.follow`).
 - **A right-click on a picture of an item offers Open Item and Copy Link,** then Open and Show in Finder.
-- **Every look of a link reads the same under the pointer** (`LinkLook`), and a link to nothing keeps its dashes in all of them.
-- **Opening is refused for an address that may not be opened**, such as a script, and the rest of the link's menu stays.
+- **Every look of a link reads the same under the pointer** (`LinkLook`); a link to nothing keeps its dashes.
+- **An address that may not be opened**, such as a script, is refused; the rest of the link's menu stays.
 - **Removing a link keeps its words.**
 
 ## Files and saved web pages
