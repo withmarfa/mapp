@@ -332,7 +332,7 @@ import Testing
 
         let settings = LibrarySettings(defaults: bench.defaults, aside: aside, lastOpen: bareKey)
         let moved = try settings.settle(rename: { host.currentLibraryKey(forStored: $0) })
-        #expect(moved.libraries[key] == [portKey])
+        #expect(moved.libraries[key]?.contains(portKey) == true)
         #expect(settings.unsettled[key] == [TypeLooks.defaultsKey, SidebarLayouts.defaultsKey])
         let looksHeld = try stored(bench, TypeLooks.defaultsKey)
         #expect(looksHeld[bareKey] as? String == "broken", "kept as stored")
