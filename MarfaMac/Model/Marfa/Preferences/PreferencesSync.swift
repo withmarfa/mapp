@@ -81,6 +81,9 @@ final class PreferencesSync {
     @ObservationIgnored private let detachedLibrary: @MainActor () -> String
     /// The commands, by raw value, whose shortcut that works in any app the system refused at the stores' last reload.
     @ObservationIgnored let refusedShortcuts: @MainActor () -> Set<String>
+    /// The settings, by key, that a library's earlier name still holds (`LibrarySettings.unsettled`), which no step
+    /// changes on either side, so nothing deletes what has not yet moved.
+    @ObservationIgnored let unsettled: @MainActor (String) -> Set<String>
 
     /// The running app's version and build.
     nonisolated static var appBuild: String {
@@ -93,6 +96,7 @@ final class PreferencesSync {
     init(defaults: UserDefaults, domain: String? = nil, enabled: Bool, coalescing: Duration = .seconds(1),
          build: String = PreferencesSync.appBuild, restorePoints: RestorePoints = .temporary(),
          library: @escaping @MainActor () -> String = { "" }, refusedShortcuts: @escaping @MainActor () -> Set<String> = { [] },
+         unsettled: @escaping @MainActor (String) -> Set<String> = { _ in [] },
          reload: @escaping @MainActor () -> Void) {
         self.defaults = defaults
         self.domain = domain
@@ -102,6 +106,7 @@ final class PreferencesSync {
         self.restorePoints = restorePoints
         detachedLibrary = library
         self.refusedShortcuts = refusedShortcuts
+        self.unsettled = unsettled
         self.reload = reload
         guard enabled else { return }
         observer = NotificationCenter.default.addObserver(
@@ -379,11 +384,17 @@ final class PreferencesSync {
         }
     }
 
-    /// This Mac's settings, and what each setting this Mac cannot read owns, which no step changes.
+    /// This Mac's settings, and what each setting this Mac cannot read, or that has not yet moved to this library's
+    /// name (`unsettled`), owns, which no step changes.
     func readLocal() -> Local {
         var units: PreferenceUnits = [:]
         var frozen: [SyncedSetting] = []
+        let held = unsettled(library)
         for setting in PreferencesMap.synced {
+            if held.contains(setting.key) {
+                frozen.append(setting)
+                continue
+            }
             switch setting.read(defaults, library: library) {
             case .units(let held): units.merge(held) { first, _ in first }
             case .unreadable: frozen.append(setting)
@@ -538,7 +549,9 @@ final class PreferencesSync {
         outcome.toLocal.formUnion(outcome.merged.keys.filter { unit in
             local.units[unit] == nil && isKeptAbsent(unit) && !unreadable.contains { $0.owns(unit) }
         })
-        if switched { outcome.toLocal.formUnion(Set(local.units.keys).union(outcome.merged.keys)) }
+        if switched {
+            outcome.toLocal.formUnion(Set(local.units.keys).union(outcome.merged.keys).filter { unit in !unreadable.contains { $0.owns(unit) } })
+        }
         try await apply(outcome, to: chosen, local: local, adopted: &adopted, retrying: retrying, in: copy) {
             [defaults, before] partial, unsent in
             var record = Record.read(defaults)

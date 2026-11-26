@@ -869,6 +869,16 @@
         }
       }
     },
+    "%lld changes made at another address for this Marfa are kept on this Mac in %@ and are sent the next time the app connects." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld changes made at another address for this Marfa are kept on this Mac in %2$@ and are sent the next time the app connects."
+          }
+        }
+      }
+    },
     "%lld changes need attention" : {
       "localizations" : {
         "en" : {
@@ -3455,6 +3465,9 @@
     "Changes Haven’t Been Sent" : {
       "extractionState" : "manual"
     },
+    "Changes Still Waiting" : {
+
+    },
     "Changes not yet sent are kept." : {
 
     },
@@ -3598,9 +3611,6 @@
 
     },
     "Choose it in Runs next time, or remove it in Terminal with %@." : {
-
-    },
-    "Choose one item to read or edit it." : {
 
     },
     "Choose the machine that runs %@ to see one." : {
@@ -9033,6 +9043,9 @@
     "Settings Not Saved" : {
 
     },
+    "Settings Not Synced" : {
+
+    },
     "Settings Read When It Starts" : {
 
     },
@@ -11211,6 +11224,9 @@
     },
     "This library was closed before the change could be kept." : {
       "extractionState" : "manual"
+    },
+    "This library’s settings on this Mac couldn’t be brought together, so they aren’t kept in the Marfa for now. Check that this Mac has free space, then open the library again." : {
+
     },
     "This link can’t be replaced by moving one end, because the item that stays can hold more than one." : {
       "extractionState" : "manual"

@@ -20,6 +20,10 @@ nonisolated final class FakeMarfaSource: MarfaMac.ItemSource {
 
     var calls: [String] { asked.withLock { $0 } }
 
+    /// The instance the copy says it holds, as a filled copy does offline.
+    let instance = Mutex<String?>(nil)
+    func instanceID() async -> String? { instance.withLock { $0 } }
+
     private func record(_ call: String) {
         asked.withLock { $0.append(call) }
     }
@@ -162,6 +166,20 @@ nonisolated final class FakeServers: Sendable {
         }
     }
 
+    /// The instance each address says it is; an address with none does not say.
+    let instances = Mutex<[MarfaConnection: String]>([:])
+    /// Whether an opened copy says the instance its address does, as a filled copy does; false for one that cannot tell.
+    let copiesSayInstance = Mutex(true)
+
+    var identifier: MarfaHost.Identifier {
+        { connection in
+            guard let instance = self.instances.withLock({ $0[connection] }) else {
+                throw SourceFailure(kind: .missing, message: "The server did not answer.")
+            }
+            return instance
+        }
+    }
+
     var opened: [FakeMarfaSource] { made.withLock { $0 } }
     var last: FakeMarfaSource? { opened.last }
 
@@ -186,6 +204,7 @@ nonisolated final class FakeServers: Sendable {
             }
             let source = FakeMarfaSource(connection: connection)
             source.store.withLock { $0 = store }
+            if self.copiesSayInstance.withLock({ $0 }) { source.instance.withLock { $0 = self.instances.withLock { $0[connection] } } }
             self.made.withLock { $0.append(source) }
             return source
         }
@@ -230,6 +249,7 @@ nonisolated extension MarfaHost.DisconnectChoice {
     ) -> MarfaHost {
         MarfaHost(
             defaults: defaults, signIns: signIns, location: location, opener: opener ?? servers.opener, describer: servers.describer,
+            identifier: servers.identifier,
             remover: remover ?? { try await MarfaHost.removeStore($0, agreedToLose: $1) }, cleaner: cleaner ?? {})
     }
 
