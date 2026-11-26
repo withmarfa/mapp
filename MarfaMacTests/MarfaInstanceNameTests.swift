@@ -17,7 +17,7 @@ import Testing
         #expect(await eventually { host.instanceName(for: first) == "One" })
         try await host.changeAddress(to: "http://second.test:8210", key: "k", choice: .keepCopy)
         #expect(await eventually { host.instanceName(for: second) == "Two" })
-        #expect(host.instanceName(for: first) == nil)
+        #expect(host.instanceName(for: first) == "One", "the Marfa left keeps its name for a return")
     }
 
     @Test func theNameIsKeptForTheNextLaunch() async throws {

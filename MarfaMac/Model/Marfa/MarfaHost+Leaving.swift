@@ -73,21 +73,23 @@ extension MarfaHost {
         if rememberingAddress { defaults.set(connection.address.absoluteString, forKey: Self.addressKey) }
     }
 
-    /// Ends the sign-in, and removes the copy where it was discarded (`agreed` is the changes the person agreed
-    /// to lose with it), once the copy is closed. A discarded copy is marked before anything is removed and
-    /// unmarked only once it is gone or the package has refused it, so neither a removal that fails nor a quit
-    /// part way lets it be opened again as it was.
-    func finishLeaving(_ connection: MarfaConnection, agreed: Agreed?) async -> Problem? {
+    /// Ends the sign-in unless `signingOut` is false, as for the Marfa a switch leaves, and removes the copy where it was
+    /// discarded (`agreed` is the changes the person agreed to lose with it), once the copy is closed. A discarded copy
+    /// is marked before anything is removed and unmarked only once it is gone or the package has refused it, so neither
+    /// a removal that fails nor a quit part way lets it be opened again as it was.
+    func finishLeaving(_ connection: MarfaConnection, agreed: Agreed?, signingOut: Bool = true) async -> Problem? {
         if let agreed { markDiscarded(connection, agreed: agreed) }
         var signIn: String?
         var copy: String?
         var kept: CopyKept?
         var outcome = SignOutOutcome.endedAtServer
         let address = connection.address.absoluteString
-        do {
-            outcome = try await signIns.signOut(of: connection)
-        } catch {
-            signIn = Self.message(error)
+        if signingOut {
+            do {
+                outcome = try await signIns.signOut(of: connection)
+            } catch {
+                signIn = Self.message(error)
+            }
         }
         if let agreed {
             switch await removeCopy(connection, agreed: agreed) {

@@ -31,7 +31,7 @@ nonisolated enum PictureAsk: String, CaseIterable, Sendable {
     private var fetching: [URL: Task<Result<URL, PictureFailure>, Never>] = [:]
 
     init(
-        cache: PictureCache = PictureCache(), fetcher: PictureFetcher = PictureFetcher(), defaults: UserDefaults = .standard,
+        cache: PictureCache, fetcher: PictureFetcher = PictureFetcher(), defaults: UserDefaults = .standard,
         queue: PictureQueue = PictureQueue()
     ) {
         self.cache = cache
@@ -100,6 +100,14 @@ nonisolated enum PictureAsk: String, CaseIterable, Sendable {
 }
 
 extension WebPictures {
-    /// The one used by every window, so a picture two items share is fetched once.
-    static let standard = WebPictures()
+    private static var byLibrary: [String: WebPictures] = [:]
+
+    /// The one every window of the library whose copy is in `folder` uses, so a picture two of its items share is fetched
+    /// once, and kept in that library's own cache (`PictureCache.folder(for:)`), which leaving another never clears.
+    static func kept(for folder: String) -> WebPictures {
+        if let pictures = byLibrary[folder] { return pictures }
+        let pictures = WebPictures(cache: PictureCache(folder: PictureCache.folder(for: folder)))
+        byLibrary[folder] = pictures
+        return pictures
+    }
 }

@@ -298,7 +298,7 @@ struct MarfaSourceOfflineTests {
         let reopened = try await MarfaSource.open(connection, signIns: keys, location: location)
         #expect(try Self.inode(store) != before)
         #expect(try await reopened.copy.blobs.isHeld(hash))
-        #expect(try await MarfaDownloads(copy: reopened.copy).read().budget == .keepAll)
+        #expect(try await reopened.downloadedFiles!.read().budget == .keepAll)
         let log = ChangeLog(reopened)
         _ = try #require(await log.wait { $0.snapshot != nil })
         await reopened.close()

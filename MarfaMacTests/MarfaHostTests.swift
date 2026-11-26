@@ -841,7 +841,7 @@ import Testing
         #expect(host.connection == second)
         #expect(host.source === bench.servers.last)
         #expect(bench.savedAddress == "http://second.test:8210")
-        #expect(try bench.signIns.key(for: first.address) == nil)
+        #expect(try bench.signIns.key(for: first.address) == "one", "the Marfa left stays signed in for a return")
         #expect(try bench.signIns.key(for: second.address) == "two")
         #expect(old.calls.last == "close")
         #expect(bench.hasCopy(first))

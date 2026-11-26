@@ -200,8 +200,9 @@ final class EditorController: NSObject {
     /// Every editor open, so their edits can be handed over before the app quits or changes library.
     @ObservationIgnored static let open = NSHashTable<EditorController>.weakObjects()
 
-    init(library: any ItemLibrary, pictures: WebPictures = .standard) {
+    init(library: any ItemLibrary, pictures: WebPictures? = nil) {
         self.library = library
+        let pictures = pictures ?? library.pictures
         self.pictures = pictures
         pictureRequests = PictureRequests(pictures: pictures)
         toldPictureSetting = pictures.setting

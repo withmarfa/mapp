@@ -356,7 +356,8 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         case .signIn(let outcome):
             signInNotice(outcome)
         case .notRevoked(let address):
-            approvalNotice(reached == .switched ? .previous : .left, address: address)
+            // Only a disconnect signs out: a switch keeps the Marfa left signed in.
+            approvalNotice(.left, address: address)
         case .notRemoved(let signIn, let copy, let approvalAt):
             switch reached {
             case .left:
@@ -366,7 +367,9 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
             case .switched:
                 Notice(
                     title: String(localized: "Switched Servers, but Not Everything Was Removed"),
-                    message: withApproval(previousRemovalMessage(signIn: signIn, copy: copy), approvalAt, .previous))
+                    message: withApproval(
+                        String(localized: "The previous server’s copy is still on this Mac. The app removes it before it connects to that server again."),
+                        approvalAt, .left))
             case .notOpened, .signedInAgain:
                 Notice(
                     title: String(localized: "Can’t Open the Library"),
@@ -471,7 +474,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         }
         let note = signIn == nil ? nil : String(localized: "The sign-in is still in your Keychain. Remove it in Keychain Access.")
         let told = note.map { sentences(body, $0) } ?? body
-        let message = withApproval(told, approvalAt, reached == .switched ? .previous : .left)
+        let message = withApproval(told, approvalAt, .left)
         switch reached {
         case .left:
             return Notice(title: String(localized: "Disconnected, but the Copy Was Kept"), message: message)
@@ -502,16 +505,6 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         }
     }
 
-    private static func previousRemovalMessage(signIn: String?, copy: String?) -> String {
-        switch (signIn != nil, copy != nil) {
-        case (true, true):
-            String(localized: "The previous server’s sign-in is still in your Keychain, and its copy is still on this Mac. Remove the sign-in in Keychain Access. The app removes the copy before it connects to that server again.")
-        case (true, false):
-            String(localized: "The previous server’s sign-in is still in your Keychain. Remove it in Keychain Access.")
-        default:
-            String(localized: "The previous server’s copy is still on this Mac. The app removes it before it connects to that server again.")
-        }
-    }
 
     // MARK: Running a step
 

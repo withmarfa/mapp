@@ -48,9 +48,11 @@ nonisolated extension DownloadedFileState {
 
 struct MarfaDownloads: DownloadedFiles {
     private let copy: WorkingCopy
+    private let keptFolder: URL
 
-    init(copy: WorkingCopy) {
+    init(copy: WorkingCopy, keptFolder: URL) {
         self.copy = copy
+        self.keptFolder = keptFolder
     }
 
     func read() async throws -> DownloadedFileState {
@@ -69,6 +71,6 @@ struct MarfaDownloads: DownloadedFiles {
         } catch let error as MarfaError {
             throw SourceFailure(kind: .failed, message: String(localized: "Couldn’t remove downloaded files. \(error.message)"))
         }
-        await MarfaSource.removeKeptCopies()
+        await MarfaSource.removeKeptCopies(in: keptFolder)
     }
 }

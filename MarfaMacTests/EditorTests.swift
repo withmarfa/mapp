@@ -16,7 +16,7 @@ struct EditorTests {
         let editor: EditorController
         var changes: [String] = []
 
-        init(library: Library, pictures: WebPictures = .standard) async throws {
+        init(library: Library, pictures: WebPictures? = nil) async throws {
             self.library = library
             editor = EditorController(library: library, pictures: pictures)
             editor.onChange = { [unowned self] _, markdown, _ in changes.append(markdown) }

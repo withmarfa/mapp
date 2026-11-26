@@ -75,9 +75,11 @@ import Testing
         #expect(second !== first)
         #expect(host.source === second)
         #expect(host.libraryKey(for: moved) == key)
-        // Each origin's sign-in is its own: the new address was signed in to, and the old one's was never sent to it.
+        // Each origin's sign-in is its own: the new address was signed in to, the old one's was never sent to it, and
+        // the old one's stays for a return.
         #expect(try bench.signIns.key(for: moved.address) == "new-origin")
-        #expect(try bench.signIns.key(for: bare.address) == nil)
+        #expect(try bench.signIns.key(for: bare.address) == "old-origin")
+        #expect(!bench.signIns.calls.contains("signOut https://marfa.test"))
         #expect(bench.signIns.calls.contains("browser https://moved.test"))
         #expect(bench.savedAddress == "https://moved.test")
     }

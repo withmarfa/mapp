@@ -250,7 +250,7 @@ nonisolated extension MarfaHost.DisconnectChoice {
         MarfaHost(
             defaults: defaults, signIns: signIns, location: location, opener: opener ?? servers.opener, describer: servers.describer,
             identifier: servers.identifier,
-            remover: remover ?? { try await MarfaHost.removeStore($0, agreedToLose: $1) }, cleaner: cleaner ?? {})
+            remover: remover ?? { try await MarfaHost.removeStore($0, agreedToLose: $1) }, cleaner: cleaner ?? { _ in })
     }
 
     /// The defaults' name, which another thread opens them by while the bench lives.

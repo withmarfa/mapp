@@ -18,7 +18,7 @@ import Testing
 
     @Test func aKeptCopyOutlastsTheLeasedFileUnderItsTitle() async throws {
         let leased = try leasedFile(holding: "bytes")
-        let copy = try await MarfaSource.keptCopy(of: leased, hash: "sha256:a", name: "Photo.png", in: kept)
+        let copy = try await MarfaSource.keptCopy(of: leased, hash: "sha256:a", name: "Photo.png", in: kept, generation: MarfaSource.keptGeneration(of: kept))
 
         try FileManager.default.removeItem(at: leased)
 
@@ -28,7 +28,7 @@ import Testing
     }
 
     @Test func aKeptCopyIsReadOnlySoAnotherAppCanNotSaveOverMarfasFile() async throws {
-        let copy = try await MarfaSource.keptCopy(of: try leasedFile(holding: "bytes"), hash: "sha256:a", name: "a.txt", in: kept)
+        let copy = try await MarfaSource.keptCopy(of: try leasedFile(holding: "bytes"), hash: "sha256:a", name: "a.txt", in: kept, generation: MarfaSource.keptGeneration(of: kept))
 
         let permissions = try FileManager.default.attributesOfItem(atPath: copy.path)[.posixPermissions] as? Int
         #expect(permissions == 0o444)
@@ -38,9 +38,9 @@ import Testing
     }
 
     @Test func aHashAlreadyKeptIsAnsweredWithoutCopyingAgain() async throws {
-        let copy = try await MarfaSource.keptCopy(of: try leasedFile(holding: "first"), hash: "sha256:a", name: "a.txt", in: kept)
+        let copy = try await MarfaSource.keptCopy(of: try leasedFile(holding: "first"), hash: "sha256:a", name: "a.txt", in: kept, generation: MarfaSource.keptGeneration(of: kept))
 
-        let again = try await MarfaSource.keptCopy(of: try leasedFile(holding: "second"), hash: "sha256:a", name: "a.txt", in: kept)
+        let again = try await MarfaSource.keptCopy(of: try leasedFile(holding: "second"), hash: "sha256:a", name: "a.txt", in: kept, generation: MarfaSource.keptGeneration(of: kept))
 
         #expect(again == copy)
         #expect(try String(contentsOf: again, encoding: .utf8) == "first")
@@ -50,7 +50,7 @@ import Testing
         let missing = folder.url.appending(path: "missing")
 
         await #expect(throws: (any Error).self) {
-            try await MarfaSource.keptCopy(of: missing, hash: "sha256:a", name: "a.txt", in: kept)
+            try await MarfaSource.keptCopy(of: missing, hash: "sha256:a", name: "a.txt", in: kept, generation: MarfaSource.keptGeneration(of: kept))
         }
 
         let names = (try? FileManager.default.contentsOfDirectory(atPath: kept.appending(path: "sha256:a").path)) ?? []
@@ -63,8 +63,33 @@ import Testing
         #expect(MarfaSource.keptName(title: ".hidden/name:x", mimeType: nil) == "hidden-name-x")
     }
 
+    /// A file whose fetch began before its library's files were removed, as on a disconnect, is not kept after them.
+    @Test func aFileFetchedBeforeItsLibraryWasLeftIsNotKept() async throws {
+        let generation = MarfaSource.keptGeneration(of: kept)
+        await MarfaSource.removeKeptCopies(in: kept)
+
+        await #expect(throws: CancellationError.self) {
+            try await MarfaSource.keptCopy(of: try leasedFile(holding: "late"), hash: "sha256:a", name: "a.txt", in: kept, generation: generation)
+        }
+        #expect(!FileManager.default.fileExists(atPath: kept.path))
+    }
+
+    /// Removing one library's files leaves another's, and a fetch for the other still keeps its file.
+    @Test func removingOneLibrarysFilesLeavesAnothers() async throws {
+        let other = folder.url.appending(path: "Other Files", directoryHint: .isDirectory)
+        let theirs = try await MarfaSource.keptCopy(
+            of: try leasedFile(holding: "theirs"), hash: "sha256:b", name: "b.txt", in: other, generation: MarfaSource.keptGeneration(of: other))
+        let generation = MarfaSource.keptGeneration(of: other)
+
+        await MarfaSource.removeKeptCopies(in: kept)
+
+        #expect(FileManager.default.fileExists(atPath: theirs.path))
+        let late = try await MarfaSource.keptCopy(of: try leasedFile(holding: "late"), hash: "sha256:c", name: "c.txt", in: other, generation: generation)
+        #expect(late.path.hasPrefix(other.path))
+    }
+
     @Test func keptCopiesAreRemovedTogether() async throws {
-        let copy = try await MarfaSource.keptCopy(of: try leasedFile(holding: "bytes"), hash: "sha256:a", name: "a.txt", in: kept)
+        let copy = try await MarfaSource.keptCopy(of: try leasedFile(holding: "bytes"), hash: "sha256:a", name: "a.txt", in: kept, generation: MarfaSource.keptGeneration(of: kept))
 
         await MarfaSource.removeKeptCopies(in: kept)
 

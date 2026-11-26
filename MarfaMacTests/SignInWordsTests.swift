@@ -57,7 +57,7 @@ import Testing
         let bench = HostBench()
         let host = MarfaHost(
             defaults: bench.defaults, signIns: signIns, location: bench.location, opener: bench.servers.opener,
-            describer: bench.servers.describer, cleaner: {})
+            describer: bench.servers.describer, cleaner: { _ in })
         let model = MarfaSettingsModel(host: host)
         for (address, title) in [
             ("https://marfa.invalid", "Can’t Find the Server"),

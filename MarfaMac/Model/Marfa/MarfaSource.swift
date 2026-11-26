@@ -1,5 +1,6 @@
 import Foundation
 import Marfa
+import Synchronization
 import UniformTypeIdentifiers
 
 /// The writes a copy holds that the server has not taken, by their queue ids, so what the person agrees to lose
@@ -65,6 +66,8 @@ nonisolated final class MarfaSource: ItemSource {
     let embeds: any EmbedResolver
     let copy: WorkingCopy
     let downloadedFiles: (any DownloadedFiles)?
+    /// Where the files this library opens are kept (`keptFiles(for:)`), apart from every other library's.
+    let keptFolder: URL
     let hub = MarfaHub()
     let engine: MarfaEngine
     let events: MarfaEngine.Events
@@ -74,10 +77,12 @@ nonisolated final class MarfaSource: ItemSource {
 
     /// `parentLinks` is where the engine keeps its new items' parent links across a relaunch, or nil for memory.
     init(copy: WorkingCopy, connection: MarfaConnection,
-         reading: (any MarfaReading)? = nil, refreshing: (any MarfaRefreshing)? = nil, parentLinks: URL? = nil) {
+         reading: (any MarfaReading)? = nil, refreshing: (any MarfaRefreshing)? = nil, parentLinks: URL? = nil,
+         keptFolder: URL = MarfaSource.keptFiles(for: "Sample")) {
         self.copy = copy
+        self.keptFolder = keptFolder
         counting = MarfaCounts(copy: copy)
-        let downloads = MarfaDownloads(copy: copy)
+        let downloads = MarfaDownloads(copy: copy, keptFolder: keptFolder)
         downloadedFiles = downloads
         self.connection = connection
         let (stream, continuation) = AsyncStream<MarfaEngine.Event>.makeStream()
@@ -124,7 +129,8 @@ nonisolated final class MarfaSource: ItemSource {
         let refreshing = MarfaRefresh(copy: copy, scopes: { try? signIns.scopes(for: connection) })
         let source = MarfaSource(
             copy: copy, connection: connection, refreshing: refreshing,
-            parentLinks: location.directory(for: connection).appending(path: "New Item Parent Links.json"))
+            parentLinks: location.directory(for: connection).appending(path: "New Item Parent Links.json"),
+            keptFolder: keptFiles(for: location.directory(for: connection).lastPathComponent))
         source.events.yield(.paint)
         return source
     }
@@ -269,9 +275,13 @@ nonisolated final class MarfaSource: ItemSource {
         #if DEBUG
         if let url = await SampleGallery.url(forBlob: hash) { return url }
         #endif
+        // Read before the fetch, so a file that arrives after its library was disconnected is not kept.
+        let generation = Self.keptGeneration(of: keptFolder)
         do {
-            return try await MarfaEngine.asking {
-                try await copy.blobs.withFile(hash) { try await Self.keptCopy(of: $0, hash: hash, name: name) }
+            return try await MarfaEngine.asking { [keptFolder] in
+                try await copy.blobs.withFile(hash) {
+                    try await Self.keptCopy(of: $0, hash: hash, name: name, in: keptFolder, generation: generation)
+                }
             }
         } catch let error as MarfaError {
             throw SourceFailure(kind: .failed, message: Self.fetchFailure(error))
@@ -290,9 +300,14 @@ nonisolated final class MarfaSource: ItemSource {
         }
     }
 
-    /// Where kept copies are, under this copy's temporary folder so another copy never clears them, and cleared when
-    /// the library is disconnected or its downloads are removed.
+    /// Where kept copies are, under this copy's temporary folder so another copy of the app never clears them.
     nonisolated static let keptFiles = AppPaths.temporary("Marfa Files")
+
+    /// Where the library whose copy is in `folder` keeps its files, cleared when that library is disconnected or its
+    /// downloads are removed, so leaving one Marfa never clears another's.
+    nonisolated static func keptFiles(for folder: String) -> URL {
+        keptFiles.appending(path: folder, directoryHint: .isDirectory)
+    }
 
     /// The file's title as a name on disk, with the extension its type has where the title has none, since the
     /// page, Open and the Finder all tell a file's kind by its extension.
@@ -305,12 +320,23 @@ nonisolated final class MarfaSource: ItemSource {
         return "\(name).\(ext)"
     }
 
+    /// How many times each library's kept files were removed. A fetch that began before a removal keeps nothing after it,
+    /// and the lock is held for the removal and for placing a file, so neither happens halfway through the other.
+    private nonisolated static let keptRemovals = Mutex<[URL: Int]>([:])
+
+    /// A token for what `folder` holds now, to give `keptCopy` with a fetch's file.
+    nonisolated static func keptGeneration(of folder: URL) -> Int {
+        keptRemovals.withLock { $0[folder] ?? 0 }
+    }
+
     /// The package keeps a fetched file from cache trimming only while `withFile` runs, and the views read the file
-    /// long after, so its bytes are copied out into a folder named by their hash, which names them whole.
-    @concurrent static func keptCopy(of file: URL, hash: String, name: String, in folder: URL = keptFiles) async throws -> URL {
+    /// long after, so its bytes are copied out into a folder named by their hash, which names them whole. Where
+    /// `folder` was emptied since `generation` was read, nothing is kept and `CancellationError` is thrown.
+    @concurrent static func keptCopy(of file: URL, hash: String, name: String, in folder: URL, generation: Int) async throws -> URL {
         let manager = FileManager.default
         let directory = folder.appending(path: hash, directoryHint: .isDirectory)
         let kept = directory.appending(path: name, directoryHint: .notDirectory)
+        guard keptGeneration(of: folder) == generation else { throw CancellationError() }
         if manager.fileExists(atPath: kept.path) { return kept }
         try manager.createDirectory(at: directory, withIntermediateDirectories: true)
         // Copied beside and moved in whole, so a copy cut short is never taken for the file. The partial copy's
@@ -320,7 +346,10 @@ nonisolated final class MarfaSource: ItemSource {
         do {
             // Read-only, so an app Open hands it to offers a duplicate rather than saving over Marfa's file.
             try manager.setAttributes([.posixPermissions: 0o444], ofItemAtPath: partial.path)
-            try manager.moveItem(at: partial, to: kept)
+            try keptRemovals.withLock { removals in
+                guard (removals[folder] ?? 0) == generation else { throw CancellationError() }
+                try manager.moveItem(at: partial, to: kept)
+            }
         } catch {
             try? manager.removeItem(at: partial)
             if !manager.fileExists(atPath: kept.path) { throw error }
@@ -328,9 +357,13 @@ nonisolated final class MarfaSource: ItemSource {
         return kept
     }
 
-    /// Clears every kept copy, so files fetched for a library don't outlast it on this Mac.
-    @concurrent static func removeKeptCopies(in folder: URL = keptFiles) async {
-        try? FileManager.default.removeItem(at: folder)
+    /// Clears a library's kept copies, so files fetched for it don't outlast it on this Mac. A fetch still on its way
+    /// keeps nothing when it ends (`keptGeneration(of:)`).
+    @concurrent static func removeKeptCopies(in folder: URL) async {
+        keptRemovals.withLock { removals in
+            removals[folder, default: 0] += 1
+            try? FileManager.default.removeItem(at: folder)
+        }
     }
 
     /// Read from the copy alone, so a view lists only what the copy holds, which is every item the library holds.
