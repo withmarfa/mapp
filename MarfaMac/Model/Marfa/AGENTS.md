@@ -52,9 +52,11 @@
 
 ## Connecting
 
-- **`MarfaHost` owns the connection:** the address in defaults, the sign-in in the Keychain. Each address has its own copy (`MarfaStoreLocation`).
-- **An address is read as entered.** `https://host` and `https://host:443` are two copies; `sameServer(as:)` only offers Sign In Again.
-- **Plain http to another machine is told once a run** (`Server.plainHTTPOrigin`). App Transport Security has no exception.
+- **`MarfaHost` owns the connection:** the address in defaults, the sign-in in the Keychain. A Marfa has one copy, found by its origin (`MarfaStoreLocation`, `MarfaCopies`).
+- **A Marfa is known by the instance it says it is,** read unsigned (`MarfaHost+Copies.swift`). Another origin opens its copy only then, with its own sign-in; another instance gets a new copy.
+- **Another copy of the open Marfa is sent from its own store,** never merged, and removed once its queue is empty (`sendOtherCopies`).
+- **A discard mark names its copy's folder,** not the address (`bindDiscardMarks`).
+- **Plain http to another machine is told once a run** (`Server.plainHTTPOrigin`). No App Transport Security exception.
 - **`SignIns` keeps the sign-in** (`ScriptedSignIns` in tests) and asks for what `SystemSignIns.scopes` lists. An `http_<n>` refusal means there is no Marfa server.
 
 ## Server calls

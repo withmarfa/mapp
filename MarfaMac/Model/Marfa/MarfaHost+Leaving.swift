@@ -61,7 +61,7 @@ extension MarfaHost {
         _ connection: MarfaConnection, agreed: Agreed?, choice: DisconnectChoice?, forgettingAddress: Bool = true
     ) -> PriorMark? {
         guard case .discardCopy = choice, let agreed else { return nil }
-        let prior = PriorMark(agreed: discarded[connection.address.absoluteString])
+        let prior = PriorMark(agreed: discardMark(for: connection))
         if forgettingAddress { defaults.removeObject(forKey: Self.addressKey) }
         markDiscarded(connection, agreed: agreed)
         return prior
@@ -106,19 +106,46 @@ extension MarfaHost {
         return approvalAt.map { .notRevoked(address: $0) }
     }
 
+    /// The mark of each copy the person discarded but which could not be removed, by the copy's folder.
     var discarded: [String: Agreed] {
         (defaults.dictionary(forKey: Self.discardedKey) ?? [:]).mapValues(Agreed.init(stored:))
     }
 
+    /// The mark of the copy `connection` opens now.
+    func discardMark(for connection: MarfaConnection) -> Agreed? {
+        discarded[location.directory(for: connection).lastPathComponent]
+    }
+
+    /// Marks the copy `connection` opens now. A mark names the copy's folder, never the address, so the address
+    /// opening another Marfa's copy later neither takes the mark nor leaves this copy unmarked.
     func markDiscarded(_ connection: MarfaConnection, agreed: Agreed?) {
         var marks = defaults.dictionary(forKey: Self.discardedKey) ?? [:]
-        marks[connection.address.absoluteString] = agreed?.stored
+        marks[location.directory(for: connection).lastPathComponent] = agreed?.stored
         defaults.set(marks, forKey: Self.discardedKey)
+    }
+
+    /// Binds each mark an older build made under an address to the folder that address opens, before anything can
+    /// change which folder that is. Two marks for one folder agree to lose what either listed. A key that is no
+    /// address stays as it is.
+    func bindDiscardMarks() {
+        guard let marks = defaults.dictionary(forKey: Self.discardedKey) else { return }
+        var bound: [String: Any] = [:]
+        for (key, stored) in marks {
+            guard key.contains("://"), let connection = try? MarfaConnection(address: key, completing: false) else {
+                bound[key] = stored
+                continue
+            }
+            let folder = location.directory(for: connection).lastPathComponent
+            let earlier = bound[folder].map(Agreed.init(stored:))?.ids ?? []
+            bound[folder] = Agreed(ids: earlier.union(Agreed(stored: stored).ids)).stored
+        }
+        guard !NSDictionary(dictionary: bound).isEqual(to: marks) else { return }
+        defaults.set(bound, forKey: Self.discardedKey)
     }
 
     /// A copy the person discarded is removed before its address is opened again, or not opened at all.
     func clearDiscarded(_ connection: MarfaConnection) async throws(Problem) {
-        guard let agreed = discarded[connection.address.absoluteString] else { return }
+        guard let agreed = discardMark(for: connection) else { return }
         switch await removeCopy(connection, agreed: agreed) {
         case .removed:
             markDiscarded(connection, agreed: nil)
@@ -156,11 +183,15 @@ extension MarfaHost {
     /// between the read and the removal is read and asked again, once.
     func removeCopy(_ connection: MarfaConnection, agreed: Agreed, retrying: Bool = false) async -> Removal {
         let directory = location.directory(for: connection)
+        // Recorded first, so every spelling of the origin still names this folder, and its mark, once it is gone.
+        try? location.copies.change { $0.origins[MarfaCopies.origin(of: connection)] = directory.lastPathComponent }
         do {
             try await remover(location.store(for: connection), agreed)
             // The package removes the copy's files and leaves the folder that held them, which it releases its
             // lock on first: the folder goes only if it is empty, so a copy opened in the gap is never taken with it.
             try await Self.offMain { try Self.removeIfEmpty(directory) }
+            // A copy made at this folder again is filled from whichever Marfa answers then.
+            try? location.copies.change { $0.instances[directory.lastPathComponent] = nil }
             return .removed
         } catch MarfaError.readingHandle, MarfaError.storeBusy {
             return .failed(Words.inUse)

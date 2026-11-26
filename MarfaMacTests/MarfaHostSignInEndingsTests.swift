@@ -278,12 +278,11 @@ import Testing
         #expect(!bench.signIns.calls.contains { $0.hasPrefix("signOut") }, "\(bench.signIns.calls)")
         #expect(source.given == ["new"])
         #expect(host.connection?.address.absoluteString == "https://marfa.test")
-        #expect(!bench.hasCopy(host443), "no copy was made for the other spelling")
+        #expect(bench.location.folders().count == 1, "no copy was made for the other spelling")
     }
 
-    /// A copy kept under one spelling stays as it is, with its writes, when the other spelling is connected: that is its
-    /// own copy, opened empty.
-    @Test func aKeptCopyIsNotReachedByTheOtherSpelling() async throws {
+    /// A copy kept under one spelling is the copy the other spelling opens, with its writes.
+    @Test func aKeptCopyIsOpenedByTheOtherSpellingWithItsWrites() async throws {
         let bench = HostBench()
         bench.servers.storedWrites.withLock { $0 = 2 }
         let host = bench.host()
@@ -295,22 +294,26 @@ import Testing
 
         try await host.connect(address: "https://marfa.test", key: "again")
         let source = try #require(bench.servers.last)
-        let other = try MarfaConnection(address: "https://marfa.test")
-        #expect(source.connection == other)
-        #expect(bench.hasCopy(other))
-        #expect(try await source.storeWrites.isEmpty, "the other spelling opened its own copy")
-        #expect(try await WorkingCopy.unsentWrites(in: keptStore).writes.count == 2, "the kept copy and its queue are untouched")
+        #expect(source.connection == (try MarfaConnection(address: "https://marfa.test")))
+        #expect(source.store.withLock { $0 } == keptStore)
+        #expect(try await source.storeWrites.count == 2, "the kept queue is the one opened")
+        #expect(bench.location.folders().count == 1)
         #expect(bench.savedAddress == "https://marfa.test")
     }
 
-    /// A discard mark names the spelling it was made under only.
-    @Test func aDiscardMarkIsNotHonouredUnderTheOtherSpelling() async throws {
+    /// A discard mark made under one spelling is honoured under the other: it names the copy, not the text.
+    @Test func aDiscardMarkIsHonouredUnderTheOtherSpelling() async throws {
         let bench = HostBench()
+        let folder = bench.location.directory(for: host443)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let copy = try await WorkingCopy.open(store: bench.location.store(for: host443))
+        await copy.close()
         let host = bench.host()
         let other = try MarfaConnection(address: "https://marfa.test")
         host.markDiscarded(host443, agreed: MarfaHost.Agreed(ids: []))
         try await host.clearDiscarded(other)
-        #expect(bench.defaults.dictionary(forKey: "MarfaDiscardedCopies")?["https://marfa.test:443"] != nil)
+        #expect(bench.defaults.dictionary(forKey: "MarfaDiscardedCopies")?.isEmpty != false)
+        #expect(!FileManager.default.fileExists(atPath: folder.path))
     }
 
     // MARK: Nothing raw after a sign-in

@@ -108,7 +108,8 @@ import Testing
             $0 = { seen.withLock { $0 = UserDefaults(suiteName: suite)?.dictionary(forKey: "MarfaDiscardedCopies") as? [String: [String]] ?? [:] } }
         }
         try await host.disconnect()
-        #expect(seen.withLock { $0 } == ["http://first.test:8210": []], "marked with the ids of the changes agreed to be lost")
+        let folder = bench.location.directory(for: try MarfaConnection(address: "http://first.test:8210")).lastPathComponent
+        #expect(seen.withLock { $0 } == [folder: []], "marked with the ids of the changes agreed to be lost")
         #expect(bench.defaults.dictionary(forKey: "MarfaDiscardedCopies")?.isEmpty ?? true)
         #expect(!bench.hasCopy(first))
     }
