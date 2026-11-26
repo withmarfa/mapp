@@ -72,6 +72,21 @@ struct ShortcutTests {
         #expect(ShortcutBindings(defaults: store).shortcut(for: .newItem)?.display == "⌃⌘N")
     }
 
+    @Test func aNewDefaultNeverTakesAKeyThePersonGaveAnotherCommand() {
+        let store = defaults()
+        let bindings = ShortcutBindings(defaults: store)
+        let option: ShortcutModifiers = [.command, .option]
+        #expect(bindings.shortcut(for: .copyFilePath) == key("c", option))
+        bindings.set(key("c", option), for: .refresh)
+        #expect(bindings.shortcut(for: .refresh) == key("c", option))
+        #expect(bindings.shortcut(for: .copyFilePath) == nil, "the person's binding wins and the new command starts with none")
+        #expect(bindings.holder(of: key("c", option), besides: .copyFilePath) == .command(.refresh))
+        #expect(ShortcutBindings(defaults: store).shortcut(for: .copyFilePath) == nil, "also after a relaunch")
+        bindings.restoreDefaults()
+        #expect(bindings.shortcut(for: .copyFilePath) == key("c", option))
+        #expect(bindings.shortcut(for: .refresh) == key("r"))
+    }
+
     @Test func aClearedShortcutStaysClearedAndTheDefaultComesBackOnRestore() {
         let store = defaults()
         let bindings = ShortcutBindings(defaults: store)

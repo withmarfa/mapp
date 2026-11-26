@@ -3740,6 +3740,9 @@
     "Click the map to place the pin." : {
       "extractionState" : "manual"
     },
+    "Clipboard Not Changed" : {
+
+    },
     "Clock" : {
 
     },
@@ -12470,6 +12473,9 @@
     },
     "Your sign-in is sent to %@ without encryption, so anyone on the network can read it. Use an https address unless this network is private." : {
       "extractionState" : "manual"
+    },
+    "Your unsaved text is still on the clipboard, so nothing was copied over it. Paste it back or answer its alert, then try again." : {
+
     },
     "Yours" : {
 

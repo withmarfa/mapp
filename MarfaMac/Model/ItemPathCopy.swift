@@ -12,10 +12,12 @@ extension ItemLibrary {
     }
 
     /// Copies the path of each chosen file item's file, fetched first, one to a line in the order given. An item that
-    /// is not a file is left out and the person is told how many; with no file to copy, or if the pasteboard changed
-    /// while the files were fetched, it is left as it was.
+    /// is not a file is left out and the person is told how many, and counts nothing against the limit; with no file to
+    /// copy, or if the pasteboard changed while the files were fetched, it is left as it was.
     func copyFilePaths(of ids: [ItemID], to pasteboard: NSPasteboard = .general) async {
-        guard ids.count <= ItemPathLimit.items else {
+        guard mayWriteClipboard() else { return }
+        let files = ids.filter { item($0)?.isFile == true }
+        guard files.count <= ItemPathLimit.items else {
             notices.tell(
                 String(localized: "Too Many Items for Paths"),
                 String(localized: "Copy File Paths takes up to \(ItemPathLimit.items) items at once, because each file is fetched. Choose fewer items."))
@@ -23,13 +25,9 @@ extension ItemLibrary {
         }
         let before = pasteboard.changeCount
         var paths: [String] = []
-        var skipped = 0
+        var skipped = ids.count - files.count
         var failure: String?
-        for id in ids {
-            guard item(id)?.isFile == true else {
-                skipped += 1
-                continue
-            }
+        for id in files {
             do {
                 if let url = try await fileURL(of: id) { paths.append(url.path) } else { skipped += 1 }
             } catch {

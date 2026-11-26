@@ -466,6 +466,7 @@ struct CommandPalette: View {
         case .copyWikiLink:
             close()
             Task {
+                guard library.mayWriteClipboard() else { return }
                 if let link = await library.bodyLink(to: id, in: nil) {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(link, forType: .string)

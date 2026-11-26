@@ -32,6 +32,9 @@ nonisolated enum SampleLibrary {
         }
     }
 
+    /// Whether the launch opens the Collections place of a library with no collection, which no item will ever fill.
+    static var opensEmptyCollections: Bool { argument(after: "-MarfaMacOpenPlace") == "collections" && collections.isEmpty }
+
     static var launchLayout: ItemViewMode? { argument(after: "-MarfaMacLayout").flatMap(ItemViewMode.init(rawValue:)) }
 
     /// Forgets what an earlier run chose and the defaults kept, so a sample launch opens as a first launch does: the

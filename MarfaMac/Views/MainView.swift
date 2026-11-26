@@ -436,7 +436,7 @@ struct MainView: View {
                 if let place = SampleLibrary.launchPlace {
                     // A type with no item yet has no place to stay on, so a server's copy still filling is waited for.
                     let scope = PlaceDefaults.favoritesScope(in: UserDefaults.standard.data(forKey: PlaceDefaults.key))
-                    for _ in 0..<60 where library.count(in: place, favoritesScope: scope) == 0 { try? await Task.sleep(for: .milliseconds(500)) }
+                    for _ in 0..<60 where !SampleLibrary.opensEmptyCollections && library.count(in: place, favoritesScope: scope) == 0 { try? await Task.sleep(for: .milliseconds(500)) }
                     // As a sidebar row does: the place's first item, not the page the restore left beside it.
                     browser.show(place, in: library, order: order)
                 }

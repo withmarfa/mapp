@@ -71,6 +71,42 @@ struct ItemPathCopyTests {
         #expect(library.notices.waiting.first?.message == "The server can’t be reached.")
     }
 
+    @Test func fileItemsAloneCountAgainstTheLimit() async {
+        let library = FakeItemLibrary()
+        let host = library.add("A note\n")
+        let file = library.attachPicture(picture, to: host.id)
+        let others = (0..<ItemPathLimit.items).map { _ in library.add("Another\n").id }
+        let pasteboard = privatePasteboard()
+        defer { pasteboard.releaseGlobally() }
+        await library.copyFilePaths(of: [file] + others, to: pasteboard)
+        #expect(pasteboard.string(forType: .string) == "/tmp/kept/Celadon.png")
+        #expect(library.notices.waiting.map(\.title) == ["Some Paths Not Copied"])
+    }
+
+    @Test func noCopyCommandWritesOverTextNotKeptThatIsOnTheClipboard() async throws {
+        let library = FakeItemLibrary()
+        library.heldInstanceID = "3f2504e0-4f89-41d3-9a0c-0305e82c3301"
+        let host = library.add("A note\n")
+        let file = library.attachPicture(picture, to: host.id)
+        library.notices.notKept("Couldn’t Save “Trip”", text: "Book the hotel")
+        let window = UUID()
+        _ = library.notices.show(in: window, copying: { _ in })
+        library.notices.released(by: window)
+        let pasteboard = privatePasteboard()
+        defer { pasteboard.releaseGlobally() }
+        pasteboard.setString("Book the hotel", forType: .string)
+        await library.copyFilePaths(of: [file], to: pasteboard)
+        await library.copyLink(of: host.id, to: pasteboard)
+        await library.copyLinks(of: [host.id, file], to: pasteboard)
+        #expect(pasteboard.string(forType: .string) == "Book the hotel")
+        #expect(library.notices.waiting.map(\.title) == ["Couldn’t Save “Trip”", "Clipboard Not Changed"])
+
+        // Once the person has answered, copying works again.
+        library.notices.answered(library.notices.waiting[0].id)
+        await library.copyFilePaths(of: [file], to: pasteboard)
+        #expect(pasteboard.string(forType: .string) == "/tmp/kept/Celadon.png")
+    }
+
     @Test func theCommandAppliesOnlyWhereAChosenItemIsAFile() {
         let library = FakeItemLibrary()
         let note = library.add("A note\n")

@@ -24,6 +24,7 @@ nonisolated enum ItemLinkLimit {
 extension ItemLibrary {
     /// Keep the current pasteboard contents if the link can't be built, or if they changed while it was read.
     func copyLink(of id: ItemID, to pasteboard: NSPasteboard = .general) async {
+        guard mayWriteClipboard() else { return }
         let before = pasteboard.changeCount
         guard let link = await itemLink(id) else {
             notices.tell(
@@ -61,6 +62,7 @@ extension ItemLibrary {
     /// told how many items had none; with none to copy, or if the pasteboard changed while they were read, it is left as
     /// it was.
     func copyLinks(of ids: [ItemID], to pasteboard: NSPasteboard = .general) async {
+        guard mayWriteClipboard() else { return }
         let before = pasteboard.changeCount
         guard let found = await links(of: ids) else { return }
         guard !found.links.isEmpty else {

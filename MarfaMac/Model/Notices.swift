@@ -87,6 +87,9 @@ import Observation
         return notice
     }
 
+    /// Whether a window has shown the notice, so its text has gone to the clipboard.
+    func isShown(_ id: Notice.ID) -> Bool { shown.contains(id) }
+
     /// The window closed, or stopped showing its notice without an answer, so another window can show it.
     func released(by window: UUID) {
         if shownIn == window { shownIn = nil }
