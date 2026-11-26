@@ -720,9 +720,14 @@ extension Browser {
 
     /// A day of the timeline as drawn, or the part of one.
     nonisolated struct DrawnDay: Identifiable, Sendable {
+        struct ID: Hashable, Sendable {
+            let run: Int
+            let day: ItemTimelineGroup.ID
+        }
+
         let group: ItemTimelineGroup
         let part: ListDrawn.Part
-        var id: String { "\(part.run):\(group.id)" }
+        var id: ID { ID(run: part.run, day: group.id) }
     }
 
     nonisolated struct SectionsChoices: Equatable, Sendable {

@@ -107,11 +107,12 @@ extension MarfaLibrary {
         if let held = listed[key], held.content == content || canPatch(key, since: held.content) { return nil }
         let ids = members(of: key)
         guard ids.count > limit else { return nil }
-        let items = ids.compactMap { records[$0]?.listedItem }
+        let snapshots = index.items
         let positions: [ItemID: Double]?
         if case .collection(let id) = key.place, !key.favorites { positions = self.positions(in: id) }
         else { positions = nil }
         return DeferredListing(make: {
+            let items = ids.compactMap { snapshots[$0] }
             if let positions { return Self.orderMembers(items, at: positions) }
             return Self.ordered(items)
         }, take: { [weak self] items in

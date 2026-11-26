@@ -21,7 +21,6 @@ struct ItemMap: View {
             canvas(placing)
         } else {
             PlaceProgress()
-                .task { controller.prepare(style: browser.mapStyle) }
         }
     }
 

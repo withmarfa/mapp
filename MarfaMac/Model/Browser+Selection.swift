@@ -149,6 +149,8 @@ extension Browser {
     /// keeps whichever are still there. If none are, it moves to the item that followed them, or failing that
     /// the one before, as Notes and Mail do.
     static func selection(_ selection: Set<ItemID>, keptFrom old: [ItemID], in new: [ItemID]) -> Set<ItemID> {
+        guard !selection.isEmpty else { return [] }
+        if selection.count == 1, let id = selection.first, new.contains(id) { return selection }
         let visible = Set(new)
         let kept = selection.intersection(visible)
         guard kept.isEmpty, let first = old.firstIndex(where: selection.contains) else { return kept }

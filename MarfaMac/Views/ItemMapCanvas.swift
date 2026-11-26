@@ -105,8 +105,7 @@ final class MapController: NSObject, MKMapViewDelegate {
         syncSelection(inputs.browser.selection)
     }
 
-    /// Sets up the native view before the first placement asks it to draw.
-    func prepare(style: ItemMapStyle) {
+    private func prepare(style: ItemMapStyle) {
         guard self.style != style else { return }
         self.style = style
         mapView.preferredConfiguration = Self.configuration(for: style)

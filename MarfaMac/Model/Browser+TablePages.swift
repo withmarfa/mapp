@@ -60,7 +60,7 @@ extension Browser {
             case .timeline: count = timelineWork.held?.value.positions.count ?? 0
             default: count = 0
             }
-            return ListDrawn(head: count > Self.arrangesAlongsideAbove ? 80 : Self.listPage)
+            return ListDrawn(head: count > Self.arrangesAlongsideAbove ? 40 : Self.listPage)
         }
         return held.drawn
     }

@@ -388,14 +388,20 @@ extension NSView {
     /// The table a background view sits behind: the first, going outwards, whose scroll view covers the view's centre.
     func nearestTable() -> NSTableView? {
         let centre = convert(NSPoint(x: bounds.midX, y: bounds.midY), to: nil)
+        func firstTable(in view: NSView) -> NSTableView? {
+            for child in view.subviews {
+                if let table = child as? NSTableView {
+                    let area = table.enclosingScrollView ?? table
+                    if area.convert(area.bounds, to: nil).contains(centre) { return table }
+                } else if let table = firstTable(in: child) {
+                    return table
+                }
+            }
+            return nil
+        }
         var ancestor = superview
         while let view = ancestor {
-            if let table = Self.tables(in: view).first(where: { table in
-                let area = table.enclosingScrollView ?? table
-                return area.convert(area.bounds, to: nil).contains(centre)
-            }) {
-                return table
-            }
+            if let table = firstTable(in: view) { return table }
             ancestor = view.superview
         }
         return nil

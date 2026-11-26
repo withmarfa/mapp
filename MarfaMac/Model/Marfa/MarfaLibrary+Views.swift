@@ -101,9 +101,13 @@ extension MarfaLibrary {
         let content = contentRevision
         let revision = viewRevision
         if let held = orderedView, held.content == content, held.hits == hits { return nil }
-        let items = hits.compactMap(viewItem)
-        guard items.count > limit else { return nil }
-        return DeferredListing(make: { Self.ordered(items) }, take: { [weak self] items in
+        let snapshots = index.items
+        return DeferredListing(make: {
+            Self.ordered(hits.compactMap { id in
+                guard let item = snapshots[id], item.state != .trashed else { return nil }
+                return item
+            })
+        }, take: { [weak self] items in
             guard let self, contentRevision == content, viewRevision == revision else { return }
             orderedView = (content, hits, items)
         })
