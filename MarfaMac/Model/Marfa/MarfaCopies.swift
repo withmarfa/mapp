@@ -11,6 +11,9 @@ nonisolated final class MarfaCopies: Sendable {
         var origins: [String: String] = [:]
         /// The instance each copy folder was read or verified to hold.
         var instances: [String: String] = [:]
+        /// The folder each library name an earlier build gave by address (`marfa:<address>`) was first read as, so its
+        /// settings stay that copy's wherever the address later opens (`MarfaHost.currentLibraryKey`).
+        var addresses: [String: String] = [:]
     }
 
     enum Failure: Error, Equatable {
@@ -84,8 +87,13 @@ nonisolated final class MarfaCopies: Sendable {
         }
     }
 
-    /// Puts the record back to `earlier`, for a step that did not finish.
+    /// Puts the record back to `earlier`, for a step that did not finish, but for the folders addresses were first
+    /// read as, which are never read again.
     func restore(_ earlier: Record) {
-        try? change { $0 = earlier }
+        try? change { record in
+            let addresses = record.addresses
+            record = earlier
+            record.addresses.merge(addresses) { _, kept in kept }
+        }
     }
 }

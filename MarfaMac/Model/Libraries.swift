@@ -111,6 +111,7 @@ import MarfaTesting
             defaults: defaults, domain: domain, enabled: syncsPreferences, restorePoints: restorePoints,
             library: { [host] in host.libraryKey(for: host.configuredConnection) },
             refusedShortcuts: { [anyAppShortcuts] in Set(anyAppShortcuts.refused.map(\.rawValue)) },
+            unsettled: { [librarySettings] library in librarySettings.unsettled[library] ?? [] },
             reload: { [sidebarLayouts, typeLooks, searchLeaveOuts, shortcuts, anyAppShortcuts, automaticExport] in
                 sidebarLayouts.reload()
                 typeLooks.reload()

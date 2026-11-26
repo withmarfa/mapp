@@ -241,9 +241,10 @@ import os
     }
 
     /// The name the library whose settings are kept under `stored` has now (`LibrarySettings.settle`), or nil where it
-    /// is that name or no library's. An earlier build's name is the address as typed, read as the folder that address
-    /// opens now, so the settings move before anything can give the address another folder; both spellings of its
-    /// origin name the one folder (`bindOrigin`).
+    /// is that name, no library's, or not yet known. An earlier build's name is the address as typed, read as the folder
+    /// that address opened when the name was first read, and kept so (`MarfaCopies.Record.addresses`): the address can
+    /// later open another Marfa's copy, which never takes these settings. Both spellings of an origin are first read as
+    /// the one folder (`bindOrigin`). A name whose folder cannot be kept is not moved.
     func currentLibraryKey(forStored stored: String) -> String? {
         guard stored.hasPrefix("marfa:") else { return nil }
         let name = String(stored.dropFirst("marfa:".count))
@@ -251,8 +252,18 @@ import os
         if name.hasPrefix(Self.copyPrefix) {
             folder = String(name.dropFirst(Self.copyPrefix.count))
         } else if name.contains("://"), let connection = try? MarfaConnection(address: name, completing: false) {
-            bindOrigin(of: connection)
-            folder = location.directory(for: connection).lastPathComponent
+            if let pinned = location.copies.current.addresses[stored] {
+                folder = pinned
+            } else {
+                bindOrigin(of: connection)
+                let first = location.directory(for: connection).lastPathComponent
+                do {
+                    try location.copies.change { $0.addresses[stored] = first }
+                } catch {
+                    return nil
+                }
+                folder = first
+            }
         } else {
             return nil
         }
