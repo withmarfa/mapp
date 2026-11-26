@@ -82,12 +82,13 @@ struct ItemList: View, Equatable {
         .dragContainer(for: ItemReference.self) { ids in ids.map(library.dragReference(of:)) }
         .dragsSelection(of: browser)
         .onChange(of: ids) { old, new in
-            browser.keepSelection(from: old, to: new, isPending: isPending)
+            browser.keepSelection(from: old, to: new, isPending: isPending, holds: arrangement.holds)
         }
         .background(ChosenItemDrawn(browser: browser, positions: arrangement.shownPositions))
+        .background(ChosenParentsOpen(browser: browser, nestings: arrangement.nestings, made: arrangement.made))
         // An answer that lists what the waiting list listed (nothing, most often) changes no ids.
         .onChange(of: isPending) { _, isPending in
-            if !isPending { browser.keepHeldSelection(in: ids) }
+            if !isPending { browser.keepHeldSelection(in: ids, holds: arrangement.holds) }
         }
         .contextMenu(forSelectionType: ItemID.self) { ids in
             ItemRowMenu(browser: browser, ids: ids, undoManager: undoManager)
@@ -109,7 +110,7 @@ struct ItemList: View, Equatable {
                 let nest = nesting[line.id]
                 let row = ListLineRow(
                     line: line, content: contents[line.id], density: density, excerpt: excerpts[line.id], browser: browser,
-                    fold: browser.listShape?.arranged == true ? { browser.toggleGroup($0, in: library) } : nil, nest: nest)
+                    fold: browser.listShape?.arranged == true ? { browser.toggleGroup($0, in: library) } : nil, nest: nest, order: order)
                 .selectionDisabled(line.itemID == nil)
                 .listRowSeparator(line.itemID == nil ? .hidden : .automatic, edges: .top)
                 .listRowSeparator(line.endsSection || line.drawsMore != nil ? .hidden : .automatic, edges: .bottom)
@@ -168,6 +169,7 @@ private struct ListLineRow: View {
     var fold: ((String) -> Void)?
     /// Where the item stands among its parents, where the list nests it.
     var nest: ItemNesting.Place?
+    let order: ItemOrder
 
     var body: some View {
         switch line {
@@ -200,7 +202,7 @@ private struct ListLineRow: View {
                 ItemRow(content: content, density: density, excerpt: excerpt, itemID: line.id)
                     .wantsCounts(of: line.id, content.countQueries, in: library.counts)
                     .hoverQuickActions(for: line.id, actions: browser.quickActions(for: item))
-                    .nested(nest, id: line.id, browser: browser)
+                    .nested(nest) { browser.toggleSubItems(of: line.id, in: library, order: order) }
             }
         }
     }
@@ -209,10 +211,10 @@ private struct ListLineRow: View {
 extension View {
     /// A list row under its parent: stood in by its depth, with the chevron of a parent before it (`SubItemDisclosure`).
     /// How many sub-items are done is the type's look's to say, as a progress count, as on a card.
-    @ViewBuilder fileprivate func nested(_ nest: ItemNesting.Place?, id: ItemID, browser: Browser) -> some View {
+    @ViewBuilder fileprivate func nested(_ nest: ItemNesting.Place?, toggle: @escaping () -> Void) -> some View {
         if let nest {
             HStack(spacing: SubItemDisclosure.gap) {
-                SubItemDisclosure(place: nest) { browser.toggleSubItems(of: id) }
+                SubItemDisclosure(place: nest, toggle: toggle)
                 self
             }
             .padding(.leading, CGFloat(nest.depth) * SubItemDisclosure.indent - SubItemDisclosure.width - SubItemDisclosure.gap)
@@ -309,6 +311,22 @@ private enum ListLine: Identifiable {
     .listStyle(.inset)
     .interfaceTextStyle()
     .frame(width: 340, height: 460)
+}
+
+/// Opens the parents above the chosen items, as the list nests them, so a sub-item chosen by Back, a link or a new item
+/// is drawn: when the choice changes, and when the sections it was made in are made again. A view of its own, so the
+/// list does not observe the selection.
+private struct ChosenParentsOpen: View {
+    let browser: Browser
+    let nestings: [ItemNesting]
+    /// The sections the nestings were made with (`ListArrangement.made`).
+    let made: UUID
+
+    var body: some View {
+        Color.clear
+            .onChange(of: browser.selection, initial: true) { browser.openParents(of: browser.selection, in: nestings) }
+            .onChange(of: made) { browser.openParents(of: browser.selection, in: nestings) }
+    }
 }
 
 /// Tracks the cursor or selection in a separate view so a selection change can extend the page

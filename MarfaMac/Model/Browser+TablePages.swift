@@ -37,21 +37,36 @@ extension Browser {
     /// The parents whose sub-items the place shows (`expandedRows`).
     var expandedHere: Set<ItemID> { expandedRows[shown] ?? [] }
 
-    /// Shows or hides the sub-items of `id` in the place.
-    func toggleSubItems(of id: ItemID) {
+    /// Shows or hides the sub-items of `id` in the place, as the table or the list nests them (`subItemNestings`). A chosen
+    /// item the closing hides leaves the choice, which moves to `id` where nothing else stays chosen, so no command acts on
+    /// an item out of sight.
+    func toggleSubItems(of id: ItemID, in library: any ItemLibrary, order: ItemOrder) {
         var open = expandedHere
-        if open.remove(id) == nil { open.insert(id) }
+        if open.remove(id) == nil {
+            open.insert(id)
+        } else {
+            let nestings = subItemNestings(in: library, order: order)
+            let hidden = selection.filter { chosen in nestings.contains { $0.ancestors(of: chosen).contains(id) } }
+            if !hidden.isEmpty {
+                let kept = selection.subtracting(hidden)
+                selectAutomatically(kept.isEmpty ? [id] : kept)
+            }
+        }
         expandedRows[shown] = open
     }
 
-    /// Opens every parent above the chosen items, in the table's nesting, so a sub-item reached by Back, a link or a new
-    /// item is drawn.
-    private func openParents(of ids: Set<ItemID>, in content: ItemTableContent) {
-        let nestings = content.grouping == nil ? [content.nesting] : Array(content.groupNestings.values)
-        guard nestings.contains(where: { !$0.isFlat }) else { return }
+    /// The nestings the place's layout draws its items by: the table's, or the list's sections'.
+    func subItemNestings(in library: any ItemLibrary, order: ItemOrder) -> [ItemNesting] {
+        viewMode == .table ? tableContent(in: library).nestings : arrangement(in: library, order: order, now: library.now()).nestings
+    }
+
+    /// Opens every parent above the chosen items in `nestings`, so a sub-item reached by Back, a link or a new item is
+    /// drawn, in the table and the list alike.
+    func openParents(of ids: Set<ItemID>, in nestings: [ItemNesting]) {
+        guard !ids.isEmpty, nestings.contains(where: { !$0.isFlat }) else { return }
         var open = expandedHere
         for id in ids {
-            for nesting in nestings { open.formUnion(nesting.ancestors(of: id)) }
+            for nesting in nestings where !nesting.isFlat { open.formUnion(nesting.ancestors(of: id)) }
         }
         if open != expandedHere { expandedRows[shown] = open }
     }
@@ -65,7 +80,7 @@ extension Browser {
     /// Loads enough pages to show the selected items the table holds, such as one reached by Back, a link or a new
     /// item. Nothing changes when they are all shown already.
     func revealSelectionInTable(_ content: ItemTableContent) {
-        openParents(of: selection, in: content)
+        openParents(of: selection, in: content.nestings)
         var paging = tablePaging
         paging.reveal(
             selection, rows: content.rows, nesting: content.nesting, groups: content.grouping == nil ? nil : content.groups,

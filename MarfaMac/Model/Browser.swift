@@ -212,6 +212,8 @@ final class Browser {
     /// The list's sections, worked out off the main actor for a large place (`sections(in:order:now:)`).
     @ObservationIgnored var sectionsWork = PlaceWork<SectionsKey, ListArrangement>()
     @ObservationIgnored var digestWork = PlaceWork<SectionsKey, ListArrangement>()
+    /// The list's sections as last nested for the parents open, by the sections they were nested from (`arrangement`).
+    @ObservationIgnored var nestedListMemo: (made: UUID, expanded: Set<ItemID>, value: ListArrangement)?
     /// Counts what landed from work off the main actor besides the table, which a layout reads to draw it.
     var placeWorkLanded = 0
     /// How often the window worked a place's table or list out whole, and how often it updated one, which tests read.

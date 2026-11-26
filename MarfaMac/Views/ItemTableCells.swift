@@ -187,7 +187,7 @@ struct ItemTableCell: View {
     @ViewBuilder private var title: some View {
         if let nest {
             HStack(spacing: SubItemDisclosure.gap) {
-                SubItemDisclosure(place: nest) { browser.toggleSubItems(of: row.id) }
+                SubItemDisclosure(place: nest) { browser.toggleSubItems(of: row.id, in: library, order: order) }
                 name
             }
             // The chevron hangs before the name, in the margin at the top, as a group's does.

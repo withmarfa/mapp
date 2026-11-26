@@ -45,6 +45,13 @@ struct ItemNestingTests {
         #expect(nesting.drawnCount(expanded: [Self.id("a"), Self.id("b"), Self.id("c")]) == 4)
     }
 
+    @Test func anItemBelowACycleStaysUnderIt() {
+        // a and b are each other's parent, d is under a and comes first: the cycle's first member stands at the top.
+        let nesting = Self.nesting([("d", "a"), ("a", "b"), ("b", "a")])
+        #expect(Self.drawn(nesting) == ["a"])
+        #expect(Self.drawn(nesting, open: ["a", "b"]) == ["a", "-d", "-b"])
+    }
+
     @Test func aSubItemIsDrawnOnlyWhereEveryParentAboveIsOpen() {
         let nesting = Self.nesting([("p", nil), ("c", "p"), ("g", "c")])
         #expect(Self.drawn(nesting, open: ["c"]) == ["p"], "an open child under a closed parent stays hidden")
@@ -108,7 +115,7 @@ struct ItemNestingTests {
         let rows = Self.rows([("p", nil), ("c", "p"), ("q", nil), ("elsewhere", "q")])
         let today = ItemSection(group: .today, items: [rows[0].item, rows[1].item, rows[2].item])
         let earlier = ItemSection(group: .yesterday, items: [rows[3].item])
-        let arrangement = ListArrangement(sections: [today, earlier], sorted: nil, content: nil)
+        let arrangement = ListArrangement(sections: [today, earlier], sorted: nil, content: nil).withNestings(in: FakeItemLibrary.testCatalogue)
         let closed = arrangement.nested(expanded: [])
         #expect(closed.ids.map(\.rawValue) == ["p", "q", "elsewhere"], "a child in another section stands at its top")
         #expect(closed.nesting[ItemID("p")]?.children == 1)

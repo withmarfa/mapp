@@ -22,9 +22,7 @@ extension Browser {
         guard !opensInDigest(shown) else { return selectAutomatically([]) }
         // A table's first row is its content's, which the table shares, so a large place is not ordered twice.
         if viewMode == .table, usesCollection {
-            let content = tableContent(in: library)
-            let first = content.grouping == nil ? content.rows.first : content.groups.first { !$0.rows.isEmpty }?.rows.first
-            return selectAutomatically(first.map { [$0.id] } ?? [])
+            return selectAutomatically(tableContent(in: library).firstDrawnID.map { [$0] } ?? [])
         }
         let first = sections(in: library, order: order, now: library.now()).first?.items.first
         selectAutomatically(first.map { [$0.id] } ?? [])
@@ -71,32 +69,40 @@ extension Browser {
             return shown + rest.filter { !isShown.contains($0) }
         }
         let content = tableContent(in: library)
-        // A grouped table shows its rows group by group, not in the sort's order across groups.
-        let shown = (content.grouping == nil ? content.rows : content.groups.flatMap(\.rows)).map(\.id)
+        // A grouped table shows its rows group by group, not in the sort's order across groups, and a sub-item under its
+        // parent; one a closed parent hides stays in reach after the rows drawn.
+        let shown = content.drawnIDs(expanded: expandedHere)
         let isShown = Set(shown)
         return shown + content.allRows.map(\.id).filter { !isShown.contains($0) }
     }
 
     /// Keeps the selection in the list after items leave it or the search changes it (see `selection(_:keptFrom:in:)`).
+    /// A chosen item the list `holds` without drawing, as a sub-item under a closed parent, stays chosen.
     ///
     /// A search not yet answered shows nothing, which says nothing about the selection: it is held, and the answer is
     /// compared with the list as it stood before the search.
-    func keepSelection(from old: [ItemID], to new: [ItemID], isPending: Bool = false) {
+    func keepSelection(from old: [ItemID], to new: [ItemID], isPending: Bool = false, holds: [ItemID: Int] = [:]) {
         if isPending {
             listBeforePendingSearch = listBeforePendingSearch ?? old
             return
         }
         let before = listBeforePendingSearch ?? old
         listBeforePendingSearch = nil
-        let kept = Self.selection(selection, keptFrom: before, in: new)
+        let kept: Set<ItemID>
+        if selection.contains(where: { holds[$0] != nil }) {
+            let listed = Set(new)
+            kept = selection.filter { holds[$0] != nil || listed.contains($0) }
+        } else {
+            kept = Self.selection(selection, keptFrom: before, in: new)
+        }
         if kept != selection { selectAutomatically(kept) }
     }
 
     /// Compares the answer of a search with the list before it, when the answer arrives without changing the list,
     /// as one that finds nothing does after a list that showed nothing while it waited.
-    func keepHeldSelection(in list: [ItemID]) {
+    func keepHeldSelection(in list: [ItemID], holds: [ItemID: Int] = [:]) {
         guard listBeforePendingSearch != nil else { return }
-        keepSelection(from: list, to: list)
+        keepSelection(from: list, to: list, holds: holds)
     }
 
     /// A place that is gone can no longer be shown, so the window moves to where `placeFallback(in:)` says.

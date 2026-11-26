@@ -8,7 +8,7 @@ import Foundation
 ///   listed.
 /// - An item stands once: an item has one parent, and a second row of the same item is left out.
 /// - A `parent-of` cycle never recurses: the first item of the cycle, in the rows' order, stands at the top, and the rest
-///   under it.
+///   of the cycle, and the items below it, under it.
 nonisolated struct ItemNesting: Equatable, Sendable {
     /// The items at the top, in order.
     private(set) var roots: [ItemID]
@@ -61,9 +61,20 @@ nonisolated struct ItemNesting: Equatable, Sendable {
             }
         }
         for id in order where parentOf[id].map({ seen[$0] == nil }) ?? true { attach(id) }
-        // What is left stands in a cycle: each item's parent is listed and none reaches the top.
+        // What is left stands in or below a cycle: each item's parent is listed and none reaches the top. The cycle's
+        // first member in order stands at the top, so the items below the cycle stay under it.
         if placed.count < order.count {
-            for id in order where !placed.contains(id) { attach(id) }
+            for id in order where !placed.contains(id) {
+                var walk: [ItemID] = []
+                var walked: Set<ItemID> = []
+                var current = id
+                while walked.insert(current).inserted, let parent = parentOf[current] {
+                    walk.append(current)
+                    current = parent
+                }
+                let cycle = walk.drop { $0 != current }
+                attach(cycle.min { positions[$0, default: 0] < positions[$1, default: 0] } ?? id)
+            }
             roots.sort { positions[$0, default: 0] < positions[$1, default: 0] }
         }
         self.init(roots: roots, children: children, parents: parents, positions: positions)
@@ -122,6 +133,14 @@ nonisolated struct ItemNesting: Equatable, Sendable {
         }
         return true
     }
+
+    /// The items drawn with the parents in `expanded` open, in order.
+    func drawnIDs(expanded: Set<ItemID>) -> [ItemID] {
+        drawn(expanded: expanded).places.map(\.id)
+    }
+
+    /// The first item drawn, whatever is open.
+    var firstDrawn: ItemID? { roots.first }
 
     /// The parents above `id`, nearest first.
     func ancestors(of id: ItemID) -> [ItemID] {

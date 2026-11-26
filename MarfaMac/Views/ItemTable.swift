@@ -179,11 +179,10 @@ struct ItemTable: View {
     private func foldSubItems(open: Bool, places: [ItemID: ItemNesting.Place]) -> KeyPress.Result {
         guard browser.selection.count == 1, let id = browser.selection.first, let place = places[id] else { return .ignored }
         if place.children > 0, place.isExpanded != open {
-            browser.toggleSubItems(of: id)
+            browser.toggleSubItems(of: id, in: library, order: order)
             return .handled
         }
-        let content = browser.tableContent(in: library)
-        let nestings = content.grouping == nil ? [content.nesting] : Array(content.groupNestings.values)
+        let nestings = browser.tableContent(in: library).nestings
         guard !open, let parent = nestings.lazy.compactMap({ $0.parents[id] }).first else { return .ignored }
         browser.selection = [parent]
         return .handled
