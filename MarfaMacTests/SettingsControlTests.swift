@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import Synchronization
 import Testing
 @testable import MarfaMac
 
