@@ -126,10 +126,7 @@ extension LiveMarfaTests {
                 await libraries.launch()
                 let source = try #require(host.source as? MarfaSource)
                 source.refresh()
-                try #require(await LiveMarfa.until {
-                    await libraries.preferences.flush()
-                    return libraries.preferences.standing == .syncing
-                }, "the settings never synced: \(libraries.preferences.standing)")
+                try #require(await Self.syncs(libraries), "the settings never synced: \(libraries.preferences.standing)")
                 // A copy that has not said its instance yet names the library by its folder until it next opens.
                 let stored = try JSONSerialization.jsonObject(with: try #require(older.defaults.data(forKey: TypeLooks.defaultsKey))) as? [String: Any]
                 #expect(stored.map { Array($0.keys) } == [libraries.libraryKey])
@@ -147,10 +144,7 @@ extension LiveMarfaTests {
                 await reopened.launch()
                 let second = try #require(again.source as? MarfaSource)
                 second.refresh()
-                try #require(await LiveMarfa.until {
-                    await reopened.preferences.flush()
-                    return reopened.preferences.standing == .syncing
-                }, "the settings never synced again: \(reopened.preferences.standing)")
+                try #require(await Self.syncs(reopened), "the settings never synced again: \(reopened.preferences.standing)")
                 #expect(reopened.libraryKey == "marfa:" + (try #require(ProcessInfo.processInfo.environment["MARFA_TEST_INSTANCE_ID"])), "\(reopened.libraryKey)")
                 #expect(reopened.typeLooks.choices(for: reopened.libraryKey).count == 3)
                 await reopened.preferences.flush()
@@ -166,13 +160,20 @@ extension LiveMarfaTests {
                     look("core.note"): #"{"date":"created"}"#, look("core.task"): #"{"date":"edited"}"#,
                     look("core.event"): #"{"date":"created"}"#,
                 ]
-                var held: PreferenceUnits = [:]
                 let reached = await LiveMarfa.until {
-                    held = (try? await copy.units(of: item.rawValue)) ?? [:]
+                    let held = (try? await copy.units(of: item.rawValue)) ?? [:]
                     return expected.allSatisfy { held[$0.key] == $0.value }
                 }
+                let held = (try? await copy.units(of: item.rawValue)) ?? [:]
                 #expect(reached, "the Marfa holds \(held.filter { if case .row(.types, "look", _) = $0.key { true } else { false } })")
                 #expect(await Self.settingsItems() == [item])
+            }
+        }
+
+        private static func syncs(_ libraries: Libraries) async -> Bool {
+            await LiveMarfa.until {
+                await libraries.preferences.flush()
+                return libraries.preferences.standing == .syncing
             }
         }
 
