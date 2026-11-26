@@ -93,6 +93,7 @@ nonisolated enum SignInOutcome: Hashable, Sendable {
     case refused
     /// The server could not be reached.
     case unreachable
+    case discoveryTransport(SignInError.DiscoveryTransportReason)
     /// The sign-in did not finish and the package could not say why: the server or the browser did not answer.
     case couldNotFinish
     /// The address answered, but not as a Marfa server the app can sign in to: not Marfa's answer, or a plain HTTP status.
@@ -128,6 +129,7 @@ nonisolated enum SignInOutcome: Hashable, Sendable {
             case .denied: self = .denied
             case .expired: self = .expired
             case .unavailable: self = .couldNotFinish
+            case .discoveryTransport(let reason): self = .discoveryTransport(reason)
             case .heldElsewhere: self = .inUse
             case .refused(let code, _): self = Self.isHTTPStatus(code) ? .notMarfa : .refused
             case .stateMismatch, .issuerMismatch: self = .notVerified

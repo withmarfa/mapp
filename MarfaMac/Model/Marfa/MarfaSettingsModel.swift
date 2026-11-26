@@ -404,6 +404,18 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
             Notice(
                 title: String(localized: "Can’t Reach the Server"),
                 message: String(localized: "The app couldn’t reach that address, so nothing changed. Check the address and your connection, then try again."))
+        case .discoveryTransport(.dnsFailure):
+            Notice(
+                title: String(localized: "Can’t Find the Server"),
+                message: String(localized: "The app couldn’t find the server by name. Check the address and your connection, then try again."))
+        case .discoveryTransport(.connectionFailed):
+            Notice(
+                title: String(localized: "Can’t Connect to the Server"),
+                message: String(localized: "The app couldn’t connect to the server. Check the address and make sure the server is running and reachable from this Mac, then try again."))
+        case .discoveryTransport(.untrustedCertificate):
+            Notice(
+                title: String(localized: "Can’t Verify the Server’s Certificate"),
+                message: String(localized: "This Mac couldn’t verify the server’s certificate. Check the address and ask whoever manages the server to check its certificate."))
         case .couldNotFinish:
             Notice(
                 title: String(localized: "Couldn’t Finish Signing In"),

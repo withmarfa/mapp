@@ -36,7 +36,7 @@ import Testing
     }
 
     @Test(arguments: [false, true])
-    func discoveryFailuresReachTheNotice(usingBrowser: Bool) async throws {
+    func discoveryFailuresReachTheNotice(usingCode: Bool) async throws {
         // Reserve a loopback port without listening so no other test can take it.
         let socket = Darwin.socket(AF_INET, SOCK_STREAM, 0)
         try #require(socket >= 0)
@@ -52,24 +52,49 @@ import Testing
                 try #require(getsockname(socket, address, &length) == 0)
             }
         }
-        let anchor = NSWindow()
+        let anchor = NSWindow(contentRect: .zero, styleMask: [], backing: .buffered, defer: true)
         let signIns = SystemSignIns(bundleIdentifier: "com.withmarfa.marfa.tests", anchor: { anchor })
+        let bench = HostBench()
+        let host = MarfaHost(
+            defaults: bench.defaults, signIns: signIns, location: bench.location, opener: bench.servers.opener,
+            describer: bench.servers.describer, cleaner: {})
+        let model = MarfaSettingsModel(host: host)
         for (address, title) in [
             ("https://marfa.invalid", "Can’t Find the Server"),
             ("http://127.0.0.1:\(UInt16(bigEndian: local.sin_port))", "Can’t Connect to the Server"),
         ] {
-            let connection = try MarfaConnection(address: address)
-            do {
-                if usingBrowser {
-                    _ = try await signIns.signInWithBrowser(to: connection)
-                } else {
-                    _ = try await signIns.startCodeSignIn(to: connection)
-                }
-                Issue.record("Discovery unexpectedly succeeded for \(address)")
-            } catch {
-                let notice = MarfaSettingsModel.notice(for: .signIn(SignInOutcome(error)))
-                #expect(notice?.title == title, "Discovery at \(address) failed with \(error)")
+            model.address = address
+            await model.connect(usingCode: usingCode)
+            #expect(model.notice?.title == title)
+            #expect(!model.isConnected)
+            #expect(model.address == address)
+            #expect(!anchor.isVisible)
+        }
+    }
+
+    @Test(arguments: [false, true])
+    func certificateTrustAndOtherSignInEndingsReachTheNotice(usingCode: Bool) async throws {
+        let bench = HostBench()
+        let model = MarfaSettingsModel(host: bench.host())
+        let endings: [(SignInError, String?)] = [
+            (.discoveryTransport(reason: .untrustedCertificate), "Can’t Verify the Server’s Certificate"),
+            (.unavailable(message: "NSURLErrorDomain -1200"), "Couldn’t Finish Signing In"),
+            (.refused(code: "invalid_client", message: "Unknown client"), "The Server Refused the Sign-In"),
+            (.canceled, nil),
+        ]
+        for (error, title) in endings {
+            if usingCode {
+                bench.signIns.script(code: [.failure(error)])
+            } else {
+                bench.signIns.script(browser: [.failure(error)])
             }
+            model.address = "https://marfa.test"
+            await model.connect(usingCode: usingCode)
+            #expect(model.notice?.title == title)
+            if case .discoveryTransport = error {
+                #expect(model.notice?.message.contains("ask whoever manages the server") == true)
+            }
+            #expect(!model.isConnected)
         }
     }
 
