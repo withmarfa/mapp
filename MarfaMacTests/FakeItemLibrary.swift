@@ -25,7 +25,7 @@ final class FakeItemLibrary: ItemLibrary {
     /// Every preview asked for, in order.
     @ObservationIgnored private(set) var previewsAsked: [LibraryViewQuery] = []
     var reachesServer = true
-    /// What Settings > On This Mac reads, where a test gives it files.
+    /// What Settings > Connection reads, where a test gives it files.
     var downloadedFiles: (any DownloadedFiles)?
     private(set) var downloadedAgain = 0
     func downloadEverythingAgain() { downloadedAgain += 1 }

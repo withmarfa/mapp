@@ -1,9 +1,8 @@
 import AppKit
 import SwiftUI
 
-/// Shows the space used by the local copy and its offline files, with controls for exports and downloads.
-struct OnThisMacPage: View {
-    let openConnection: () -> Void
+/// The open Marfa’s offline files and the controls for exporting or rebuilding its local copy.
+struct ConnectionCopySections: View {
     @Environment(Libraries.self) private var libraries
     @Environment(\.library) private var library
     @State private var downloads: DownloadedFileState?
@@ -26,106 +25,94 @@ struct OnThisMacPage: View {
     private var isFilling: Bool { DownloadAgainRow.isFilling(library?.syncReport.fill, in: host.state) }
 
     var body: some View {
+        if let library, let source = library.downloadedFiles, let connection = host.configuredConnection {
+            sections(library: library, source: source, connection: connection)
+        }
+    }
+
+    private func sections(library: any ItemLibrary, source: any DownloadedFiles, connection: MarfaConnection) -> some View {
         Group {
-            if let library, library.downloadedFiles != nil, let connection = host.configuredConnection {
-                page(library: library, connection: connection)
-            } else {
-                SettingsPageState(
-                    symbol: "laptopcomputer", title: Text("No Marfa Open"),
-                    line: Text("Connect to a Marfa in Connection to see what the app keeps of it."),
-                    action: ("Open Connection…", openConnection))
+            files(source)
+                .task(id: ObjectIdentifier(library)) {
+                    await StoreSize.keepReading { if !isWorking { await read() } }
+                }
+                .onChange(of: isFilling) { _, filling in
+                    guard !filling, !isWorking else { return }
+                    Task { await read() }
+                }
+            SettingsSection("This Mac’s Copy", footer: "An export is an archive that any Marfa can restore.") {
+                SettingsRow("Space used") {
+                    SettingsValue(verbatim: storeBytes.map(StoreSize.text) ?? String(localized: "Unavailable"))
+                }
+                exportRow(connection: connection)
+                automaticRows
+                downloadRow(library: library)
+            }
+            .alert("Download Everything Again?", isPresented: $isConfirmingDownload) {
+                Button("Cancel", role: .cancel) {}
+                Button("Download Again") { library.downloadEverythingAgain() }
+            } message: {
+                Text(Self.downloadMessage(name: name, unsent: host.waitingChanges ?? 0))
             }
         }
-        .accessibilityIdentifier("OnThisMacPage")
-    }
-
-    private func page(library: any ItemLibrary, connection: MarfaConnection) -> some View {
-        SettingsPageColumn {
-            SettingsHead(
-                symbol: "laptopcomputer", tone: .gray, title: Text("\(name) on This Mac"),
-                line: Text(verbatim: headLine)
-            )
-            .accessibilityIdentifier("LibrarySummary")
-            files(library.downloadedFiles)
-            export(connection: connection)
-            startAgain(library: library)
-        }
-        .alert("Download Everything Again?", isPresented: $isConfirmingDownload) {
-            Button("Cancel", role: .cancel) {}
-            Button("Download Again") { library.downloadEverythingAgain() }
-        } message: {
-            Text(Self.downloadMessage(name: name, unsent: host.waitingChanges ?? 0))
-        }
-        .task(id: ObjectIdentifier(library)) {
-            let directory = libraries.host.location.directory(for: connection)
-            await StoreSize.keepSumming { await sum(directory: directory) }
-        }
-        .onChange(of: isFilling) { _, filling in
-            guard !filling else { return }
-            let directory = libraries.host.location.directory(for: connection)
-            Task { await sum(directory: directory) }
-        }
-    }
-
-    private var headLine: String {
-        let kept = String(localized: "Kept here so the app works offline and searches fast.")
-        return storeBytes.map { "\(StoreSize.text($0)). \(kept)" } ?? kept
     }
 
     // MARK: Files
 
-    @ViewBuilder private func files(_ source: (any DownloadedFiles)?) -> some View {
-        if let source {
-            SettingsSection("Files") {
-                if let state = downloads {
-                    SettingsRow(title: Text("Keep Opened Files"), line: Text(verbatim: budgetLine(state))) {
-                        SettingsPopUp(
-                            title: "Keep Opened Files",
-                            selection: Binding(get: { state.budget }, set: { budget in change { try await source.setBudget(budget) } })
-                        ) {
-                            Text("Automatic").tag(DownloadBudget.automatic)
-                            ForEach(Self.sizes, id: \.self) { bytes in
-                                Text(StoreSize.text(bytes)).tag(DownloadBudget.bytes(bytes))
-                            }
-                            if case .bytes(let bytes) = state.budget, !Self.sizes.contains(bytes) {
-                                Text(StoreSize.text(bytes)).tag(state.budget)
-                            }
-                            Text("Keep All Downloads").tag(DownloadBudget.keepAll)
-                        }
-                        .disabled(isWorking)
-                        .accessibilityIdentifier("KeepOpenedFiles")
-                    }
-                    attachments(state)
-                    SettingsRow(
-                        title: Text("Opened Files"),
-                        line: Text("\(state.bytes.map(StoreSize.text) ?? String(localized: "Unavailable")), fetched again when you open them.")
+    private func files(_ source: any DownloadedFiles) -> some View {
+        SettingsSection(
+            "Downloaded Files",
+            footer: "Attachments are always kept, so they open offline. Opened files are fetched again when you open them, and the least used go first when there’s no room."
+        ) {
+            if let state = downloads {
+                SettingsRow("Keep opened files") {
+                    SettingsPopUp(
+                        title: "Keep opened files",
+                        selection: Binding(get: { state.budget }, set: { budget in change { try await source.setBudget(budget) } })
                     ) {
+                        Text("Automatic").tag(DownloadBudget.automatic)
+                        ForEach(Self.sizes, id: \.self) { bytes in
+                            Text(StoreSize.text(bytes)).tag(DownloadBudget.bytes(bytes))
+                        }
+                        if case .bytes(let bytes) = state.budget, !Self.sizes.contains(bytes) {
+                            Text(StoreSize.text(bytes)).tag(state.budget)
+                        }
+                        Text("Keep All Downloads").tag(DownloadBudget.keepAll)
+                    }
+                    .help(Text(verbatim: budgetLine(state)))
+                    .disabled(isWorking)
+                    .accessibilityIdentifier("KeepOpenedFiles")
+                }
+                attachments(state)
+                SettingsRow("Opened files") {
+                    HStack(spacing: SettingsTokens.Metric.buttonGap) {
+                        SettingsValue(verbatim: state.bytes.map(StoreSize.text) ?? String(localized: "Unavailable"))
                         SettingsButton("Clear") { change { try await source.removeDownloadedFiles() } }
                             .disabled(isWorking)
                             .accessibilityIdentifier("RemoveDownloadedFiles")
                     }
-                } else if !readFailed {
-                    SettingsRow("Reading Downloaded Files…") { ProgressView().controlSize(.small) }
                 }
-                if readFailed {
-                    SettingsProblemRow(title: Text("Couldn’t Read Downloaded Files"), line: Text("The app will try again."), actions: [])
-                }
-                if let actionFailure {
-                    SettingsRow(verbatim: actionFailure, size: .compact, lines: nil) {}
-                }
+            } else if !readFailed {
+                SettingsRow("Reading downloaded files…") { ProgressView().controlSize(.small) }
             }
-            .accessibilityIdentifier("LibraryDownloads")
+            if readFailed {
+                SettingsProblemRow(title: Text("Couldn’t read downloaded files"), line: Text("The app will try again."), actions: [])
+            }
+            if let actionFailure {
+                SettingsRow(verbatim: actionFailure, size: .compact, lines: nil) {}
+            }
         }
+        .accessibilityIdentifier("LibraryDownloads")
     }
 
     @ViewBuilder private func attachments(_ state: DownloadedFileState) -> some View {
         if let attachments = state.attachments {
-            SettingsRow("Attachments", line: "Always kept, so they open offline.") {
+            SettingsRow("Attachments") {
                 SettingsValue(verbatim: StoreSize.text(attachments.heldBytes))
             }
             if attachments.missing > 0 {
                 SettingsRow(
-                    title: Text("Attachments Not Yet Offline"), line: DownloadWording.line(attachments.reasons).map { Text(verbatim: $0) },
+                    title: Text("Attachments not yet offline"), line: DownloadWording.line(attachments.reasons).map { Text(verbatim: $0) },
                     lines: nil
                 ) {
                     SettingsValue(verbatim: attachments.missing.formatted())
@@ -144,24 +131,22 @@ struct OnThisMacPage: View {
 
     // MARK: Export
 
-    private func export(connection: MarfaConnection) -> some View {
+    private func exportRow(connection: MarfaConnection) -> some View {
         let line = !canAskServer
-            ? String(localized: "Needs \(name) to answer.")
-            : exported ?? String(localized: "An archive \(name), or any Marfa, can restore.")
-        return SettingsSection("Export") {
-            SettingsRow(
-                title: Text("Export Everything"), line: Text(verbatim: line), error: exportFailure, look: canAskServer ? .normal : .off
-            ) {
-                HStack(spacing: SettingsTokens.Metric.buttonGap) {
-                    if isExporting { ProgressView().controlSize(.small) }
-                    SettingsButton("Export…") { exportEverything(connection: connection) }
-                        .disabled(isExporting || isChoosingExportFolder)
-                        .accessibilityIdentifier("ExportEverything")
-                }
+            ? String(localized: "This Marfa must be reachable.")
+            : exported
+        return SettingsRow(
+            title: Text("Export everything"), line: line.map { Text(verbatim: $0) }, error: exportFailure,
+            look: canAskServer ? .normal : .off, lines: nil
+        ) {
+            HStack(spacing: SettingsTokens.Metric.buttonGap) {
+                if isExporting { ProgressView().controlSize(.small) }
+                SettingsButton("Export…") { exportEverything(connection: connection) }
+                    .disabled(isExporting || isChoosingExportFolder)
+                    .accessibilityIdentifier("ExportEverything")
             }
-            .accessibilityIdentifier("ExportRow")
-            automaticRows
         }
+        .accessibilityIdentifier("ExportRow")
     }
 
     // MARK: Export Automatically
@@ -171,9 +156,9 @@ struct OnThisMacPage: View {
         let instance = automatic.openInstance
         let plan = automatic.current
         let schedule = plan?.schedule ?? .never
-        SettingsRow(title: Text("Export Automatically"), line: Text(verbatim: automaticLine(plan)), error: automaticFailure) {
+        SettingsRow(title: Text("Export automatically"), line: automaticLine(plan).map { Text(verbatim: $0) }, error: automaticFailure, lines: nil) {
             SettingsPopUp(
-                title: "Export Automatically",
+                title: "Export automatically",
                 selection: Binding(get: { schedule }, set: { new in if let instance { choose(new, plan: plan, for: instance) } })
             ) {
                 Text("Never").tag(ExportSchedule.never)
@@ -187,7 +172,7 @@ struct OnThisMacPage: View {
         .accessibilityIdentifier("ExportAutomaticallyRow")
         .task(id: host.configuredConnection) { await automatic.learn() }
         if schedule != .never, let folder = plan?.folder, let instance {
-            SettingsRow(title: Text("Export Folder"), line: Text(verbatim: (folder.path as NSString).abbreviatingWithTildeInPath)) {
+            SettingsRow(title: Text("Export folder"), line: Text(verbatim: (folder.path as NSString).abbreviatingWithTildeInPath), lineGlyph: .folder) {
                 SettingsButton("Choose…") {
                     chooseAutomaticFolder { chosen in
                         automatic.set(schedule, folder: chosen, for: instance)
@@ -199,11 +184,9 @@ struct OnThisMacPage: View {
         }
     }
 
-    private func automaticLine(_ plan: ExportPlan?) -> String {
-        guard let plan, plan.schedule != .never, let folder = plan.folder else { return String(localized: "To a folder you choose.") }
-        let to = String(localized: "To “\(folder.url.lastPathComponent)”.")
-        guard let last = plan.last else { return to }
-        return to + " " + String(localized: "Last saved \(last.formatted(.dateTime.day().month().year())).")
+    private func automaticLine(_ plan: ExportPlan?) -> String? {
+        guard let plan, plan.schedule != .never, let last = plan.last else { return nil }
+        return String(localized: "Last saved \(last.formatted(.dateTime.day().month().year())).")
     }
 
     /// A schedule is turned on only with a folder, asked for the first time for this Marfa; a cancelled or refused chooser
@@ -302,19 +285,18 @@ struct OnThisMacPage: View {
 
     // MARK: Start again
 
-    private func startAgain(library: any ItemLibrary) -> some View {
-        SettingsSection("Start Again") {
-            SettingsRow(
-                title: Text("Download Everything Again"),
-                line: Text(verbatim: DownloadAgainRow.line(name: name, fill: library.syncReport.fill, in: host.state)).monospacedDigit(),
-                look: canAskServer ? .normal : .off
-            ) {
-                SettingsButton("Download Again…") { isConfirmingDownload = true }
-                    .disabled(isFilling)
-                    .accessibilityIdentifier("DownloadAgain")
-            }
-            .accessibilityIdentifier("DownloadAgainRow")
+    private func downloadRow(library: any ItemLibrary) -> some View {
+        let line = DownloadAgainRow.line(fill: library.syncReport.fill, in: host.state)
+        return SettingsRow(
+            title: Text("Download everything again"),
+            line: Text(verbatim: line).monospacedDigit(),
+            look: canAskServer ? .normal : .off
+        ) {
+            SettingsButton("Download Again") { isConfirmingDownload = true }
+                .disabled(isFilling)
+                .accessibilityIdentifier("DownloadAgain")
         }
+        .accessibilityIdentifier("DownloadAgainRow")
     }
 
     /// What the alert says before the whole library is fetched again: nothing waiting is lost.
@@ -327,16 +309,11 @@ struct OnThisMacPage: View {
 
     // MARK: Reading
 
-    /// The folder's size and the files' state, summed when the page appears, after each step that changes them, when a
-    /// fill ends and then at `StoreSize.interval`.
-    private func sum(directory: URL) async {
-        guard !isWorking else { return }
-        storeBytes = await StoreSize.bytes(of: directory)
-        await read()
-    }
-
     private func read() async {
-        guard let source = library?.downloadedFiles else { return }
+        guard let source = library?.downloadedFiles, let connection = host.configuredConnection else { return }
+        let bytes = await StoreSize.bytes(of: host.location.directory(for: connection))
+        guard !Task.isCancelled, connection == host.configuredConnection else { return }
+        storeBytes = bytes
         do {
             downloads = try await source.read()
             readFailed = false
@@ -359,7 +336,6 @@ struct OnThisMacPage: View {
                 actionFailure = String(localized: "Couldn’t change downloaded files. Check the current limit and try again.")
             }
             await read()
-            if let connection = host.configuredConnection { storeBytes = await StoreSize.bytes(of: host.location.directory(for: connection)) }
         }
     }
 }

@@ -408,7 +408,7 @@ final class Browser {
         if !followsCollection { focusRequest = .page }
     }
 
-    /// Opens the item a link in the item's text names the way Settings > General > Open Items says, as Return does in
+    /// Opens the item a link in the item's text names the way General’s Open items in setting says, as Return does in
     /// the list: the item is selected where the window lists it, then shown in the modal, as a full page or in a
     /// window. An item reached from the modal stays in the modal, as `reveal` keeps it.
     func follow(link item: Item, in library: any ItemLibrary, order: ItemOrder, defaults: UserDefaults = .standard) {

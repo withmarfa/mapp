@@ -1,8 +1,6 @@
 import Foundation
 
-/// Where an item opens when a person presses Return on it, double-clicks it or chooses Open, as Settings > General >
-/// Open Items says. One value in the defaults (`ListKey.openItemsIn`),
-/// which syncs through the Marfa (`PreferencesMap`).
+/// Where Open, Return and double-click open an item. General’s Open items in setting syncs through the Marfa.
 nonisolated enum ItemOpening: String, Codable, CaseIterable, Identifiable, Hashable, Sendable {
     /// The page in a column beside the list, or beside a table, board or gallery. Choosing another row replaces it.
     case besideList
@@ -14,6 +12,9 @@ nonisolated enum ItemOpening: String, Codable, CaseIterable, Identifiable, Hasha
     case newWindow
 
     static let standard = ItemOpening.besideList
+    static let defaultChoices: [ItemOpening] = [.besideList, .modal, .fullPage]
+
+    var asDefault: ItemOpening { self == .newWindow ? Self.standard : self }
 
     var id: Self { self }
 
@@ -46,7 +47,7 @@ nonisolated enum ItemOpening: String, Codable, CaseIterable, Identifiable, Hasha
         }
     }
 
-    /// The ways Open does not do, in the order Settings lists them.
+    /// The other ways the row menu can open this item.
     var others: [ItemOpening] { Self.allCases.filter { $0 != self } }
 
     /// Whether `count` items can be opened this way: a modal and a full page show one item, and windows take as
@@ -55,9 +56,9 @@ nonisolated enum ItemOpening: String, Codable, CaseIterable, Identifiable, Hasha
         self == .newWindow ? count >= 1 : count == 1
     }
 
-    /// What Settings holds, or the standard where nothing is stored or what is stored is not a way this version has.
+    /// The opening preference from General, or Beside the List when the stored choice is unavailable there.
     static func stored(in defaults: UserDefaults = .standard) -> ItemOpening {
-        defaults.string(forKey: ListKey.openItemsIn).flatMap(ItemOpening.init(rawValue:)) ?? .standard
+        defaults.string(forKey: ListKey.openItemsIn).flatMap(ItemOpening.init(rawValue:))?.asDefault ?? .standard
     }
 }
 

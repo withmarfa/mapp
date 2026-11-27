@@ -1,10 +1,9 @@
 import SwiftUI
 
-/// The General page: how the app opens, what a new item is, how dates and times read, what the app does with the web, and
-/// this app's settings: saving them to a file, bringing them back and starting them over.
 struct GeneralPage: View {
     let libraries: Libraries
     @State private var files: SettingsFilesModel
+    @State private var links = OpenLinksModel()
     @AppStorage(StartWith.key) private var startWith = StartWith.standard
     @AppStorage(ReopenWindows.key) private var reopensWindows = ReopenWindows.standard
     @AppStorage(ListKey.openItemsIn) private var openItemsIn = ItemOpening.standard
@@ -18,6 +17,9 @@ struct GeneralPage: View {
     @Environment(\.library) private var library
     @Environment(\.appUpdater) private var updater
     @State private var isConfirmingReset = false
+    @State private var isConfirmingRemoval = false
+    @State private var isChangingKeptSettings = false
+    @State private var settingsProblem: String?
 
     init(libraries: Libraries) {
         self.libraries = libraries
@@ -42,14 +44,20 @@ struct GeneralPage: View {
         } message: {
             Text(resetMessage)
         }
+        .alert(Text(verbatim: keptSettings.removeTitle), isPresented: $isConfirmingRemoval) {
+            Button("Cancel", role: .cancel) {}
+            Button("Remove", role: .destructive) { removeKeptSettings() }
+        } message: {
+            Text(keptSettings.removeMessage)
+        }
     }
 
     // MARK: Opening
 
     private var opening: some View {
         SettingsSection("Opening") {
-            SettingsRow("Start With", line: "What a new window shows.") {
-                SettingsPopUp(title: "Start With", selection: $startWith) {
+            SettingsRow("Start with") {
+                SettingsPopUp(title: "Start with", selection: $startWith) {
                     Text("Where I Left Off").tag(StartWith.leftOff)
                     Divider()
                     Text("Library").tag(StartWith.place(.library))
@@ -67,15 +75,16 @@ struct GeneralPage: View {
                 }
                 .accessibilityIdentifier("StartWith")
             }
-            SettingsRow("Reopen Windows", line: "After you quit Marfa.") {
-                SettingsToggle(title: "Reopen Windows", isOn: $reopensWindows).accessibilityIdentifier("ReopenWindows")
+            SettingsRow("Reopen windows after quitting") {
+                SettingsToggle(title: "Reopen windows after quitting", isOn: $reopensWindows).accessibilityIdentifier("ReopenWindows")
             }
-            SettingsRow("Open Items", line: "From a list or a search.") {
-                SettingsPopUp(title: "Open Items", selection: $openItemsIn) {
-                    ForEach(ItemOpening.allCases) { Text($0.title).tag($0) }
+            SettingsRow("Open items in") {
+                SettingsPopUp(title: "Open items in", selection: Binding { openItemsIn.asDefault } set: { openItemsIn = $0 }) {
+                    ForEach(ItemOpening.defaultChoices) { Text($0.title).tag($0) }
                 }
                 .accessibilityIdentifier("OpenItems")
             }
+            OpenLinksRow(model: links)
         }
     }
 
@@ -95,15 +104,9 @@ struct GeneralPage: View {
     // MARK: New items
 
     private var newItems: some View {
-        SettingsSection("New Items") {
-            SettingsRow("New Opens", line: "One line, or a form that also takes text and files.") {
-                SettingsPopUp(title: "New Opens", selection: $newOpens) {
-                    ForEach(NewOpens.allCases, id: \.self) { Text($0.title).tag($0) }
-                }
-                .accessibilityIdentifier("NewOpens")
-            }
-            SettingsRow("New Items Are", line: "Outside a type’s own list.") {
-                SettingsPopUp(title: "New Items Are", selection: $newItemType) {
+        SettingsSection("New Items", footer: "Outside a type’s own list.") {
+            SettingsRow("New items are") {
+                SettingsPopUp(title: "New items are", selection: $newItemType) {
                     Text("Last Used").tag("")
                     let types = library.map { QuickAdd.types(in: $0) } ?? []
                     if !types.isEmpty {
@@ -117,6 +120,12 @@ struct GeneralPage: View {
                 }
                 .accessibilityIdentifier("NewItemsAre")
             }
+            SettingsRow("New item opens as") {
+                SettingsPopUp(title: "New item opens as", selection: $newOpens) {
+                    ForEach(NewOpens.allCases, id: \.self) { Text($0.title).tag($0) }
+                }
+                .accessibilityIdentifier("NewOpens")
+            }
         }
     }
 
@@ -124,19 +133,19 @@ struct GeneralPage: View {
 
     private var dates: some View {
         SettingsSection("Dates and Times") {
-            SettingsRow("Today and Yesterday", line: "Instead of the date, when it’s recent.") {
-                SettingsToggle(title: "Today and Yesterday", isOn: $dateFormat.usesWords).accessibilityIdentifier("TodayAndYesterday")
+            SettingsRow("Say today and yesterday") {
+                SettingsToggle(title: "Say today and yesterday", isOn: $dateFormat.usesWords).accessibilityIdentifier("TodayAndYesterday")
             }
-            SettingsRow("Week Starts On") {
-                SettingsPopUp(title: "Week Starts On", selection: $weekStart) {
+            SettingsRow("Week starts on") {
+                SettingsPopUp(title: "Week starts on", selection: $weekStart) {
                     Text("System Setting").tag(0)
                     Divider()
                     ForEach(WeekStart.days, id: \.self) { Text(verbatim: Self.weekdayName($0)).tag($0) }
                 }
                 .accessibilityIdentifier("WeekStartsOn")
             }
-            SettingsRow("Date Format") {
-                SettingsPopUp(title: "Date Format", selection: $dateFormat.date) {
+            SettingsRow("Date format") {
+                SettingsPopUp(title: "Date format", selection: $dateFormat.date) {
                     Text("System Setting").tag(DateFormat.DateStyle.system)
                     Divider()
                     Text("Numeric").tag(DateFormat.DateStyle.numeric)
@@ -145,8 +154,8 @@ struct GeneralPage: View {
                 }
                 .accessibilityIdentifier("DateFormat")
             }
-            SettingsRow("Time Format") {
-                SettingsPopUp(title: "Time Format", selection: $dateFormat.time) {
+            SettingsRow("Time format") {
+                SettingsPopUp(title: "Time format", selection: $dateFormat.time) {
                     Text("System Setting").tag(DateFormat.TimeStyle.system)
                     Divider()
                     Text("12-Hour").tag(DateFormat.TimeStyle.twelveHour)
@@ -166,8 +175,8 @@ struct GeneralPage: View {
 
     private var privacy: some View {
         SettingsSection("Privacy") {
-            SettingsRow("Pictures from Websites", line: "In saved pages and emails.") {
-                SettingsPopUp(title: "Pictures from Websites", selection: $pictures) {
+            SettingsRow("Load pictures from websites", line: "In saved pages and emails.") {
+                SettingsPopUp(title: "Load pictures from websites", selection: $pictures) {
                     ForEach(RemotePictureSetting.allCases) { option in
                         switch option {
                         case .ask: Text("Ask").tag(option)
@@ -179,8 +188,8 @@ struct GeneralPage: View {
                 .accessibilityIdentifier("RemotePictures")
             }
             if Reporting.carriesDestination {
-                SettingsRow("Send Error Reports", line: "What went wrong, never your items.") {
-                    SettingsToggle(title: "Send Error Reports", isOn: $sendsReports).accessibilityIdentifier("SendErrorReports")
+                SettingsRow("Send error reports", line: "What went wrong, never your items.") {
+                    SettingsToggle(title: "Send error reports", isOn: $sendsReports).accessibilityIdentifier("SendErrorReports")
                 }
             }
         }
@@ -192,16 +201,20 @@ struct GeneralPage: View {
     /// Shown only in a build that updates itself.
     @ViewBuilder private var updates: some View {
         if let updater {
-            SettingsSection("Updates") {
-                SettingsRow("Check Automatically", line: "Look for a new version once a day.") {
+            SettingsSection("Marfa for Mac") {
+                SettingsRow(title: Text("Marfa for Mac \(updater.version)"), line: updater.checkSummary.map { Text(verbatim: $0) }, lines: nil) {
+                    SettingsButton("Check for Updates") { updater.checkForUpdates() }
+                        .disabled(!updater.canCheckForUpdates)
+                }
+                SettingsRow("Check automatically") {
                     SettingsToggle(
-                        title: "Check Automatically",
+                        title: "Check automatically",
                         isOn: Binding { updater.checksAutomatically } set: { updater.checksAutomatically = $0 }
                     )
                     .accessibilityIdentifier("CheckAutomatically")
                 }
-                SettingsRow("Beta Versions", line: "Try new versions before they’re released.") {
-                    SettingsToggle(title: "Beta Versions", isOn: $betaVersions).accessibilityIdentifier("BetaVersions")
+                SettingsRow("Try beta versions") {
+                    SettingsToggle(title: "Try beta versions", isOn: $betaVersions).accessibilityIdentifier("BetaVersions")
                 }
             }
         }
@@ -210,27 +223,86 @@ struct GeneralPage: View {
     // MARK: This app's settings
 
     private var appSettings: some View {
-        SettingsSection("This App’s Settings") {
-            SettingsRow("Export Settings", line: "Save every setting to a file.") {
+        SettingsSection("Settings") {
+            keptSettingsRow
+            SettingsRow("Export settings") {
                 SettingsButton("Export…") { files.export() }
                     .accessibilityIdentifier("ExportSettings")
             }
-            SettingsRow("Import Settings", line: "Replace settings with those in a file.") {
+            SettingsRow("Import settings") {
                 SettingsButton("Import…") { files.chooseFileToImport() }
                     .accessibilityIdentifier("ImportSettings")
             }
             SettingsRow(
-                "Restore Earlier Settings", line: files.restorePoints.isEmpty ? "None saved yet." : "Go back to settings saved before a change.",
+                "Restore earlier settings", line: files.restorePoints.isEmpty ? "None saved yet." : nil,
                 look: files.restorePoints.isEmpty ? .off : .normal
             ) {
                 SettingsButton("Restore…") { files.chooseRestorePoint() }
                     .accessibilityIdentifier("RestoreSettings")
             }
-            SettingsRow("Reset This App’s Settings", line: libraries.preferences.syncs ? "On every Mac that connects to this Marfa. Your items stay." : "Every setting on this Mac. Your items stay.") {
-                SettingsButton("Reset…", role: .destructive) { isConfirmingReset = true }
+            SettingsRow("Reset settings", line: libraries.preferences.syncs ? "On every Mac that connects to this Marfa. Your items stay." : "Every setting on this Mac. Your items stay.") {
+                SettingsButton("Reset", role: .destructive) { isConfirmingReset = true }
                     .accessibilityIdentifier("ResetSettings")
             }
         }
+    }
+
+    private var keptSettings: ConnectionSettings {
+        ConnectionSettings(standing: libraries.preferences.standing, name: LibraryDescription.name(libraries))
+    }
+
+    @ViewBuilder private var keptSettingsRow: some View {
+        let words = keptSettings
+        if libraries.host.configuredConnection != nil, words.isShown {
+            SettingsRow(verbatim: words.title, line: words.line, error: settingsProblem, lines: nil) {
+                if let title = words.actionTitle {
+                    let buttonTitle = words.action == .allowMore && libraries.marfaSettings.isAllowingMore
+                        ? String(localized: "Waiting…") : title
+                    SettingsButton(title: Text(verbatim: buttonTitle), role: words.action == .remove ? .destructive : .normal) {
+                        act(on: words.action)
+                    }
+                    .disabled(isChangingKeptSettings || libraries.marfaSettings.isAllowingMore)
+                    .accessibilityIdentifier(words.action == .remove ? "RemoveAppSettings" :
+                        words.action == .keepAgain ? "KeepAppSettingsAgain" : "AllowMoreForAppSettings")
+                }
+            }
+            .accessibilityIdentifier("AppSettingsRow")
+        }
+    }
+
+    private func act(on action: ConnectionSettings.Action) {
+        settingsProblem = nil
+        switch action {
+        case .remove:
+            isConfirmingRemoval = true
+        case .allowMore:
+            let model = libraries.marfaSettings
+            Task {
+                if await model.allowMore([]) == .failed {
+                    settingsProblem = model.notice?.message ?? String(localized: "That didn’t work. Try again in a moment.")
+                }
+            }
+        case .keepAgain:
+            changeKeptSettings { try await libraries.preferences.startAgain() }
+        case .none:
+            break
+        }
+    }
+
+    private func changeKeptSettings(_ step: @escaping () async throws -> Void) {
+        isChangingKeptSettings = true
+        Task {
+            defer { isChangingKeptSettings = false }
+            do {
+                try await step()
+            } catch {
+                settingsProblem = String(localized: "That didn’t work. Try again in a moment.")
+            }
+        }
+    }
+
+    private func removeKeptSettings() {
+        changeKeptSettings { try await libraries.preferences.remove() }
     }
 
     /// Where the settings sync, a reset reaches every Mac that connects to the Marfa. Either way a restore point is saved first.

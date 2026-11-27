@@ -360,7 +360,7 @@ private struct ViewPanelOpeningRow: View {
         ViewPanelChoiceRow(
             symbol: "arrow.up.right.square", label: String(localized: "Open Items"),
             choices: [ItemOpening?.none] + ItemOpening.allCases.map(Optional.some),
-            title: { $0?.title ?? String(localized: "As in Settings (\(settings.title))") },
+            title: { $0?.title ?? String(localized: "As in Settings (\(settings.asDefault.title))") },
             selection: browser.chosenOpening, choose: { browser.setOpening($0) })
             .accessibilityIdentifier("ViewPanelOpenItems")
     }

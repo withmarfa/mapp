@@ -66,7 +66,7 @@ extension EditorController {
         }
     }
 
-    /// Opens an item the page links to as Settings > General > Open Items says: a link in the text, a row or the foot, or
+    /// Opens an item the page links to as General’s Open items in setting says: a link in the text, a row or the foot, or
     /// one in a panel.
     func follow(_ id: ItemID) { (onFollowItemLink ?? onOpenItem)(id) }
 

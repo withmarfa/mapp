@@ -23,7 +23,7 @@ struct SettingsWindowTests {
         let moved: [SettingsPage: SettingsPage] = [
             .overview: .account, .updates: .account, .addresses: .account, .fileStorage: .account,
             .history: .account, .housekeeping: .account, .limits: .account, .monitoring: .account,
-            .startUp: .account, .apps: .keys, .links: .types, .onThisMac: .connection,
+            .startUp: .account, .apps: .keys, .links: .types,
         ]
         #expect(Set(sidebar + Array(moved.keys)) == Set(SettingsPage.allCases))
         for page in SettingsPage.allCases {
@@ -33,9 +33,22 @@ struct SettingsWindowTests {
 
     @Test func movedPagesContributeToSidebarSearch() {
         #expect(SettingsPage.sidebarMatches("Add a Website") == [.account])
-        #expect(SettingsPage.sidebarMatches("Open Marfa Links In") == [.keys])
+        #expect(SettingsPage.sidebarMatches("Open Marfa Links In") == [.general])
         #expect(SettingsPage.sidebarMatches("New Link Type") == [.types])
-        #expect(SettingsPage.sidebarMatches("Download Everything Again") == [.connection])
+    }
+
+    @Test func searchesForLocalCopySettingsOpenConnection() {
+        for word in [
+            "On This Mac", "Keep opened files", "Space used", "Remove downloaded files",
+            "Export everything", "Download everything again",
+        ] {
+            let launcher = SettingsLauncher()
+            let results = SettingsPage.sidebarMatches(word)
+            #expect(results == [.connection])
+            launcher.show(results.first)
+            #expect(launcher.navigation.page == .connection)
+        }
+        #expect(SettingsPage.sidebarMatches("Clear").contains(.connection))
     }
 
     @Test func appPagesAreFoundByTheirControls() {

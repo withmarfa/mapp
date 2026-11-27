@@ -8,7 +8,7 @@ struct PanelLinksView: View {
     @Environment(\.undoManager) private var undoManager
     let item: ItemID
     let groups: [PanelLinkGroup]
-    /// Opens the item as Settings > Open Items says, through the browser's follow function.
+    /// Opens the item as General’s Open items in setting says, through the browser's follow function.
     let onOpen: (ItemID) -> Void
     @State private var expanded: Set<PanelLinkGroup.Kind> = []
 

@@ -4,6 +4,7 @@ import Observation
 /// One app that registered `marfa://`, as the pop-up lists it.
 struct LinkApp: Identifiable {
     let url: URL
+    let name: String
     let title: String
     let icon: NSImage
     var id: URL { url }
@@ -90,7 +91,7 @@ struct LinkApp: Identifiable {
         apps = zip(candidates, titles).map { candidate, title in
             let icon = workspace.icon(forFile: candidate.url.path)
             icon.size = NSSize(width: 16, height: 16)
-            return LinkApp(url: candidate.url, title: title, icon: icon)
+            return LinkApp(url: candidate.url, name: candidate.name, title: title, icon: icon)
         }
         current = defaultApp
     }
@@ -99,9 +100,11 @@ struct LinkApp: Identifiable {
         let manager = FileManager.default
         var name = manager.displayName(atPath: url.path)
         if name.hasSuffix(".app") { name.removeLast(4) }
+        let bundle = Bundle(url: url)
+        if bundle?.bundleIdentifier == AppPaths.bundleIdentifier { name = String(localized: "Marfa for Mac") }
         let folder = url.deletingLastPathComponent()
         return LinkApp.Candidate(
-            url: url, name: name, version: Bundle(url: url)?.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+            url: url, name: name, version: bundle?.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
             folder: manager.displayName(atPath: folder.path), path: (folder.path as NSString).abbreviatingWithTildeInPath)
     }
 }

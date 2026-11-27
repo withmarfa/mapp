@@ -110,7 +110,7 @@ import Testing
     func emptyDeleted() {}
 }
 
-/// Files for On This Mac with canned answers.
+/// Downloaded files with canned answers.
 nonisolated struct FakeDownloads: DownloadedFiles {
     var state: DownloadedFileState
     func read() async throws -> DownloadedFileState { state }
@@ -185,10 +185,26 @@ struct RenderedWindow<Detail: View>: View {
         return (libraries, bench)
     }
 
-    @Test func general() async throws {
-        let (libraries, _) = try await connected()
+    @Test(arguments: [ColorScheme.light, .dark], [13, 24])
+    func general(appearance: ColorScheme, textSize: Int) async throws {
+        let bench = HostBench()
+        let defaults = ThrowawayDefaults.make("GeneralRender")
+        let libraries = Libraries(
+            host: bench.host(), defaults: defaults, handOverPages: { $0(true) },
+            syncsPreferences: true, defaultsDomain: defaults.suite)
+        try await libraries.host.connect(address: "https://marfa.castell.studio", key: "k")
+        libraries.preferences.attach(FakePreferencesCopy(), library: "marfa:castell-studio", name: { "Castell Studio" })
+        await libraries.preferences.flush()
+        try libraries.preferences.saveRestorePoint(.reset)
+        let updater = AppUpdater(defaults: defaults, startingUpdater: false)
         try await SettingsRender.png(
-            RenderedWindow(selection: .general, detail: GeneralPage(libraries: libraries)), size: Self.size, named: "General")
+            RenderedWindow(selection: .general, detail: GeneralPage(libraries: libraries))
+                .environment(\.settingsTextScale, InterfaceStyle.scale(for: textSize))
+                .environment(\.appUpdater, updater)
+                .defaultAppStorage(defaults),
+            size: CGSize(width: textSize == 24 ? SettingsTokens.Metric.windowMinWidth : Self.size.width,
+                         height: textSize == 24 ? 2_450 : 1_420),
+            named: "General, \(appearance), \(textSize) pt", appearance: appearance)
     }
 
     @Test(arguments: [11, 24])
@@ -418,28 +434,27 @@ struct RenderedWindow<Detail: View>: View {
             size: Self.size, named: "Search, at the limit")
     }
 
-    @Test func onThisMac() async throws {
+    @Test(arguments: [ColorScheme.light, .dark], [13, 24])
+    func connectionWithLocalCopy(appearance: ColorScheme, textSize: Int) async throws {
         let library = FakeItemLibrary(items: [])
         library.downloadedFiles = FakeDownloads(
             state: DownloadedFileState(
-                budget: .automatic, limit: 12_000_000_000, bytes: 1_200_000_000,
-                attachments: .init(held: 53, heldBytes: 640_000_000, missing: 3, reasons: [MissingAttachments(reason: .waiting, count: 3)])))
+                budget: .automatic, limit: 12_000_000_000, bytes: 1_200_000,
+                attachments: .init(held: 53, heldBytes: 640_000, missing: 0, reasons: [])))
         let (libraries, bench) = try await connected()
-        _ = bench
+        let host = AppSettingsHost(libraries: libraries, launcher: SettingsLauncher())
+        let defaults = ThrowawayDefaults.make("ConnectionRender")
+        let connection = try #require(libraries.host.configuredConnection)
+        let store = bench.location.store(for: connection)
+        try Data(repeating: 1, count: 2_000_000).write(to: store)
         try await SettingsRender.png(
             RenderedWindow(
-                selection: .onThisMac,
-                detail: OnThisMacPage(openConnection: {}).environment(libraries).environment(libraries.host).environment(\.library, library)),
-            size: Self.size, named: "On This Mac", settle: .milliseconds(1_000))
-    }
-
-    @Test func onThisMacWithNoMarfaOpen() async throws {
-        let bench = HostBench()
-        let defaults = ThrowawayDefaults.make("SettingsRenderTests")
-        let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) })
-        try await SettingsRender.png(
-            RenderedWindow(selection: .onThisMac, detail: OnThisMacPage(openConnection: {}).environment(libraries).environment(libraries.host)),
-            size: Self.size, named: "On This Mac, no Marfa open")
+                selection: .connection, detail: ConnectionPage(settingsHost: host)
+                    .environment(libraries).environment(libraries.host).environment(\.library, library))
+                .environment(\.settingsTextScale, InterfaceStyle.scale(for: textSize))
+                .defaultAppStorage(defaults),
+            size: textSize == 24 ? CGSize(width: SettingsTokens.Metric.windowMinWidth, height: 1_775) : Self.size,
+            named: "Connection, \(appearance), \(textSize) pt", appearance: appearance, settle: .milliseconds(1_000))
     }
 
     /// The host's fake server, to put concerns and readings on.

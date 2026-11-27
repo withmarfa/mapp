@@ -1,6 +1,6 @@
 import Foundation
 
-/// Opening an item the way the place's Open Items, or Settings > General > Open Items, says (`ItemOpening`): beside
+/// Opening an item the way the place's Open Items, or General’s Open items in setting, says (`ItemOpening`): beside
 /// the list, in the modal over the window, as a full page, or in a window of its own. Every layout and the list open
 /// through here.
 extension Browser {

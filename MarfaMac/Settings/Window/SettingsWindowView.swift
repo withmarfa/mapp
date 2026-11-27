@@ -112,7 +112,6 @@ struct SettingsDetail: View {
             case .editor: EditorPage()
             case .layouts: LayoutsPage()
             case .search: SearchPage()
-            case .onThisMac: OnThisMacPage(openConnection: { navigation.show(.connection) })
             case .connection: ConnectionPage(settingsHost: host)
             case .marfa(let page): MarfaSettingsPageView(page: page, host: host)
             }

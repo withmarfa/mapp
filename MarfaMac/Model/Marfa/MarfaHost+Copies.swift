@@ -92,6 +92,14 @@ extension MarfaHost {
 
     // MARK: Other copies of this Marfa
 
+    func hasOtherMarfas(besides connection: MarfaConnection) -> Bool {
+        _ = copiesRevision
+        let current = location.directory(for: connection).lastPathComponent
+        let thisMarfa = Set(otherCopies(of: connection)).union([current])
+        let known = Set(location.copies.current.origins.values).subtracting(thisMarfa)
+        return location.folders().contains { known.contains($0) && discarded[$0] == nil }
+    }
+
     /// The other copies of the Marfa `connection` opens that this Mac holds: one its origin made under its other
     /// spelling, and one recorded as the same instance. A copy the person discarded is not among them.
     func otherCopies(of connection: MarfaConnection) -> [String] {

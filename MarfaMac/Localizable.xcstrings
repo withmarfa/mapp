@@ -412,9 +412,6 @@
     "%@ of %@ selected" : {
 
     },
-    "%@ on This Mac" : {
-
-    },
     "%@ on its disk" : {
 
     },
@@ -666,9 +663,6 @@
     },
     "%@, edited" : {
       "extractionState" : "manual"
-    },
-    "%@, fetched again when you open them." : {
-
     },
     "%@, on the machine %@ runs on." : {
       "localizations" : {
@@ -2504,9 +2498,6 @@
     "After the status, in this order. A row shows the first two." : {
 
     },
-    "After you quit Marfa." : {
-
-    },
     "Align Center" : {
 
     },
@@ -2609,9 +2600,6 @@
     "Always Show" : {
 
     },
-    "Always kept, so they open offline." : {
-
-    },
     "An IP address." : {
 
     },
@@ -2627,9 +2615,6 @@
     "An app." : {
 
     },
-    "An archive %@, or any Marfa, can restore." : {
-
-    },
     "An earlier change to this item hasn’t reached the server yet." : {
       "extractionState" : "manual"
     },
@@ -2638,6 +2623,9 @@
     },
     "An entry needs at least one value." : {
       "extractionState" : "manual"
+    },
+    "An export is an archive that any Marfa can restore." : {
+
     },
     "An item can have at most %lld tags." : {
 
@@ -2934,7 +2922,10 @@
     "Attachments" : {
 
     },
-    "Attachments Not Yet Offline" : {
+    "Attachments are always kept, so they open offline. Opened files are fetched again when you open them, and the least used go first when there’s no room." : {
+
+    },
+    "Attachments not yet offline" : {
 
     },
     "Audit Log" : {
@@ -3064,9 +3055,6 @@
 
     },
     "Best Match" : {
-
-    },
-    "Beta Versions" : {
 
     },
     "Bisque, 1000°C, nine hours. Two test tiles cracked on the lower shelf, both from the new clay." : {
@@ -3563,6 +3551,9 @@
     "Check a source too. With none, no app or key could read items of these types." : {
 
     },
+    "Check automatically" : {
+
+    },
     "Check for Updates" : {
 
     },
@@ -3576,6 +3567,19 @@
       "extractionState" : "manual"
     },
     "Check your connection and try again." : {
+
+    },
+    "Checked %@ at %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Checked %1$@ at %2$@."
+          }
+        }
+      }
+    },
+    "Checked today at %@." : {
 
     },
     "Checking" : {
@@ -3879,9 +3883,6 @@
     "Connect to a Marfa in Connection to see this page." : {
 
     },
-    "Connect to a Marfa in Connection to see what the app keeps of it." : {
-
-    },
     "Connect to a Marfa server in Library to see and change its settings here." : {
       "extractionState" : "manual"
     },
@@ -4081,9 +4082,6 @@
     "Couldn’t Read Database and File Sizes" : {
 
     },
-    "Couldn’t Read Downloaded Files" : {
-
-    },
     "Couldn’t Read Every Source" : {
 
     },
@@ -4219,6 +4217,9 @@
     "Couldn’t read backup settings" : {
 
     },
+    "Couldn’t read downloaded files" : {
+
+    },
     "Couldn’t read downloaded files. The app will try again." : {
       "extractionState" : "manual"
     },
@@ -4316,6 +4317,9 @@
       "extractionState" : "manual"
     },
     "Date and Time" : {
+
+    },
+    "Date format" : {
 
     },
     "Date of Each Type" : {
@@ -4558,13 +4562,13 @@
     "Download Again" : {
 
     },
-    "Download Again…" : {
-
-    },
-    "Download Everything Again" : {
-
-    },
     "Download Everything Again?" : {
+
+    },
+    "Download everything again" : {
+
+    },
+    "Downloaded Files" : {
 
     },
     "Downloading" : {
@@ -4603,7 +4607,7 @@
     "Each %@ keeps its value." : {
 
     },
-    "Each Mac keeps its own window sizes and positions, column widths, global shortcuts, and On This Mac settings." : {
+    "Each Marfa has its own copy on this Mac." : {
 
     },
     "Each Option" : {
@@ -4928,25 +4932,25 @@
     "Export" : {
 
     },
-    "Export Automatically" : {
-
-    },
-    "Export Everything" : {
-
-    },
-    "Export Folder" : {
-
-    },
     "Export Layouts…" : {
-
-    },
-    "Export Settings" : {
 
     },
     "Export Shortcuts" : {
 
     },
     "Export as PDF…" : {
+
+    },
+    "Export automatically" : {
+
+    },
+    "Export everything" : {
+
+    },
+    "Export folder" : {
+
+    },
+    "Export settings" : {
 
     },
     "Exported Without Some Files" : {
@@ -5259,9 +5263,6 @@
     "From a key alone." : {
 
     },
-    "From a list or a search." : {
-
-    },
     "From a plugin you’ve installed." : {
 
     },
@@ -5324,9 +5325,6 @@
 
     },
     "Go" : {
-
-    },
-    "Go back to settings saved before a change." : {
 
     },
     "Go back to the item" : {
@@ -5588,6 +5586,9 @@
     "Import Shortcuts" : {
 
     },
+    "Import settings" : {
+
+    },
     "Important" : {
 
     },
@@ -5723,9 +5724,6 @@
     },
     "Instance" : {
       "extractionState" : "manual"
-    },
-    "Instead of the date, when it’s recent." : {
-
     },
     "Interface text size" : {
 
@@ -6179,9 +6177,6 @@
     "Keep My Edit" : {
       "extractionState" : "manual"
     },
-    "Keep Opened Files" : {
-
-    },
     "Keep Versions" : {
 
     },
@@ -6202,6 +6197,9 @@
 
     },
     "Keep less free on disk?" : {
+
+    },
+    "Keep opened files" : {
 
     },
     "Keep the copy and the changes stay on this Mac." : {
@@ -6235,13 +6233,10 @@
     "Kept for Marfa for Mac." : {
 
     },
-    "Kept here so the app works offline and searches fast." : {
+    "Kept in this Marfa" : {
 
     },
-    "Kept in %@" : {
-
-    },
-    "Kept on This Mac Only" : {
+    "Kept on this Mac only" : {
 
     },
     "Kept “%@” in the Library" : {
@@ -6527,6 +6522,9 @@
     "Load Pictures" : {
 
     },
+    "Load pictures from websites" : {
+
+    },
     "Loading %@…" : {
 
     },
@@ -6558,9 +6556,6 @@
       "extractionState" : "manual"
     },
     "Look After This Marfa" : {
-
-    },
-    "Look for a new version once a day." : {
 
     },
     "Looking After This Marfa" : {
@@ -6729,6 +6724,12 @@
 
     },
     "Marfa didn’t take a change to a view made while your server couldn’t be reached: %@" : {
+
+    },
+    "Marfa for Mac" : {
+
+    },
+    "Marfa for Mac %@" : {
 
     },
     "Marfa for Mac can’t check this link yet. Try again once your Marfa has finished syncing." : {
@@ -6963,9 +6964,6 @@
     "Needed before it can run." : {
 
     },
-    "Needs %@ to answer." : {
-
-    },
     "Needs Attention" : {
 
     },
@@ -7024,9 +7022,6 @@
     "New Items" : {
 
     },
-    "New Items Are" : {
-
-    },
     "New Items Go To" : {
 
     },
@@ -7046,9 +7041,6 @@
 
     },
     "New Link Type…" : {
-
-    },
-    "New Opens" : {
 
     },
     "New Password" : {
@@ -7093,6 +7085,12 @@
     },
     "New entry: %@" : {
       "extractionState" : "manual"
+    },
+    "New item opens as" : {
+
+    },
+    "New items are" : {
+
     },
     "New windows open at these widths." : {
 
@@ -7386,9 +7384,6 @@
     "Not Added to the Item" : {
 
     },
-    "Not Answering" : {
-
-    },
     "Not Applicable" : {
       "extractionState" : "manual"
     },
@@ -7414,9 +7409,6 @@
 
     },
     "Not Now" : {
-
-    },
-    "Not Ready Yet" : {
 
     },
     "Not Removed" : {
@@ -7458,10 +7450,7 @@
     "Not allowed" : {
 
     },
-    "Not answering since %@. The app keeps trying." : {
-
-    },
-    "Not answering. The app keeps trying." : {
+    "Not answering" : {
 
     },
     "Not connected" : {
@@ -7483,6 +7472,9 @@
       "extractionState" : "manual"
     },
     "Not named yet." : {
+
+    },
+    "Not ready yet" : {
 
     },
     "Not set." : {
@@ -7696,9 +7688,6 @@
     "One command uses %@." : {
 
     },
-    "One line, or a form that also takes text and files." : {
-
-    },
     "One of them removes this app’s settings from %@. Discard the copy and the settings stay there." : {
 
     },
@@ -7821,7 +7810,7 @@
     "Open Link" : {
 
     },
-    "Open Marfa Links In" : {
+    "Open Marfa links in" : {
 
     },
     "Open Original" : {
@@ -7860,6 +7849,9 @@
     "Open in New Window" : {
 
     },
+    "Open items in" : {
+
+    },
     "Open the file in another app to view it." : {
 
     },
@@ -7869,7 +7861,7 @@
     "Open “%@”" : {
 
     },
-    "Opened Files" : {
+    "Opened files" : {
 
     },
     "Opening" : {
@@ -8117,6 +8109,9 @@
     "Permanently deletes %@ items." : {
 
     },
+    "Permissions" : {
+
+    },
     "Person" : {
 
     },
@@ -8136,9 +8131,6 @@
       "extractionState" : "manual"
     },
     "Pictures" : {
-
-    },
-    "Pictures from Websites" : {
 
     },
     "Pill" : {
@@ -8393,9 +8385,6 @@
     "Reader or Original" : {
 
     },
-    "Reading Downloaded Files…" : {
-
-    },
     "Reading Files" : {
 
     },
@@ -8555,6 +8544,9 @@
     "Remove control and text-direction characters." : {
       "extractionState" : "manual"
     },
+    "Remove downloaded files" : {
+
+    },
     "Remove from Collection" : {
       "extractionState" : "manual"
     },
@@ -8681,13 +8673,10 @@
     "Rendering diagram…" : {
 
     },
-    "Reopen Windows" : {
+    "Reopen windows after quitting" : {
 
     },
     "Replace" : {
-
-    },
-    "Replace settings with those in a file." : {
 
     },
     "Replace the Shortcut?" : {
@@ -8726,16 +8715,13 @@
     "Reset" : {
 
     },
-    "Reset This App’s Settings" : {
-
-    },
     "Reset This App’s Settings?" : {
 
     },
     "Reset View" : {
 
     },
-    "Reset…" : {
+    "Reset settings" : {
 
     },
     "Resize Image" : {
@@ -8764,6 +8750,9 @@
     },
     "Restore Version" : {
       "extractionState" : "manual"
+    },
+    "Restore earlier settings" : {
+
     },
     "Restore the Backup From %@" : {
 
@@ -8919,9 +8908,6 @@
     "Save as New View…" : {
 
     },
-    "Save every setting to a file." : {
-
-    },
     "Save the text as %@.md beside %@.json." : {
       "localizations" : {
         "en" : {
@@ -8962,6 +8948,9 @@
     },
     "Saved. The server now has:" : {
       "extractionState" : "manual"
+    },
+    "Say today and yesterday" : {
+
     },
     "Sea" : {
 
@@ -9062,13 +9051,13 @@
     "Send" : {
 
     },
-    "Send Error Reports" : {
-
-    },
     "Send Telemetry" : {
 
     },
     "Send a Heartbeat" : {
+
+    },
+    "Send error reports" : {
 
     },
     "Sending" : {
@@ -9114,10 +9103,7 @@
     "Sent only while this sign-in may read the server’s status." : {
 
     },
-    "Sent when %@ answers." : {
-
-    },
-    "Server" : {
+    "Sent when this Marfa answers." : {
 
     },
     "Server Settings" : {
@@ -9489,6 +9475,12 @@
     "Sign Out…" : {
 
     },
+    "Sign in again" : {
+
+    },
+    "Sign in and switch" : {
+
+    },
     "Sign in to the previous server again to see them." : {
 
     },
@@ -9507,10 +9499,10 @@
     "Sign-Ins" : {
 
     },
-    "Sign-ins, keys and apps" : {
+    "Sign-in expired" : {
 
     },
-    "Signed In As" : {
+    "Sign-ins, keys and apps" : {
 
     },
     "Signed In to %@" : {
@@ -9528,6 +9520,9 @@
     "Signed in %@." : {
 
     },
+    "Signed in as" : {
+
+    },
     "Signed in with your password or a passkey." : {
 
     },
@@ -9536,9 +9531,6 @@
     },
     "Signed out, %lld changes waiting" : {
       "extractionState" : "manual"
-    },
-    "Signed out. This Mac’s copy is kept." : {
-
     },
     "Signing Secret" : {
 
@@ -9693,7 +9685,7 @@
     "Sources show where items came from." : {
 
     },
-    "Space Used" : {
+    "Space used" : {
 
     },
     "Speed" : {
@@ -9723,19 +9715,16 @@
     "Start" : {
 
     },
-    "Start Again" : {
-
-    },
     "Start Day" : {
 
     },
     "Start Time" : {
 
     },
-    "Start With" : {
+    "Start typing…" : {
 
     },
-    "Start typing…" : {
+    "Start with" : {
 
     },
     "Start-Up" : {
@@ -10219,9 +10208,6 @@
     "The app forgot its sign-in on this Mac, but couldn’t confirm that %@ ended the approval." : {
       "extractionState" : "manual"
     },
-    "The app holds %lld of the owner’s %lld permissions." : {
-
-    },
     "The app holds all %lld of the owner’s permissions, but not all the access it asks for." : {
 
     },
@@ -10693,7 +10679,7 @@
     "The oldest Marfa this version works with." : {
 
     },
-    "The owner’s permissions the app holds." : {
+    "The owner’s permissions this app holds." : {
 
     },
     "The owner’s permissions. A key can only lose them." : {
@@ -11101,9 +11087,6 @@
     "This App’s Earlier Approval May Still Stand" : {
 
     },
-    "This App’s Settings" : {
-
-    },
     "This App’s Sign-In May Still Be Kept" : {
 
     },
@@ -11137,9 +11120,6 @@
     "This Link Type Is Gone" : {
 
     },
-    "This Mac" : {
-
-    },
     "This Mac can’t play this kind of file. Open it in another app." : {
 
     },
@@ -11152,8 +11132,17 @@
     "This Mac isn’t connected to a Marfa. Connect to your Marfa in Settings, then open the link again." : {
 
     },
+    "This Mac’s Copy" : {
+
+    },
+    "This Mac’s copy is kept." : {
+
+    },
     "This Marfa" : {
       "extractionState" : "manual"
+    },
+    "This Marfa must be reachable." : {
+
     },
     "This Marfa takes a plugin that carries guidance only from the command line for now." : {
 
@@ -11522,10 +11511,10 @@
     "Time Allowed" : {
 
     },
-    "Time Format" : {
+    "Time Zone" : {
 
     },
-    "Time Zone" : {
+    "Time format" : {
 
     },
     "Time of %@" : {
@@ -11564,9 +11553,6 @@
     "To PostHog’s error tracking." : {
 
     },
-    "To a folder you choose." : {
-
-    },
     "To keep what you wrote, copy it before you discard this change." : {
       "extractionState" : "manual"
     },
@@ -11576,16 +11562,10 @@
     "To start a new copy from this server, choose Disconnect in Settings, then connect again." : {
       "extractionState" : "manual"
     },
-    "To “%@”." : {
-
-    },
     "To: %@" : {
 
     },
     "Today" : {
-
-    },
-    "Today and Yesterday" : {
 
     },
     "Today, %@" : {
@@ -11636,7 +11616,7 @@
     "Try again in a moment." : {
 
     },
-    "Try new versions before they’re released." : {
+    "Try beta versions" : {
 
     },
     "Tuesday" : {
@@ -11818,7 +11798,7 @@
     "Unresolved connections will be preserved." : {
       "extractionState" : "manual"
     },
-    "Unsent Changes" : {
+    "Unsent changes" : {
 
     },
     "Until you decide, these changes stay on this Mac." : {
@@ -11839,10 +11819,7 @@
     "Up to date" : {
 
     },
-    "Up to date %@" : {
-
-    },
-    "Up to date just now" : {
+    "Up to date. %@" : {
 
     },
     "Update" : {
@@ -11855,6 +11832,12 @@
 
     },
     "Update and Maintain" : {
+
+    },
+    "Update available: %@." : {
+
+    },
+    "Update ready" : {
 
     },
     "Update to %@" : {
@@ -11906,6 +11889,9 @@
     "Use Another Marfa" : {
 
     },
+    "Use Another Marfa…" : {
+
+    },
     "Use Current Name" : {
       "extractionState" : "manual"
     },
@@ -11952,6 +11938,9 @@
 
     },
     "Use an address like https://marfa.example, with no path." : {
+
+    },
+    "Use another Marfa" : {
 
     },
     "Use at most 200 characters." : {
@@ -12159,10 +12148,10 @@
     "Week %lld" : {
       "extractionState" : "manual"
     },
-    "Week Starts On" : {
+    "Week of %@" : {
 
     },
-    "Week of %@" : {
+    "Week starts on" : {
 
     },
     "Weekends" : {
@@ -12202,9 +12191,6 @@
 
     },
     "What a field means can be %lld characters at most." : {
-
-    },
-    "What a new window shows." : {
 
     },
     "What a type, a collection or a new view lists." : {
@@ -12275,9 +12261,6 @@
 
     },
     "Where I Left Off" : {
-
-    },
-    "Where a link to an item opens." : {
 
     },
     "Where a proxy puts the caller’s address." : {

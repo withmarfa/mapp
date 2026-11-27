@@ -421,7 +421,7 @@ private struct FakeArchive: ArchiveSource {
         /// Exports `archive` while the chooser is up as another Marfa opens.
         func export(_ archive: String) async -> Result<String, LibraryExport.Failure>? {
             open = "instance-one"
-            return await OnThisMacPage.exportEverything(
+            return await ConnectionCopySections.exportEverything(
                 from: FakeArchive(bytes: archiveBytes(instance: archive)), serverName: "Marfa", instance: { open },
                 folder: {
                     open = "instance-two"
@@ -435,14 +435,14 @@ private struct FakeArchive: ArchiveSource {
         #expect((try? saved?.get())?.hasPrefix("Saved as") == true)
 
         open = nil
-        let unknown = await OnThisMacPage.exportEverything(
+        let unknown = await ConnectionCopySections.exportEverything(
             from: FakeArchive(), serverName: "Marfa", instance: { open },
             folder: {
                 Issue.record("no folder is asked for")
                 return folder
             })
         #expect(unknown?.failureMessage?.contains("can’t yet tell") == true)
-        let cancelled = await OnThisMacPage.exportEverything(
+        let cancelled = await ConnectionCopySections.exportEverything(
             from: FakeArchive(), serverName: "Marfa", instance: { "instance-one" }, folder: { nil })
         #expect(cancelled == nil)
     }
@@ -490,8 +490,8 @@ private extension Result where Failure == LibraryExport.Failure {
 
 @Suite(.hangLimit) struct DownloadAlertTests {
     @Test func theAlertSaysWhatHappensToChangesNotYetSent() {
-        #expect(!OnThisMacPage.downloadMessage(name: "Castell Studio", unsent: 0).contains("not yet sent"))
-        let kept = OnThisMacPage.downloadMessage(name: "Castell Studio", unsent: 3)
+        #expect(!ConnectionCopySections.downloadMessage(name: "Castell Studio", unsent: 0).contains("not yet sent"))
+        let kept = ConnectionCopySections.downloadMessage(name: "Castell Studio", unsent: 3)
         #expect(kept.contains("3 changes") && kept.contains("stay on this Mac"))
     }
 }

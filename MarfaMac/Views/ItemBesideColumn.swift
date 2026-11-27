@@ -36,7 +36,7 @@ struct BesideColumn: ViewModifier {
 
     func body(content: Content) -> some View {
         let _ = layouts
-        let isShown = browser.showsBesidePage(opening: browser.chosenOpening ?? opening)
+        let isShown = browser.showsBesidePage(opening: browser.itemOpening(settings: opening))
         let pageWidth = Self.pageWidth(in: shared)
         HStack(spacing: 0) {
             // Neither side holds a least width. The split view adds the sidebar and the panel over the column to its least

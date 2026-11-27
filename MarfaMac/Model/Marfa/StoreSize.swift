@@ -1,12 +1,12 @@
 import Foundation
 
-/// How much room the copy of a library takes on this Mac: every file in its store folder, which the package does not
-/// report (it reports the bytes of downloaded files only).
+/// Reads and formats the local copy’s sizes while Connection is open.
 nonisolated enum StoreSize {
-    /// The bytes of every regular file under `directory`, or nil where the folder cannot be read.
+    /// The allocated bytes of every regular file under the copy's folder.
     @concurrent static func bytes(of directory: URL) async -> UInt64? { sum(of: directory) }
 
-    static func sum(of directory: URL) -> UInt64? {
+    private static func sum(of directory: URL) -> UInt64? {
+        guard (try? directory.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true else { return nil }
         guard let files = FileManager.default.enumerator(
             at: directory, includingPropertiesForKeys: [.totalFileAllocatedSizeKey, .isRegularFileKey], options: [])
         else { return nil }
@@ -24,22 +24,13 @@ nonisolated enum StoreSize {
     static func text(_ bytes: UInt64) -> String {
         ByteCountFormatter.string(fromByteCount: Int64(clamping: bytes), countStyle: .file)
     }
-}
 
-nonisolated extension StoreSize {
-    /// How often the page sums the copy's folder while it stays open: a sum walks every file, so a changing size is read
-    /// slowly and the page's own steps sum it at once.
-    static let interval: Duration = .seconds(30)
-
-    /// Runs `sum` now, then again after each `interval` until cancelled. `pause` is the wait, so a test can stand in for it.
-    static func keepSumming(
-        every interval: Duration = StoreSize.interval, pause: (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
-        sum: () async -> Void
-    ) async {
-        await sum()
+    /// Reads now and every 30 seconds until the page closes.
+    static func keepReading(_ read: () async -> Void) async {
+        await read()
         while !Task.isCancelled {
-            do { try await pause(interval) } catch { return }
-            await sum()
+            do { try await Task.sleep(for: .seconds(30)) } catch { return }
+            await read()
         }
     }
 }

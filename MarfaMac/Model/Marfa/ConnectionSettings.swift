@@ -1,6 +1,6 @@
 import Foundation
 
-/// What Connection's "This App’s Settings" section says in each state of `PreferencesSync.Standing`, in the app's words.
+/// What General says about settings kept in the Marfa, and what Disconnect says about removing them.
 nonisolated struct ConnectionSettings: Equatable, Sendable {
     nonisolated enum Action: Equatable, Sendable {
         /// Moves the settings out of the Marfa.
@@ -21,9 +21,9 @@ nonisolated struct ConnectionSettings: Equatable, Sendable {
 
     var title: String {
         switch standing {
-        case .syncing: String(localized: "Kept in \(name)")
-        case .off(.needsPermission), .off(.removed), .off(.noMarfa): String(localized: "Kept on This Mac Only")
-        case .off(.notFilled): String(localized: "Not Ready Yet")
+        case .syncing: String(localized: "Kept in this Marfa")
+        case .off(.needsPermission), .off(.removed), .off(.noMarfa): String(localized: "Kept on this Mac only")
+        case .off(.notFilled): String(localized: "Not ready yet")
         }
     }
 
@@ -54,11 +54,6 @@ nonisolated struct ConnectionSettings: Equatable, Sendable {
         case .keepAgain: String(localized: "Keep in Marfa Again")
         case .none: nil
         }
-    }
-
-    /// What stays on each Mac, whatever the state.
-    static var footer: String {
-        String(localized: "Each Mac keeps its own window sizes and positions, column widths, global shortcuts, and On This Mac settings.")
     }
 
     /// The question before Remove… takes the settings out of the Marfa.

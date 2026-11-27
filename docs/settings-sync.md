@@ -15,7 +15,7 @@ paths:
 | Home | What it holds |
 | --- | --- |
 | The Marfa's own data | Items, types, views and the sign-in's grants. Never an app setting |
-| This app's settings | Settings that follow the person to another Mac, such as New Opens |
+| This app's settings | Settings that follow the person, such as New item opens as |
 | This Mac only | Widths, last place, playback places, recent kinds, New Item's tags and parents, any-app shortcuts, error-report consent, export plans |
 
 - **A setting has the narrowest home a person would expect**, and one home only. `PreferencesMap` names it, and a test fails for a key it does not place.
@@ -64,7 +64,7 @@ paths:
 
 ## Removing and disconnecting
 
-- **Remove… in Connection moves every settings item to the bin** and stops writing until Keep in Marfa Again. This Mac keeps its own settings.
+- **Remove… in General queues removal and stops sync**, even offline. Keep in Marfa Again resumes sync. Local settings stay.
 - **Disconnect can remove them too, and only with Keep Copy.** A removal sends the whole queue, which must not carry a discarded change.
 - **The app signs out only after the server has taken the removal.** If that fails, it stays connected.
 

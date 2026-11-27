@@ -93,7 +93,7 @@ The server one person owns, and the source of every item the app shows.
 
 **In the app:** links in text and as rows, and everything that points at an item, gathered beside its page.
 
-- **Every link opens as Settings says** (Open Items), wherever it stands: text, a row, the panel, a card.
+- **Links in text, rows, panels and cards follow the opening preference** (General’s Open items in setting or the place’s Open Items choice).
 - **A link to an item is its mark and its current name.** A link that cannot be resolved stays as it was written.
 - **Opening a link never changes anything.**
 

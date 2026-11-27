@@ -9,10 +9,17 @@ struct ItemOpeningTests {
     @Test func whatAPersonChoseIsKeptAndNothingStoredOpensBesideTheList() {
         let defaults = ThrowawayDefaults.make("ItemOpeningTests")
         #expect(ItemOpening.stored(in: defaults) == .besideList)
-        for way in ItemOpening.allCases {
+        for way in ItemOpening.defaultChoices {
             defaults.set(way.rawValue, forKey: ListKey.openItemsIn)
             #expect(ItemOpening.stored(in: defaults) == way)
         }
+    }
+
+    @Test func newWindowRemainsACommandAndIsReadAsTheDefaultBesideTheList() {
+        let defaults = ThrowawayDefaults.make("ItemOpeningTests")
+        defaults.set(ItemOpening.newWindow.rawValue, forKey: ListKey.openItemsIn)
+        #expect(ItemOpening.stored(in: defaults) == .besideList)
+        #expect(RowMenuEntry.entries(opening: .besideList, inBin: false).contains(.openAs(.newWindow)))
     }
 
     @Test func aWordThisCopyDoesNotKnowIsReadAsTheStandardAndLeftStored() {
