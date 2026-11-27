@@ -19,7 +19,7 @@ import Testing
         let needing = words(.off(.needsPermission))
         #expect(needing.title == "Kept on this Mac only")
         #expect(needing.line == "The app isn’t allowed to keep them in Home yet. Once it is, every Mac that connects uses them.")
-        #expect(needing.action == .allowMore && needing.actionTitle == "Allow More…")
+        #expect(needing.action == .allowMore && needing.actionTitle == "Allow More")
     }
 
     @Test func removedSettingsStayOnThisMacUntilThePersonKeepsThemAgain() {
@@ -38,7 +38,7 @@ import Testing
         #expect(syncing.actionTitle == "Remove…")
     }
 
-    /// The section's state is the sync's own, so Allow More… moving it on needs nothing else.
+    /// The section's state is the sync's own, so Allow More moving it on needs nothing else.
     @Test func theSectionFollowsTheSyncsStanding() async throws {
         let defaults = ThrowawayDefaults.make("ConnectionSettingsTests")
         let copy = FakePreferencesCopy()

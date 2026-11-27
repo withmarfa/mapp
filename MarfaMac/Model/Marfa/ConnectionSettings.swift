@@ -50,7 +50,7 @@ nonisolated struct ConnectionSettings: Equatable, Sendable {
     var actionTitle: String? {
         switch action {
         case .remove: String(localized: "Remove…")
-        case .allowMore: String(localized: "Allow More…")
+        case .allowMore: String(localized: "Allow More")
         case .keepAgain: String(localized: "Keep in Marfa Again")
         case .none: nil
         }

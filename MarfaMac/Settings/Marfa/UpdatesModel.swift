@@ -97,7 +97,7 @@ import Observation
         return !needsMaintain && status.checksAutomatically && !isChecking && !isUpdating
     }
 
-    /// Whether the sign-in lacks `instance.maintain`, which Update and Check for Updates need: the page offers Allow More… first.
+    /// Whether the sign-in lacks `instance.maintain`, which Update and Check for Updates need: the page offers Allow More first.
     var needsMaintain: Bool { !context.grants().contains(.instanceMaintain) }
 
     func checkForUpdates() async {

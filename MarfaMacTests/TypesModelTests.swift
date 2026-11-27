@@ -1476,7 +1476,7 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         let missing = try answer(#"{"changes":["guidance"],"required_scope":"schema.write"}"#, status: 403, code: "forbidden")
         #expect(
             ServerTypeCalls.failure(MarfaError.forbidden(code: "forbidden", message: "Forbidden", server: missing))
-                == .owner(.notPermitted("schema.write")), "a missing permission shows Allow More…, not the command")
+                == .owner(.notPermitted("schema.write")), "a missing permission shows Allow More, not the command")
     }
 
     @Test func aSignInSheetTheOwnerClosedIsNotAFailure() {

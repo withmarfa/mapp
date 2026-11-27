@@ -242,7 +242,7 @@ private struct KeyDetail: View {
         }
     }
 
-    /// The expiry with Extend…, which only a sign-in holding Manage Keys may use. Without it the row says so, with Allow More….
+    /// The expiry with Extend…, which only a sign-in holding Manage Keys may use. Without it the row says so, with Allow More.
     @ViewBuilder private var expires: some View {
         let ends = key.expires.map { OwnerWording.day($0) } ?? String(localized: "Never")
         if !model.canExtend {

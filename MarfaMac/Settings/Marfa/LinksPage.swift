@@ -174,7 +174,7 @@ struct NewLinkTypeSheet: View {
                         SettingsProblemRow(
                             title: Text("Not Made"), line: Text(verbatim: line), symbol: "lock", tone: nil,
                             actions: [
-                                SettingsProblemAction(host.isAllowingMore ? "Waiting…" : "Allow More…") { Task { await model.allowMore() } }
+                                SettingsProblemAction(host.isAllowingMore ? "Waiting…" : "Allow More") { Task { await model.allowMore() } }
                             ])
                             .disabled(host.isAllowingMore)
                     }

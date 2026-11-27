@@ -344,7 +344,7 @@ private struct PluginDetail: View {
         return String(localized: "Based on \(model.typeTitle(parent)). ") + count
     }
 
-    /// The connector's row, which opens the connector's own page, where Allow More… is asked if that page needs it.
+    /// The connector's row, which opens the connector's own page, where Allow More is asked if that page needs it.
     private func connectorRow(_ connector: InstalledPlugin.Connector) -> some View {
         let line: String
         if plugin.host != nil, let name = model.hostName(of: plugin) {

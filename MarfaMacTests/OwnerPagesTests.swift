@@ -918,7 +918,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     }
 }
 
-/// What a context lends a model in a test, with the grants it holds and what Allow More… answers.
+/// What a context lends a model in a test, with the grants it holds and what Allow More answers.
 @MainActor final class OwnerBench {
     let calls = FakeOwnerCalls()
     var grants: Set<InstancePermission>
