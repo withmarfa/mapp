@@ -290,7 +290,7 @@ struct AlreadyInMarfaTests {
 
     // MARK: The check itself
 
-    @Test func aCheckPastItsLimitAddsEveryFileOnceTheLookupEnds() async {
+    @Test func aCheckPastItsLimitAddsEveryFileWithoutAnAnswer() async {
         let library = FakeItemLibrary()
         let gate = Parked()
         let sawCancel = Mutex(false)
@@ -315,7 +315,7 @@ struct AlreadyInMarfaTests {
         #expect(asking.question == nil)
         gate.open()
         #expect(await checking.value == .addingAll(count: 1))
-        #expect(finishedCancelled.withLock { $0 })
+        #expect(await eventually { finishedCancelled.withLock { $0 } })
         #expect(asking.question == nil)
     }
 
@@ -359,9 +359,9 @@ struct AlreadyInMarfaTests {
         watched.withLock { $0 = staged.resolvingSymlinksInPath().path }
         #expect(FileManager.default.fileExists(atPath: staged.path), "the staged copy is held while the cancelled lookup runs")
         #expect(stops.withLock { $0 } == 0)
-        #expect(library.addedFiles.isEmpty)
+        #expect(await eventually(within: .seconds(2)) { library.addedFiles.map(\.name) == ["IMG.png"] })
         gate.open()
-        #expect(await eventually { library.addedFiles.map(\.name) == ["IMG.png"] })
+        try #require(await eventually { atEnd.withLock { $0 != nil } })
         let end = try #require(atEnd.withLock { $0 })
         #expect(end.cancelled && end.readable && end.stops == 0)
         #expect(await eventually { stops.withLock { $0 } == 1 && !FileManager.default.fileExists(atPath: staged.path) })
@@ -401,12 +401,13 @@ struct AlreadyInMarfaTests {
         #expect(await eventually { sawCancel.withLock { $0 } })
         #expect(FileManager.default.isReadableFile(atPath: real.path))
         #expect(stops.withLock { $0 } == 0)
-        #expect(library.addedFiles.isEmpty)
+        #expect(await eventually(within: .seconds(2)) { library.addedFiles.map(\.name) == ["photo.png"] })
         gate.open()
         #expect(await adding.value.count == 1)
+        try #require(await eventually { atEnd.withLock { $0 != nil } })
         let end = try #require(atEnd.withLock { $0 })
         #expect(end.cancelled && end.name == "photo.png" && end.readable && end.stops == 0)
-        #expect(stops.withLock { $0 } == 1)
+        #expect(await eventually { stops.withLock { $0 } == 1 })
         #expect(library.addedFiles.map(\.name) == ["photo.png"])
     }
 

@@ -221,10 +221,24 @@ enum AlreadyInMarfa {
         }
     }
 
-    /// Checks `files` against what the library holds and, on a match, asks through `asking`. The caller keeps each
-    /// file's access and any staged copy until this returns: a time-out cancels the lookup and waits until that
-    /// cancelled lookup has ended, then every file is added. The caller takes no access here.
-    static func check(_ files: [URL], in library: any ItemLibrary, asking: Asking, within requested: Duration = limit) async -> Plan {
+    /// A cancelled lookup may still be reading after the add finishes.
+    final class FileLifetime {
+        fileprivate var lateLookup: Task<FileMatches, Never>?
+
+        func afterLookup(_ release: @escaping @MainActor () -> Void) {
+            guard let lateLookup else { return release() }
+            Task {
+                _ = await lateLookup.value
+                release()
+            }
+        }
+    }
+
+    /// A timeout lets the add proceed. The caller releases grants and staged copies through the batch's lifetime.
+    static func check(
+        _ files: [URL], in library: any ItemLibrary, asking: Asking,
+        lifetime: FileLifetime = FileLifetime(), within requested: Duration = limit
+    ) async -> Plan {
         guard !files.isEmpty else { return .addingAll(count: 0) }
         #if DEBUG
         let limit = limitOverride ?? requested
@@ -252,7 +266,7 @@ enum AlreadyInMarfa {
         case .answered(let answers):
             return await decide(files, answers: answers, in: library, asking: asking)
         case .timedOut:
-            _ = await lookupTask.value
+            lifetime.lateLookup = lookupTask
             return .addingAll(count: files.count)
         }
     }

@@ -1002,7 +1002,9 @@ extension Browser {
                 typed.files = asked.indices.filter { !skipped.contains($0) }.map { asked[$0] }
                 quickAdd.draft?.files = typed.files
             }
-            let plan = await AlreadyInMarfa.check(asked.map(\.url), in: library, asking: quickAdd.alreadyInMarfa)
+            let lifetime = AlreadyInMarfa.FileLifetime()
+            let plan = await AlreadyInMarfa.check(asked.map(\.url), in: library, asking: quickAdd.alreadyInMarfa, lifetime: lifetime)
+            lifetime.afterLookup { withExtendedLifetime(asked) {} }
             quickAdd.alreadyInMarfa.onSkip = nil
             quickAdd.checking(false)
             if plan.isCancelled { return nil }

@@ -23,21 +23,24 @@ extension EditorController {
         }
         Task {
             let held = prepared.compactMap(\.1)
-            defer { held.forEach { $0.close() } }
             let staged = Self.stageForChecking(prepared.map(\.0))
-            let plan = await AlreadyInMarfa.check(staged.urls, in: asked, asking: alreadyInMarfa)
-            let skipped = staged.urls.count - plan.adding.count
-            guard !plan.isCancelled else {
-                staged.remove()
-                return
+            let lifetime = AlreadyInMarfa.FileLifetime()
+            var kept: Set<URL> = []
+            defer {
+                lifetime.afterLookup { [kept, directory = staged.directory] in
+                    ImageCheckBatch.remove(directory, keeping: kept)
+                    held.forEach { $0.close() }
+                }
             }
+            let plan = await AlreadyInMarfa.check(staged.urls, in: asked, asking: alreadyInMarfa, lifetime: lifetime)
+            let skipped = staged.urls.count - plan.adding.count
+            guard !plan.isCancelled else { return }
             let adding = Set(plan.adding)
             let chosen = staged.entries.filter { entry in
                 guard let index = entry.checkIndex else { return true }
                 return adding.contains(index)
             }
             guard !chosen.isEmpty else {
-                staged.remove()
                 tellSkipped(skipped, matches: plan.show)
                 return
             }
@@ -57,7 +60,7 @@ extension EditorController {
                 unplaced: placed ? [] : embeds.map(\.name), refused: notPlaced,
                 copies: keptCopies, in: asked.item(pageItemID)?.title ?? "", to: asked
             )
-            staged.remove(keeping: Set(keptCopies))
+            kept = Set(keptCopies)
             tellSkipped(skipped, matches: plan.show)
         }
         return true
@@ -154,7 +157,7 @@ extension EditorController {
         var urls: [URL] { entries.compactMap(\.url) }
 
         /// Removes the staged copies. A URL in `kept` is left: its attach could not be saved, so the person can still get it.
-        func remove(keeping kept: Set<URL> = []) {
+        static func remove(_ directory: URL?, keeping kept: Set<URL>) {
             guard let directory else { return }
             let kept = Set(kept.map { $0.resolvingSymlinksInPath() })
             guard !kept.isEmpty else {

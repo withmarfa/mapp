@@ -20,7 +20,7 @@ extension Browser {
     func importFiles(
         _ urls: [URL], unreadable: Int = 0, to target: FileDropTarget? = nil,
         in library: any ItemLibrary, order: ItemOrder, undoManager: UndoManager?, toasts: ToastPresenter? = nil,
-        waiting: Duration = .seconds(10)
+        waiting: Duration = .seconds(10), releaseCopies: @escaping @MainActor () -> Void = {}
     ) async -> [ItemID] {
         let target = target ?? fileDropTarget(in: library)
         var files: [QuickAdd.File] = []
@@ -33,7 +33,9 @@ extension Browser {
             }
         }
         QuickAdd.File.tellUnreadable(notRead, unreadable: unreadable, to: library.notices)
-        let plan = await AlreadyInMarfa.check(files.map(\.url), in: library, asking: alreadyInMarfa)
+        let lifetime = AlreadyInMarfa.FileLifetime()
+        defer { lifetime.afterLookup { [files] in withExtendedLifetime(files, releaseCopies) } }
+        let plan = await AlreadyInMarfa.check(files.map(\.url), in: library, asking: alreadyInMarfa, lifetime: lifetime)
         guard !plan.isCancelled else { return [] }
         let skipped = files.count - plan.adding.count
         let show: (@MainActor () -> Void)?
@@ -103,8 +105,7 @@ extension Browser {
             let gathered = await FileIntake.files(from: providers)
             await importFiles(
                 gathered.urls, unreadable: gathered.unreadable, to: target, in: library, order: order,
-                undoManager: undoManager, toasts: toasts)
-            gathered.remove()
+                undoManager: undoManager, toasts: toasts, releaseCopies: gathered.remove)
         }
     }
 
