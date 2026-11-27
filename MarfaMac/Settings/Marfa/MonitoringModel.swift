@@ -21,8 +21,8 @@ nonisolated enum MonitoringSecret: String, CaseIterable, Hashable, Sendable, Ide
     var title: String {
         switch self {
         case .heartbeatAddress, .telemetryAddress: String(localized: "Address")
-        case .postHogHost: String(localized: "Error Reports Address")
-        case .postHogToken: String(localized: "Project Token")
+        case .postHogHost: String(localized: "Error reports address")
+        case .postHogToken: String(localized: "Project token")
         case .telemetryHeaders: String(localized: "Headers")
         }
     }
@@ -47,7 +47,7 @@ nonisolated enum MonitoringSecret: String, CaseIterable, Hashable, Sendable, Ide
         switch self {
         case .heartbeatAddress: String(localized: "The server stops sending its heartbeat.")
         case .postHogHost, .postHogToken: String(localized: "The PostHog host and the project token are removed together, and error reports stop.")
-        case .telemetryAddress: String(localized: "The server stops sending telemetry.")
+        case .telemetryAddress: String(localized: "Telemetry stops using this address. Separate destinations for traces, logs, metrics and error reports still apply.")
         case .telemetryHeaders: String(localized: "Telemetry is sent without these headers.")
         }
     }
@@ -258,9 +258,9 @@ struct MonitoringSecretSheet: Identifiable, Equatable {
     private static func name(_ key: String) -> String {
         if let secret = MonitoringSecret.allCases.first(where: { $0.key == key }) { return secret.title }
         switch key {
-        case "heartbeat_enabled": return String(localized: "Send a Heartbeat")
-        case "error_reporting_enabled": return String(localized: "Report Errors")
-        case "telemetry_enabled": return String(localized: "Send Telemetry")
+        case "heartbeat_enabled": return String(localized: "Send a heartbeat")
+        case "error_reporting_enabled": return String(localized: "Report errors")
+        case "telemetry_enabled": return String(localized: "Send telemetry")
         default: return key
         }
     }

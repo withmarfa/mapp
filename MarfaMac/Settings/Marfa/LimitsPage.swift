@@ -28,7 +28,7 @@ struct LimitsPage: View {
                 SettingsPageColumn {
                     limitSections
                     if let readFailure {
-                        OwnerProblem(title: "Couldn’t Read Start-Up Settings", failure: readFailure, page: .limits, host: host) { Task { await readStartUp() } }
+                        OwnerProblem(title: "Couldn’t read start-up settings", failure: readFailure, page: .limits, host: host) { Task { await readStartUp() } }
                     } else if let readOnlyStartUp { StartUpSettings(rows: readOnlyStartUp) }
                 }
             }
@@ -96,9 +96,9 @@ struct LimitsPage: View {
 
     @ViewBuilder private var rateLimitSwitch: some View {
         if host.grants.contains(.configManage) {
-            switchRow("Limit Requests", key: LimitSetting.rateLimitSwitch)
+            switchRow("Limit requests", key: LimitSetting.rateLimitSwitch)
         } else {
-            LockedInstanceRow(title: String(localized: "Limit Requests"), permission: .configManage, host: host)
+            LockedInstanceRow(title: String(localized: "Limit requests"), permission: .configManage, host: host)
         }
     }
 

@@ -1,8 +1,6 @@
 import Marfa
 import SwiftUI
 
-/// The Housekeeping page: the jobs the server runs by itself, how often, when each last ran and how it went, and the problem
-/// that holds clean-up: the server's clock reading far past the time it last trusted. Confirm Date… asks first.
 struct HousekeepingPage: View {
     let host: any MarfaSettingsHost
     @State private var model: HousekeepingModel
@@ -69,7 +67,7 @@ struct HousekeepingPage: View {
     @ViewBuilder private var jobsContent: some View {
         if !host.grants.contains(.instanceRead) {
             SettingsSection("Jobs") {
-                LockedInstanceRow(title: String(localized: "Scheduled Jobs"), permission: .instanceRead, host: host)
+                LockedInstanceRow(title: String(localized: "Scheduled jobs"), permission: .instanceRead, host: host)
             }
         } else if let failure = model.failure {
             OwnerFailureState(page: .housekeeping, failure: failure, host: host) { Task { await model.load() } }
@@ -117,9 +115,9 @@ struct HousekeepingPage: View {
 
     private func confirmAction(_ hold: ClockHold) -> SettingsProblemAction {
         if host.grants.contains(.instanceMaintain) {
-            SettingsProblemAction("Confirm Date…") { Task { await model.askToConfirm(health: host.health) } }
+            SettingsProblemAction("Confirm Date") { Task { await model.askToConfirm(health: host.health) } }
         } else {
-            SettingsProblemAction("Allow More…") { host.askForMore(naming: InstancePermission.instanceMaintain.rawValue) }
+            SettingsProblemAction("Allow More") { host.askForMore(naming: InstancePermission.instanceMaintain.rawValue) }
         }
     }
 

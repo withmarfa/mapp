@@ -37,8 +37,8 @@ struct FileStoragePage: View {
                 }
                 SettingsSection("Files from the Web") {
                     if catalog.setting(LimitSetting.fetchSwitch)?.value?.bool != nil {
-                        SettingsRow("Let Agents Fetch Files", line: "From a web address, or a file attached in a chat.", error: catalog.lines[LimitSetting.fetchSwitch]) {
-                            SettingsToggle(title: "Let Agents Fetch Files", isOn: Binding { catalog.isOn(LimitSetting.fetchSwitch) } set: { on in
+                        SettingsRow("Let agents fetch files", line: "From a web address, or a file attached in a chat.", error: catalog.lines[LimitSetting.fetchSwitch]) {
+                            SettingsToggle(title: "Let agents fetch files", isOn: Binding { catalog.isOn(LimitSetting.fetchSwitch) } set: { on in
                                 Task { await catalog.setSwitch(LimitSetting.fetchSwitch, on) }
                             })
                             .disabled(catalog.saving.contains(LimitSetting.fetchSwitch))
@@ -59,10 +59,10 @@ struct FileStoragePage: View {
     private func files(_ catalog: LimitsModel) -> some View {
         SettingsSection("Files") {
             if !host.grants.contains(.instanceRead) {
-                LockedInstanceRow(title: String(localized: "File Storage Details"), permission: .instanceRead, host: host)
+                LockedInstanceRow(title: String(localized: "File storage details"), permission: .instanceRead, host: host)
             } else if let failure = storage.failure {
                 OwnerProblemRow(
-                    title: "Couldn’t Read Where Files Are", failure: failure, page: .fileStorage, host: host,
+                    title: "Couldn’t read where files are", failure: failure, page: .fileStorage, host: host,
                     retry: { Task { await storage.load() } })
             } else if let stores = storage.stores {
                 ForEach(stores.stores) { store in storeRow(store) }
@@ -71,11 +71,11 @@ struct FileStoragePage: View {
                 }
                 if let failure = storage.fileBytesFailure {
                     OwnerProblemRow(
-                        title: "Couldn’t Read the Total File Size", failure: failure, page: .fileStorage, host: host,
+                        title: "Couldn’t read the total file size", failure: failure, page: .fileStorage, host: host,
                         retry: { Task { await storage.load() } })
                 }
             } else {
-                SettingsRow("Reading Where Files Are…") { ProgressView().controlSize(.small) }
+                SettingsRow("Reading where files are…") { ProgressView().controlSize(.small) }
             }
             InstanceChoiceRow(model: model, setting: .blobMinCopies, among: all, catalog: catalog)
             InstanceNumberRow(model: model, setting: .diskReserveMegabytes, among: all, catalog: catalog, unit: "MB", line: "Uploads stop below this.")
@@ -88,9 +88,9 @@ struct FileStoragePage: View {
     private func storeRow(_ store: FileStoreRow) -> some View {
         let title: String =
             switch store.kind {
-            case .disk: String(localized: "This Marfa’s Disk")
-            case .folder: String(localized: "Backup Folder")
-            case .objectStore: String(localized: "Object Store")
+            case .disk: String(localized: "This Marfa’s disk")
+            case .folder: String(localized: "Backup folder")
+            case .objectStore: String(localized: "Object store")
             }
         return SettingsRow(
             title: Text(verbatim: title), line: store.error == nil ? Text(verbatim: store.locator) : nil,
@@ -109,7 +109,7 @@ struct FileStoragePage: View {
     @ViewBuilder private var unused: some View {
         if storage.failure == nil, let stores = storage.stores {
             if stores.orphanCount == 0 {
-                SettingsRow("No Unused Files", line: "Nothing is waiting to be removed.")
+                SettingsRow("No unused files", line: "Nothing is waiting to be removed.")
             } else {
                 let size = Int64(stores.orphanBytes).formatted(.byteCount(style: .file))
                 let more = stores.orphansComplete ? "" : "+"

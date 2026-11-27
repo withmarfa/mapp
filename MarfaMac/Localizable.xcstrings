@@ -2942,9 +2942,6 @@
     "Back 15 Seconds" : {
 
     },
-    "Back Up" : {
-
-    },
     "Back Up Every" : {
 
     },
@@ -2978,6 +2975,9 @@
     "Back to Timeline" : {
       "extractionState" : "manual"
     },
+    "Back up" : {
+
+    },
     "Backing Up…" : {
 
     },
@@ -2985,6 +2985,9 @@
 
     },
     "Backup Folder Not Kept" : {
+
+    },
+    "Backup folder" : {
 
     },
     "Backups" : {
@@ -3384,6 +3387,9 @@
     "Change Density" : {
 
     },
+    "Change Error Reports Address" : {
+
+    },
     "Change Keep Versions to %@?" : {
 
     },
@@ -3400,6 +3406,9 @@
 
     },
     "Change Password" : {
+
+    },
+    "Change Project Token" : {
 
     },
     "Change Properties" : {
@@ -3529,9 +3538,6 @@
     "Check Document Now" : {
 
     },
-    "Check Files Are Intact" : {
-
-    },
     "Check a source too. With none, no app or key could add items of these types." : {
 
     },
@@ -3541,10 +3547,16 @@
     "Check automatically" : {
 
     },
+    "Check files are intact" : {
+
+    },
     "Check for Updates" : {
 
     },
     "Check for Updates…" : {
+
+    },
+    "Check for updates" : {
 
     },
     "Check spelling" : {
@@ -3855,9 +3867,6 @@
     "Confirm Date" : {
 
     },
-    "Confirm Date…" : {
-
-    },
     "Confirmed the clock" : {
 
     },
@@ -3897,12 +3906,6 @@
     "Connector Deliveries" : {
 
     },
-    "Connector Deliveries, Handled" : {
-
-    },
-    "Connector Deliveries, Waiting" : {
-
-    },
     "Connector Link Not Shown Again" : {
 
     },
@@ -3910,6 +3913,12 @@
 
     },
     "Connector Not Added" : {
+
+    },
+    "Connector deliveries handled" : {
+
+    },
+    "Connector deliveries waiting" : {
 
     },
     "Connectors" : {
@@ -3952,7 +3961,7 @@
     "Copies" : {
 
     },
-    "Copies of Each File" : {
+    "Copies of each file" : {
 
     },
     "Copy" : {
@@ -3973,9 +3982,6 @@
     "Copy File Paths takes up to %lld items at once, because each file is fetched. Choose fewer items." : {
 
     },
-    "Copy Files to Storage" : {
-
-    },
     "Copy Link" : {
 
     },
@@ -3989,6 +3995,9 @@
       "extractionState" : "manual"
     },
     "Copy Wiki Link" : {
+
+    },
+    "Copy files to storage" : {
 
     },
     "Copy the Key Now" : {
@@ -4066,9 +4075,6 @@
     "Couldn’t Read Its Data" : {
 
     },
-    "Couldn’t Read Start-Up Settings" : {
-
-    },
     "Couldn’t Read This Folder" : {
 
     },
@@ -4081,16 +4087,10 @@
     "Couldn’t Read This Type’s Guidance" : {
 
     },
-    "Couldn’t Read Where Files Are" : {
-
-    },
     "Couldn’t Read the Keys This App Made" : {
 
     },
     "Couldn’t Read the Rules" : {
-
-    },
-    "Couldn’t Read the Total File Size" : {
 
     },
     "Couldn’t Remove This App’s Settings" : {
@@ -4198,6 +4198,9 @@
     "Couldn’t read private addresses" : {
 
     },
+    "Couldn’t read start-up settings" : {
+
+    },
     "Couldn’t read the name" : {
 
     },
@@ -4205,6 +4208,12 @@
 
     },
     "Couldn’t read the release" : {
+
+    },
+    "Couldn’t read the total file size" : {
+
+    },
+    "Couldn’t read where files are" : {
 
     },
     "Couldn’t remove downloaded files. %@" : {
@@ -4360,9 +4369,6 @@
     "Delete Items" : {
 
     },
-    "Delete Items Past Their Time in Trash" : {
-
-    },
     "Delete Link Type" : {
 
     },
@@ -4387,7 +4393,10 @@
     "Delete View…" : {
       "extractionState" : "manual"
     },
-    "Delete from Trash After" : {
+    "Delete from Trash after" : {
+
+    },
+    "Delete items past their time in Trash" : {
 
     },
     "Delete the collection “%@”?" : {
@@ -4802,7 +4811,7 @@
     "Error Reports" : {
 
     },
-    "Error Reports Address" : {
+    "Error reports address" : {
 
     },
     "Event" : {
@@ -5033,13 +5042,13 @@
     "File Not in the Text" : {
       "extractionState" : "manual"
     },
-    "File Storage Details" : {
-
-    },
     "File Unavailable" : {
       "extractionState" : "manual"
     },
     "File could not be loaded" : {
+
+    },
+    "File storage details" : {
 
     },
     "Files" : {
@@ -5307,9 +5316,6 @@
     },
     "Go to Today" : {
       "extractionState" : "manual"
-    },
-    "Going back to the default for “%@” uses the server’s own default, which the app can’t read. That may remove %@ sooner than the server’s current setting, %@. What it removes can’t be recovered." : {
-
     },
     "Graphite" : {
 
@@ -6128,12 +6134,6 @@
     "Keep Copy and Switch" : {
       "extractionState" : "manual"
     },
-    "Keep Every Version For" : {
-
-    },
-    "Keep Free on Disk" : {
-
-    },
     "Keep My Edit" : {
       "extractionState" : "manual"
     },
@@ -6152,6 +6152,12 @@
           }
         }
       }
+    },
+    "Keep every version for" : {
+
+    },
+    "Keep free on disk" : {
+
     },
     "Keep in Library" : {
 
@@ -6244,19 +6250,19 @@
     "Large Cards" : {
 
     },
-    "Largest Bulk Request" : {
+    "Largest bulk request" : {
 
     },
-    "Largest Delivery" : {
+    "Largest delivery" : {
 
     },
-    "Largest File" : {
+    "Largest file" : {
 
     },
-    "Largest File Read" : {
+    "Largest file read" : {
 
     },
-    "Largest Request" : {
+    "Largest request" : {
 
     },
     "Last Backup" : {
@@ -6341,7 +6347,7 @@
     "Length" : {
 
     },
-    "Let Agents Fetch Files" : {
+    "Let agents fetch files" : {
 
     },
     "Lets webhooks and the heartbeat reach this network." : {
@@ -6365,13 +6371,13 @@
     "Limit Not Changed" : {
 
     },
-    "Limit Requests" : {
-
-    },
     "Limit Sources" : {
 
     },
     "Limit Sources Not Saved" : {
+
+    },
+    "Limit requests" : {
 
     },
     "Limits" : {
@@ -6503,7 +6509,7 @@
     "Look After This Marfa" : {
 
     },
-    "Look for Problems" : {
+    "Look for problems" : {
 
     },
     "Looking After This Marfa" : {
@@ -6764,31 +6770,28 @@
     "Most Recent" : {
 
     },
-    "Most Text Kept" : {
-
-    },
-    "Most Versions per Item" : {
-
-    },
-    "Most Viewers at Once" : {
-
-    },
     "Most connections at once." : {
 
     },
     "Most connections from one address." : {
 
     },
+    "Most text kept" : {
+
+    },
     "Most versions kept per item" : {
       "extractionState" : "manual"
+    },
+    "Most versions per item" : {
+
+    },
+    "Most viewers at once" : {
+
     },
     "Move Between Windows" : {
 
     },
     "Move Down" : {
-
-    },
-    "Move Expired Feed Items to Trash" : {
 
     },
     "Move Feed Items to Recently Deleted After" : {
@@ -6810,6 +6813,9 @@
 
     },
     "Move ^[%lld item](inflect: true) to the Feed?" : {
+
+    },
+    "Move expired Feed items to Trash" : {
 
     },
     "Move to Feed" : {
@@ -7233,9 +7239,6 @@
     "No Types of Your Own" : {
 
     },
-    "No Unused Files" : {
-
-    },
     "No Value" : {
       "extractionState" : "manual"
     },
@@ -7316,6 +7319,9 @@
     },
     "No text" : {
       "extractionState" : "manual"
+    },
+    "No unused files" : {
+
     },
     "None" : {
 
@@ -7551,7 +7557,7 @@
     "Numeric" : {
 
     },
-    "Object Store" : {
+    "Object store" : {
 
     },
     "Off" : {
@@ -8207,7 +8213,7 @@
     "Project" : {
       "extractionState" : "manual"
     },
-    "Project Token" : {
+    "Project token" : {
 
     },
     "Properties" : {
@@ -8279,19 +8285,10 @@
     "Reaches no items." : {
 
     },
-    "Read New Files" : {
-
-    },
     "Read Only" : {
       "extractionState" : "manual"
     },
     "Read Server Status" : {
-
-    },
-    "Read Text in Files" : {
-
-    },
-    "Read Text in Pictures" : {
 
     },
     "Read a file’s text" : {
@@ -8300,10 +8297,19 @@
     "Read and Edit" : {
 
     },
+    "Read new files" : {
+
+    },
     "Read only. %@ keeps this item, so a change made here would be overwritten." : {
 
     },
     "Read only. A connector keeps this item, so a change made here would be overwritten." : {
+
+    },
+    "Read text in files" : {
+
+    },
+    "Read text in pictures" : {
 
     },
     "Read the Audit Log" : {
@@ -8330,9 +8336,6 @@
     "Reading Time" : {
 
     },
-    "Reading Where Files Are…" : {
-
-    },
     "Reading downloaded files…" : {
       "extractionState" : "manual"
     },
@@ -8344,6 +8347,9 @@
     },
     "Reading the server’s settings…" : {
       "extractionState" : "manual"
+    },
+    "Reading where files are…" : {
+
     },
     "Reads %@." : {
 
@@ -8432,9 +8438,6 @@
     "Remove %@?" : {
 
     },
-    "Remove After" : {
-
-    },
     "Remove Choice" : {
 
     },
@@ -8443,12 +8446,6 @@
     },
     "Remove Downloaded Files" : {
       "extractionState" : "manual"
-    },
-    "Remove Expired Connector Deliveries" : {
-
-    },
-    "Remove Expired Sign-Ins, Keys and App Access" : {
-
     },
     "Remove Field" : {
 
@@ -8459,23 +8456,11 @@
     "Remove Filters" : {
 
     },
-    "Remove Finished Bulk Changes" : {
-
-    },
     "Remove Link" : {
 
     },
     "Remove Mark" : {
       "extractionState" : "manual"
-    },
-    "Remove Old Activity" : {
-
-    },
-    "Remove Old Events" : {
-
-    },
-    "Remove Old Table Changes" : {
-
     },
     "Remove Sort" : {
 
@@ -8492,13 +8477,22 @@
     "Remove This App’s Settings from %@?" : {
 
     },
-    "Remove Unused Files" : {
+    "Remove after" : {
 
     },
     "Remove control and text-direction characters." : {
       "extractionState" : "manual"
     },
     "Remove downloaded files" : {
+
+    },
+    "Remove expired connector deliveries" : {
+
+    },
+    "Remove expired sign-ins, keys and app access" : {
+
+    },
+    "Remove finished bulk changes" : {
 
     },
     "Remove from Collection" : {
@@ -8516,6 +8510,15 @@
     "Remove it again to finish." : {
 
     },
+    "Remove old activity" : {
+
+    },
+    "Remove old events" : {
+
+    },
+    "Remove old table changes" : {
+
+    },
     "Remove the %@?" : {
 
     },
@@ -8526,6 +8529,9 @@
 
     },
     "Remove the instance’s source filter." : {
+
+    },
+    "Remove unused files" : {
 
     },
     "Remove “%@”" : {
@@ -8645,10 +8651,10 @@
     "Reply to Ines about the zine proofs" : {
 
     },
-    "Report Errors" : {
+    "Report a Problem…" : {
 
     },
-    "Report a Problem…" : {
+    "Report errors" : {
 
     },
     "Reported %@." : {
@@ -8660,13 +8666,13 @@
     "Requests" : {
 
     },
-    "Requests That Manage Keys" : {
+    "Requests from each app or key" : {
 
     },
-    "Requests from Each App or Key" : {
+    "Requests per window" : {
 
     },
-    "Requests per Window" : {
+    "Requests that manage keys" : {
 
     },
     "Required" : {
@@ -8912,7 +8918,7 @@
     "Say today and yesterday" : {
 
     },
-    "Scheduled Jobs" : {
+    "Scheduled jobs" : {
 
     },
     "Sea" : {
@@ -9017,13 +9023,13 @@
     "Send" : {
 
     },
-    "Send Telemetry" : {
-
-    },
-    "Send a Heartbeat" : {
+    "Send a heartbeat" : {
 
     },
     "Send error reports" : {
+
+    },
+    "Send telemetry" : {
 
     },
     "Sending" : {
@@ -9085,6 +9091,12 @@
       "extractionState" : "manual"
     },
     "Set %@ first." : {
+
+    },
+    "Set Error Reports Address" : {
+
+    },
+    "Set Project Token" : {
 
     },
     "Set Where It Runs" : {
@@ -9807,10 +9819,10 @@
     "Table" : {
 
     },
-    "Table Changes" : {
+    "Table Rows Changed" : {
 
     },
-    "Table Rows Changed" : {
+    "Table changes" : {
 
     },
     "Tables" : {
@@ -9866,6 +9878,9 @@
 
     },
     "Telemetry is sent without these headers." : {
+
+    },
+    "Telemetry stops using this address. Separate destinations for traces, logs, metrics and error reports still apply." : {
 
     },
     "Template" : {
@@ -10744,9 +10759,6 @@
     "The server stops sending its heartbeat." : {
 
     },
-    "The server stops sending telemetry." : {
-
-    },
     "The server takes no backup on a schedule." : {
 
     },
@@ -10921,10 +10933,10 @@
     "Theme" : {
 
     },
-    "Then One a Day Up To" : {
+    "Then one a day up to" : {
 
     },
-    "Then One a Week Up To" : {
+    "Then one a week up to" : {
 
     },
     "There are no server settings to show for this library." : {
@@ -10993,7 +11005,7 @@
     "They’re still in that copy. To send them, install the previous version of the app and connect it to this server if it isn’t already. When it has sent them, and you’ve resolved any it can’t send, update the app again." : {
       "extractionState" : "manual"
     },
-    "Thin Old Versions" : {
+    "Thin old versions" : {
 
     },
     "Thinned old versions" : {
@@ -11080,7 +11092,7 @@
     "This Marfa takes guidance only from the command line for now. Your text is kept here." : {
 
     },
-    "This Marfa’s Disk" : {
+    "This Marfa’s disk" : {
 
     },
     "This Month" : {
@@ -11441,10 +11453,10 @@
     "Time" : {
 
     },
-    "Time Allowed" : {
+    "Time Zone" : {
 
     },
-    "Time Zone" : {
+    "Time allowed" : {
 
     },
     "Time format" : {
@@ -11882,6 +11894,9 @@
     "Username Not Changed" : {
 
     },
+    "Using the default for “%@” may remove %@ sooner than the current setting of %@. Deletion is permanent." : {
+
+    },
     "Value panels" : {
 
     },
@@ -12027,7 +12042,7 @@
     "Waiting to start" : {
 
     },
-    "Waiting, at Most" : {
+    "Waiting, at most" : {
 
     },
     "Waiting…" : {

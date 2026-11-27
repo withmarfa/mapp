@@ -401,11 +401,11 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
             [String(localized: "Audit Log"), String(localized: "Who Did What")]
         case .monitoring:
             [
-                String(localized: "Heartbeat"), String(localized: "Error Reports"), String(localized: "Telemetry"), String(localized: "Error Reports Address"),
-                String(localized: "Project Token"), String(localized: "Report Errors"),
+                String(localized: "Heartbeat"), String(localized: "Error Reports"), String(localized: "Telemetry"), String(localized: "Error reports address"),
+                String(localized: "Project token"), String(localized: "Report errors"),
             ]
         case .limits:
-            LimitSetting.limitFields.map(\.title) + [String(localized: "Rate Limits"), String(localized: "Limit Requests"), String(localized: "Requests"), String(localized: "Start-Up"), String(localized: "Set Where It Runs")]
+            LimitSetting.limitFields.map(\.title) + [String(localized: "Rate Limits"), String(localized: "Limit requests"), String(localized: "Requests"), String(localized: "Start-Up"), String(localized: "Set Where It Runs")]
         case .links:
             [String(localized: "Links Between Items"), String(localized: "New Link Type")]
         }

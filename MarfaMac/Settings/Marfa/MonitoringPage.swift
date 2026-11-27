@@ -1,7 +1,5 @@
 import SwiftUI
 
-/// The Monitoring page: the heartbeat, the error reports and the telemetry the server sends, and the addresses and tokens
-/// they go to. A secret is shown as Set or Not Set and never in full; it is changed in a sheet by typing it again.
 struct MonitoringPage: View {
     let host: any MarfaSettingsHost
     @State private var model: MonitoringModel
@@ -41,21 +39,21 @@ struct MonitoringPage: View {
                 if let notice = model.notice { OwnerNotice(title: "Changed Elsewhere", line: notice, close: { model.dismissNotice() }) }
                 SettingsSection("Heartbeat") {
                     switchRow(
-                        "Send a Heartbeat", key: "heartbeat_enabled", hasReceiver: model.heartbeatHasReceiver,
+                        "Send a heartbeat", key: "heartbeat_enabled", hasReceiver: model.heartbeatHasReceiver,
                         line: "Asks the address below on a schedule, so a monitor notices if it stops.",
                         idle: "Nothing is sent until an address is set.")
                     secretRow(.heartbeatAddress)
                 }
                 SettingsSection("Telemetry") {
                     switchRow(
-                        "Send Telemetry", key: "telemetry_enabled", hasReceiver: model.telemetryHasReceiver || model.errorReportsHaveReceiver,
+                        "Send telemetry", key: "telemetry_enabled", hasReceiver: model.telemetryHasReceiver || model.errorReportsHaveReceiver,
                         line: "Traces, logs, metrics and error reports. Off sends none of them.", idle: "Nothing is sent until a destination is set.")
                     secretRow(.telemetryAddress)
                     secretRow(.telemetryHeaders)
                 }
                 SettingsSection("Error Reports", footer: "Sent only while telemetry is on. Secrets are never shown.") {
                     switchRow(
-                        "Report Errors", key: "error_reporting_enabled", hasReceiver: model.errorReportsHaveReceiver,
+                        "Report errors", key: "error_reporting_enabled", hasReceiver: model.errorReportsHaveReceiver,
                         line: nil, idle: "Nothing is sent until the address and token are set.")
                     secretRow(.postHogHost)
                     secretRow(.postHogToken)
@@ -119,7 +117,7 @@ struct MonitoringSecretSheetView: View {
                 }
             } leading: {
                 if model.isSet(sheet.secret) {
-                    SettingsButton("Remove…", role: .destructive) {
+                    SettingsButton("Remove", role: .destructive) {
                         model.close()
                         model.askToRemove(sheet.secret)
                     }
@@ -136,7 +134,11 @@ struct MonitoringSecretSheetView: View {
     }
 
     private func title(_ sheet: MonitoringSecretSheet) -> Text {
-        model.isSet(sheet.secret) ? Text("Change \(sheet.secret.title)") : Text("Set \(sheet.secret.title)")
+        switch sheet.secret {
+        case .postHogHost: model.isSet(sheet.secret) ? Text("Change Error Reports Address") : Text("Set Error Reports Address")
+        case .postHogToken: model.isSet(sheet.secret) ? Text("Change Project Token") : Text("Set Project Token")
+        default: model.isSet(sheet.secret) ? Text("Change \(sheet.secret.title)") : Text("Set \(sheet.secret.title)")
+        }
     }
 
     /// What the sheet says about what is typed, where the server never shows it again.

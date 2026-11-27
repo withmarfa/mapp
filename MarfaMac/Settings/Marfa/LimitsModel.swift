@@ -96,30 +96,30 @@ nonisolated struct LimitSetting: Identifiable, Hashable, Sendable {
 
     private static let tebibyte = 1_099_511_627_776
 
-    static let largestRequest = bytes("max_request_bytes", String(localized: "Largest Request"), tebibyte)
+    static let largestRequest = bytes("max_request_bytes", String(localized: "Largest request"), tebibyte)
     static let largestBulkRequest = bytes(
-        "max_bulk_request_bytes", String(localized: "Largest Bulk Request"), 33_554_432)
+        "max_bulk_request_bytes", String(localized: "Largest bulk request"), 33_554_432)
     static let requestsPerWindow = LimitSetting(
-        key: "rate_limit_requests", title: String(localized: "Requests from Each App or Key"), unit: .requests, range: 1...1_000_000, requires: rateLimitSwitch)
+        key: "rate_limit_requests", title: String(localized: "Requests from each app or key"), unit: .requests, range: 1...1_000_000, requires: rateLimitSwitch)
     static let keyRequestsPerWindow = LimitSetting(
-        key: "rate_limit_keys_requests", title: String(localized: "Requests That Manage Keys"), unit: .requests, range: 1...1_000_000, requires: rateLimitSwitch)
+        key: "rate_limit_keys_requests", title: String(localized: "Requests that manage keys"), unit: .requests, range: 1...1_000_000, requires: rateLimitSwitch)
     static let window = LimitSetting(
         key: "rate_limit_window_seconds", title: String(localized: "Window"), unit: .seconds, range: 1...86_400, requires: rateLimitSwitch)
-    static let largestFileRead = bytes("enrichment_max_blob_bytes", String(localized: "Largest File Read"), tebibyte)
+    static let largestFileRead = bytes("enrichment_max_blob_bytes", String(localized: "Largest file read"), tebibyte)
     static let mostTextKept = LimitSetting(
-        key: "enrichment_max_text_chars", title: String(localized: "Most Text Kept"), unit: .characters, range: 1...100_000_000)
+        key: "enrichment_max_text_chars", title: String(localized: "Most text kept"), unit: .characters, range: 1...100_000_000)
     static let tries = LimitSetting(key: "enrichment_max_attempts", title: String(localized: "Tries"), unit: .times, range: 1...100)
-    static let largestDelivery = bytes("inbound_max_bytes", String(localized: "Largest Delivery"), tebibyte)
+    static let largestDelivery = bytes("inbound_max_bytes", String(localized: "Largest delivery"), tebibyte)
     static let deliveriesPerWindow = LimitSetting(
-        key: "rate_limit_inbound_requests", title: String(localized: "Requests per Window"), unit: .requests, range: 1...1_000_000,
+        key: "rate_limit_inbound_requests", title: String(localized: "Requests per window"), unit: .requests, range: 1...1_000_000,
         requires: rateLimitSwitch)
     static let waiting = LimitSetting(
-        key: "inbound_backlog_deliveries", title: String(localized: "Waiting, at Most"), unit: .deliveries, range: 1...1_000_000)
+        key: "inbound_backlog_deliveries", title: String(localized: "Waiting, at most"), unit: .deliveries, range: 1...1_000_000)
     static let mostViewers = LimitSetting(
-        key: "event_stream_max_viewers", title: String(localized: "Most Viewers at Once"), unit: .viewers, range: 0...1_000_000)
-    static let largestFetch = bytes("mcp_fetch_max_bytes", String(localized: "Largest File"), tebibyte, requires: fetchSwitch)
+        key: "event_stream_max_viewers", title: String(localized: "Most viewers at once"), unit: .viewers, range: 0...1_000_000)
+    static let largestFetch = bytes("mcp_fetch_max_bytes", String(localized: "Largest file"), tebibyte, requires: fetchSwitch)
     static let fetchTime = LimitSetting(
-        key: "mcp_fetch_timeout_seconds", title: String(localized: "Time Allowed"), unit: .seconds, range: 1...3_600, requires: fetchSwitch)
+        key: "mcp_fetch_timeout_seconds", title: String(localized: "Time allowed"), unit: .seconds, range: 1...3_600, requires: fetchSwitch)
 
     static let rateLimitSwitch = "rate_limit_enabled"
     static let fetchSwitch = "mcp_fetch_enabled"
@@ -240,7 +240,7 @@ nonisolated struct LimitSetting: Identifiable, Hashable, Sendable {
     }
 
     private static func name(_ key: String) -> String {
-        if key == LimitSetting.rateLimitSwitch { return String(localized: "Limit Requests") }
+        if key == LimitSetting.rateLimitSwitch { return String(localized: "Limit requests") }
         if key == LimitSetting.fetchSwitch { return InstanceSetting.mcpFetchEnabled.title }
         return LimitSetting.all.first { $0.key == key }?.title ?? key
     }

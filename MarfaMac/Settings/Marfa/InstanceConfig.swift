@@ -56,9 +56,7 @@ nonisolated enum InstanceSetting: String, CaseIterable, Hashable, Sendable {
         }
     }
 
-    /// What the server uses while the setting is unset and whoever runs it has set nothing else. A key cannot read the
-    /// server's environment, so this is only the documented value, which the page says may differ. It is shown, never
-    /// compared with: whether a change keeps things for less time is judged only against a value the server holds.
+    /// Built-in defaults used outside the server’s settings catalog.
     var documentedDefault: Int? {
         switch self {
         case .name, .enrichmentEnabled, .enrichmentOcrEnabled, .mcpFetchEnabled, .blobCleanupEnabled: nil
@@ -119,24 +117,24 @@ nonisolated enum InstanceSetting: String, CaseIterable, Hashable, Sendable {
     var title: String {
         switch self {
         case .name: String(localized: "Name")
-        case .trashRetentionDays: String(localized: "Delete from Trash After")
-        case .versionRecentDays: String(localized: "Keep Every Version For")
-        case .versionDailyDays: String(localized: "Then One a Day Up To")
-        case .versionWeeklyDays: String(localized: "Then One a Week Up To")
-        case .versionMaxVersions: String(localized: "Most Versions per Item")
+        case .trashRetentionDays: String(localized: "Delete from Trash after")
+        case .versionRecentDays: String(localized: "Keep every version for")
+        case .versionDailyDays: String(localized: "Then one a day up to")
+        case .versionWeeklyDays: String(localized: "Then one a week up to")
+        case .versionMaxVersions: String(localized: "Most versions per item")
         case .auditRetentionDays: String(localized: "Activity")
         case .eventLogRetentionDays: String(localized: "Events")
-        case .rowLogRetentionDays: String(localized: "Table Changes")
-        case .inboundHandledRetentionDays: String(localized: "Connector Deliveries, Handled")
-        case .inboundPendingRetentionDays: String(localized: "Connector Deliveries, Waiting")
-        case .blobMinCopies: String(localized: "Copies of Each File")
-        case .diskReserveMegabytes: String(localized: "Keep Free on Disk")
-        case .enrichmentEnabled: String(localized: "Read Text in Files")
-        case .enrichmentOcrEnabled: String(localized: "Read Text in Pictures")
-        case .mcpFetchEnabled: String(localized: "Let Agents Fetch Files")
-        case .mcpFetchMaxMegabytes: String(localized: "Largest File")
-        case .blobCleanupEnabled: String(localized: "Remove Unused Files")
-        case .blobCleanupGraceSeconds: String(localized: "Remove After")
+        case .rowLogRetentionDays: String(localized: "Table changes")
+        case .inboundHandledRetentionDays: String(localized: "Connector deliveries handled")
+        case .inboundPendingRetentionDays: String(localized: "Connector deliveries waiting")
+        case .blobMinCopies: String(localized: "Copies of each file")
+        case .diskReserveMegabytes: String(localized: "Keep free on disk")
+        case .enrichmentEnabled: String(localized: "Read text in files")
+        case .enrichmentOcrEnabled: String(localized: "Read text in pictures")
+        case .mcpFetchEnabled: String(localized: "Let agents fetch files")
+        case .mcpFetchMaxMegabytes: String(localized: "Largest file")
+        case .blobCleanupEnabled: String(localized: "Remove unused files")
+        case .blobCleanupGraceSeconds: String(localized: "Remove after")
         }
     }
 

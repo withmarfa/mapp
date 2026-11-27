@@ -111,7 +111,7 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
         if let pending = model.pending { await model.confirm(pending) }
         #expect(source.sent == [InstanceConfigPatch(clear: [.versionMaxVersions])])
         #expect(model.loaded?.values[.versionMaxVersions] == nil)
-        #expect(model.saved == ["Most Versions per Item: default, 500 versions"])
+        #expect(model.saved == ["Most versions per item: default, 500 versions"])
     }
 
     @Test func whatTheContractRefusesIsRefusedBeforeAnythingIsSent() async {
@@ -206,7 +206,7 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
 
         #expect(source.sent == [InstanceConfigPatch(values: [.trashRetentionDays: .number(7)])])
         #expect(model.draft[.trashRetentionDays] == "7")
-        #expect(model.saved == ["Delete from Trash After: 7 days"])
+        #expect(model.saved == ["Delete from Trash after: 7 days"])
         #expect(!model.hasUnsentEdits)
     }
 

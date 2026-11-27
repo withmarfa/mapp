@@ -442,7 +442,7 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
         await model.load()
         model.drafts["max_request_bytes"] = "9"
         model.drafts["enrichment_max_attempts"] = "3"
-        #expect(model.takeDrafts() == [.typed(title: "Largest Request", text: "9")], "a value the server already holds is no draft")
+        #expect(model.takeDrafts() == [.typed(title: "Largest request", text: "9")], "a value the server already holds is no draft")
         #expect(model.drafts.isEmpty)
     }
 
@@ -580,7 +580,7 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
         model.sheet?.inputs["posthog_host"] = "https://eu.example"
         model.sheet?.inputs["posthog_project_token"] = "phc_secret"
         await model.save()
-        #expect(model.notice == "Error Reports Address was changed elsewhere. The app read the new value; yours wasn’t saved.")
+        #expect(model.notice == "Error reports address was changed elsewhere. The app read the new value; yours wasn’t saved.")
         model.dismissNotice()
         #expect(model.notice == nil)
     }
