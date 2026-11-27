@@ -96,15 +96,12 @@ enum AlreadyInMarfa {
         /// How many files the message names one by one before it says how many more there are.
         static let listLimit = 5
 
-        /// Whether Open covers more than the one file the title names, including files the message does not list.
-        var openShowsAll: Bool { rows.count > 1 }
-
         var title: String {
             if rows.count == 1, total == 1 {
-                return String(localized: "“\(rows[0].file.lastPathComponent)” Is Already in Marfa")
+                return String(localized: "“\(rows[0].file.lastPathComponent)” is already in Marfa.")
             }
             if rows.count == total {
-                return String(localized: "\(rows.count) Files Are Already in Marfa")
+                return String(localized: "\(rows.count) files are already in Marfa.")
             }
             return String(localized: "\(rows.count) of \(total) Files Already in Marfa")
         }
@@ -114,7 +111,7 @@ enum AlreadyInMarfa {
             var lines = rows.prefix(Self.listLimit).map { Self.sentence(for: $0, named: $0.file.lastPathComponent) }
             let rest = rows.count - Self.listLimit
             if rest > 0 { lines.append(AttributedString(localized: "And ^[\(rest) more file](inflect: true).").text) }
-            if openShowsAll { lines.append(String(localized: "Open shows all of them.")) }
+            if rows.count > 1 { lines.append(String(localized: "Open shows matches for all \(rows.count) files.")) }
             return lines.joined(separator: "\n")
         }
 

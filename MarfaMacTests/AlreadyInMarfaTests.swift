@@ -48,7 +48,7 @@ struct AlreadyInMarfaTests {
         let adding = Task { await browser.importFiles([disk.url("shot.png")], in: library, order: ItemOrder(), undoManager: nil) }
         try #require(await eventually { browser.alreadyInMarfa.question != nil })
         let question = try #require(browser.alreadyInMarfa.question)
-        #expect(question.title == "“shot.png” Is Already in Marfa")
+        #expect(question.title == "“shot.png” is already in Marfa.")
         #expect(question.message == "It has the same contents as “Beach Day”.")
         #expect(library.addedFiles.isEmpty, "nothing is added before the person answers")
         browser.alreadyInMarfa.answer(.addAnyway, to: question.id)
@@ -74,7 +74,7 @@ struct AlreadyInMarfaTests {
             “a.png” has the same contents as “Beach Day”.
             “b.png” has the same contents as “Trip” and 1 other item.
             “c.png” has the same contents as “Receipt” and other items.
-            Open shows all of them.
+            Open shows matches for all 3 files.
             """)
         browser.alreadyInMarfa.answer(.cancel, to: question.id)
         #expect(await adding.value.isEmpty)
@@ -90,11 +90,11 @@ struct AlreadyInMarfaTests {
         let adding = Task { await browser.importFiles(names.map { disk.url($0) }, in: library, order: ItemOrder(), undoManager: nil) }
         try #require(await eventually { browser.alreadyInMarfa.question != nil })
         let question = try #require(browser.alreadyInMarfa.question)
-        #expect(question.title == "7 Files Are Already in Marfa")
+        #expect(question.title == "7 files are already in Marfa.")
         let lines = question.message.split(separator: "\n")
         #expect(lines.count == 7)
         #expect(lines.dropLast().last == "And 2 more files.")
-        #expect(lines.last == "Open shows all of them.")
+        #expect(lines.last == "Open shows matches for all 7 files.")
         browser.alreadyInMarfa.answer(.cancel, to: question.id)
         _ = await adding.value
     }

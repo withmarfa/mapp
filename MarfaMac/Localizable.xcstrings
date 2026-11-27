@@ -750,7 +750,7 @@
     "%lld Days" : {
 
     },
-    "%lld Files Are Already in Marfa" : {
+    "%lld files are already in Marfa." : {
 
     },
     "%lld Files Are Held Back" : {
@@ -7917,7 +7917,7 @@
     "Open items in" : {
 
     },
-    "Open shows all of them." : {
+    "Open shows matches for all %lld files." : {
 
     },
     "Open the file in another app to view it." : {
@@ -13181,7 +13181,7 @@
     "“%@”" : {
 
     },
-    "“%@” Is Already in Marfa" : {
+    "“%@” is already in Marfa." : {
 
     },
     "“%@” already holds this link to “%@”. Remove it there first." : {

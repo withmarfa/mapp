@@ -59,14 +59,14 @@ Every editor asks `Item.allows(_:)` for the `ItemChange` it writes (`ValueEditKi
 
 ### Typed text is never lost
 
-`NewItemDrafts` keeps drafts by slot and instance through a window close, quit or refusal. A sent draft starts another. An interrupted draft returns if its item is absent. Add Again asks first (`mayBeInMarfa`); Cancel keeps that warning until the write starts.
+`NewItemDrafts` keeps drafts by slot and instance through a window close, quit or refusal. Editing a submitted draft starts another. An interrupted draft returns if its item is absent. Cancel keeps the Add Again warning (`mayBeInMarfa`).
 
 ### Dropping
 
 - **Files dropped on a list join the place in view** (`Browser.fileDropTarget`): a collection, the Feed, else the Library.
 - **A collection's row, card or sidebar row takes items and files** (`dropsInto`).
 - **A drop is one undo step and one toast;** Undo unlinks, then moves them to Recently Deleted.
-- **Files are checked as a batch.** One prompt. Open shows every match, or adds a file it could not open. Quick Add keeps the rest. Pasted images are checked. No answer still adds.
+- **One duplicate alert covers the batch, including pasted images.** Open shows the matches Marfa returned and adds files with no reachable match. In Quick Add, those files stay in the draft. An unanswered lookup allows the add to proceed.
 
 ## Changing type
 
