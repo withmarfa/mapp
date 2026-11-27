@@ -51,7 +51,8 @@ The page gate checks the connection and the sign-in’s permissions. A configure
 - **Ask before anything that cannot be got back**, naming what goes and what stays: narrowing, revoking, disconnecting, emptying, shorter retention, less free disk, a raised folder limit, removing a type, plugin or data.
 - **A question holds its version.** What is confirmed is sent on the version it named, whatever is read while the alert is open.
 - **A typed safety number asks when the field is left**, because a person passes through other numbers while typing.
-- **A shorter retention asks.** Compare the proposed and current periods using the server’s reported default for an unset period. With an unknown default, ask if the change could shorten retention. Keep Versions asks on every change.
+- **Version history** asks before a change to any snapshot window or a possible reduction of the version cap. The server applies the cap after all three windows. Keep Versions asks on every change.
+- **Trash and log retention** ask before a shorter period. Use the server’s reported default for an unset period. If the default is unknown, ask when the change could shorten retention.
 - **Removing an app's data counts first and never half-tells.** It repeats until nothing is left, says how many went where it stops, and never says nothing changed once an item has gone.
 - **The app's own data is never removed here.** Connection's Remove… stops `PreferencesSync` first; a purge from here would delete the item under it.
 - **A disconnected app's keys still work** (`keys-and-oauth/grant-revoke-keeps-keys`); its webhooks go.

@@ -54,7 +54,7 @@ import Testing
         let words = model.pending.map { $0.shortenings.map(InstanceWording.consequence).joined() } ?? ""
         #expect(words.contains("30 days"))
         #expect(words.contains("activity and webhook deliveries"))
-        #expect(words.contains("can’t be recovered"))
+        #expect(words.contains("The next cleanup can permanently delete older data"))
         model.agree(model.pending!)
         #expect(model.pending == nil)
         #expect(await eventually { source.sent.count == 1 })

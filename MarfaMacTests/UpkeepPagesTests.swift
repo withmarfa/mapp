@@ -1,5 +1,6 @@
 import Foundation
 import Marfa
+import MarfaAPI
 import Synchronization
 import Testing
 @testable import MarfaMac
@@ -44,6 +45,12 @@ nonisolated private func record(_ name: String, hoursAgo: Int = 0) -> BackupReco
 
 @MainActor
 @Suite(.hangLimit) struct BackupsModelTests {
+    @Test func anUnreportedBackupIntervalHasNoNumericValue() {
+        let interval: Int? = ClientOwnerCalls.upkeep(.init(instanceId: "instance-1")).intervalSeconds
+        #expect(interval == nil)
+        #expect(ClientOwnerCalls.upkeep(.init(instanceId: "instance-1", backupIntervalSeconds: 0)).intervalSeconds == 0)
+    }
+
     private func bench(grants: Set<InstancePermission> = [.backupsManage, .configManage]) -> OwnerBench {
         let bench = OwnerBench(grants: grants)
         bench.calls.state.withLock { $0.backups = [record("c", hoursAgo: 0), record("b", hoursAgo: 1), record("a", hoursAgo: 2)] }

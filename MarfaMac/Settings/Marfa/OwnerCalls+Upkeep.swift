@@ -15,11 +15,11 @@ extension ClientOwnerCalls {
 
     // MARK: Settings
 
-    private static func upkeep(_ config: Components.Schemas.InstanceConfig) -> UpkeepSettings {
+    static func upkeep(_ config: Components.Schemas.InstanceConfig) -> UpkeepSettings {
         let folder = config.backupPath.flatMap { $0.isEmpty ? nil : $0 }
         return UpkeepSettings(
             instanceID: config.instanceId, folder: folder, objectStore: !(config.objectStoreBucket ?? "").isEmpty,
-            intervalSeconds: config.backupIntervalSeconds ?? UpkeepSettings.defaultInterval,
+            intervalSeconds: config.backupIntervalSeconds,
             checksForUpdates: config.updateCheckEnabled ?? true)
     }
 

@@ -3,7 +3,7 @@ import Observation
 
 /// What This Marfa shows and changes: the server's own settings, held as the person's draft beside the last answer
 /// the server gave. Nothing is sent until Save, a save sends only the settings that differ from that answer, and
-/// a shorter retention is sent only after the person has agreed to what it may remove. The server's answer is shown
+/// a change that may remove data is sent only after the person has agreed. The server's answer is shown
 /// after every save, and a refusal keeps what was typed.
 @Observable @MainActor final class InstanceSettingsModel {
     /// The server to ask and a name for it, so a different server starts again from nothing.
@@ -12,10 +12,10 @@ import Observation
         let source: any InstanceConfigSource
     }
 
-    /// A retention that may keep things for less time than the server does now, or a reserve of free disk that may be
-    /// smaller, which the person agrees to before it is sent.
+    /// Why a retention or disk reserve change needs confirmation.
     struct Shortening: Hashable, Sendable {
         enum Change: Hashable, Sendable {
+            case versionPolicy
             /// The server holds `from` and the person typed the shorter `to`.
             case shorter(from: Int, to: Int)
             /// Nothing is set, so the server uses a default that a key can't read, and `to` may be shorter than it.
@@ -32,6 +32,7 @@ import Observation
         let id = UUID()
         let patch: InstanceConfigPatch
         let base: InstanceConfig
+        let defaults: [InstanceSetting: Int]
         let shortenings: [Shortening]
         var revertsOnFailure = false
     }
@@ -53,13 +54,13 @@ import Observation
     /// Why the last read or save failed; cleared when one succeeds.
     private(set) var failure: InstanceConfigFailure?
     /// Settings found changed on the server since they were read, when a save was about to replace them.
-    private(set) var elsewhere: [InstanceSetting] = []
+    private var conflicts: [(setting: InstanceSetting, standard: Int?)] = []
     /// What the server answered for the settings the last save changed.
     private(set) var saved: [String] = []
     /// Another instance was found answering at this address when a save was about to reach it. Nothing was sent, and
     /// the page starts again from that instance's settings.
     private(set) var serverChanged = false
-    /// Set while the person is asked to agree to a shorter retention.
+    /// Set while a change waits for confirmation.
     var pending: Pending?
 
     /// The settings of a change agreed to or being sent, marked before the call so nothing in between counts them as unsent.
@@ -109,7 +110,7 @@ import Observation
         pending = nil
         guard let loaded else { return }
         for setting in InstanceSetting.allCases where !sending.contains(setting) { draft[setting] = loaded.text(setting) }
-        elsewhere = []
+        conflicts = []
         saved = []
         serverChanged = false
         if case .refused? = failure { failure = nil }
@@ -188,14 +189,14 @@ import Observation
         let invalid = problems
         if let problem = related.compactMap({ invalid[$0] }).first {
             draft[setting] = loaded.text(setting)
-            elsewhere = []
+            conflicts = []
             failure = .refused(problem.message)
             return
         }
         await save([setting], revertsOnFailure: true, defaults: defaultValue.map { [setting: $0] } ?? [:])
     }
 
-    /// Sends the changes, or first asks the person to agree where one keeps things for less time.
+    /// Sends the changes, asking first when they may remove data or lower the disk reserve.
     func save() async { await save(Set(InstanceSetting.allCases)) }
 
     /// Sends the changes to `settings` alone. While a question is open, or a change is on its way, it does nothing.
@@ -203,9 +204,9 @@ import Observation
         guard canSave(settings), let patch = patch(for: settings), let loaded else { return }
         let shortenings = shortenings(of: patch, defaults: defaults)
         if shortenings.isEmpty {
-            await send(patch, basedOn: loaded, revertsOnFailure: revertsOnFailure)
+            await send(patch, basedOn: loaded, defaults: defaults, revertsOnFailure: revertsOnFailure)
         } else {
-            pending = Pending(patch: patch, base: loaded, shortenings: shortenings, revertsOnFailure: revertsOnFailure)
+            pending = Pending(patch: patch, base: loaded, defaults: defaults, shortenings: shortenings, revertsOnFailure: revertsOnFailure)
         }
     }
 
@@ -218,7 +219,7 @@ import Observation
     @discardableResult func agree(_ agreed: Pending) -> Task<Void, Never> {
         pending = nil
         sending.formUnion(agreed.patch.settings)
-        return Task { await send(agreed.patch, basedOn: agreed.base, revertsOnFailure: agreed.revertsOnFailure) }
+        return Task { await send(agreed.patch, basedOn: agreed.base, defaults: agreed.defaults, revertsOnFailure: agreed.revertsOnFailure) }
     }
 
     /// The person kept things as they were: what was chosen is put back, so the field shows what the server holds.
@@ -236,12 +237,17 @@ import Observation
         guard let loaded else { return [] }
         return InstanceSetting.allCases.compactMap { setting in
             guard patch.settings.contains(setting) else { return nil }
-            if setting == .diskReserveMegabytes { return lowerReserve(patch, loaded) }
-            guard setting.isRetention else { return nil }
             let held = loaded.number(setting) ?? defaults[setting]
-            let change: Shortening.Change
             let proposed: Int?
             if case .number(let number)? = patch.values[setting] { proposed = number } else { proposed = defaults[setting] }
+            if InstanceSetting.versionSettings.contains(setting) {
+                // housekeeping/thinning-max-versions (housekeeping.md:477) removes the excess after the windows.
+                // A cap that cannot decrease adds no removals. Every edited window still asks.
+                if setting == .versionMaxVersions, (proposed ?? setting.range.lowerBound) >= (held ?? setting.range.upperBound) { return nil }
+                return Shortening(setting: setting, change: .versionPolicy)
+            }
+            guard setting.isRetention || setting == .diskReserveMegabytes else { return nil }
+            let change: Shortening.Change
             if let to = proposed {
                 if let held {
                     guard setting.keepsLonger(held, than: to) else { return nil }
@@ -258,18 +264,7 @@ import Observation
         }
     }
 
-    /// Keeping less free on disk asks, since a number typed on the way to a larger one (a 5 before 500) is sent when the field is
-    /// left. Where the server holds nothing, the documented default is what is lowered.
-    private func lowerReserve(_ patch: InstanceConfigPatch, _ loaded: InstanceConfig) -> Shortening? {
-        let setting = InstanceSetting.diskReserveMegabytes
-        guard let standard = setting.documentedDefault else { return nil }
-        let held = loaded.number(setting) ?? standard
-        let to: Int
-        if case .number(let typed)? = patch.values[setting] { to = typed } else { to = standard }
-        return to < held ? Shortening(setting: setting, change: .shorter(from: held, to: to)) : nil
-    }
-
-    private func send(_ patch: InstanceConfigPatch, basedOn base: InstanceConfig, revertsOnFailure: Bool) async {
+    private func send(_ patch: InstanceConfigPatch, basedOn base: InstanceConfig, defaults: [InstanceSetting: Int], revertsOnFailure: Bool) async {
         let typedReserve = revertsOnFailure && patch.settings.contains(.diskReserveMegabytes) ? draft[.diskReserveMegabytes] : nil
         var applied = false
         defer {
@@ -287,7 +282,7 @@ import Observation
         let expected = base.instanceID
         isSaving = true
         failure = nil
-        elsewhere = []
+        conflicts = []
         saved = []
         serverChanged = false
         defer { if generation == self.generation { isSaving = false } }
@@ -302,7 +297,7 @@ import Observation
             let moved = InstanceSetting.allCases.filter { patch.settings.contains($0) && current.values[$0] != base.values[$0] }
             absorb(current, resetting: revertsOnFailure && !moved.isEmpty ? patch.settings : [])
             guard moved.isEmpty else {
-                elsewhere = moved
+                conflicts = moved.map { ($0, defaults[$0]) }
                 return
             }
             let answer = try await target.source.update(patch, expecting: expected)
@@ -310,7 +305,7 @@ import Observation
             guard generation == self.generation else { return }
             absorb(answer, resetting: patch.settings)
             saved = InstanceSetting.allCases.filter(patch.settings.contains).map {
-                "\($0.title): \(InstanceWording.value(answer, $0))"
+                "\($0.title): \(InstanceWording.value(answer, $0, standard: defaults[$0]))"
             }
             onSaved(answer, patch.settings, target.id)
         } catch {
@@ -331,8 +326,8 @@ import Observation
 
     /// What the page says about settings found changed elsewhere, with the value the server holds now.
     var elsewhereMessage: String? {
-        guard !elsewhere.isEmpty, let loaded else { return nil }
-        let now = elsewhere.map { "\($0.title): \(InstanceWording.value(loaded, $0))" }.joined(separator: "; ")
+        guard !conflicts.isEmpty, let loaded else { return nil }
+        let now = conflicts.map { "\($0.setting.title): \(InstanceWording.value(loaded, $0.setting, standard: $0.standard))" }.joined(separator: "; ")
         return String(localized: "These changed on the server since you opened this page: \(now). Nothing was sent. Check what you typed, then save again.")
     }
 
@@ -352,7 +347,7 @@ import Observation
         loaded = nil
         draft = [:]
         failure = nil
-        elsewhere = []
+        conflicts = []
         saved = []
         serverChanged = false
         pending = nil
@@ -402,15 +397,13 @@ nonisolated enum InstanceWording {
     }
 
     /// A setting's value as the server holds it, or its default where unset.
-    static func value(_ config: InstanceConfig, _ setting: InstanceSetting) -> String {
-        switch setting.kind {
-        case .text: return config.name ?? String(localized: "Marfa (default)")
-        case .flag:
-            guard let flag = config.flag(setting) else { return String(localized: "default, on") }
-            return flag ? String(localized: "on") : String(localized: "off")
-        case .count:
-            if let number = config.number(setting) { return amount(setting, number) }
-            return String(localized: "default, \(amount(setting, setting.documentedDefault ?? 0))")
+    static func value(_ config: InstanceConfig, _ setting: InstanceSetting, standard: Int?) -> String {
+        switch config.values[setting] {
+        case .text(let text): return text
+        case .flag(let flag): return flag ? String(localized: "on") : String(localized: "off")
+        case .number(let number): return amount(setting, number)
+        case nil:
+            return standard.map { String(localized: "Default (\(amount(setting, $0)))") } ?? String(localized: "Default")
         }
     }
 
@@ -419,12 +412,16 @@ nonisolated enum InstanceWording {
     static func consequence(_ shortening: InstanceSettingsModel.Shortening) -> String {
         let setting = shortening.setting
         switch shortening.change {
+        case .versionPolicy:
+            return String(localized: "The server may permanently remove older versions at its next cleanup.")
         case .shorter(let from, let to):
             if setting == .diskReserveMegabytes { return String(localized: "Uploads will stop below \(amount(setting, to)) free instead of below \(amount(setting, from)), which leaves the server less room to work in.") }
             return removal(setting, keeping: to)
         case .mayBeShorter(let to):
+            if setting == .diskReserveMegabytes { return String(localized: "Uploads will stop below \(amount(setting, to)) free. This may leave the server less room to work in.") }
             return String(localized: "This may remove \(setting.removes) sooner than the server’s current setting.") + " " + removal(setting, keeping: to)
         case .toDefault(let from):
+            if setting == .diskReserveMegabytes { return String(localized: "The server’s default may keep less than \(amount(setting, from)) free for uploads.") }
             return String(localized: "Using the default for “\(setting.title)” may remove \(setting.removes) sooner than the server’s current setting of \(amount(setting, from)). Deletion is permanent.")
         }
     }
@@ -437,10 +434,6 @@ nonisolated enum InstanceWording {
                 : String(localized: "A sweep can permanently remove a file after it has been reported as unused for \(seconds(limit)).")
         case .trashRetentionDays:
             String(localized: "Items deleted more than \(days(limit)) ago will be permanently deleted, with their history, the next time the server tidies up. They can’t be recovered.")
-        case .versionMaxVersions:
-            String(localized: "An item with more than \(limit) versions will have its oldest versions permanently deleted the next time the server tidies up.")
-        case .versionRecentDays, .versionDailyDays, .versionWeeklyDays:
-            String(localized: "“\(setting.title)” changes to \(days(limit)). Older versions of items may be permanently deleted the next time the server tidies up, so Version History will show fewer.")
         default:
             String(localized: "“\(setting.title)” changes to \(days(limit)). The next cleanup can permanently delete older data, including \(setting.removes).")
         }
@@ -453,7 +446,6 @@ nonisolated extension InstanceSetting {
         switch self {
         case .blobCleanupGraceSeconds: String(localized: "unused files")
         case .trashRetentionDays: String(localized: "deleted items")
-        case .versionRecentDays, .versionDailyDays, .versionWeeklyDays, .versionMaxVersions: String(localized: "versions")
         case .auditRetentionDays: String(localized: "activity and webhook deliveries")
         case .eventLogRetentionDays: String(localized: "events and records the server uses to recognize repeated writes")
         case .rowLogRetentionDays: String(localized: "records used to undo table changes")

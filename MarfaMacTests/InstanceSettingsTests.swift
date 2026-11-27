@@ -114,7 +114,7 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
         await model.load()
         await model.confirm(pending)
         #expect(model.draft[.versionWeeklyDays] == "180")
-        #expect(model.elsewhere == [.versionWeeklyDays])
+        #expect(model.elsewhereMessage?.contains("Then one a week up to: 180 days") == true)
         #expect(source.sent.isEmpty)
     }
 
@@ -128,6 +128,56 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
             #expect((model.pending != nil) == asks)
             #expect(source.sent.isEmpty == asks)
         }
+    }
+
+    @Test(arguments: [InstanceSetting.versionWeeklyDays, .versionRecentDays])
+    func lengtheningAVersionWindowWaitsForConfirmation(setting: InstanceSetting) async throws {
+        let allZero = setting == .versionWeeklyDays
+        let (model, source) = await loaded([
+            .versionRecentDays: .number(0), .versionDailyDays: .number(allZero ? 0 : 7),
+            .versionWeeklyDays: .number(allZero ? 0 : 30), .versionMaxVersions: .number(3),
+        ])
+        await model.choose(7, for: setting, defaultValue: nil)
+        #expect(source.sent.isEmpty)
+        let pending = try #require(model.pending)
+        #expect(pending.shortenings.map(InstanceWording.consequence) == ["The server may permanently remove older versions at its next cleanup."])
+        #expect(InstanceSettingsQuestion.button(pending) == "Change and Save")
+        await model.confirm(pending)
+        #expect(source.sent == [.init(values: [setting: .number(7)])])
+    }
+
+    @Test func raisingOnlyTheVersionCapSavesImmediately() async {
+        let (model, source) = await loaded([.versionMaxVersions: .number(3)])
+        await model.choose(4, for: .versionMaxVersions, defaultValue: nil)
+        #expect(model.pending == nil)
+        #expect(source.sent == [.init(values: [.versionMaxVersions: .number(4)])])
+    }
+
+    @Test func extendingAllWindowsAndRaisingTheCapStillAsksOnce() async throws {
+        let (model, source) = await loaded([.versionMaxVersions: .number(3)])
+        for setting in InstanceSetting.versionWindows { model.draft[setting] = "36500" }
+        model.draft[.versionMaxVersions] = "4"
+        await model.save()
+        #expect(source.sent.isEmpty)
+        let pending = try #require(model.pending)
+        #expect(pending.shortenings.map(\.setting) == InstanceSetting.versionWindows)
+        #expect(InstanceSettingsQuestion.message(pending) == "The server may permanently remove older versions at its next cleanup.")
+        model.cancelPending()
+        #expect(source.sent.isEmpty)
+        #expect(!model.hasEdits)
+    }
+
+    @Test(arguments: [90, nil] as [Int?])
+    func aRetentionClearedElsewhereShowsTheServerDefault(standard: Int?) async throws {
+        let (model, source) = await loaded([.trashRetentionDays: .number(30)])
+        await model.choose(7, for: .trashRetentionDays, defaultValue: standard)
+        let pending = try #require(model.pending)
+        source.config.withLock { $0.values[.trashRetentionDays] = nil }
+        await model.confirm(pending)
+        #expect(source.sent.isEmpty)
+        let message = try #require(model.elsewhereMessage)
+        #expect(message.contains(standard == nil ? "Default." : "Default (90 days)."))
+        #expect(!message.contains("60"))
     }
 
     @Test func aRefusedDiskReserveReturnsTheTypedTextAndShowsTheAppliedValue() async {
@@ -150,7 +200,7 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
         if let pending = model.pending { await model.confirm(pending) }
         #expect(source.sent == [InstanceConfigPatch(clear: [.versionMaxVersions])])
         #expect(model.loaded?.values[.versionMaxVersions] == nil)
-        #expect(model.saved == ["Most versions per item: default, 500 versions"])
+        #expect(model.saved == ["Most versions per item: Default"])
     }
 
     @Test func whatTheContractRefusesIsRefusedBeforeAnythingIsSent() async {
@@ -175,7 +225,7 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
         #expect(model.problems[.versionDailyDays] == .shorterThan(.versionRecentDays))
     }
 
-    @Test func aShorterRetentionWaitsForTheirAgreementAndNothingElseDoes() async {
+    @Test func shorteningTrashRetentionWaitsForAgreementAndUnlimitedRetentionSavesImmediately() async {
         let (model, source) = await loaded([.trashRetentionDays: .number(60)])
 
         model.draft[.trashRetentionDays] = "7"
@@ -304,19 +354,22 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
         #expect(source.sent == [InstanceConfigPatch(values: [.diskReserveMegabytes: .number(5000)])])
     }
 
-    @Test func keepingLessFreeOnDiskIsComparedWithTheDocumentedDefaultWhereNothingIsSet() async {
-        #expect(await asked([:], [.diskReserveMegabytes: "5"]) == [.init(setting: .diskReserveMegabytes, change: .shorter(from: 128, to: 5))])
-        #expect(await asked([:], [.diskReserveMegabytes: "128"]).isEmpty)
-        #expect(await asked([:], [.diskReserveMegabytes: "1024"]).isEmpty)
-        #expect(await asked([.diskReserveMegabytes: .number(500)], [.diskReserveMegabytes: ""]) == [.init(setting: .diskReserveMegabytes, change: .shorter(from: 500, to: 128))])
-        #expect(await asked([.diskReserveMegabytes: .number(100)], [.diskReserveMegabytes: ""]).isEmpty)
+    @Test func keepingLessFreeOnDiskUsesTheServerDefaultWhereNothingIsSet() async {
+        let setting = InstanceSetting.diskReserveMegabytes
+        let defaults = [setting: 256]
+        #expect(await asked([:], [setting: "128"], defaults: defaults) == [.init(setting: setting, change: .shorter(from: 256, to: 128))])
+        #expect(await asked([:], [setting: "256"], defaults: defaults).isEmpty)
+        #expect(await asked([:], [setting: "1024"], defaults: defaults).isEmpty)
+        #expect(await asked([setting: .number(500)], [setting: ""], defaults: defaults) == [.init(setting: setting, change: .shorter(from: 500, to: 256))])
+        #expect(await asked([setting: .number(100)], [setting: ""], defaults: defaults).isEmpty)
+        #expect(await asked([:], [setting: "128"]) == [.init(setting: setting, change: .mayBeShorter(to: 128))])
     }
 
     /// What `save` would ask about for `typed` on a server that holds `held`.
-    private func asked(_ held: [InstanceSetting: InstanceValue], _ typed: [InstanceSetting: String]) async -> [InstanceSettingsModel.Shortening] {
+    private func asked(_ held: [InstanceSetting: InstanceValue], _ typed: [InstanceSetting: String], defaults: [InstanceSetting: Int] = [:]) async -> [InstanceSettingsModel.Shortening] {
         let (model, _) = await loaded(held)
         for (setting, text) in typed { model.draft[setting] = text }
-        await model.save()
+        await model.save(Set(typed.keys), defaults: defaults)
         return model.pending?.shortenings ?? []
     }
 
@@ -327,15 +380,13 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
         #expect(await asked([:], [.trashRetentionDays: "90"]).count == 1)
         #expect(await asked([:], [.trashRetentionDays: "60"]).count == 1)
         #expect(await asked([:], [.trashRetentionDays: "36500"]).count == 1, "Even the longest finite period shortens unlimited retention.")
-        #expect(await asked([:], [.versionWeeklyDays: "400"]) == [.init(setting: .versionWeeklyDays, change: .mayBeShorter(to: 400))])
-        #expect(await asked([:], [.versionMaxVersions: "900"]) == [.init(setting: .versionMaxVersions, change: .mayBeShorter(to: 900))])
-        // A zero window is empty, so it is the least a window keeps.
+        #expect(await asked([:], [.versionWeeklyDays: "400"]) == [.init(setting: .versionWeeklyDays, change: .versionPolicy)])
+        #expect(await asked([:], [.versionMaxVersions: "900"]) == [.init(setting: .versionMaxVersions, change: .versionPolicy)])
         #expect(await asked([:], [.versionRecentDays: "0"]).count == 1)
     }
 
     @Test func aValueNothingCouldOutlastAsksNothing() async {
         #expect(await asked([:], [.trashRetentionDays: "0"]).isEmpty)
-        #expect(await asked([:], [.versionRecentDays: "36500", .versionDailyDays: "36500", .versionWeeklyDays: "36500"]).isEmpty)
         #expect(await asked([:], [.versionMaxVersions: "1000000"]).isEmpty)
         #expect(await asked([:], [.name: "Home"]).isEmpty)
     }
@@ -344,7 +395,7 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
         let shortenings = await asked([.trashRetentionDays: .number(45), .versionMaxVersions: .number(50)], [.trashRetentionDays: "", .versionMaxVersions: " "])
         #expect(shortenings == [
             .init(setting: .trashRetentionDays, change: .toDefault(from: 45)),
-            .init(setting: .versionMaxVersions, change: .toDefault(from: 50)),
+            .init(setting: .versionMaxVersions, change: .versionPolicy),
         ])
         let words = shortenings.map(InstanceWording.consequence)
         #expect(words[0].contains("may remove deleted items sooner than the server’s current setting"))
@@ -353,8 +404,8 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
         #expect(!words[1].contains("500"))
     }
 
-    @Test func clearingASettingThatCannotKeepLessAsksNothing() async {
-        #expect(await asked([.versionRecentDays: .number(0)], [.versionRecentDays: ""]).isEmpty)
+    @Test func clearingASettingAsksWhenTheDefaultCouldRemoveData() async {
+        #expect(await asked([.versionRecentDays: .number(0)], [.versionRecentDays: ""]) == [.init(setting: .versionRecentDays, change: .versionPolicy)])
         #expect(await asked([.trashRetentionDays: .number(1)], [.trashRetentionDays: ""]).isEmpty)
         #expect(await asked([.versionMaxVersions: .number(1)], [.versionMaxVersions: ""]).isEmpty)
         // No limit on trash keeps the most, so any default may keep less.
@@ -378,10 +429,9 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
         await model.save()
 
         #expect(source.sent.isEmpty)
-        #expect(model.elsewhere == [.name])
         #expect(model.loaded?.name == "Office")
         #expect(model.draft[.name] == "Home")
-        #expect(model.elsewhereMessage?.contains("Office") == true)
+        #expect(model.elsewhereMessage?.contains("Name: Office") == true)
     }
 
     @Test func aKeyWithoutPermissionSeesNoSettings() async {

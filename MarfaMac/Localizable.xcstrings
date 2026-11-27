@@ -2636,9 +2636,6 @@
     "An item can’t be linked to itself." : {
       "extractionState" : "manual"
     },
-    "An item with more than %lld versions will have its oldest versions permanently deleted the next time the server tidies up." : {
-      "extractionState" : "manual"
-    },
     "And %lld more changes whose text can’t be shown." : {
       "localizations" : {
         "en" : {
@@ -3439,6 +3436,9 @@
     "Change Properties" : {
 
     },
+    "Change Retention Settings?" : {
+
+    },
     "Change Settings" : {
 
     },
@@ -3462,6 +3462,9 @@
 
     },
     "Change Your Server Address" : {
+
+    },
+    "Change and Save" : {
 
     },
     "Change the Saved Address" : {
@@ -6687,9 +6690,6 @@
     "Marfa %@" : {
 
     },
-    "Marfa (default)" : {
-      "extractionState" : "manual"
-    },
     "Marfa Documentation" : {
 
     },
@@ -7958,9 +7958,6 @@
 
     },
     "Own Items Only" : {
-
-    },
-    "Owner’s Permissions" : {
 
     },
     "Owner’s permissions" : {
@@ -10829,6 +10826,9 @@
     "The server lists no start-up settings." : {
 
     },
+    "The server may permanently remove older versions at its next cleanup." : {
+
+    },
     "The server met a fault lately." : {
 
     },
@@ -10899,6 +10899,9 @@
       "extractionState" : "manual"
     },
     "The server’s clock is behind." : {
+
+    },
+    "The server’s default may keep less than %@ free for uploads." : {
 
     },
     "The server’s link for adding a passkey couldn’t be read." : {
@@ -11949,6 +11952,9 @@
     "Uploads will stop below %@ free instead of below %@, which leaves the server less room to work in." : {
 
     },
+    "Uploads will stop below %@ free. This may leave the server less room to work in." : {
+
+    },
     "Use %lld characters or fewer." : {
       "extractionState" : "manual"
     },
@@ -12758,14 +12764,8 @@
     "days" : {
       "extractionState" : "manual"
     },
-    "default, %@" : {
-      "extractionState" : "manual"
-    },
     "default, %lld" : {
       "extractionState" : "manual"
-    },
-    "default, on" : {
-
     },
     "deleted items" : {
 
@@ -13124,9 +13124,6 @@
     },
     "“%@” can no longer do this. This can’t be undone: a permission can’t be given back to a key." : {
 
-    },
-    "“%@” changes to %@. Older versions of items may be permanently deleted the next time the server tidies up, so Version History will show fewer." : {
-      "extractionState" : "manual"
     },
     "“%@” changes to %@. The next cleanup can permanently delete older data, including %@." : {
 

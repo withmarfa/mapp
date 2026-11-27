@@ -78,8 +78,7 @@ nonisolated enum InstanceChoices {
     }
 }
 
-/// A number the server holds, chosen from a pop-up and sent at once. A shorter retention asks first
-/// through the confirmation shared by the retention settings.
+/// A number the server holds, chosen from a pop-up. A change that may remove data asks first.
 struct InstanceChoiceRow: View {
     let model: InstanceSettingsModel
     let setting: InstanceSetting
@@ -149,14 +148,23 @@ struct InstanceNumberRow: View {
     let unit: LocalizedStringKey
     var line: LocalizedStringKey?
 
+    private var standard: Int? {
+        guard let bytes = catalog.setting(setting.serverKey)?.defaultValue?.int, bytes.isMultiple(of: InstanceSetting.bytesPerMegabyte) else { return nil }
+        return bytes / InstanceSetting.bytesPerMegabyte
+    }
+
+    private func save() {
+        Task { await model.save([setting], revertsOnFailure: true, defaults: standard.map { [setting: $0] } ?? [:]) }
+    }
+
     var body: some View {
         let errors = InstanceRowErrors(model: model, settings: among)
         if catalog.setting(setting.serverKey)?.value != nil {
             SettingsRow(title: Text(verbatim: setting.title), line: line.map { Text($0) }, error: errors.message(for: setting)) {
                 SettingsNumberField(
                     title: LocalizedStringKey(setting.title), text: Binding { model.draft[setting] ?? "" } set: { model.draft[setting] = $0 },
-                    unit: unit, prompt: catalog.setting(setting.serverKey)?.defaultValue?.int.map { String($0 / InstanceSetting.bytesPerMegabyte) }, isError: errors.isError(setting),
-                    onSubmit: { Task { await model.save([setting], revertsOnFailure: true) } }, onEndEditing: { Task { await model.save([setting], revertsOnFailure: true) } }
+                    unit: unit, prompt: standard.map { String($0) }, isError: errors.isError(setting),
+                    onSubmit: save, onEndEditing: save
                 )
                 .disabled(model.isSaving)
                 .accessibilityIdentifier("Instance" + setting.rawValue)
@@ -200,23 +208,29 @@ extension View {
         ) { pending in
             Button(InstanceSettingsQuestion.button(pending), role: .destructive) { model.agree(pending) }
         } message: { pending in
-            Text(pending.shortenings.map(InstanceWording.consequence).joined(separator: "\n\n"))
+            Text(InstanceSettingsQuestion.message(pending))
         }
     }
 }
 
-/// The words of the question, which say what is being lowered.
 enum InstanceSettingsQuestion {
     private static func onlyReserve(_ pending: InstanceSettingsModel.Pending) -> Bool {
         pending.shortenings.allSatisfy { $0.setting == .diskReserveMegabytes }
     }
 
     static func title(_ pending: InstanceSettingsModel.Pending) -> String {
-        onlyReserve(pending) ? String(localized: "Keep less free on disk?") : String(localized: "Keep things for less time?")
+        if pending.shortenings.contains(where: { $0.change == .versionPolicy }) { return String(localized: "Change Retention Settings?") }
+        return onlyReserve(pending) ? String(localized: "Keep less free on disk?") : String(localized: "Keep things for less time?")
     }
 
     static func button(_ pending: InstanceSettingsModel.Pending) -> String {
-        onlyReserve(pending) ? String(localized: "Lower and Save") : String(localized: "Shorten and Save")
+        if pending.shortenings.contains(where: { $0.change == .versionPolicy }) { return String(localized: "Change and Save") }
+        return onlyReserve(pending) ? String(localized: "Lower and Save") : String(localized: "Shorten and Save")
+    }
+
+    static func message(_ pending: InstanceSettingsModel.Pending) -> String {
+        var seen = Set<String>()
+        return pending.shortenings.map(InstanceWording.consequence).filter { seen.insert($0).inserted }.joined(separator: "\n\n")
     }
 }
 

@@ -56,27 +56,6 @@ nonisolated enum InstanceSetting: String, CaseIterable, Hashable, Sendable {
         }
     }
 
-    /// Built-in defaults used outside the server’s settings catalog.
-    var documentedDefault: Int? {
-        switch self {
-        case .name, .enrichmentEnabled, .enrichmentOcrEnabled, .mcpFetchEnabled, .blobCleanupEnabled: nil
-        case .trashRetentionDays: 60
-        case .versionRecentDays: 30
-        case .versionDailyDays: 90
-        case .versionWeeklyDays: 365
-        case .versionMaxVersions: 500
-        case .auditRetentionDays: 90
-        case .eventLogRetentionDays: 30
-        case .rowLogRetentionDays: 30
-        case .inboundHandledRetentionDays: 7
-        case .inboundPendingRetentionDays: 30
-        case .blobMinCopies: 1
-        case .diskReserveMegabytes: 128
-        case .mcpFetchMaxMegabytes: 50
-        case .blobCleanupGraceSeconds: 86_400
-        }
-    }
-
     /// The settings each page shows, in the order it shows them.
     static let versionSettings: [InstanceSetting] = [.versionRecentDays, .versionDailyDays, .versionWeeklyDays, .versionMaxVersions]
     static let logSettings: [InstanceSetting] = [
@@ -141,7 +120,7 @@ nonisolated enum InstanceSetting: String, CaseIterable, Hashable, Sendable {
     /// Whether a shorter value removes something that cannot be recovered, so the person agrees to it first.
     var isRetention: Bool {
         switch self {
-        case .blobCleanupGraceSeconds, .trashRetentionDays, .versionRecentDays, .versionDailyDays, .versionWeeklyDays, .versionMaxVersions, .auditRetentionDays,
+        case .blobCleanupGraceSeconds, .trashRetentionDays, .auditRetentionDays,
             .eventLogRetentionDays, .rowLogRetentionDays, .inboundHandledRetentionDays, .inboundPendingRetentionDays:
             true
         default: false
@@ -168,8 +147,7 @@ nonisolated enum InstanceSetting: String, CaseIterable, Hashable, Sendable {
         zeroMeansNoLimit ? value == 0 : value >= range.upperBound
     }
 
-    /// Whether `value` reaches further than `other` in what it keeps. Zero where it means no limit is the furthest; a zero
-    /// version window is empty, so it is the least.
+    /// Whether a single retention period or disk reserve keeps more. A period with no limit keeps the most.
     func keepsLonger(_ value: Int, than other: Int) -> Bool {
         if zeroMeansNoLimit {
             if value == 0 { return other != 0 }
