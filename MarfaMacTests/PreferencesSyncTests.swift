@@ -328,6 +328,33 @@ import Testing
         #expect(await copy.creates == 2)
     }
 
+    @Test(arguments: [false, true])
+    func removedSettingsDoNotSyncWhileTheItemListCatchesUp(confirmed: Bool) async throws {
+        let copy = FakePreferencesCopy()
+        let sync = await sync(copy)
+        let removed = try #require(await copy.activeIDs.first)
+        await copy.showBinnedItems(true)
+        try await sync.remove(confirmed: confirmed)
+        #expect(try await copy.items().map(\.id) == [removed])
+
+        defaults.set("dark", forKey: AppearanceKey.theme)
+        await sync.flush()
+        #expect(sync.standing == .off(.removed))
+        #expect(await copy.writesToBinned == 0)
+        sync.detach()
+        sync.attach(copy, library: "marfa:https://one", name: { "Demo" })
+        await sync.flush()
+        #expect(sync.standing == .off(.removed))
+        #expect(await copy.writesToBinned == 0)
+
+        await copy.showBinnedItems(false)
+        try await sync.startAgain()
+        #expect(sync.standing == .syncing)
+        let made = try #require(await copy.activeIDs.first)
+        #expect(made != removed)
+        #expect(await copy.unitsHeld(made)[theme] == #""dark""#)
+    }
+
     // MARK: Review findings
 
     /// A value a later version of the app wrote, which a store here sets aside, stays in the Marfa for the Macs that read it: the

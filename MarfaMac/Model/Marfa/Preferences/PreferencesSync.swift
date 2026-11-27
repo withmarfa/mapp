@@ -321,7 +321,10 @@ final class PreferencesSync {
             var record = Record.read(defaults)
             let local = readLocal()
             if let adopted = record.marfas[instance] {
-                if let chosen = originals.first, chosen.id == adopted.item {
+                if adopted.removed == true {
+                    item = nil
+                    return standing = .off(.removed)
+                } else if let chosen = originals.first, chosen.id == adopted.item {
                     guard let followed = try await follow(
                         chosen, from: adopted, of: instance, local: local, switched: record.last != instance,
                         winning: record.winning ?? [:], siblings: items.filter(\.isConflictedCopy), in: copy,
@@ -333,9 +336,6 @@ final class PreferencesSync {
                     try saveRestorePoint(.adoption)
                     guard let adopted = try await adopt(originals, local: local, in: copy, generation: generation) else { return }
                     record.marfas[instance] = adopted
-                } else if adopted.removed == true {
-                    item = nil
-                    return standing = .off(.removed)
                 } else if try await copy.isBinned(adopted.item) {
                     guard generation == self.generation else { return }
                     record = Record.read(defaults)
