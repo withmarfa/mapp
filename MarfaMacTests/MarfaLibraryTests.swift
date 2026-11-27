@@ -543,6 +543,36 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(library.notices.waiting.last?.message == "The item changed after you saw it.")
     }
 
+    @Test func emptyTrashOnlySubmitsUnchangedListedItemsTheSignInMayWrite() async throws {
+        let unchanged = F.item(F.n1, F.note, "Unchanged", age: 1, state: .trashed)
+        var edited = F.item(F.n2, F.note, "Edited", age: 2, state: .trashed)
+        var retrashed = F.item(F.n3, F.note, "Trashed again", age: 3, state: .trashed)
+        var restored = F.item(F.e1, F.note, "Restored", age: 4, state: .trashed)
+        let readOnly = F.item(F.p1, F.project, "Read access", age: 5, state: .trashed)
+        let removed = F.item(F.p2, F.note, "Already gone", age: 6, state: .trashed)
+        let (library, source) = try await loaded([unchanged, edited, retrashed, restored, readOnly, removed])
+        source.state.set(.online)
+        #expect(await eventually { library.reachesServer })
+        let shown = library.deletedItems
+
+        edited.version = ItemVersion(2)
+        retrashed.trashed = .now
+        restored.state = .active
+        restored.trashed = nil
+        let later = F.item(F.t1, F.note, "New to Trash", age: 0, state: .trashed)
+        source.send(.upserted([edited, retrashed, restored, later]))
+        source.send(.removed([removed.id]))
+        try #require(await eventually { library.item(later.id) != nil && library.item(removed.id) == nil })
+
+        AppSettingsHost.purgeUnchanged(shown, in: library, access: .app(scopes: ["\(F.note.rawValue):write"], vendors: []))
+        #expect(source.writes == [.purge(unchanged.id, version: unchanged.version)])
+        var skips = BatchSkips()
+        for _ in 0..<3 { skips.skip(.changedSince) }
+        skips.skip(.gone)
+        skips.skip(.typeWriteDenied)
+        #expect(library.notices.waiting.last?.message == skips.message)
+    }
+
     @Test func deletingForGoodWaitsForTheServer() async throws {
         let (library, source) = try await loaded()
         source.state.set(.offline(reason: "network"))

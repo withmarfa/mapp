@@ -3245,6 +3245,9 @@
     "Can’t Edit This Property" : {
       "extractionState" : "manual"
     },
+    "Can’t Empty Trash" : {
+
+    },
     "Can’t Extend This Key" : {
 
     },
@@ -4751,6 +4754,9 @@
 
     },
     "Empty Trash" : {
+
+    },
+    "Empty Trash?" : {
 
     },
     "Emptying “%@” goes back to the server’s own default, which the app can’t read. That may remove items sooner than the server’s current setting, %@. What it removes can’t be recovered." : {
@@ -8137,6 +8143,9 @@
     "Permanently Delete…" : {
 
     },
+    "Permanently delete up to ^[%lld listed item](inflect: true)? Parts that went to Trash with their hosts may also be deleted. You can’t undo this." : {
+
+    },
     "Permanently deleted an item" : {
 
     },
@@ -10254,6 +10263,9 @@
     "The app holds all %lld of the owner’s permissions, but not all the access it asks for." : {
 
     },
+    "The app doesn’t have write access to ^[%lld item](inflect: true)." : {
+
+    },
     "The app is no longer allowed to %@. Allow it again from the page that needs it." : {
       "extractionState" : "manual"
     },
@@ -10645,6 +10657,9 @@
       "extractionState" : "manual"
     },
     "The library sets this tag itself." : {
+
+    },
+    "The library whose Trash you opened is no longer open." : {
 
     },
     "The link could not be saved." : {
