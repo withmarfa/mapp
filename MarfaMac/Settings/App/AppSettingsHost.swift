@@ -340,8 +340,12 @@ enum LibraryDescription {
                 return
             }
             guard library.reachesServer else { return library.tellCannotPurge() }
-            guard self.connection == .connected, self.grants.contains(.itemsPurge) else {
-                library.notices.tell(title, MarfaSettingsPage.trash.permissionLine)
+            guard self.connection == .connected else {
+                library.notices.tell(title, String(localized: "Wait until this Mac is connected to the library, then try again."))
+                return
+            }
+            guard self.grants.contains(.itemsPurge) else {
+                library.notices.tell(title, String(localized: "This sign-in doesn’t have permission to empty Trash."))
                 return
             }
             // App-vendor types are hidden from the working-copy list.

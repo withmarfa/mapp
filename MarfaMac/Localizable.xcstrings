@@ -10248,6 +10248,9 @@
     "The app doesn’t have permission for “%@”. Ask whoever runs the server to allow it, then make the change again." : {
       "extractionState" : "manual"
     },
+    "The app doesn’t have write access to ^[%lld item](inflect: true)." : {
+
+    },
     "The app dropped a sign-in it didn’t use, but couldn’t confirm that %@ ended its approval." : {
 
     },
@@ -10261,9 +10264,6 @@
       "extractionState" : "manual"
     },
     "The app holds all %lld of the owner’s permissions, but not all the access it asks for." : {
-
-    },
-    "The app doesn’t have write access to ^[%lld item](inflect: true)." : {
 
     },
     "The app is no longer allowed to %@. Allow it again from the page that needs it." : {
@@ -11488,6 +11488,9 @@
     "This server runs Marfa %@. Update the server to Marfa %@ or later to use this app." : {
       "extractionState" : "manual"
     },
+    "This sign-in doesn’t have permission to empty Trash." : {
+
+    },
     "This sign-in holds %lld webhooks, the most the server allows." : {
 
     },
@@ -12142,6 +12145,9 @@
     },
     "Wait for the current step to finish, then try again." : {
       "extractionState" : "manual"
+    },
+    "Wait until this Mac is connected to the library, then try again." : {
+
     },
     "Waiting" : {
 

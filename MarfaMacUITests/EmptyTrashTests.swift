@@ -1,7 +1,7 @@
 import XCTest
 
 nonisolated final class EmptyTrashTests: XCTestCase {
-    @MainActor func testEmptyTrashCountsTheListedItemsAndDefaultsToCancel() {
+    @MainActor func testEmptyTrashCountsTheListedItemsAndEscapeCancels() {
         continueAfterFailure = false
         let app = XCUIApplication.sample()
         app.launch()
@@ -18,14 +18,18 @@ nonisolated final class EmptyTrashTests: XCTestCase {
         empty.click()
         let confirm = app.sheets.buttons["Empty Trash"]
         XCTAssertTrue(confirm.waitForExistence(timeout: 5))
-        let message = app.sheets.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "2 listed items")).firstMatch
-        XCTAssertTrue(message.exists)
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = "EmptyTrashConfirmation"
         attachment.lifetime = .keepAlways
         add(attachment)
+        let count = "2 listed items"
+        let predicate = NSPredicate(format: "value CONTAINS %@ OR label CONTAINS %@", count, count)
+        let message = app.sheets.staticTexts.containing(predicate).firstMatch
+        XCTAssertTrue(message.exists, app.sheets.firstMatch.debugDescription)
 
         app.typeKey(.return, modifierFlags: [])
+        XCTAssertTrue(confirm.exists)
+        app.typeKey(.escape, modifierFlags: [])
         XCTAssertTrue(confirm.waitForNonExistence(timeout: 3))
         XCTAssertTrue(empty.isEnabled)
 
