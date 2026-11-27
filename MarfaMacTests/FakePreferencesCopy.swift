@@ -51,6 +51,8 @@ actor FakePreferencesCopy: PreferencesCopy {
     private nonisolated let stream = AsyncStream<String?>.makeStream()
     /// Runs once, the next time an item's settings are read, as a person's change made while a step reads.
     private var duringRead: (@MainActor () -> Void)?
+    /// Runs once, the next time a step writes to an item, as a store's change made while a step awaits its writes.
+    private var duringWrite: (@MainActor () -> Void)?
     /// The id of each field write, in the order queued.
     private(set) var writeIDs: [String] = []
     /// Whether the next field write is answered as taken the moment it is queued. A test of a conflict answers it itself.
@@ -91,6 +93,15 @@ actor FakePreferencesCopy: PreferencesCopy {
 
     /// Has `change` run the next time a step reads an item's settings.
     func whileReading(_ change: @escaping @MainActor () -> Void) { duringRead = change }
+
+    /// Has `change` run the next time a step writes a field or a table of an item.
+    func whileWriting(_ change: @escaping @MainActor () -> Void) { duringWrite = change }
+
+    private func runWhileWriting() async {
+        guard let change = duringWrite else { return }
+        duringWrite = nil
+        await change()
+    }
 
     /// The item goes from the copy without passing through the bin, as a discarded create or a restored server leaves it.
     func forget(_ id: String) { held[id] = nil }
@@ -211,6 +222,7 @@ actor FakePreferencesCopy: PreferencesCopy {
     }
 
     func update(_ item: String, fields: [PreferencesField: JSONObject], readAt version: Int64) async throws -> String {
+        await runWhileWriting()
         updates.append(fields.keys.sorted { $0.rawValue < $1.rawValue })
         if held[item]?.trashed == true { writesToBinned += 1 }
         let write = "write-\(writeIDs.count + 1)"
@@ -223,6 +235,7 @@ actor FakePreferencesCopy: PreferencesCopy {
     }
 
     func write(_ operations: [RowOperation], to table: PreferencesTable, of item: String) async throws {
+        await runWhileWriting()
         if refusesNextWrite == table {
             refusesNextWrite = nil
             throw MarfaError.invalid(message: "the copy refused the write")
