@@ -45,9 +45,9 @@ See `docs/owner-settings.md` for Marfa pages and `docs/settings-sync.md` for sto
 | Page | What to know before a change |
 | --- | --- |
 | General | Reopen Windows follows the Mac until the person changes it, and only then writes `NSQuitAlwaysKeepsWindows`. Send Error Reports and Updates show only in a build that carries a destination or a feed |
-| Appearance | A color is stored as a name or a hex value. Installed fonts are listed when the page appears, never before |
+| Appearance | App icon updates the Dock at launch and on change. Sky uses the bundle icon. Alternatives are Cobalt, Sea, Leaf, Marigold, and Adobe. Sidebar color applies to the main window |
 | Keyboard | Every menu command with its shortcut, and the any-app ones (`docs/commands.md`) |
-| Editor | Each change reaches an open page. Inkkit's options go as one set (`EditorOptions`), because each of its calls replaces the whole set. Edit Pages As applies to items opened next, never to the page shown |
+| Editor | Fonts load when the page opens. PDF background shares the choice in View › PDF Background. Inkkit replaces `EditorOptions` as a set. Edit pages as applies to items opened next |
 | Lists | The starting density, sort and group of a place, until a view or the place chooses its own |
 | Layouts | How each type looks, through the stores of `docs/type-looks.md`. Only what differs from the type's preset is kept, so a better preset still reaches it. Page pins properties and holds the one Linked From row, which reads and writes the type's stored choice (`PagePlacements.linkedFrom`) |
 | Search | What searches of the whole library leave out (`SearchLeaveOuts`). A search in one place leaves nothing out. A type or source that would pass a query's ten conditions is dimmed, with the reason |
