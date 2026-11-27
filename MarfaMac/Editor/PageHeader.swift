@@ -196,9 +196,9 @@ extension PropertyRow: Encodable {
         case .items(let targets):
             try container.encode("items", forKey: .kind)
             try container.encode(targets.map(Link.init), forKey: .items)
-            if targets.count > PageHead.linkLimit {
-                try container.encode(PageHead.linkLimit, forKey: .itemsAfter)
-                try container.encode(PageHead.moreLinksText(targets.count - PageHead.linkLimit), forKey: .moreItems)
+            if targets.count > PageHead.rowLinkLimit {
+                try container.encode(PageHead.rowLinkLimit, forKey: .itemsAfter)
+                try container.encode(PageHead.moreLinksText(targets.count - PageHead.rowLinkLimit), forKey: .moreItems)
             }
         case .people(let names):
             try container.encode("people", forKey: .kind)

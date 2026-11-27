@@ -330,7 +330,7 @@ body[data-lead='on'] #item-footer > .item-rows + .item-foot-lists {
 }
 
 /* The page's notice (`PageNotice`): one quiet line at the top of the column, above the head, which scrolls with the
-   page. 13 points at the default text size, radius 10, a wash, and one action that has no fill. The app draws the same
+   page. 13 points at the default text size, radius 10, a wash, and one action, a small gray button. The app draws the same
    line over a file page and a saved web page. */
 #page-notice {
   /* The wash starts 12 points outside the text, so its symbol lines up with the text. */
@@ -340,6 +340,7 @@ body[data-lead='on'] #item-footer > .item-rows + .item-foot-lists {
   line-height: calc(var(--interface-text-size) * 18 / 13);
   -webkit-user-select: none;
   user-select: none;
+  container-type: inline-size;
 }
 
 #page-notice:not(:empty) {
@@ -373,21 +374,33 @@ body[data-lead='on'] #item-footer > .item-rows + .item-foot-lists {
   min-width: 0;
 }
 
+/* The action is the same small gray button as a waiting picture's Load (the --picture-* values). It is 24 points tall in
+   a line of 18, so it takes 3 points off its margins and the line keeps its height. */
 .page-notice-action {
   flex: none;
-  margin: 0 0 0 calc(var(--interface-text-size) * 14 / 13);
-  padding: 0;
+  box-sizing: border-box;
+  height: var(--picture-button-height);
+  margin: calc(var(--interface-text-size) * -3 / 13) 0 calc(var(--interface-text-size) * -3 / 13)
+    calc(var(--interface-text-size) * 14 / 13);
+  padding: 0 var(--picture-button-padding);
   border: 0;
-  background: none;
+  border-radius: var(--picture-button-radius);
+  background: var(--picture-button-fill);
   color: var(--label-primary);
   font: inherit;
-  font-weight: 500;
+  font-size: var(--picture-button-text-size);
+  font-weight: var(--picture-button-font-weight);
+  line-height: var(--picture-button-height);
   white-space: nowrap;
   cursor: default;
 }
 
+.page-notice-action:hover {
+  background: var(--picture-button-fill-hover);
+}
+
 .page-notice-action:active {
-  opacity: 0.6;
+  background: var(--picture-button-fill-pressed);
 }
 
 .page-notice-close {
@@ -407,6 +420,30 @@ body[data-lead='on'] #item-footer > .item-rows + .item-foot-lists {
 
 .page-notice-close:hover {
   color: var(--label-secondary);
+}
+
+/* On a narrow page the words would wrap to four short lines beside the button, so the action stands under them, at the
+   words' edge, and the close button stays at the top right. The width is in the container's own em, 340 points at the
+   default text size, so a larger text size folds sooner. */
+@container (max-width: 26.2em) {
+  .page-notice {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    column-gap: calc(var(--interface-text-size) * 7 / 13);
+    row-gap: calc(var(--interface-text-size) * 6 / 13);
+  }
+
+  .page-notice-action {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: start;
+    margin: 0;
+  }
+
+  .page-notice-close {
+    grid-column: 3;
+    grid-row: 1;
+  }
 }
 
 .page-notice-close-icon {
@@ -875,16 +912,12 @@ button.item-kicker-type:focus-visible {
   white-space: nowrap;
 }
 
-/* The rows: a name and its value in two columns, every value on one edge, then Show More, over a hairline. */
+/* The rows: a name and its value in two columns, every value on one edge, then Show More. No line separates them from the
+   text that follows. */
 .item-rows {
   align-self: stretch;
   margin-top: calc(var(--step) * 4);
   padding-bottom: calc(var(--step) * 2);
-  border-bottom: 1px solid var(--separator);
-}
-
-.item-rows.bare {
-  border-bottom: 0;
 }
 
 .item-pins:not([hidden]) + .item-rows {
@@ -938,13 +971,19 @@ button.item-kicker-type:focus-visible {
   margin: 0;
 }
 
-/* A name in a column 150 points wide: its symbol in a slot of 16, so the names line up. */
+/* A name in a column of 40% of the row, 150 points at most and 112 at least in the 13 point design: its symbol in a slot of
+   16, so the names line up. A narrow page gives its values the room, and a name that does not fit is cut. */
 .item-prop-label {
   box-sizing: border-box;
   flex: none;
   position: relative;
   isolation: isolate;
-  width: calc(var(--interface-text-size) * 150 / 13);
+  width: clamp(
+    calc(var(--interface-text-size) * 112 / 13),
+    40%,
+    calc(var(--interface-text-size) * 150 / 13)
+  );
+  min-width: 0;
   padding-inline-end: calc(var(--step) * 2);
   color: var(--label-secondary);
   font-weight: 400;
@@ -1044,6 +1083,7 @@ button.item-kicker-type:focus-visible {
 }
 
 .item-prop-name {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1056,7 +1096,7 @@ button.item-kicker-type:focus-visible {
 }
 
 .item-prop-value {
-  flex: 1 1 10rem;
+  flex: 1 1 calc(var(--interface-text-size) * 96 / 13);
   min-width: 0;
   flex-wrap: wrap;
   gap: calc(var(--interface-text-size) * 6 / 13);
@@ -1157,19 +1197,20 @@ button.item-kicker-type:focus-visible {
   padding: 0;
   border: 0;
   background: none;
-  color: var(--label-tertiary);
+  color: var(--label-secondary);
   font: inherit;
+  font-weight: 500;
   cursor: default;
 }
 
 .item-more:hover {
-  color: var(--label-secondary);
+  color: var(--label-primary);
 }
 
-/* The rows' Show More starts where their symbols do: a symbol is its text size wide in a slot of 16 points (see
-   `.item-prop-symbol`), centered, so its edge is half the slack in. `PageHeadView` insets its line the same way. */
+/* The rows' Show More starts where their names do: after the symbol's slot of 16 points and the gap (see
+   `.item-prop-label`). `PageHeadView` insets its line the same way. */
 .item-rows > .item-more {
-  padding-inline-start: calc(var(--interface-text-size) * (16 - 13) / 2 / 13);
+  padding-inline-start: calc(var(--interface-text-size) * 16 / 13 + var(--step) * 2);
 }
 
 /* What belongs to the item, under the text: Sub-Items, nested, and Timeline or Linked From. Every measure is its design
