@@ -96,7 +96,7 @@ The page gate checks connection and permissions. A configured Marfa keeps its Ac
 
 ## Words
 
-- **The server's own error texts are never shown**, because they name settings by key and requests by path. Pages word a title and one line; details go to the log. A field may show a reason holding no key, code or route.
+- **The server's own error texts are never shown**, because they name settings by key and requests by path. Pages word a title and one line; details go to the log. A field may show a reason without a key, code or route.
 - **A setting with no name in the app is counted or described**, never shown by its key.
 - **Problems and the Account badge share the server’s attention list.** A problem opens the page that fixes it, or offers a command to copy where no page can.
 - **A problem row's title is a sentence.**
@@ -115,7 +115,7 @@ The page gate checks connection and permissions. A configured Marfa keeps its Ac
 
 ## Folders and backups
 
-- **Folders is one list.** A copy's sign-in does not say which Mac it is on.
+- **Folders is one list**: a sign-in does not say which Mac holds a copy.
 - **A folder's record is pinned by the working copy** (`CopyFolderCalls`), because the copy's slice leaves out `system.folder`. A pin goes only with Stop Syncing.
 - **Stop Syncing cannot be undone**, and leaves items in Marfa and files on disk.
 - **A restore adds what a backup holds and changes nothing that is there**, and says what it leaves out.
