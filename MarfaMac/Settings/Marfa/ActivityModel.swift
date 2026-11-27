@@ -123,6 +123,11 @@ enum ActivityColumn: Int, CaseIterable, Hashable, Sendable {
 struct ActivityOrder: Equatable, Sendable {
     var column: ActivityColumn = .when
     var ascending = false
+
+    /// Whether `column` is the one in force, and which way. Nil on the others, so only one heading shows a direction.
+    func ascending(for column: ActivityColumn) -> Bool? {
+        self.column == column ? ascending : nil
+    }
 }
 
 /// The Activity page: the server's audit log, newest first, a page at a time. The server gives no count and no way back, so

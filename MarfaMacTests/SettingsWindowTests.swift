@@ -39,7 +39,7 @@ struct SettingsWindowTests {
 
     @Test func searchesForLocalCopySettingsOpenConnection() {
         for word in [
-            "On This Mac", "Keep opened files", "Space used", "Remove downloaded files",
+            "Keep opened files", "Space used", "Remove downloaded files",
             "Export everything", "Download everything again",
         ] {
             let launcher = SettingsLauncher()
@@ -48,6 +48,7 @@ struct SettingsWindowTests {
             launcher.show(results.first)
             #expect(launcher.navigation.page == .connection)
         }
+        #expect(SettingsPage.sidebarMatches("On This Mac") == [.connection])
         #expect(SettingsPage.sidebarMatches("Clear").contains(.connection))
     }
 
@@ -95,13 +96,27 @@ struct SettingsWindowTests {
         #expect(expanded.countLabel == nil)
     }
 
+    @Test func trashReadAccessComesFromItemScopes() {
+        #expect(TrashPage.canReadItems(scopes: ["*:read"]))
+        #expect(TrashPage.canReadItems(scopes: ["core.note:write"]))
+        #expect(!TrashPage.canReadItems(scopes: ["items.purge", "edge.*:read", "metadata:read", "profile.username:write"]))
+    }
+
     @Test func theMarfasPagesNameThePermissionTheyNeed() {
-        #expect(MarfaSettingsPage.trash.permission == .itemsPurge)
+        #expect(MarfaSettingsPage.trash.permission == nil)
         #expect(MarfaSettingsPage.account.permission == nil, "Account opens without one and asks for sign_ins.manage from Change Password")
         #expect(MarfaSettingsPage.apps.permission == .grantsManage)
         #expect(MarfaSettingsPage.keys.permission == nil, "Apps and Keys checks each section’s permission")
         #expect(MarfaSettingsPage.network.permission == .configManage)
         #expect(MarfaSettingsPage.types.permission == .schemaWrite)
         #expect(MarfaSettingsPage.plugins.permission == .schemaWrite)
+        #expect(MarfaSettingsPage.links.permission == .schemaWrite)
+        #expect(MarfaSettingsPage.links.sidebarEntry == .types)
+        #expect(MarfaSettingsPage.connectors.permission == .connectorsManage)
+        #expect(MarfaSettingsPage.folders.permission == nil)
+        #expect(MarfaSettingsPage.types.missingPermission(in: []) == .schemaWrite)
+        #expect(MarfaSettingsPage.plugins.missingPermission(in: []) == .schemaWrite)
+        #expect(MarfaSettingsPage.connectors.missingPermission(in: [.schemaWrite]) == .connectorsManage)
+        #expect(MarfaSettingsPage.folders.missingPermission(in: []) == nil)
     }
 }

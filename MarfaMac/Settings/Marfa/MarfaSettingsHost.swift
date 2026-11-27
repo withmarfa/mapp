@@ -35,6 +35,8 @@ struct MarfaDeletedItem: Identifiable, Hashable {
     let kind: String
     /// The name of the source that wrote it, where it has one.
     let source: String?
+    var typeID: String? = nil
+    var canWrite = true
 }
 
 /// A source as the Sources page lists it: the code items carry, the name and mark the server gives it, and how many items it wrote.
@@ -166,6 +168,7 @@ struct MarfaMarkSet: Identifiable, Hashable {
     /// Sets the type's icon, or with nil takes the owner's away, for every app. Answers why the server refused, or nil once it took it.
     func changeTypeIcon(_ icon: String?, ofType id: String) async -> OwnerFailure?
 
+    var canReadTrash: Bool { get }
     /// Items shown in Trash.
     var deletedItems: [MarfaDeletedItem] { get }
     var deletedCount: Int { get }
@@ -292,7 +295,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .sources: .keysManage
         case .types, .links: .schemaWrite
         case .plugins: .schemaWrite
-        case .trash: .itemsPurge
+        case .trash: nil
         case .connectors: .connectorsManage
         case .webhooks: .webhooksManage
         case .folders: nil
@@ -318,7 +321,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .plugins: String(localized: "The app isn’t allowed to install, update or remove plugins.")
         case .sources: String(localized: "The app isn’t allowed to rename, mark or limit sources.")
         case .network: String(localized: "The app isn’t allowed to see or change the server’s addresses.")
-        case .trash: String(localized: "The app isn’t allowed to list or permanently delete deleted items.")
+        case .trash: String(localized: "The app isn’t allowed to read deleted items.")
         case .fileStorage: String(localized: "The app isn’t allowed to see or change how the server keeps files.")
         case .connectors: String(localized: "The app isn’t allowed to see, pause, run or set up connectors.")
         case .webhooks: String(localized: "The app isn’t allowed to list, make, change or remove webhooks.")
@@ -357,14 +360,16 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
             ]
         case .types:
             [
-                String(localized: "Yours"), String(localized: "From Plugins"), String(localized: "Built In"), String(localized: "New Type"),
+                String(localized: "All"), String(localized: "Yours"), String(localized: "From Plugins"), String(localized: "From Apps"),
+                String(localized: "Built In"), String(localized: "New Type"), String(localized: "Links Between Items"), String(localized: "Links"),
                 String(localized: "New Child Type"), String(localized: "Statuses"), String(localized: "Guidance"), String(localized: "Icon"),
                 String(localized: "Based On"), String(localized: "Plural"), String(localized: "Description"),
             ]
         case .plugins:
             [
-                String(localized: "Installed"), String(localized: "Plugin Updates"), String(localized: "Available"), String(localized: "Install"),
-                String(localized: "Install From a File"), String(localized: "Update"), String(localized: "Remove"), String(localized: "Connector"),
+                String(localized: "Installed"), String(localized: "Updates"), String(localized: "Plugin Updates"), String(localized: "Available"),
+                String(localized: "Install"), String(localized: "Install from a File"), String(localized: "Update"), String(localized: "Remove"),
+                String(localized: "Connector"),
             ]
         case .sources:
             [String(localized: "Rename"), String(localized: "Change Mark"), String(localized: "Limit Sources"), String(localized: "Rules for Every App and Key")]
@@ -389,6 +394,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
             ]
         case .folders:
             [
+                String(localized: "Folders"),
                 String(localized: "Copies"), String(localized: "Needs Attention"), String(localized: "Synced Folders"), String(localized: "Rename"),
                 String(localized: "Ignore"), String(localized: "Include"), String(localized: "Safety"), String(localized: "Pause Removals Over"),
                 String(localized: "Pause Additions Over"), String(localized: "Stop Syncing"),

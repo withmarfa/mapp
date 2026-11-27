@@ -8,17 +8,23 @@ struct SettingsTableColumn<Row> {
     /// How many lines a cell may take; a cell that needs more is cut, and `truncation` says where.
     var lines = 1
     var truncation: Text.TruncationMode = .tail
+    /// Whether this column is the one the rows are ordered by, and which way. Nil when another column is, or none is.
+    var sortedAscending: Bool?
+    /// Sorts by this column. Nil on a column that does not sort.
+    var onSort: (() -> Void)?
     let cell: (Row) -> AnyView
 
     init(
         _ title: LocalizedStringKey, width: CGFloat? = nil, numeric: Bool = false, lines: Int = 1, truncation: Text.TruncationMode = .tail,
-        @ViewBuilder cell: @escaping (Row) -> some View
+        sortedAscending: Bool? = nil, onSort: (() -> Void)? = nil, @ViewBuilder cell: @escaping (Row) -> some View
     ) {
         self.title = title
         self.width = width
         self.alignment = numeric ? .trailing : .leading
         self.lines = lines
         self.truncation = truncation
+        self.sortedAscending = sortedAscending
+        self.onSort = onSort
         self.cell = { AnyView(cell($0)) }
     }
 }
@@ -81,55 +87,37 @@ struct SettingsHeaderPopUp<Value: Hashable, Choices: View>: View {
     }
 }
 
-/// Which column a log is ordered by, and which way. The column is its index in the table.
-struct SettingsColumnSort: Equatable {
-    var column: Int
-    var ascending: Bool
-}
-
-/// A bar above a list, with a count or tabs leading and search or choices trailing.
-struct SettingsListHeader<Leading: View, Trailing: View>: View {
-    @ViewBuilder let leading: Leading
-    @ViewBuilder let trailing: Trailing
-
-    var body: some View {
-        HStack(spacing: SettingsTokens.Metric.searchSpacing) {
-            leading
-            Spacer(minLength: 0)
-            trailing
-        }
-    }
-}
-
 private struct TableHeader<Row>: View {
     let columns: [SettingsTableColumn<Row>]
     let hasAction: Bool
     var inset = SettingsTokens.Metric.sectionTableInset
     var height = SettingsTokens.Metric.tableHeader
     var hasCheck = false
-    /// Set together: a log's headings then order the rows, and say which way.
-    var sort: SettingsColumnSort?
-    var onColumnSort: ((Int) -> Void)?
+    /// Reserves the chevron a row that opens a page draws, so the headings sit over the cells.
+    var hasChevron = false
+
+    private var sorts: Bool { columns.contains { $0.onSort != nil } }
 
     var body: some View {
         HStack(spacing: SettingsTokens.Metric.sectionTableColumnGap) {
             if hasCheck { Color.clear.frame(width: CheckWidth.value) }
             ForEach(columns.indices, id: \.self) { index in
-                heading(columns[index], index: index)
+                heading(columns[index])
             }
+            if hasChevron { Color.clear.frame(width: ChevronWidth.value).accessibilityHidden(true) }
             if hasAction { Color.clear.frame(width: ActionWidth.value) }
         }
         .padding(.horizontal, inset)
         .frame(minHeight: height)
-        .accessibilityHidden(onColumnSort == nil)
+        .accessibilityHidden(!sorts)
     }
 
-    /// A heading is a label, or a button where the table orders by it. The mark is only on the column in force.
-    private func heading(_ column: SettingsTableColumn<Row>, index: Int) -> some View {
-        let title = HStack(spacing: SettingsTokens.Metric.dotGap) {
+    @ViewBuilder private func heading(_ column: SettingsTableColumn<Row>) -> some View {
+        let label = HStack(spacing: 4) {
             Text(column.title)
-            if sort?.column == index {
-                Image(systemName: sort?.ascending == true ? "chevron.up" : "chevron.down")
+            if column.onSort != nil, let ascending = column.sortedAscending {
+                Image(systemName: ascending ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 9, weight: .semibold))
                     .accessibilityHidden(true)
             }
         }
@@ -137,20 +125,28 @@ private struct TableHeader<Row>: View {
         .foregroundStyle(SettingsTokens.secondaryText)
         .frame(width: column.width, alignment: column.alignment)
         .frame(maxWidth: column.width == nil ? .infinity : nil, alignment: column.alignment)
-        return Group {
-            if let onColumnSort {
-                Button { onColumnSort(index) } label: { title }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(sort?.column == index ? .isSelected : [])
-            } else {
-                title
-            }
+        if let onSort = column.onSort {
+            Button(action: onSort) { label }
+                .buttonStyle(.plain)
+                .accessibilityValue(Self.sortValue(column.sortedAscending))
+        } else {
+            label.accessibilityHidden(sorts)
+        }
+    }
+
+    /// The direction of the column the rows are ordered by. Empty when this column is not that one.
+    private static func sortValue(_ ascending: Bool?) -> String {
+        switch ascending {
+        case true: String(localized: "Ascending")
+        case false: String(localized: "Descending")
+        case nil: ""
         }
     }
 }
 
 private enum ActionWidth { static let value: CGFloat = SettingsTokens.Metric.Column.action }
 private enum CheckWidth { static let value: CGFloat = SettingsTokens.Metric.Column.check }
+private enum ChevronWidth { static let value: CGFloat = 14 }
 
 private struct TableRow<Row>: View {
     let row: Row
@@ -161,9 +157,22 @@ private struct TableRow<Row>: View {
     var height = SettingsTokens.Metric.tableRow
     /// Where the table is a page with a checkbox column: whether this row is ticked.
     var check: Binding<Bool>?
+    /// The chevron of a row that opens a page, and the action that opens it. The row is the button.
+    var showsChevron = false
+    var onOpen: (() -> Void)?
     @State private var isHovered = false
 
     var body: some View {
+        if let onOpen {
+            Button(action: onOpen) { contents }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+        } else {
+            contents
+        }
+    }
+
+    private var contents: some View {
         HStack(spacing: SettingsTokens.Metric.sectionTableColumnGap) {
             if let check {
                 Toggle(isOn: check) { EmptyView() }
@@ -173,6 +182,9 @@ private struct TableRow<Row>: View {
             }
             ForEach(columns.indices, id: \.self) { index in
                 cell(columns[index])
+            }
+            if showsChevron {
+                SettingsChevron().frame(width: ChevronWidth.value, alignment: .trailing)
             }
             if let action {
                 SettingsButton(action.title, small: true) { action.perform(row) }
@@ -206,6 +218,10 @@ struct SettingsSectionTable<Row: Identifiable>: View {
     let columns: [SettingsTableColumn<Row>]
     var action: SettingsRowAction<Row>?
     var showAll: (() -> Void)?
+    /// Whether a row is the one the page has open. A table that only lists passes false.
+    var isSelected: (Row) -> Bool = { _ in false }
+    /// Opens the row's page. The row is then a button with a chevron, and the heading reserves the chevron's width.
+    var onOpen: ((Row) -> Void)?
     @State private var expanded = false
 
     private var preview: SettingsTablePreview { SettingsTablePreview(total: rows.count, expanded: expanded) }
@@ -213,10 +229,12 @@ struct SettingsSectionTable<Row: Identifiable>: View {
     var body: some View {
         SettingsCard {
             VStack(spacing: 0) {
-                TableHeader(columns: columns, hasAction: action != nil, height: SettingsTokens.Metric.tableRow)
+                TableHeader(columns: columns, hasAction: action != nil, height: SettingsTokens.Metric.tableRow, hasChevron: onOpen != nil)
                 Rectangle().fill(SettingsTokens.rule).frame(height: SettingsTokens.Metric.ruleThickness)
                 ForEach(rows.prefix(preview.visibleCount)) { row in
-                    TableRow(row: row, columns: columns, action: action, isSelected: false)
+                    TableRow(
+                        row: row, columns: columns, action: action, isSelected: isSelected(row), showsChevron: onOpen != nil,
+                        onOpen: onOpen.map { open in { open(row) } })
                 }
                 if let count = preview.countLabel {
                     Rectangle().fill(SettingsTokens.rule).frame(height: SettingsTokens.Metric.ruleThickness)
@@ -325,10 +343,6 @@ struct SettingsLogTable<Row: Identifiable, Filter: View, Foot: View, Empty: View
     @ViewBuilder let filter: Filter
     @ViewBuilder let foot: Foot
     @ViewBuilder let empty: Empty
-    /// Where the headings order the rows. Nil leaves them as labels, as every table but a log does.
-    var sort: SettingsColumnSort?
-    var onColumnSort: ((Int) -> Void)?
-
     private var inset: CGFloat { SettingsTokens.Metric.pageTableInset }
 
     var body: some View {
@@ -341,7 +355,7 @@ struct SettingsLogTable<Row: Identifiable, Filter: View, Foot: View, Empty: View
             .padding(.horizontal, inset)
             .frame(minHeight: SettingsTokens.Metric.logTableBar)
             Rectangle().fill(SettingsTokens.rule).frame(height: 1)
-            TableHeader(columns: columns, hasAction: false, inset: inset, sort: sort, onColumnSort: onColumnSort)
+            TableHeader(columns: columns, hasAction: false, inset: inset)
             Rectangle().fill(SettingsTokens.rule).frame(height: 1)
             if rows.isEmpty {
                 empty.frame(maxWidth: .infinity, maxHeight: .infinity)

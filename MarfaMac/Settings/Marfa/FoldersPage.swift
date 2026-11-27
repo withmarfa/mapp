@@ -61,22 +61,25 @@ struct FoldersPage: View {
 
     private var list: some View {
         SettingsPageColumn {
-            SettingsSection(
-                name: Text("Folders"),
-                footer: Text("A folder is made where it is kept in step, such as with the command line.")
-            ) {
-                if model.folders.isEmpty {
+            if model.folders.isEmpty {
+                SettingsSection(
+                    "Folders", footer: "A folder is made where it is kept in step, such as with the command line."
+                ) {
                     SettingsEmptyCard(
                         symbol: "folder", title: Text("No Folders"),
                         line: Text("Nothing is kept in step with a folder yet."))
                 }
-                ForEach(model.folders) { folder in
-                    let report = model.reports[folder.id]
-                    let condition = model.condition(of: folder)
-                    SettingsLinkRow(
-                        verbatim: folder.title, line: line(folder, report: report),
-                        lead: .tile("folder.fill", .blue), value: condition?.title, dot: condition.map(Self.dot)
-                    ) { navigation?.push(Self.subpage(for: folder)) }
+            } else {
+                SettingsSection(
+                    "Folders", footer: "A folder is made where it is kept in step, such as with the command line."
+                ) {
+                    ForEach(model.folders) { folder in
+                        let condition = model.condition(of: folder)
+                        SettingsLinkRow(
+                            verbatim: folder.title, line: line(folder, report: model.reports[folder.id]),
+                            lead: .tile("folder.fill", .blue), value: condition?.title, dot: condition.map(Self.dot)
+                        ) { navigation?.push(Self.subpage(for: folder)) }
+                    }
                 }
             }
             if let cut = model.cutLine { SettingsNote(verbatim: cut) }

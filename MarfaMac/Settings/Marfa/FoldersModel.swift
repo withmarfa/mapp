@@ -500,15 +500,27 @@ import Observation
 
     static func condition(of report: FolderReport) -> Condition {
         guard !report.copies.isEmpty else { return Condition(title: String(localized: "No copies"), tone: .quiet) }
+        if isOnlyPaused(report.copies) {
+            return Condition(title: String(localized: "Paused"), tone: .quiet)
+        }
         return condition(
             pausedRemovals: report.pausedRemovals, problems: report.copies.contains { !$0.problems.isEmpty },
             uploads: report.pendingUploads, downloads: report.pendingDownloads, starting: report.copies.contains(where: \.firstSyncWaiting))
     }
 
     static func condition(of copy: FolderCopy) -> Condition {
-        condition(
+        if isOnlyPaused([copy]) { return Condition(title: String(localized: "Paused"), tone: .quiet) }
+        return condition(
             pausedRemovals: copy.pausedRemovals, problems: !copy.problems.isEmpty, uploads: copy.pendingUploads,
             downloads: copy.pendingDownloads, starting: copy.firstSyncWaiting)
+    }
+
+    /// Every copy is paused and nothing is waiting, so the row reads Paused rather than Needs attention.
+    private static func isOnlyPaused(_ copies: [FolderCopy]) -> Bool {
+        !copies.isEmpty && copies.allSatisfy { copy in
+            copy.pausedRemovals == 0 && copy.pendingUploads == 0 && copy.pendingDownloads == 0 && !copy.firstSyncWaiting
+                && !copy.problems.isEmpty && copy.problems.allSatisfy { $0.code == .paused }
+        }
     }
 
     private static func condition(pausedRemovals: Int, problems: Bool, uploads: Int, downloads: Int, starting: Bool) -> Condition {

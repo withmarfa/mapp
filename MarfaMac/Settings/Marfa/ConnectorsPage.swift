@@ -60,6 +60,14 @@ struct ConnectorsPage: View {
             } message: { asked in
                 Text(verbatim: asked.message)
             }
+            .toolbar {
+                if subpage == nil, model.failure == nil, model.hasLoaded {
+                    ToolbarItem(placement: .primaryAction) {
+                        SettingsButton("Add a Connector…") { model.beginAdding() }
+                            .disabled(model.unplaced.isEmpty)
+                    }
+                }
+            }
             .accessibilityIdentifier("ConnectorsPage")
     }
 
@@ -100,14 +108,18 @@ struct ConnectorsPage: View {
     private var list: some View {
         SettingsPageColumn {
             if model.entries.isEmpty {
-                SettingsSection(name: Text("Connectors")) {
+                SettingsSection(
+                    name: nil,
+                    footer: Text("A connector comes with its plugin. Its settings and secrets are kept in this Marfa.")
+                ) {
                     SettingsEmptyCard(
                         symbol: "arrow.triangle.2.circlepath", title: Text("No Connectors"),
                         line: Text("A connector comes with its plugin."))
                 }
             } else {
                 SettingsSection(
-                    name: Text("Connectors"), footer: Text("A connector comes with its plugin. Its settings and secrets are kept in \(host.serverName).")
+                    name: nil,
+                    footer: Text("A connector comes with its plugin. Its settings and secrets are kept in this Marfa.")
                 ) {
                     if let failure = model.hostsFailure {
                         OwnerProblemRow(
@@ -120,13 +132,6 @@ struct ConnectorsPage: View {
                             verbatim: entry.summary.title, line: line(of: entry), lead: .well(host.markGlyph(entry.summary.mark)),
                             value: ConnectorWording.title(health), dot: Self.dot(health), lines: 1
                         ) { navigation?.push(Self.subpage(for: entry.summary)) }
-                    }
-                    if model.unplaced.isEmpty {
-                        SettingsAddRow(
-                            off: "Add a Connector…", line: "Every installed connector has a machine. A new one comes with its plugin.",
-                            remedy: ("Show Plugins", { host.show(.plugins, subpage: nil) }))
-                    } else {
-                        SettingsAddRow("Add a Connector…") { model.beginAdding() }
                     }
                 }
             }

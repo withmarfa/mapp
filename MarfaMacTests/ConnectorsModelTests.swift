@@ -523,4 +523,47 @@ import Testing
         #expect(MarfaSettingsPage.connectors.permission == .connectorsManage)
         #expect(MarfaSettingsPage.connectors.permissionLine.contains("connectors"))
     }
+
+    @Test func noConnectorLeavesTheListEmpty() async {
+        let bench = OwnerBench(grants: [.connectorsManage])
+        let model = ConnectorsModel(context: bench.context)
+        await model.load()
+        #expect(model.entries.isEmpty)
+        #expect(model.hasLoaded)
+        #expect(model.failure == nil)
+    }
+
+    @Test func aFailedLastRunAndASilentConnectorAreNamed() {
+        let now = Self.now
+        let control = ConnectorControl(host: "h1", registration: "reg", paused: false, runRequested: nil)
+        let host = ConnectorHostInfo(id: "h1", name: "Castell Studio", lastSeen: now.addingTimeInterval(-30), linked: true)
+        let failedAt = now.addingTimeInterval(-100)
+        let failed = ConnectorRegistration(
+            lastHeartbeat: now.addingTimeInterval(-30),
+            lastRun: ConnectorRunInfo(succeeded: false, started: failedAt, finished: failedAt, summary: nil), problems: [])
+        #expect(ConnectorHealth.of(control: control, registration: failed, settings: nil, host: host, now: now) == .lastRunFailed(failedAt))
+        #expect(ConnectorWording.title(.lastRunFailed(failedAt)) == "Last run failed")
+
+        let quietAt = now.addingTimeInterval(-7_200)
+        let quiet = ConnectorRegistration(
+            lastHeartbeat: quietAt, lastRun: ConnectorRunInfo(succeeded: true, started: quietAt, finished: quietAt, summary: nil), problems: [])
+        let quietHost = ConnectorHostInfo(id: "h1", name: "Castell Studio", lastSeen: quietAt, linked: true)
+        #expect(ConnectorHealth.of(control: control, registration: quiet, settings: nil, host: quietHost, now: now) == .silent(since: quietAt))
+        #expect(ConnectorWording.title(.silent(since: quietAt)) == "Not heard from")
+    }
+
+    @Test func aServerThatDoesNotAnswerAndAMissingPermissionLeaveConnectorsUnread() async {
+        let silent = OwnerBench(grants: [.connectorsManage])
+        silent.calls.fail("connectorPlugins", with: .unreachable)
+        let unanswered = ConnectorsModel(context: silent.context)
+        await unanswered.load()
+        #expect(unanswered.failure == .unreachable)
+
+        let refused = OwnerBench(grants: [])
+        refused.calls.fail("connectorPlugins", with: .notPermitted("connectors.manage"))
+        let blocked = ConnectorsModel(context: refused.context)
+        await blocked.load()
+        #expect(blocked.failure == .notPermitted("connectors.manage"))
+        #expect(MarfaSettingsPage.connectors.missingPermission(in: []) == .connectorsManage)
+    }
 }

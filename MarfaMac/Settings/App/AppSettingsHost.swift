@@ -312,12 +312,16 @@ enum LibraryDescription {
 
     // MARK: Trash
 
+    var canReadTrash: Bool { TrashPage.canReadItems(scopes: Array(host.heldScopes)) }
+
     var deletedItems: [MarfaDeletedItem] {
         guard let library = libraries.current else { return [] }
+        let access = SourceWriters.Access.app(scopes: Array(host.heldScopes), vendors: [])
         return library.deletedItems.map { item in
             MarfaDeletedItem(
                 id: item.id.rawValue, title: item.displayTitle, deleted: item.trashed ?? item.modified,
-                kind: library.catalogue.label(for: item.type), source: item.source.map { library.sources.name($0) })
+                kind: library.catalogue.label(for: item.type), source: item.source.map { library.sources.name($0) },
+                typeID: item.type.rawValue, canWrite: access.writes(item.type.rawValue))
         }
     }
 

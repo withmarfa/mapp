@@ -634,15 +634,18 @@
     "%@, edited" : {
       "extractionState" : "manual"
     },
-    "%@, on the machine %@ runs on." : {
+    "%@, from %@" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "%1$@, on the machine %2$@ runs on."
+            "value" : "%1$@, from %2$@"
           }
         }
       }
+    },
+    "%@, on the machine that runs this Marfa." : {
+
     },
     "%@, remove" : {
 
@@ -1712,6 +1715,16 @@
         }
       }
     },
+    "%lld types such as %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld types such as %2$@."
+          }
+        }
+      }
+    },
     "%lld versions" : {
 
     },
@@ -1946,6 +1959,9 @@
     "A Folder" : {
 
     },
+    "A Plugin" : {
+
+    },
     "A View" : {
 
     },
@@ -1991,7 +2007,33 @@
     "A connector comes with its plugin." : {
 
     },
-    "A connector comes with its plugin. Its settings and secrets are kept in %@." : {
+    "A connector comes with its plugin. Its settings and secrets are kept in this Marfa." : {
+
+    },
+    "A connector, and %@ and %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "A connector, and %1$@ and %2$@."
+          }
+        }
+      }
+    },
+    "A connector, and %@." : {
+
+    },
+    "A connector, and %lld types such as %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "A connector, and %1$lld types such as %2$@."
+          }
+        }
+      }
+    },
+    "A connector." : {
 
     },
     "A connector’s sign-in needs the app signed in as an app. Sign in again in Connection." : {
@@ -2076,6 +2118,9 @@
 
     },
     "A paused connector does nothing until you resume it." : {
+
+    },
+    "A plugin brings its types with it." : {
 
     },
     "A plugin’s type can’t change here. A child type adds words and fields." : {
@@ -2606,6 +2651,9 @@
     "Always Show" : {
 
     },
+    "An App" : {
+
+    },
     "An IP address." : {
 
     },
@@ -2619,6 +2667,9 @@
 
     },
     "An app." : {
+
+    },
+    "An app’s types are listed here." : {
 
     },
     "An earlier change to this item hasn’t reached the server yet." : {
@@ -2891,6 +2942,9 @@
     "As media" : {
 
     },
+    "Ascending" : {
+
+    },
     "Ask" : {
 
     },
@@ -3030,10 +3084,7 @@
     "Backups can’t be kept there" : {
 
     },
-    "Backups of %@" : {
-
-    },
-    "Base a type on one below to make your own." : {
+    "Base a type on one to make your own." : {
 
     },
     "Based On" : {
@@ -3384,6 +3435,9 @@
     },
     "Can’t be shorter than “%@”." : {
       "extractionState" : "manual"
+    },
+    "Can’t reach the backup folder. Connect its disk, then back up." : {
+
     },
     "Card Density" : {
       "extractionState" : "manual"
@@ -3766,9 +3820,6 @@
     "Clean-up waits until the server’s clock is right." : {
 
     },
-    "Cleanup" : {
-
-    },
     "Clear" : {
       "extractionState" : "manual"
     },
@@ -3785,6 +3836,9 @@
       "extractionState" : "manual"
     },
     "Clear Shortcut" : {
+
+    },
+    "Clear the search and type filter to empty the whole Trash." : {
 
     },
     "Cleared" : {
@@ -4122,6 +4176,9 @@
 
     },
     "Couldn’t Read Available Types" : {
+
+    },
+    "Couldn’t Read Backups" : {
 
     },
     "Couldn’t Read Connector Machines" : {
@@ -4511,14 +4568,29 @@
     "Deleted items kept for" : {
       "extractionState" : "manual"
     },
+    "Deleted items stay here for %@ days." : {
+
+    },
+    "Deleted items stay here for one day." : {
+
+    },
+    "Deleted items stay here until you delete them permanently." : {
+
+    },
     "Deleted items stay in Recently Deleted this long, then the server permanently deletes them, with their history. 0 keeps them with no limit. Empty uses the server’s default." : {
       "extractionState" : "manual"
+    },
+    "Deleted items wait here before they are permanently deleted." : {
+
     },
     "Delete…" : {
 
     },
     "Deleting permanently needs the server, which can’t be reached right now. The items are still in Recently Deleted." : {
       "extractionState" : "manual"
+    },
+    "Deleting this item permanently needs write access to its type and permission to empty Trash." : {
+
     },
     "Delivered" : {
 
@@ -4536,6 +4608,9 @@
 
     },
     "Density" : {
+
+    },
+    "Descending" : {
 
     },
     "Description" : {
@@ -4614,9 +4689,6 @@
       "extractionState" : "manual"
     },
     "Disconnecting this app also signs this Mac out." : {
-
-    },
-    "Disconnect…" : {
 
     },
     "Divider" : {
@@ -4917,9 +4989,6 @@
     "Every Mac that connects to it uses them." : {
 
     },
-    "Every Marfa has these. Base a type on one to add to it." : {
-
-    },
     "Every Week" : {
 
     },
@@ -4936,9 +5005,6 @@
 
     },
     "Every group with items is hidden. Show a group in the View panel to see its items." : {
-
-    },
-    "Every installed connector has a machine. A new one comes with its plugin." : {
 
     },
     "Every setting on this Mac starts over. Your items and sign-in stay. A restore point is saved first, and Restore Earlier Settings brings it back." : {
@@ -5319,6 +5385,9 @@
           }
         }
       }
+    },
+    "From Apps" : {
+
     },
     "From Plugins" : {
 
@@ -5766,13 +5835,16 @@
     "Install" : {
 
     },
-    "Install From a File" : {
-
-    },
-    "Install From a File…" : {
-
-    },
     "Install From the Command Line" : {
+
+    },
+    "Install from a File" : {
+
+    },
+    "Install from a File…" : {
+
+    },
+    "Install one from the list below, or from a file." : {
 
     },
     "Installed" : {
@@ -6052,9 +6124,6 @@
 
     },
     "Items you add show here." : {
-
-    },
-    "Items you delete wait here before they are permanently deleted." : {
 
     },
     "Items you favorite show here." : {
@@ -6483,6 +6552,9 @@
     "Library" : {
 
     },
+    "Limit sources" : {
+
+    },
     "Library and Feed" : {
 
     },
@@ -6498,13 +6570,13 @@
     "Limit Sources" : {
 
     },
-    "Limit sources" : {
-
-    },
     "Limit Sources Not Saved" : {
 
     },
     "Limit requests" : {
+
+    },
+    "Limit sources" : {
 
     },
     "Limits" : {
@@ -7245,6 +7317,9 @@
     "No Browsers" : {
 
     },
+    "No Built In Types" : {
+
+    },
     "No Collections" : {
       "extractionState" : "manual"
     },
@@ -7354,7 +7429,7 @@
     "No Passkeys" : {
 
     },
-    "No Plugins Installed" : {
+    "No Plugins" : {
 
     },
     "No Preview Yet" : {
@@ -7382,6 +7457,12 @@
 
     },
     "No Types" : {
+
+    },
+    "No Types from Apps" : {
+
+    },
+    "No Types from Plugins" : {
 
     },
     "No Types of Your Own" : {
@@ -7487,9 +7568,6 @@
 
     },
     "None selected" : {
-
-    },
-    "None yet." : {
 
     },
     "Not Added to the Item" : {
@@ -7606,9 +7684,6 @@
     "Nothing Matches" : {
 
     },
-    "Nothing More Is Available" : {
-
-    },
     "Nothing Pinned" : {
       "extractionState" : "manual"
     },
@@ -7622,6 +7697,9 @@
 
     },
     "Nothing answers there." : {
+
+    },
+    "Nothing else." : {
 
     },
     "Nothing from this source yet." : {
@@ -7651,13 +7729,13 @@
     "Nothing is kept in step with a folder yet." : {
 
     },
+    "Nothing is listed on this tab." : {
+
+    },
     "Nothing is sent until an address is set." : {
 
     },
     "Nothing is sent until the address and token are set." : {
-
-    },
-    "Nothing is waiting here." : {
 
     },
     "Nothing is waiting to be removed." : {
@@ -7667,6 +7745,9 @@
 
     },
     "Nothing matches your search." : {
+
+    },
+    "Nothing more is available" : {
 
     },
     "Nothing on the Page" : {
@@ -8205,9 +8286,6 @@
     "Permanently deleted an item" : {
 
     },
-    "Permanently deletes %@ items." : {
-
-    },
     "Permissions" : {
 
     },
@@ -8499,7 +8577,7 @@
     "Reading earlier versions…" : {
 
     },
-    "Reading the Plugins Release…" : {
+    "Reading the plugins release…" : {
 
     },
     "Reading the server’s settings…" : {
@@ -8910,6 +8988,9 @@
     "Restoring changes the settings on this Mac only. A restore point is saved first." : {
 
     },
+    "Restoring this item needs write access to its type." : {
+
+    },
     "Restoring…" : {
 
     },
@@ -8960,9 +9041,6 @@
 
     },
     "Revoked a key" : {
-
-    },
-    "Revoke…" : {
 
     },
     "Revoking this key also signs this Mac out." : {
@@ -9174,9 +9252,6 @@
     "Select All" : {
 
     },
-    "Select Items" : {
-
-    },
     "Selected" : {
       "extractionState" : "manual"
     },
@@ -9271,7 +9346,7 @@
     "Set a telemetry address or turn on error reports with an address and token." : {
 
     },
-    "Set on the machine %@ runs on." : {
+    "Set on the machine that runs this Marfa." : {
 
     },
     "Set or Not Set" : {
@@ -9464,9 +9539,6 @@
 
     },
     "Show Plugin" : {
-
-    },
-    "Show Plugins" : {
 
     },
     "Show Reader" : {
@@ -10154,6 +10226,9 @@
     "The Keychain wouldn’t keep or give the sign-in. Check that the app can use the Keychain, then try again." : {
       "extractionState" : "manual"
     },
+    "The Last Backup Failed" : {
+
+    },
     "The Marfa server can’t be reached. The items are still in Recently Deleted." : {
       "extractionState" : "manual"
     },
@@ -10403,9 +10478,6 @@
     "The app isn’t allowed to keep them in %@ yet. Once it is, every Mac that connects uses them." : {
 
     },
-    "The app isn’t allowed to list or permanently delete deleted items." : {
-
-    },
     "The app isn’t allowed to list, make, change or remove webhooks." : {
 
     },
@@ -10419,6 +10491,9 @@
 
     },
     "The app isn’t allowed to manage your passkeys." : {
+
+    },
+    "The app isn’t allowed to read deleted items." : {
 
     },
     "The app isn’t allowed to read how many items this Marfa holds." : {
@@ -10523,7 +10598,16 @@
     "The app’s sign-in isn’t allowed to read this item’s history. Ask whoever runs the server to allow it." : {
       "extractionState" : "manual"
     },
+    "The backup destination isn’t available." : {
+
+    },
+    "The backup destination isn’t available. Check where backups are kept, then back up." : {
+
+    },
     "The backup folder may not belong to this server alone." : {
+
+    },
+    "The backups couldn’t be read from their destination." : {
 
     },
     "The clipboard changed while the files were being fetched, so it was left as it is. Try again." : {
@@ -10633,9 +10717,6 @@
     },
     "The filter on %@" : {
       "extractionState" : "manual"
-    },
-    "The first is taken once there is somewhere to keep it." : {
-
     },
     "The first version." : {
 
@@ -10805,6 +10886,9 @@
     "The next sweep can permanently remove files already reported as unused." : {
 
     },
+    "The object store isn’t accepting backups. Check the store, then back up." : {
+
+    },
     "The oldest Marfa this version works with." : {
 
     },
@@ -10850,6 +10934,12 @@
     "The plugin brought no types." : {
 
     },
+    "The plugins release couldn’t be read" : {
+
+    },
+    "The plugins release wasn’t read" : {
+
+    },
     "The port it listens on." : {
 
     },
@@ -10890,6 +10980,9 @@
 
     },
     "The server couldn’t do that." : {
+
+    },
+    "The server couldn’t finish the backup. Try backing up again." : {
 
     },
     "The server didn’t accept that folder. It must already exist on the machine it runs on." : {
@@ -11148,9 +11241,6 @@
 
     },
     "Their plugins keep them." : {
-
-    },
-    "Their plugins keep them. Add a child type to change one." : {
 
     },
     "Their types and %@. Delete them in Types if you want." : {
@@ -12054,6 +12144,9 @@
     "Updated to %@" : {
 
     },
+    "Updates" : {
+
+    },
     "Updating" : {
 
     },
@@ -12317,6 +12410,9 @@
     "Waiting to download." : {
 
     },
+    "Webhook limit reached" : {
+
+    },
     "Waiting to start" : {
 
     },
@@ -12341,13 +12437,13 @@
     "Webhook Created" : {
 
     },
-    "Webhook limit reached" : {
-
-    },
     "Webhook Not Made" : {
 
     },
     "Webhook Unavailable" : {
+
+    },
+    "Webhook limit reached" : {
 
     },
     "Webhooks" : {
@@ -12443,16 +12539,6 @@
     "What went wrong, never your items." : {
 
     },
-    "What you added to %@. Browse %@ under Available." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "What you added to %1$@. Browse %2$@ under Available."
-          }
-        }
-      }
-    },
     "What you typed reached a folded section, which is now open. It wasn’t added, so type it again." : {
 
     },
@@ -12519,10 +12605,10 @@
     "Who May Write" : {
 
     },
-    "Who may write" : {
+    "Who May Write Not Saved" : {
 
     },
-    "Who May Write Not Saved" : {
+    "Who may write" : {
 
     },
     "Whole Number" : {
@@ -12586,6 +12672,9 @@
 
     },
     "Yesterday, %@" : {
+
+    },
+    "You" : {
 
     },
     "You can bring them back from Recently Deleted." : {
@@ -12746,6 +12835,9 @@
 
     },
     "^[%lld change](inflect: true)" : {
+
+    },
+    "^[%lld item](inflect: true)" : {
 
     },
     "^[%lld item](inflect: true) already in %@" : {

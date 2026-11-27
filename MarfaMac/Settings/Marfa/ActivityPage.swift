@@ -252,16 +252,27 @@ struct ActivityPage: View {
 
     private var columns: [SettingsTableColumn<ActivityEntry>] {
         [
-            SettingsTableColumn("When", width: SettingsTokens.Metric.Column.day) { entry in
+            SettingsTableColumn(
+                "When", width: SettingsTokens.Metric.Column.day,
+                sortedAscending: model.order.ascending(for: .when), onSort: { model.toggleSort(.when) }
+            ) { entry in
                 Text(verbatim: ActivityWording.when(entry.date)).foregroundStyle(SettingsTokens.secondaryText)
             },
-            SettingsTableColumn("Who", width: SettingsTokens.Metric.Column.who) { entry in
+            SettingsTableColumn(
+                "Who", width: SettingsTokens.Metric.Column.who,
+                sortedAscending: model.order.ascending(for: .who), onSort: { model.toggleSort(.who) }
+            ) { entry in
                 Text(verbatim: entry.who ?? String(localized: "Unknown")).foregroundStyle(SettingsTokens.secondaryText)
             },
-            SettingsTableColumn("What") { entry in
+            SettingsTableColumn(
+                "What", sortedAscending: model.order.ascending(for: .what), onSort: { model.toggleSort(.what) }
+            ) { entry in
                 Text(verbatim: ActivityWording.what(entry.action)).foregroundStyle(SettingsTokens.secondaryText)
             },
-            SettingsTableColumn("Address", width: SettingsTokens.Metric.Column.address) { entry in
+            SettingsTableColumn(
+                "Address", width: SettingsTokens.Metric.Column.address,
+                sortedAscending: model.order.ascending(for: .address), onSort: { model.toggleSort(.address) }
+            ) { entry in
                 Text(verbatim: entry.address ?? "").foregroundStyle(SettingsTokens.secondaryText)
             },
         ]
@@ -309,10 +320,7 @@ struct ActivityPage: View {
                         line: Text("Changes and sign-ins are recorded here."), action: nil)
                 }
             },
-            sort: SettingsColumnSort(column: model.order.column.rawValue, ascending: model.order.ascending),
-            onColumnSort: { index in
-                if let column = ActivityColumn(rawValue: index) { model.toggleSort(column) }
-            })
+        )
     }
 
     /// The tab's own words. A page line would not match, because the page itself needs no permission.

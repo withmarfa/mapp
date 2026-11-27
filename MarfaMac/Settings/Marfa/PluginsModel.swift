@@ -214,6 +214,11 @@ struct PluginsAccess {
     /// The installed plugin's types, in the order the server lists them, named as the server names them.
     func typeTitle(_ id: String) -> String { typeInfo[id]?.title ?? id }
 
+    /// The line under an installed plugin in the list.
+    func catalogueLine(of plugin: InstalledPlugin) -> String {
+        PluginWording.catalogueLine(hasConnector: plugin.connector != nil, typeTitles: plugin.types.map(typeTitle))
+    }
+
     func hostName(of plugin: InstalledPlugin) -> String? { plugin.host.flatMap { hostNames[$0] } }
 
     func items(ofType id: String) -> Int { access.ownItems(id) }
@@ -242,9 +247,21 @@ struct PluginsAccess {
 
     func isWorking(_ name: String) -> Bool { working.contains(name) }
 
+    /// Update and remove of a plugin that has a connector also need `connectors.manage`.
+    func mayChange(_ plugin: InstalledPlugin) -> Bool {
+        plugin.connector == nil || context.grants().contains(.connectorsManage)
+    }
+
     /// Installs, or updates to, what the release lists for `entry`. The bundle is read and checked first.
     func install(_ entry: ReleasePlugin, asUpdate: Bool = false) async {
         let name = entry.name
+        if asUpdate, let held = plugin(name), !mayChange(held) {
+            notice = nil
+            problem = Problem(
+                plugin: name, title: String(localized: "Not Updated"),
+                failure: .owner(.notPermitted(InstancePermission.connectorsManage.rawValue)))
+            return
+        }
         guard !working.contains(name) else { return }
         working.insert(name)
         defer { working.remove(name) }
@@ -336,6 +353,14 @@ struct PluginsAccess {
 
     /// Asks before removing: what stops and what stays, with the items the plugin's types hold now.
     func askToRemove(_ plugin: InstalledPlugin) {
+        guard mayChange(plugin) else {
+            notice = nil
+            removal = nil
+            problem = Problem(
+                plugin: plugin.name, title: String(localized: "Not Removed"),
+                failure: .owner(.notPermitted(InstancePermission.connectorsManage.rawValue)))
+            return
+        }
         problem = nil
         notice = nil
         removal = Removal(
@@ -346,6 +371,13 @@ struct PluginsAccess {
 
     func confirmRemoval() async {
         guard let asked = removal else { return }
+        guard mayChange(asked.plugin) else {
+            removal = nil
+            problem = Problem(
+                plugin: asked.plugin.name, title: String(localized: "Not Removed"),
+                failure: .owner(.notPermitted(InstancePermission.connectorsManage.rawValue)))
+            return
+        }
         removal = nil
         let name = asked.plugin.name
         working.insert(name)
