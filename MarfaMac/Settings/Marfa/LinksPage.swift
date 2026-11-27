@@ -201,7 +201,7 @@ struct NewLinkTypeSheet: View {
     }
 }
 
-// Temporary until Account and Types are rebuilt in session 266c.
+/// The row on Types that opens Links. The page stays, because this row still goes there.
 struct LinksSection: View {
     @State private var model: LinksModel
     let host: any MarfaSettingsHost

@@ -13,6 +13,17 @@ nonisolated enum TypeOrigin: Hashable, Sendable {
     case unknown
 }
 
+/// The sign-in that first registered a type, as the server recorded it (`provenance.created_by`).
+nonisolated struct TypeCreator: Hashable, Sendable {
+    enum Kind: String, Hashable, Sendable {
+        case browser, app, key, local
+    }
+
+    var kind: Kind
+    var id: String
+    var name: String
+}
+
 /// One word a status field takes, in one of four groups.
 nonisolated struct StatusWordRecord: Hashable, Sendable {
     var value: String
@@ -74,6 +85,8 @@ nonisolated struct TypeRecord: Identifiable, Hashable, Sendable {
     var parent: String?
     var origin: TypeOrigin
     var plugin: PluginOrigin?
+    /// The sign-in that first registered the type, when the server recorded one. It does not by itself say the type is the owner's.
+    var creator: TypeCreator?
     /// The icon the type declares itself; a child with none shows its parent's.
     var icon: String?
     var fields: [String: TypeFieldRecord]

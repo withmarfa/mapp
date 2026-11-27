@@ -354,7 +354,8 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
             ]
         case .types:
             [
-                String(localized: "Yours"), String(localized: "From Plugins"), String(localized: "Built In"), String(localized: "New Type"),
+                String(localized: "All"), String(localized: "Yours"), String(localized: "From Plugins"), String(localized: "From Apps"),
+                String(localized: "Built In"), String(localized: "New Type"), String(localized: "Links Between Items"), String(localized: "Links"),
                 String(localized: "New Child Type"), String(localized: "Statuses"), String(localized: "Guidance"), String(localized: "Icon"),
                 String(localized: "Based On"), String(localized: "Plural"), String(localized: "Description"),
             ]

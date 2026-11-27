@@ -367,7 +367,7 @@ extension TypesModel {
         childName = ""
         childPlural = ""
         childIcon = nil
-        records = ((try? await calls.types().types) ?? records).filter { !Self.isHidden($0.id) }
+        records = ((try? await calls.types().types) ?? records).filter { !Self.isHidden($0.id, ownVendor: ownVendor) }
         made = id
         return true
     }

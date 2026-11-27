@@ -24,9 +24,55 @@ import Observation
     static let wordMeaningLimit = 120
     static let fieldMeaningLimit = 300
 
+    /// Where a listed type sits. Membership comes from the server's origin and the type's id, never from its name.
+    enum TypeGroup: Hashable {
+        case yours, builtIn, fromPlugins, fromApps
+    }
+
+    /// The tabs over the list. From Apps is shown only while `showsFromApps`.
+    enum TypesTab: Hashable {
+        case all, yours, builtIn, fromPlugins, fromApps
+    }
+
+    enum TypeColumn: Hashable {
+        case type, source, items
+    }
+
+    /// Which column orders the list, and which way.
+    enum TypeColumnSort: Hashable {
+        case type(ascending: Bool)
+        case source(ascending: Bool)
+        case items(ascending: Bool)
+
+        func ascending(for column: TypeColumn) -> Bool? {
+            switch (self, column) {
+            case (.type(let ascending), .type), (.source(let ascending), .source), (.items(let ascending), .items): ascending
+            default: nil
+            }
+        }
+
+        func toggled(_ column: TypeColumn) -> TypeColumnSort {
+            let ascending = ascending(for: column).map { !$0 } ?? true
+            switch column {
+            case .type: return .type(ascending: ascending)
+            case .source: return .source(ascending: ascending)
+            case .items: return .items(ascending: ascending)
+            }
+        }
+    }
+
+    /// One row of the type list. `depth` is how far under a parent that is also in this tab. A parent outside the tab leaves a root.
+    struct TypeListRow: Identifiable, Hashable {
+        var type: TypeRecord
+        var depth: Int
+        var id: String { type.id }
+    }
+
     let context: OwnerContext
     let calls: any TypeCalls
     let access: TypeAccess
+    /// The `app.<vendor>` namespace this app keeps for itself. Types under it stay off the list. Nil hides only `system.*`.
+    let ownVendor: String?
 
     var records: [TypeRecord] = [] {
         didSet { refreshList() }
@@ -128,10 +174,11 @@ import Observation
     /// The type a child type was made as, so the page can open it.
     var made: String?
 
-    init(context: OwnerContext, calls: any TypeCalls, access: TypeAccess) {
+    init(context: OwnerContext, calls: any TypeCalls, access: TypeAccess, ownVendor: String? = nil) {
         self.context = context
         self.calls = calls
         self.access = access
+        self.ownVendor = ownVendor
         iconSet = access.markSets.first ?? MarfaMarkSet(id: "", title: "")
     }
 
@@ -141,7 +188,7 @@ import Observation
         await loader.load(in: context, primary: { () throws(OwnerFailure) in
             do throws(TypeFailure) {
                 let listing = try await calls.types()
-                records = listing.types.filter { !Self.isHidden($0.id) }
+                records = listing.types.filter { !Self.isHidden($0.id, ownVendor: ownVendor) }
                 pluginTitles = listing.pluginTitles
             } catch {
                 throw Self.owner(error)
@@ -155,8 +202,13 @@ import Observation
         })
     }
 
-    /// `system.*` and `app.*` are machinery that no app lists.
-    static func isHidden(_ id: String) -> Bool { id.hasPrefix("system.") || id.hasPrefix("app.") }
+    /// `system.*` is machinery. This app's own `app.<vendor>.*` types are its settings, not a type the owner manages here.
+    /// Another app's types stay listed.
+    static func isHidden(_ id: String, ownVendor: String?) -> Bool {
+        if id.hasPrefix("system.") { return true }
+        guard let ownVendor, !ownVendor.isEmpty else { return false }
+        return id == ownVendor || id.hasPrefix(ownVendor + ".")
+    }
 
     static func owner(_ failure: TypeFailure) -> OwnerFailure {
         switch failure {
@@ -191,7 +243,7 @@ import Observation
     @discardableResult
     func reread() async -> Bool {
         guard let listing = try? await calls.types() else { return false }
-        records = listing.types.filter { !Self.isHidden($0.id) }
+        records = listing.types.filter { !Self.isHidden($0.id, ownVendor: ownVendor) }
         pluginTitles = listing.pluginTitles
         return true
     }
@@ -208,6 +260,9 @@ import Observation
         var yours: [TypeRecord] = []
         var fromPlugins: [TypeRecord] = []
         var builtIn: [TypeRecord] = []
+        var fromApps: [TypeRecord] = []
+        /// Listed types that belong to no tab but All: an origin the server does not attribute.
+        var ungrouped: [TypeRecord] = []
 
         /// The types below `id`, at any depth.
         func descendants(of id: String) -> [TypeRecord] {
@@ -247,10 +302,12 @@ import Observation
             }
             for type in next.sorted {
                 if let parent = type.parent { next.sortedChildrenByParent[parent, default: []].append(type) }
-                switch type.origin {
-                case .registered, .unknown: next.yours.append(type)
-                case .plugin: next.fromPlugins.append(type)
-                case .platform: next.builtIn.append(type)
+                switch Self.group(of: type) {
+                case .yours: next.yours.append(type)
+                case .fromPlugins: next.fromPlugins.append(type)
+                case .builtIn: next.builtIn.append(type)
+                case .fromApps: next.fromApps.append(type)
+                case nil: next.ungrouped.append(type)
                 }
             }
             for (id, ownCount) in ownCounts {
@@ -267,13 +324,33 @@ import Observation
         }
     }
 
-    /// The owner's own types, and those an app made for them.
+    /// The owner's own types. An app's namespace is From Apps, and an origin the server does not attribute stays in All only.
     var yours: [TypeRecord] { list.yours }
     var fromPlugins: [TypeRecord] { list.fromPlugins }
     var builtIn: [TypeRecord] { list.builtIn }
+    var fromApps: [TypeRecord] { list.fromApps }
 
-    /// Whether the owner can change the type: one they made, which no plugin installed and Marfa does not ship.
-    func isEditable(_ type: TypeRecord) -> Bool { type.origin == .registered || type.origin == .unknown }
+    /// From Apps is omitted while no listed type comes from an app.
+    var showsFromApps: Bool { !list.fromApps.isEmpty }
+
+    /// Whether the owner can change the type: one they registered, outside an app's namespace.
+    func isEditable(_ type: TypeRecord) -> Bool { Self.group(of: type) == .yours }
+
+    /// Which tab a type belongs on. Nil is All only.
+    static func group(of type: TypeRecord) -> TypeGroup? {
+        switch type.origin {
+        case .platform: .builtIn
+        case .plugin: .fromPlugins
+        case .registered, .unknown:
+            if isAppNamespace(type.id) { .fromApps } else if type.origin == .registered { .yours } else { nil }
+        }
+    }
+
+    /// `app.<vendor>.<rest>`, which is an app's namespace. A shorter id is not.
+    static func isAppNamespace(_ id: String) -> Bool {
+        let parts = id.split(separator: ".")
+        return parts.count >= 3 && parts[0] == "app" && !parts[1].isEmpty && parts.dropFirst(2).contains { !$0.isEmpty }
+    }
 
     func children(of id: String) -> [TypeRecord] { list.sortedChildrenByParent[id, default: []] }
 
@@ -297,6 +374,95 @@ import Observation
         let below = children(of: type.id).map { title(of: $0) }
         if !below.isEmpty, below.count <= 4 { parts.append(String(localized: "With \(below.formatted(.list(type: .and))).")) }
         return parts.isEmpty ? nil : parts.joined(separator: " ")
+    }
+
+    func count(in tab: TypesTab) -> Int { membership(of: tab).count }
+
+    /// The rows of one tab, in the order `sort` names. The Type column keeps children under their parents. The others are flat.
+    func rows(in tab: TypesTab, sortedBy sort: TypeColumnSort) -> [TypeListRow] {
+        let members = membership(of: tab)
+        switch sort {
+        case .type(let ascending):
+            return tree(members, ascending: ascending)
+        case .source(let ascending):
+            return ordered(members, ascending: ascending) { sourceTitle(of: $0) }.map { TypeListRow(type: $0, depth: 0) }
+        case .items(let ascending):
+            return members.sorted { left, right in
+                let leftCount = count(of: left.id)
+                let rightCount = count(of: right.id)
+                if leftCount == rightCount { return left.id < right.id }
+                return ascending ? leftCount < rightCount : leftCount > rightCount
+            }.map { TypeListRow(type: $0, depth: 0) }
+        }
+    }
+
+    /// The selected type when it is still in `rows`, and none when the tab no longer lists it.
+    func keptSelection(_ id: String?, in rows: [TypeListRow]) -> String? {
+        guard let id, rows.contains(where: { $0.id == id }) else { return nil }
+        return id
+    }
+
+    /// The From column: Marfa, the plugin's title, You, the app's name, or Unknown.
+    func sourceTitle(of type: TypeRecord) -> String {
+        switch Self.group(of: type) {
+        case .builtIn: String(localized: "Marfa")
+        case .fromPlugins:
+            if let plugin = type.plugin { title(ofPlugin: plugin.name) } else { String(localized: "A Plugin") }
+        case .yours: String(localized: "You")
+        case .fromApps: appName(of: type)
+        case nil: String(localized: "Unknown")
+        }
+    }
+
+    /// The app's name from the sign-in that registered the type, or the vendor in its id when that sign-in was not recorded.
+    func appName(of type: TypeRecord) -> String {
+        if let creator = type.creator, creator.kind == .app {
+            let name = creator.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !name.isEmpty { return name }
+        }
+        let parts = type.id.split(separator: ".")
+        if parts.count >= 2, parts[0] == "app" { return Self.title(ofPlugin: String(parts[1])) }
+        return String(localized: "An App")
+    }
+
+    private func membership(of tab: TypesTab) -> [TypeRecord] {
+        switch tab {
+        case .all: list.yours + list.builtIn + list.fromPlugins + list.fromApps + list.ungrouped
+        case .yours: list.yours
+        case .builtIn: list.builtIn
+        case .fromPlugins: list.fromPlugins
+        case .fromApps: list.fromApps
+        }
+    }
+
+    /// Parents before children. A parent that this tab does not list leaves its child as a root. A cycle is listed at the root
+    /// rather than dropped.
+    private func tree(_ members: [TypeRecord], ascending: Bool) -> [TypeListRow] {
+        let ids = Set(members.map(\.id))
+        let children = Dictionary(grouping: members) { type -> String in
+            if let parent = type.parent, ids.contains(parent) { parent } else { "" }
+        }
+        var rows: [TypeListRow] = []
+        var seen: Set<String> = []
+        func walk(_ parent: String, depth: Int) {
+            for type in ordered(children[parent] ?? [], ascending: ascending, by: { title(of: $0) }) where seen.insert(type.id).inserted {
+                rows.append(TypeListRow(type: type, depth: depth))
+                walk(type.id, depth: depth + 1)
+            }
+        }
+        walk("", depth: 0)
+        let missed = members.filter { !seen.contains($0.id) }
+        rows += ordered(missed, ascending: ascending, by: { title(of: $0) }).map { TypeListRow(type: $0, depth: 0) }
+        return rows
+    }
+
+    private func ordered(_ types: [TypeRecord], ascending: Bool, by title: (TypeRecord) -> String) -> [TypeRecord] {
+        types.sorted { left, right in
+            let order = title(left).localizedStandardCompare(title(right))
+            if order == .orderedSame { return left.id < right.id }
+            let isAscending = order == .orderedAscending
+            return ascending ? isAscending : !isAscending
+        }
     }
 
     /// A plugin's name for people: `google-calendar` reads "Google Calendar".

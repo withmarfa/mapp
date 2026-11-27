@@ -133,6 +133,9 @@ nonisolated struct ServerTypeCalls: TypeCalls {
             id: own.id, label: own.label ?? own.id, plural: own.plural, description: own.description, guidance: own.guidance,
             parent: own.parent, origin: origin,
             plugin: listed.value2.provenance.plugin.map { .init(name: $0.name, version: $0.version) },
+            creator: listed.value2.provenance.createdBy.flatMap { created in
+                TypeCreator.Kind(rawValue: created.kind.rawValue).map { TypeCreator(kind: $0, id: created.id, name: created.name) }
+            },
             icon: own.displayHints?.icon, fields: Dictionary(uniqueKeysWithValues: fields.map { ($0.key, $0) }),
             feedWindow: own.retentionPolicy?.feedDays.map { $0.value.map { .days(Int($0)) } ?? .never },
             mergeStrategy: own.mergePolicy?._default?.rawValue, versionWindow: versionWindow(own.versionPolicy))
