@@ -544,6 +544,28 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(library.notices.waiting.last?.message == "The item changed after you saw it.")
     }
 
+    @Test func confirmingPermanentDeletionKeepsAnItemEditedAndTrashedAgain() async throws {
+        let (library, source) = try await loaded()
+        source.state.set(.online)
+        try #require(await eventually { library.reachesServer })
+        var changed = try #require(library.item(F.n3))
+        let shown = [changed]
+        changed.state = .active
+        source.send(.upserted([changed]))
+        try #require(await eventually { library.item(F.n3)?.state == .active })
+        changed.title = "Edited elsewhere"
+        changed.version = ItemVersion(9)
+        changed.state = .trashed
+        changed.trashed = .now
+        source.send(.upserted([changed]))
+        try #require(await eventually { library.item(F.n3) == changed })
+        library.purgeConfirmedRows(shown)
+        #expect(source.writes.isEmpty)
+        var skips = BatchSkips()
+        skips.skip(.changedSince)
+        #expect(library.notices.waiting.last?.message == skips.message)
+    }
+
     @Test func emptyTrashOnlySubmitsUnchangedListedItemsTheSignInMayWrite() async throws {
         let unchanged = F.item(F.n1, F.note, "Unchanged", age: 1, state: .trashed)
         var edited = F.item(F.n2, F.note, "Edited", age: 2, state: .trashed)

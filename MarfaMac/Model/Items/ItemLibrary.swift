@@ -467,6 +467,25 @@ extension ItemLibrary {
         return nil
     }
 
+    func purgeConfirmedRows(_ shown: [Item]) {
+        guard reachesServer else { return tellCannotPurge() }
+        var approved = Set<ItemID>()
+        var skips = BatchSkips()
+        for row in shown {
+            guard let current = item(row.id) else {
+                skips.skip(.gone)
+                continue
+            }
+            guard current == row, current.state == .trashed else {
+                skips.skip(.changedSince)
+                continue
+            }
+            approved.insert(row.id)
+        }
+        tellSkipped(skips, didChange: !approved.isEmpty, failing: String(localized: "Can’t Delete Immediately"))
+        if !approved.isEmpty { deletePermanently(approved) }
+    }
+
     /// Erases what the person confirmed, if the library still can: a Marfa library cannot while its server is out
     /// of reach, which may have begun while the dialog was open. Otherwise nothing is erased, and the person is told.
     func deletePermanentlyOnConfirm(_ ids: Set<ItemID>) {

@@ -61,10 +61,37 @@ nonisolated private func record(_ name: String, hoursAgo: Int = 0) -> BackupReco
         let bench = OwnerBench(grants: [.backupsManage])
         let model = BackupsModel(context: bench.context)
         await model.load()
-        #expect(model.lastBackupLine(health: nil) == "None yet.")
+        #expect(model.lastBackupLine(health: nil) == "Never")
         bench.calls.fail("backups", with: .unreachable)
         await model.load()
         #expect(model.failure == .unreachable)
+    }
+
+    @Test func aSharedDestinationKeepsForeignBackupsAvailableForRestore() async {
+        let foreign = BackupRecord(instanceID: "other", name: "foreign", taken: someday, bytes: 120)
+        for grants: Set<InstancePermission> in [[.backupsManage], [.backupsManage, .configManage]] {
+            let bench = bench(grants: grants)
+            bench.calls.state.withLock { $0.backups = [foreign] }
+            let model = BackupsModel(context: bench.context)
+            await model.load()
+            #expect(model.lastBackupLine(health: nil) == "Never")
+            #expect(model.backups == [foreign])
+            model.beginRestore(foreign)
+            #expect(model.sheet == .restore(foreign))
+        }
+    }
+
+    @Test func trashSearchAndTypeFiltersPreventEmptyingTheWholeTrash() {
+        let rows = ["Invoice", "Receipt"].map { MarfaDeletedItem(id: $0, title: $0, deleted: nil, kind: "Note", source: nil) }
+        var filter = TrashFilter()
+        filter.search = "invoice"
+        #expect(rows.filter(filter.matches).map(\.title) == ["Invoice"])
+        #expect(!filter.canEmptyTrash(canDeletePermanently: true))
+        filter.search = ""
+        #expect(filter.canEmptyTrash(canDeletePermanently: true))
+        #expect(!filter.canEmptyTrash(canDeletePermanently: false))
+        filter.kind = "Note"
+        #expect(!filter.canEmptyTrash(canDeletePermanently: true))
     }
 
     @Test func anUnavailableDestinationLeavesItsSettingsAvailable() async {
@@ -97,7 +124,8 @@ nonisolated private func record(_ name: String, hoursAgo: Int = 0) -> BackupReco
         #expect(model.backups.count == 3)
         #expect(model.settings?.folder == "/Volumes/Studio Backup")
         #expect(model.place == .folder)
-        #expect(model.latest?.name == "c")
+        #expect(model.backups.first?.name == "c")
+        #expect(model.lastBackupLine(health: nil) == UpkeepWording.moment(someday))
     }
 
     @Test func withoutConfigManageItNeverAsksForTheSettings() async {
@@ -136,7 +164,7 @@ nonisolated private func record(_ name: String, hoursAgo: Int = 0) -> BackupReco
         await model.backUpNow(reason: nil)
         #expect(bench.calls.state.withLock { $0.backupsTaken } == 1)
         #expect(model.backups.count == 4)
-        #expect(model.latest?.name == "now-1.json")
+        #expect(model.backups.first?.name == "now-1.json")
         #expect(model.backUpError == nil)
     }
 

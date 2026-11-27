@@ -1,26 +1,32 @@
 import Marfa
 import SwiftUI
 
+struct TrashFilter {
+    var search = ""
+    var kind: String?
+
+    var isActive: Bool { kind != nil || !search.isEmpty }
+
+    func canEmptyTrash(canDeletePermanently: Bool) -> Bool { canDeletePermanently && !isActive }
+
+    func matches(_ item: MarfaDeletedItem) -> Bool {
+        let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
+        return (kind == nil || item.kind == kind) && (query.isEmpty || item.title.localizedStandardContains(query))
+    }
+}
+
 struct TrashPage: View {
     static let allDeleted = SettingsSubpage(id: "all-deleted", title: String(localized: "All Deleted Items"))
 
     let host: any MarfaSettingsHost
     let showsAll: Bool
     @State private var showsEveryItem = false
-    @State private var search = ""
-    @State private var kind: String?
+    @State private var filter = TrashFilter()
 
     static func canReadItems(scopes: [String]) -> Bool {
         AccessScopes.parse(scopes).entries.contains { entry in
             guard let root = entry.pattern.split(separator: ".").first else { return false }
             return !["edge", "metadata", "profile", "app"].contains(root)
-        }
-    }
-
-    private var items: [MarfaDeletedItem] {
-        let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
-        return host.deletedItems.filter { item in
-            (kind == nil || item.kind == kind) && (query.isEmpty || item.title.localizedStandardContains(query))
         }
     }
 
@@ -64,7 +70,7 @@ struct TrashPage: View {
         SettingsCard {
             SettingsRow(
                 title: Text("^[\(host.deletedCount) item](inflect: true)"),
-                line: retention
+                line: filter.isActive ? Text("Clear the search and type filter to empty the whole Trash.") : retention
             ) {
                 if let purgePermission {
                     SettingsLockedValue(text: String(localized: "Empty Trash"))
@@ -72,7 +78,7 @@ struct TrashPage: View {
                         .disabled(host.isAllowingMore)
                 } else {
                     SettingsButton("Empty Trash", role: .destructive) { host.emptyDeleted() }
-                        .disabled(!host.canDeletePermanently)
+                        .disabled(!filter.canEmptyTrash(canDeletePermanently: host.canDeletePermanently))
                         .accessibilityIdentifier("TrashEmpty")
                 }
             }
@@ -80,11 +86,11 @@ struct TrashPage: View {
     }
 
     private var deletedList: some View {
-        let items = items
+        let items = host.deletedItems.filter { filter.matches($0) }
         let preview = SettingsTablePreview(total: items.count, expanded: showsAll || showsEveryItem)
         let kinds = Set(host.deletedItems.map(\.kind)).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
         return VStack(spacing: SettingsTokens.Metric.sectionGap) {
-            SettingsTableFilter(choice: $kind, search: $search) {
+            SettingsTableFilter(choice: $filter.kind, search: $filter.search) {
                 Text("All Types").tag(String?.none)
                 ForEach(kinds, id: \.self) { Text(verbatim: $0).tag(String?.some($0)) }
             }

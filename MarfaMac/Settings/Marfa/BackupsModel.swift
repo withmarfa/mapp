@@ -69,17 +69,10 @@ import Observation
         ])
     }
 
-    /// The newest backup in the destination, which can contain backups from several instances.
-    var latest: BackupRecord? { backups.first }
-
     func lastBackupLine(health: BackupsHealth?) -> String {
-        let taken: Date?
-        if let settings {
-            taken = backups.first(where: { $0.instanceID == settings.instanceID })?.taken ?? health?.lastBackup
-        } else {
-            taken = health?.lastBackup ?? latest?.taken
-        }
-        return taken.map { UpkeepWording.moment($0) } ?? String(localized: "None yet.")
+        let listed = settings?.instanceID.flatMap { id in backups.first { $0.instanceID == id }?.taken }
+        let taken = [listed, health?.lastBackup].compactMap { $0 }.max()
+        return taken.map { UpkeepWording.moment($0) } ?? String(localized: "Never")
     }
 
     var backUpButtonTitle: String {

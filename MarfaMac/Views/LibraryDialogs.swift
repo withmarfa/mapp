@@ -98,19 +98,33 @@ private struct DeleteConfirmation: ViewModifier {
 private struct LibraryDialogs: ViewModifier {
     @CurrentLibrary private var library
     @Environment(\.appearsActive) private var appearsActive
-    @State private var purging: Set<ItemID> = []
+    private struct Request {
+        let library: any ItemLibrary
+        let rows: [Item]
+    }
+
+    @State private var purging: Request?
 
     func body(content: Content) -> some View {
         content
             .onChange(of: library.itemsToPurge, initial: true, take)
             .onChange(of: appearsActive, take)
             .confirmationDialog(
-                DeletionWords.purgeTitle(count: purging.count),
-                isPresented: Binding { !purging.isEmpty } set: { if !$0 { purging = [] } }
-            ) {
-                Button("Delete", role: .destructive) { library.deletePermanentlyOnConfirm(purging) }
-            } message: {
-                Text(DeletionWords.purgeMessage(count: purging.count))
+                DeletionWords.purgeTitle(count: purging?.rows.count ?? 0),
+                isPresented: Binding { purging != nil } set: { if !$0 { purging = nil } },
+                presenting: purging
+            ) { request in
+                Button("Delete", role: .destructive) {
+                    guard library === request.library else {
+                        library.notices.tell(
+                            String(localized: "Can’t Delete Immediately"),
+                            String(localized: "The library whose Trash you opened is no longer open."))
+                        return
+                    }
+                    library.purgeConfirmedRows(request.rows)
+                }
+            } message: { request in
+                Text(DeletionWords.purgeMessage(count: request.rows.count))
             }
     }
 
@@ -119,7 +133,12 @@ private struct LibraryDialogs: ViewModifier {
         guard appearsActive else { return }
         if !library.itemsToPurge.isEmpty {
             // The server may have gone out of reach since the person asked.
-            if library.reachesServer { purging = library.itemsToPurge } else { library.tellCannotPurge() }
+            if library.reachesServer {
+                let rows = library.itemsToPurge.compactMap { library.item($0) }.filter { $0.state == .trashed }
+                if !rows.isEmpty { purging = Request(library: library, rows: rows) }
+            } else {
+                library.tellCannotPurge()
+            }
             library.itemsToPurge = []
         }
     }
