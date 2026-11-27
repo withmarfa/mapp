@@ -1,4 +1,5 @@
 import AppKit
+import Marfa
 import SwiftUI
 import Synchronization
 import Testing
@@ -9,7 +10,7 @@ struct SettingsControlTests {
     enum Finish: CaseIterable { case escape, submit, blur }
 
     @Test(arguments: [MarfaSettingsPage.account, .keys])
-    func movedPagesOpenDuringAndAfterAFailedRead(page: MarfaSettingsPage) async throws {
+    func movedPagesFollowConnectionAndReadFailures(page: MarfaSettingsPage) async throws {
         let settings = StubMarfaHost(settings: InstanceSettingsModel { nil })
         let calls = FakeOwnerCalls()
         settings.ownerCalls = calls
@@ -28,14 +29,50 @@ struct SettingsControlTests {
         pending.open()
         try #require(await eventually {
             window.contentView?.layoutSubtreeIfNeeded()
+            if page == .account && !elements(window.contentView, matching: link, attribute: "accessibilityIdentifier").isEmpty { return false }
             return !elements(window.contentView, matching: "Try Again", attribute: "accessibilityLabel").isEmpty
         })
-        try await press(in: window, matching: link, attribute: "accessibilityIdentifier")
-        #expect(settings.shown == [destination, destination])
+        if page == .account {
+            try await press(in: window, matching: "AccountSignOut", attribute: "accessibilityIdentifier")
+            #expect(settings.signOutRequests == 1)
+        } else {
+            try await press(in: window, matching: link, attribute: "accessibilityIdentifier")
+            #expect(settings.shown == [destination, destination])
+        }
+    }
+
+    @Test func accountLetsALimitedSignInSignOutAndAskForSecurityAccess() async throws {
+        let settings = StubMarfaHost(settings: InstanceSettingsModel { nil })
+        settings.grants = []
+        let window = host(MarfaSettingsPageView(page: .account, host: settings))
+        defer { window.contentView = nil; window.close() }
+        try await press(in: window, matching: "AccountSignOut", attribute: "accessibilityIdentifier")
+        #expect(settings.signOutRequests == 1)
+        try await press(in: window, matching: "AccountChangePassword", attribute: "accessibilityIdentifier")
+        #expect(await eventually { settings.allowed == [[.signInsManage]] })
+        for page in [MarfaSettingsPage.passkeys, .browsers] {
+            try await press(in: window, matching: "SettingsLink-\(page.rawValue)", attribute: "accessibilityIdentifier")
+        }
+        #expect(settings.shown == [.passkeys, .browsers])
+    }
+
+    @Test(arguments: [MarfaSettingsPage.passkeys, .browsers])
+    func anEmptySignInListShowsItsEmptyCard(_ page: MarfaSettingsPage) async throws {
+        let settings = StubMarfaHost(settings: InstanceSettingsModel { nil })
+        let calls = FakeOwnerCalls()
+        calls.state.withLock { $0.passkeys = []; $0.browsers = [] }
+        settings.ownerCalls = calls
+        let window = host(MarfaSettingsPageView(page: page, host: settings))
+        defer { window.contentView = nil; window.close() }
+        let title = page == .passkeys ? "No Passkeys" : "No Browsers"
+        try #require(await eventually(within: .seconds(5)) {
+            window.contentView?.layoutSubtreeIfNeeded()
+            return !elements(window.contentView, matching: title, attribute: "accessibilityValue").isEmpty
+        })
     }
 
     @Test(arguments: [MarfaSettingsPage.account, .passkeys, .browsers, .network])
-    func anUnreachableServerShowsOnlyTheGate(_ page: MarfaSettingsPage) async throws {
+    func anUnreachableServerOffersRetryAndSignOutOnlyFromAccount(_ page: MarfaSettingsPage) async throws {
         let settings = StubMarfaHost(settings: InstanceSettingsModel { nil })
         settings.connection = .notAnswering(lastAnswered: nil)
         let calls = FakeOwnerCalls()
@@ -47,7 +84,13 @@ struct SettingsControlTests {
             return !elements(window.contentView, matching: "Try Again", attribute: "accessibilityLabel").isEmpty
         })
         #expect(calls.calls.isEmpty)
-        #expect(elements(window.contentView, matching: "AccountSignOut", attribute: "accessibilityIdentifier").isEmpty)
+        if page == .account {
+            try await press(in: window, matching: "AccountSignOut", attribute: "accessibilityIdentifier")
+            #expect(settings.signOutRequests == 1)
+            #expect(elements(window.contentView, matching: "AccountChangePassword", attribute: "accessibilityIdentifier").isEmpty)
+        } else {
+            #expect(elements(window.contentView, matching: "AccountSignOut", attribute: "accessibilityIdentifier").isEmpty)
+        }
     }
 
     @Test(arguments: [0, 1], Finish.allCases)

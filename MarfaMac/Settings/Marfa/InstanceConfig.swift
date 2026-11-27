@@ -171,6 +171,7 @@ nonisolated struct InstanceConfig: Hashable, Sendable {
     var values: [InstanceSetting: InstanceValue] = [:]
     /// Which instance answered, as `GET /config` gives it.
     var instanceID: String?
+    var signInAddress: String?
 
     func number(_ setting: InstanceSetting) -> Int? {
         if case .number(let number)? = values[setting] { return number }
@@ -283,7 +284,7 @@ nonisolated enum InstanceConfigFailure: Error, Hashable, Sendable {
     case refused(String)
     case failed(String)
 
-    /// What every page says when another Marfa answers at the address; Overview adds that what it shows is that Marfa's.
+    /// What every page says when another Marfa answers at the address.
     static let anotherMarfaSentence = String(localized: "Another Marfa now answers at this address. Nothing was sent.")
 
     var message: String {

@@ -17,7 +17,10 @@ import Testing
 
     @Test func emptySignInListsOnlyReadTheRequestedList() async {
         let bench = OwnerBench()
-        bench.calls.state.withLock { $0.passkeys = []; $0.browsers = [] }
+        bench.calls.state.withLock {
+            $0.passkeys = []
+            $0.browsers = []
+        }
         for passkeys in [true, false] {
             let model = AccountModel(context: bench.context)
             await model.loadSignIns(passkeysOnly: passkeys)
@@ -25,6 +28,12 @@ import Testing
             #expect(model.passkeys.isEmpty && model.browsers.isEmpty)
         }
         #expect(!bench.calls.calls.contains("profile"))
+    }
+
+    @Test func aCheckThatDidNotAnswerOpensThePageForThatCheck() {
+        #expect(AttentionConcern(kind: .unavailable, reference: "API keys", title: "").destination == .keys)
+        #expect(AttentionConcern(kind: .unavailable, reference: "Webhooks", title: "").destination == .webhooks)
+        #expect(AttentionConcern(kind: .webhook, reference: "hook-id", title: "").destination == .webhooks)
     }
 
     @Test func problemsUseTheirSettingsDestinationAndCount() async {

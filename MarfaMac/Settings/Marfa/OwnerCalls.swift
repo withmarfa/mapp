@@ -31,12 +31,15 @@ nonisolated struct OwnerProfile: Hashable, Sendable {
     /// Whether the sign-in may read the picture, and whether there is one to read.
     var pictureIsReadable = false
     var hasPicture = false
-
 }
 
 /// A part of the owner's profile an app may be allowed to change.
 nonisolated enum ProfileField: String, CaseIterable, Hashable, Sendable {
     case name, avatar, username, email
+
+    func mayWrite(holding scope: (String) -> Bool) -> Bool {
+        scope("profile.\(rawValue):write") || (self != .username && scope("profile:write"))
+    }
 }
 
 nonisolated struct OwnerPasskey: Identifiable, Hashable, Sendable {
@@ -237,8 +240,6 @@ nonisolated protocol OwnerCalls: Sendable {
     func endSignIn(_ id: String) async throws(OwnerFailure)
     func changePassword(from current: String, to new: String) async throws(OwnerFailure) -> PasswordOutcome
     /// The parts of the profile the sign-in may change, as its scopes say; every part where it holds no scopes to read, as a
-    /// key does, so the server decides.
-    func changeableProfile() -> Set<ProfileField>
     /// Sends the owner's name alone, and answers the profile as the server then holds it.
     func setProfileName(_ name: String) async throws(OwnerFailure) -> OwnerProfile
     func setProfileContact(_ field: ProfileContactField, to value: String) async throws(OwnerFailure) -> OwnerProfile

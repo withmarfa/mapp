@@ -20,7 +20,6 @@ nonisolated final class OwnerCallGate: Sendable {
 nonisolated final class FakeOwnerCalls: OwnerCalls {
     struct State {
         var profile = OwnerProfile(username: "mira", emailIsReadable: true, email: nil)
-        var changeableProfile = Set(ProfileField.allCases)
         var picture: Data?
         var namesSent: [String] = []
         /// Names the server refuses once their send has been let go, as a refusal that comes after a wait.
@@ -195,8 +194,6 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         try enter("profile")
         return state.withLock { $0.profile }
     }
-
-    func changeableProfile() -> Set<ProfileField> { state.withLock { $0.changeableProfile } }
 
     func setProfileName(_ name: String) async throws(OwnerFailure) -> OwnerProfile {
         try enter("setProfileName")
@@ -1158,10 +1155,10 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     @Test func theLinesUnderAPasskeySayWhenItWasAddedAndUsed() {
         let calendar = Calendar(identifier: .gregorian)
         let now = Date(timeIntervalSince1970: 1_800_000_000)
-        let line = AccountPage.line(added: now.addingTimeInterval(-86_400 * 40), used: now, now: now, calendar: calendar)
+        let line = AccountSignInsPage.line(added: now.addingTimeInterval(-86_400 * 40), used: now, now: now, calendar: calendar)
         #expect(line.hasPrefix("Added "))
         #expect(line.hasSuffix("Used today."))
-        #expect(AccountPage.line(added: nil, used: nil, now: now, calendar: calendar) == "Never used.")
+        #expect(AccountSignInsPage.line(added: nil, used: nil, now: now, calendar: calendar) == "Never used.")
     }
 }
 

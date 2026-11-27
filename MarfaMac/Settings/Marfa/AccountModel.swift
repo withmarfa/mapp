@@ -15,10 +15,7 @@ nonisolated enum ProfileContactField: Hashable {
     }
 }
 
-/// The Account page: the owner's profile as the server holds it, with the name and picture to change, the password, the
-/// passkeys and the browsers signed in. The sign-ins need `sign_ins.manage`, which every sign-in asks for; where the owner did
-/// not approve it, Change Password asks again for everything the sign-in lacks. The name and picture need the profile's own
-/// scopes, which every sign-in asks for too. A refused write keeps what was typed.
+/// Profile edits, password changes and sign-in management for Account and the pages it opens.
 @Observable @MainActor final class AccountModel: OwnerDraftHolding {
     enum Sheet: Equatable {
         case password
@@ -45,7 +42,7 @@ nonisolated enum ProfileContactField: Hashable {
 
     private(set) var profile: OwnerProfile?
     /// What the sign-in may change of the profile.
-    private(set) var changeable: Set<ProfileField> = []
+    var changeable: Set<ProfileField> { Set(ProfileField.allCases.filter { $0.mayWrite(holding: context.holds) }) }
     /// The name as typed, sent on Return or when the field is left. A reply never changes it while Settings is open.
     var nameDraft = ""
     private(set) var nameError: String?
@@ -97,7 +94,6 @@ nonisolated enum ProfileContactField: Hashable {
             let typed = isNameEdited
             let read = try await context.calls.profile()
             profile = read
-            changeable = context.calls.changeableProfile()
             if !typed {
                 nameDraft = read.name ?? ""
                 nameError = nil
@@ -154,7 +150,6 @@ nonisolated enum ProfileContactField: Hashable {
             if contactDrafts[field] == typed { contactDrafts[field] = nil }
         } catch {
             await context.learn(from: error)
-            if case .notPermitted = error { changeable = context.calls.changeableProfile() }
             if closings == closing { contactErrors[field] = OwnerWording.line(error, on: .account) }
             else { context.lateDraft(field.unsaved(typed)); contactDrafts[field] = nil }
         }
@@ -195,7 +190,6 @@ nonisolated enum ProfileContactField: Hashable {
             profile?.name = try await context.calls.setProfileName(name).name
         } catch {
             await context.learn(from: error)
-            if case .notPermitted = error { changeable = context.calls.changeableProfile() }
             if closings == self.closings {
                 nameError = OwnerWording.line(error, on: .account)
             } else {
@@ -221,7 +215,6 @@ nonisolated enum ProfileContactField: Hashable {
         } catch {
             pictureError = OwnerWording.line(error, on: .account)
             await context.learn(from: error)
-            if case .notPermitted = error { changeable = context.calls.changeableProfile() }
         }
     }
 

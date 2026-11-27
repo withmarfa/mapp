@@ -104,7 +104,8 @@ import Testing
     func refreshGrants() async {}
     func tryAgain() {}
     func showConnection() {}
-    func requestSignOut() {}
+    private(set) var signOutRequests = 0
+    func requestSignOut() { signOutRequests += 1 }
     func client() throws -> Client { throw MarfaServerCalls.Ending.keyRefused }
     func restoreDeleted(_ ids: Set<String>) { deletedItems.removeAll { ids.contains($0.id) } }
     func deleteDeletedPermanently(_ ids: Set<String>) {}
@@ -700,6 +701,7 @@ struct RenderedWindow<Detail: View>: View {
     @Test(arguments: [ColorScheme.light, .dark]) func accountBoards(appearance: ColorScheme) async throws {
         let host = owner()
         let source = FakeInstanceConfig([.name: .text("Castell Studio")])
+        source.config.withLock { $0.signInAddress = "https://marfa.castell.studio" }
         host.instanceSettings = InstanceSettingsModel { .init(id: "https://marfa.castell.studio", source: source) }
         fake(host).state.withLock { state in
             state.profile = OwnerProfile(name: "Mira Castell", username: "mcastell", emailIsReadable: true, email: "mira@castell.studio", pictureIsReadable: true)

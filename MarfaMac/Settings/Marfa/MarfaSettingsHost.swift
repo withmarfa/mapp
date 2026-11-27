@@ -79,7 +79,7 @@ struct MarfaMarkSet: Identifiable, Hashable {
     /// The permissions the sign-in holds (`Credential.grants`).
     var grants: Set<InstancePermission> { get }
     /// Whether the sign-in lacks something the app asks for at sign-in (`SystemSignIns.lacksAsked`): an owner permission,
-    /// or a scope the app began to ask for after the sign-in was made. Overview offers Allow More… while it does.
+    /// or a scope the app began to ask for after the sign-in was made. Connection offers Allow More while it does.
     var lacksAsked: Bool { get }
     /// Whether the sign-in holds `scope`, one the app asks for beyond the owner's permissions.
     func holds(_ scope: String) -> Bool
@@ -89,7 +89,7 @@ struct MarfaMarkSet: Identifiable, Hashable {
     func allowMore(_ permissions: Set<InstancePermission>) async -> MarfaAllowMoreOutcome
     /// Reads what the sign-in holds again, where the server refused for want of a permission the app thought it held.
     func refreshGrants() async
-    /// What the owner's pages (Account, Apps, Keys, Addresses) ask of the server.
+    /// What the owner's pages (Account, Apps, Keys, Network) ask of the server.
     var ownerCalls: any OwnerCalls { get }
     /// What Activity, Monitoring, Limits and Start-Up ask of the server.
     var instanceCalls: any InstanceCalls { get }
@@ -127,11 +127,11 @@ struct MarfaMarkSet: Identifiable, Hashable {
     /// The open owner's pages that hold something typed and not kept, which the app asks when Settings closes.
     var ownerDrafts: OwnerDrafts { get }
 
-    /// Where the Overview's Needs Attention and Health are read, kept by the app so the sidebar's badge is its count.
+    /// Shares Account’s problems with the sidebar and its server readings with Connection.
     var overview: AccountOverview { get }
-    /// The one reader of the server's health, which Overview, Backups and Housekeeping all read.
+    /// The one reader of the server's health, which Backups and Housekeeping share.
     var health: ServerHealthModel { get }
-    /// The one model of the server's updates, which Overview and Updates both read, so one update is started and followed.
+    /// The one model of the server's updates, which follows an update across page changes.
     var updates: UpdatesModel { get }
     /// Opens another of the Marfa's pages in this window, at one of its own pages where `subpage` names it.
     func show(_ page: MarfaSettingsPage, subpage: SettingsSubpage?)
@@ -203,7 +203,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
     var title: String {
         switch self {
         case .passkeys: String(localized: "Passkeys")
-        case .browsers: String(localized: "Browsers Signed In")
+        case .browsers: String(localized: "Browsers")
         case .account: String(localized: "Account")
         case .apps: String(localized: "Apps")
         case .keys: String(localized: "Apps and Keys")
@@ -252,12 +252,12 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
 
     var tone: SettingsTokens.Tone {
         switch self {
-        case .passkeys: .indigo
+        case .passkeys: .green
         case .browsers: .blue
         case .account: .indigo
         case .apps: .purple
         case .keys: .amber
-        case .network: .teal
+        case .network: .blue
         case .types: .orange
         case .plugins: .purple
         case .sources: .green

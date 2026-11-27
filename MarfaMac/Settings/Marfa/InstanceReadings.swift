@@ -1,6 +1,6 @@
 import Foundation
 
-// What the Overview, File Storage and Limit Sources pages read of the server, in values of their own so the pages read
+// What the Account, Storage and Limit Sources pages read of the server, in values of their own so the pages read
 // nothing generated and a test can script every answer.
 
 /// One thing the server says needs the owner's attention, as `GET /attention` words it.

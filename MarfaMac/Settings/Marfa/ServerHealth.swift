@@ -4,7 +4,7 @@ import Observation
 
 // What the Marfa's pages read of `GET /health`, in values of their own. The package reads it once (`Server.health()`): the open
 // fields for any caller, the detail for a sign-in that holds `instance.read`. A page reads one `ServerHealthModel`, so
-// Overview, Backups and Housekeeping never disagree. The server's own `error` and `lastError` texts are never kept: they name
+// Backups and Housekeeping never disagree. The server's own `error` and `lastError` texts are never kept: they name
 // settings by key and paths, so each page words its own title and one plain line.
 
 nonisolated extension Condition {
@@ -135,7 +135,7 @@ nonisolated struct ServerHealth: Hashable, Sendable {
     }
 }
 
-/// The one reader of the server's health that Overview, Backups and Housekeeping share. A read that fails leaves `health` nil,
+/// The one reader of the server's health that Backups and Housekeeping share. A read that fails leaves `health` nil,
 /// which every page tells as "Couldn’t Check", never as working; a refusal for want of a permission has the grants read again.
 @Observable @MainActor final class ServerHealthModel {
     private let context: OwnerContext
@@ -160,8 +160,4 @@ nonisolated struct ServerHealth: Hashable, Sendable {
         })
     }
 
-    func reset() {
-        health = nil
-        loader.reset()
-    }
 }

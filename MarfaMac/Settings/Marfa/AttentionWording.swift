@@ -16,11 +16,12 @@ nonisolated extension AttentionConcern {
         case .setting where reference.hasPrefix("object_store_"): .fileStorage
         case .setting where reference.hasPrefix("backup_"): .backups
         case .setting: .monitoring
-        case .health: reference == "backups" ? .backups : .fileStorage
+        case .health: .fileStorage
         case .fault: .activity
         case .unavailable:
-            switch reference {
-            case "keys": .keys
+            switch reference.lowercased() {
+            case "api keys": .keys
+            case "health": .fileStorage
             case "connectors": .connectors
             case "folders": .folders
             case "webhooks": .webhooks

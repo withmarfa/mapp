@@ -25,7 +25,7 @@ See `docs/owner-settings.md` for Marfa pages and `docs/settings-sync.md` for sto
 
 - **Pages draw with `Parts/`.** Keep app models out of parts.
 - **Every measure, color and font is in `SettingsTokens`.**
-- **A row is a lead, a title, one line and one trailing control** (`SettingsRow`), two lines at most. A problem row may hold two buttons, as may the release row of Updates.
+- **A row is a lead, a title, one line and one trailing control** (`SettingsRow`), two lines at most. A problem row may hold two buttons, as may the release row on Account.
 - **A value a button acts on goes in the row's line**, except Connection’s permission count and opened-file size. Show problem text in full.
 - **A refused input keeps what was typed**, with one line under the title that says why.
 - **Put an add button at the trailing edge of the section title** (`SettingsSection`'s accessory). Use the same slot for header choices or search and a filter when the section needs them. Put a note about the section in its footer.

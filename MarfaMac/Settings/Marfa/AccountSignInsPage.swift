@@ -42,21 +42,28 @@ struct AccountSignInsPage: View {
         .onAppear { host.ownerDrafts.register(model) }
         .settingsSheet(presenting: model.sheet != nil, dismiss: { model.closeRename() }) { AccountSheet(model: model) }
         .alert(
-            model.question?.title ?? "", isPresented: Binding { model.question != nil } set: { if !$0 { model.cancelQuestion() } },
+            model.question?.title ?? "",
+            isPresented: Binding {
+                model.question != nil
+            } set: {
+                if !$0 { model.cancelQuestion() }
+            },
             presenting: model.question
         ) { asked in
             Button("Cancel", role: .cancel) {}
             Button(asked.confirm, role: .destructive) { Task { await model.confirm(asked) } }
-        } message: { asked in Text(verbatim: asked.message) }
+        } message: { asked in
+            Text(verbatim: asked.message)
+        }
     }
 
     private func load() async { await model.loadSignIns(passkeysOnly: page == .passkeys) }
 
     private var passkeysSection: some View {
         SettingsSection(name: nil, footer: Text("Your browser opens to add one.")) {
-                if model.passkeys.isEmpty {
-                    SettingsEmptyCard(symbol: "person.badge.key", title: Text("No Passkeys"), line: Text("Add a passkey to sign in with it."))
-                }
+            if model.passkeys.isEmpty {
+                SettingsEmptyCard(symbol: "person.badge.key", title: Text("No Passkeys"), line: Text("Add a passkey to sign in with it."))
+            }
             ForEach(model.passkeys) { passkey in
                 SettingsRow(
                     verbatim: passkey.name ?? Self.unnamed, line: Self.line(added: passkey.added, used: passkey.lastUsed),

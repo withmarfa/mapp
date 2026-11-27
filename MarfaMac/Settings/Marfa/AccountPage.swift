@@ -15,52 +15,31 @@ struct AccountPage: View {
         _model = State(initialValue: AccountModel(context: OwnerContext(host: host)))
     }
 
-    private var address: String { host.serverAddress.map(AddressesModel.display) ?? "" }
-
     var body: some View {
-        SettingsPageColumn {
-            SettingsPageHeader(name: host.serverName, address: address) {
-                Button("Sign Out", action: host.requestSignOut)
-                    .buttonStyle(.bordered).buttonBorderShape(.capsule).controlSize(.regular)
-                    .accessibilityIdentifier("AccountSignOut")
-            }
-            problems
-            if !model.canManageSignIns {
-                SettingsSection("Permissions") {
-                    SettingsProblemRow(
-                        title: Text("This App Can’t Manage Sign-Ins"), line: Text("Your password, passkeys and browsers need this permission."),
-                        symbol: "lock", actions: [SettingsProblemAction("Allow More") { Task { await model.allowSignIns() } }]
-                    ).disabled(host.isAllowingMore)
+        Group {
+            if model.failure == .unreachable {
+                SettingsStandingState {
+                    AccountHeader(host: host)
+                } state: {
+                    OwnerFailureState(page: .account, failure: .unreachable, host: host) { Task { await model.load() } }
                 }
-            }
-            if let profile = model.profile {
-                profileRows(profile)
-            } else if let failure = model.failure {
-                OwnerProblem(title: "Couldn’t Read the Profile", failure: failure, page: .account, host: host) { Task { await model.load() } }
             } else {
-                OwnerLoading()
-            }
-            security
-            AccountMarfaSection(host: host)
-            SettingsSection("Server") {
-                link(.network, value: address)
-                link(.fileStorage, value: storageSize)
-            }
-            SettingsSection("Advanced") {
-                link(.monitoring, value: monitoringCount.map { String(localized: "\($0) of 3 on") })
-                link(.limits)
-                link(.housekeeping, value: host.grants.contains(.instanceRead) ? jobCount.map { $0 == 1 ? String(localized: "1 job") : String(localized: "\($0) jobs") } : nil)
+                account
             }
         }
         .task(id: host.grants) {
             async let profile: Void = model.load()
             if host.grants.contains(.instanceRead) {
                 jobCount = try? await host.ownerCalls.housekeepingJobs().count
-            } else { jobCount = nil }
+            } else {
+                jobCount = nil
+            }
             if host.grants.contains(.configManage) {
                 let snapshot = try? await host.instanceCalls.storedSettings()
                 monitoringCount = snapshot?.enabledMonitoringCount
-            } else { monitoringCount = nil }
+            } else {
+                monitoringCount = nil
+            }
             await profile
         }
         .onAppear { host.ownerDrafts.register(model) }
@@ -71,12 +50,47 @@ struct AccountPage: View {
             case .failure: model.pictureNotChosen()
             }
         }
-        .accessibilityIdentifier("AccountPage")
+    }
+
+    private var account: some View {
+        SettingsPageColumn {
+            AccountHeader(host: host)
+            problems
+            if !model.canManageSignIns {
+                SettingsSection("Permissions") {
+                    SettingsProblemRow(
+                        title: Text("This App Can’t Manage Sign-Ins"), line: Text("Your password, passkeys and browsers need this permission."),
+                        symbol: "lock", actions: [SettingsProblemAction("Allow More") { Task { await model.allowSignIns() } }]
+                    ).disabled(host.isAllowingMore)
+                }
+            }
+            if let profile = model.profile, model.failure == nil {
+                profileRows(profile)
+            } else if let failure = model.failure {
+                OwnerProblem(title: "Couldn’t Read the Profile", failure: failure, page: .account, host: host) { Task { await model.load() } }
+            } else {
+                OwnerLoading()
+            }
+            security
+            AccountMarfaSection(host: host)
+            SettingsSection("Server") {
+                link(.network, value: host.instanceSettings.loaded?.signInAddress.map(AddressesModel.display))
+                link(.fileStorage, value: storageSize)
+            }
+            SettingsSection("Advanced") {
+                link(.monitoring, value: monitoringCount.map { String(localized: "\($0) of 3 on") })
+                link(.limits)
+                link(
+                    .housekeeping,
+                    value: host.grants.contains(.instanceRead) ? jobCount.map { $0 == 1 ? String(localized: "1 job") : String(localized: "\($0) jobs") } : nil)
+            }
+        }
     }
 
     private var storageSize: String? {
         guard host.grants.contains(.instanceRead), host.overview.metricsFailure == nil, let metrics = host.overview.metrics,
-            let database = metrics.databaseBytes else { return nil }
+            let database = metrics.databaseBytes
+        else { return nil }
         return ByteCountFormatter.string(fromByteCount: Int64(database) + Int64(metrics.fileBytes), countStyle: .file)
     }
 
@@ -89,8 +103,13 @@ struct AccountPage: View {
                 SettingsSection("Problems") {
                     ForEach(overview.concerns) { concern in
                         let page = concern.destination
-                        SettingsProblemRow(title: Text(verbatim: concern.shownTitle), line: concern.shownLine.map { Text(verbatim: $0) },
-                            actions: [SettingsProblemAction(verbatim: page == .keys ? String(localized: "Show Keys") : String(localized: "Show \(page.title)")) { host.show(page) }])
+                        SettingsProblemRow(
+                            title: Text(verbatim: concern.shownTitle), line: concern.shownLine.map { Text(verbatim: $0) },
+                            actions: [
+                                SettingsProblemAction(verbatim: page == .keys ? String(localized: "Show Keys") : String(localized: "Show \(page.title)")) {
+                                    host.show(page)
+                                }
+                            ])
                     }
                 }
             }
@@ -107,13 +126,17 @@ struct AccountPage: View {
                     SettingsButton("Change…") { choosesPicture = true }
                         .disabled(model.isSendingPicture)
                         .accessibilityIdentifier("AccountChangePicture")
-                } else { profileLock }
+                } else {
+                    profileLock
+                }
             }
             SettingsRow("Name", error: model.nameError) {
                 if profile.name != nil && model.changeable.contains(.name) {
-                    SettingsField(title: "Name", text: $model.nameDraft, isError: model.nameError != nil,
-                        onSubmit: { Task { await model.saveName() } }, onEndEditing: { Task { await model.saveName() } })
-                        .disabled(model.isSavingName).accessibilityIdentifier("AccountName")
+                    SettingsField(
+                        title: "Name", text: $model.nameDraft, isError: model.nameError != nil,
+                        onSubmit: { Task { await model.saveName() } }, onEndEditing: { Task { await model.saveName() } }
+                    )
+                    .disabled(model.isSavingName).accessibilityIdentifier("AccountName")
                 } else {
                     if let name = profile.name { SettingsValue(verbatim: name) }
                     profileLock
@@ -125,7 +148,9 @@ struct AccountPage: View {
     }
 
     private var profileLock: some View {
-        Button { Task { await model.allowProfileChanges() } } label: {
+        Button {
+            Task { await model.allowProfileChanges() }
+        } label: {
             Label("Not Allowed", systemImage: "lock").labelStyle(.iconOnly)
         }.buttonStyle(.plain).disabled(host.isAllowingMore)
     }
@@ -133,11 +158,17 @@ struct AccountPage: View {
     private func profileField(_ field: ProfileContactField, readable: Bool, value: String?) -> some View {
         SettingsRow(verbatim: field.title, error: model.contactErrors[field]) {
             if readable && model.changeable.contains(field.scope) {
-                SettingsField(title: LocalizedStringKey(field.title),
-                    text: Binding { model.contactDrafts[field] ?? value ?? "" } set: { model.contactDrafts[field] = $0 },
+                SettingsField(
+                    title: LocalizedStringKey(field.title),
+                    text: Binding {
+                        model.contactDrafts[field] ?? value ?? ""
+                    } set: {
+                        model.contactDrafts[field] = $0
+                    },
                     isError: model.contactErrors[field] != nil, onSubmit: { Task { await model.saveContact(field) } },
-                    onEndEditing: { Task { await model.saveContact(field) } })
-                    .disabled(model.savingContacts.contains(field))
+                    onEndEditing: { Task { await model.saveContact(field) } }
+                )
+                .disabled(model.savingContacts.contains(field))
             } else {
                 if readable { SettingsValue(verbatim: value ?? String(localized: "Not Set")) }
                 profileLock
@@ -154,7 +185,7 @@ struct AccountPage: View {
             } else {
                 SettingsLinkRow(verbatim: String(localized: "Password"), lock: String(localized: "Not allowed")) {
                     Task { await model.beginChangePassword() }
-                }
+                }.accessibilityIdentifier("AccountChangePassword")
             }
             let known = model.hasLoaded && model.failure == nil && model.listsFailure == nil
             link(.passkeys, value: known ? model.passkeys.count.formatted() : nil)
@@ -164,10 +195,27 @@ struct AccountPage: View {
 
     private func link(_ page: MarfaSettingsPage, value: String? = nil) -> some View {
         let locked = page.missingPermission(in: host.grants) != nil
-        return SettingsLinkRow(verbatim: page == .browsers ? String(localized: "Browsers") : page.title, lead: .tile(page.symbol, page.tone),
+        return SettingsLinkRow(
+            verbatim: page.title, lead: .tile(page.symbol, page.tone),
             value: locked ? nil : value, valueGlyph: page == .network ? .link : nil,
-            lock: locked ? String(localized: "Not allowed") : nil) { host.show(page) }
+            lock: locked ? String(localized: "Not allowed") : nil
+        ) { host.show(page) }
             .accessibilityIdentifier("SettingsLink-\(page.rawValue)")
+    }
+}
+
+/// A configured Marfa can still be signed out when the copy or server is unavailable.
+struct AccountHeader: View {
+    let host: any MarfaSettingsHost
+
+    var body: some View {
+        if let address = host.serverAddress {
+            SettingsPageHeader(name: host.serverName, address: AddressesModel.display(address)) {
+                Button("Sign Out", action: host.requestSignOut)
+                    .buttonStyle(.bordered).buttonBorderShape(.capsule).controlSize(.regular)
+                    .accessibilityIdentifier("AccountSignOut")
+            }
+        }
     }
 }
 

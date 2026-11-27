@@ -8,17 +8,35 @@ import Testing
 @MainActor
 @Suite(.hangLimit) struct AccountProfileTests {
     private func loaded(_ bench: OwnerBench) async -> AccountModel {
+        if bench.scopes.isEmpty { bench.scopes = ["profile:write"] }
         bench.calls.state.withLock { $0.profile.name = "Mira Castell" }
         let account = AccountModel(context: bench.context)
         await account.load()
         return account
     }
 
+    @Test func changingTheUsernameNeedsItsOwnScope() {
+        #expect(ProfileField.email.mayWrite(holding: ["profile:write"].contains))
+        #expect(!ProfileField.username.mayWrite(holding: ["profile:write", "profile.username:read"].contains))
+        #expect(ProfileField.username.mayWrite(holding: ["profile.username:write"].contains))
+    }
+
+    @Test func clearingEmailWritesOnceAndKeepsTheUsername() async {
+        let bench = OwnerBench()
+        bench.calls.state.withLock { $0.profile.email = "someone@example.com" }
+        let account = await loaded(bench)
+        account.contactDrafts[.email] = ""
+        await account.saveContact(.email)
+        await account.saveContact(.email)
+        #expect(account.profile?.email == nil)
+        #expect(account.profile?.username == "mira")
+        #expect(bench.calls.calls.filter { $0 == "setProfileContact" }.count == 1)
+    }
+
     @Test func refusedContactEditsSurviveReloadAndHandover() async {
         let bench = OwnerBench()
         bench.calls.state.withLock {
             $0.profile.emailIsReadable = true
-            $0.changeableProfile = [.email]
         }
         let account = await loaded(bench)
         #expect(account.picture == nil)

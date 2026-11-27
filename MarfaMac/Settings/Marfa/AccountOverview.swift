@@ -33,16 +33,18 @@ import Observation
     var attentionBadge: Int? { failure != nil || concerns.isEmpty ? nil : concerns.count }
 
     func load() async {
-        await loader.load(in: context, primary: { () throws(OwnerFailure) in
-            concerns = try await context.calls.attention()
-        }, secondary: [
-            .required(metricsRead) { [self] () throws(OwnerFailure) in metrics = try await context.calls.instanceMetrics() },
-            .required(updateRead) { [self] () throws(OwnerFailure) in update = try await context.calls.updateStatus() },
-            .quiet { [self] () throws(OwnerFailure) in
-                let profile = try await context.calls.profile()
-                owner = profile.name ?? profile.username
+        await loader.load(
+            in: context,
+            primary: { () throws(OwnerFailure) in
+                concerns = try await context.calls.attention()
             },
-        ])
+            secondary: [
+                .required(metricsRead) { [self] () throws(OwnerFailure) in metrics = try await context.calls.instanceMetrics() },
+                .required(updateRead) { [self] () throws(OwnerFailure) in update = try await context.calls.updateStatus() },
+                .quiet { [self] () throws(OwnerFailure) in
+                    let profile = try await context.calls.profile()
+                    owner = profile.name ?? profile.username
+                },
+            ])
     }
-
 }

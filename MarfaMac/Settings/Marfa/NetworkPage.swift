@@ -27,7 +27,12 @@ struct NetworkPage: View {
             .onAppear { host.ownerDrafts.register(model) }
             .settingsSheet(presenting: model.sheet != nil, dismiss: { model.close() }) { AddressSheet(model: model, serverName: host.serverName) }
             .alert(
-                model.question?.title ?? "", isPresented: Binding { model.question != nil } set: { if !$0 { model.cancelQuestion() } },
+                model.question?.title ?? "",
+                isPresented: Binding {
+                    model.question != nil
+                } set: {
+                    if !$0 { model.cancelQuestion() }
+                },
                 presenting: model.question
             ) { asked in
                 Button("Cancel", role: .cancel) {}
@@ -39,18 +44,23 @@ struct NetworkPage: View {
                 Button("Cancel", role: .cancel) {}
                 Button("Allow") { Task { await network.allow() } }
             } message: {
-                Text("\(host.serverName) can send webhooks, the heartbeat, error reports, telemetry, and object store requests to addresses that aren’t public, including its own computer and devices on private networks such as Tailscale.")
+                Text(
+                    "\(host.serverName) can send webhooks, the heartbeat, error reports, telemetry, and object store requests to addresses that aren’t public, including its own computer and devices on private networks such as Tailscale."
+                )
             }
             .accessibilityIdentifier("NetworkPage")
     }
 
     @ViewBuilder private var content: some View {
-        if let failure = model.failure, model.settings == nil {
+        if let failure = model.failure, model.settings == nil || failure == .unreachable {
             OwnerFailureState(page: .network, failure: failure, host: host) { Task { await model.load() } }
         } else if let settings = model.settings {
             SettingsPageColumn {
                 SettingsSection("Sign-In Address") {
-                    SettingsRow(verbatim: AddressesModel.display(settings.signIn), line: String(localized: "Where you sign in, and where apps connect."), lead: .symbol("link")) {
+                    SettingsRow(
+                        title: Text(verbatim: AddressesModel.display(settings.signIn)), line: Text("Where you sign in, and where apps connect."),
+                        titleGlyph: .link
+                    ) {
                         SettingsButton("Change…") { model.begin(.changeSignIn) }
                     }
                 }
@@ -60,7 +70,8 @@ struct NetworkPage: View {
                 } content: {
                     ForEach(model.otherAddresses, id: \.self) { address in
                         SettingsRow(
-                            verbatim: AddressesModel.display(address), line: AddressesModel.kind(of: address),
+                            title: Text(verbatim: AddressesModel.display(address)), line: AddressesModel.kind(of: address).map { Text(verbatim: $0) },
+                            titleGlyph: .link,
                             error: model.rowErrors[address].map { OwnerWording.line($0, on: .network) }
                         ) {
                             SettingsMoreMenu { Button("Remove…", role: .destructive) { Task { await model.askToRemove(address: address) } } }
@@ -71,7 +82,10 @@ struct NetworkPage: View {
                     SettingsButton("Add Website…") { model.begin(.addWebsite) }
                 } content: {
                     ForEach(settings.websites, id: \.self) { website in
-                        SettingsRow(verbatim: AddressesModel.display(website), error: model.rowErrors[website].map { OwnerWording.line($0, on: .network) }) {
+                        SettingsRow(
+                            title: Text(verbatim: AddressesModel.display(website)), titleGlyph: .link,
+                            error: model.rowErrors[website].map { OwnerWording.line($0, on: .network) }
+                        ) {
                             SettingsMoreMenu { Button("Remove…", role: .destructive) { model.askToRemove(website: website) } }
                         }
                     }
@@ -92,9 +106,16 @@ struct NetworkPage: View {
         SettingsSection(name: nil) {
             if network.isLoaded {
                 SettingsRow("Private Addresses", line: "Lets webhooks and the heartbeat reach this network.", error: network.line, lines: nil) {
-                    SettingsToggle(title: "Private Addresses", isOn: Binding { network.isOn } set: { on in Task { await network.set(on) } })
-                        .disabled(network.isWriting)
-                        .accessibilityIdentifier("PrivateAddresses")
+                    SettingsToggle(
+                        title: "Private Addresses",
+                        isOn: Binding {
+                            network.isOn
+                        } set: { on in
+                            Task { await network.set(on) }
+                        }
+                    )
+                    .disabled(network.isWriting)
+                    .accessibilityIdentifier("PrivateAddresses")
                 }
             } else if let failure = network.failure {
                 OwnerProblemRow(title: "Couldn’t Read Private Addresses", failure: failure, page: .network, host: host) {

@@ -19,6 +19,7 @@ struct AccountMarfaSection: View {
             .task(id: host.grants) {
                 if host.grants.contains(.configManage) { await settings.load() }
                 if host.grants.contains(.instanceRead) { await model.load() }
+                else if model.canChangeSettings { await model.loadAutomaticChecks() }
             }
             .alert("Update \(host.serverName)?", isPresented: $asksToUpdate) {
                 Button("Cancel", role: .cancel) {}
@@ -50,6 +51,7 @@ struct AccountMarfaSection: View {
                 if model.isUpdating { updating(status) }
                 else { marfa(status) }
             }
+            automaticChecks
         }
         if host.grants.contains(.instanceRead), let status = model.status, !model.isUpdating { problem(status) }
     }
@@ -92,7 +94,7 @@ struct AccountMarfaSection: View {
         return Group {
             SettingsRow(
                 title: release.map { Text("Updating to \($0)") } ?? Text("Updating"),
-                line: Text(model.standing(of: .restarting) == .now ? "Restarting. The app reconnects when it is back." : "\(host.serverName) restarts when it is done.")
+                line: Text(model.standing(of: .restarting) == .now ? "Restarting. The app reconnects when it is back." : "The server restarts when it is done.")
             ) {
                 ProgressView(value: Double(done) + 0.5, total: Double(stages.count))
                     .progressViewStyle(.linear)
@@ -125,18 +127,18 @@ struct AccountMarfaSection: View {
                         title: Text("The update to \(undone.release) didn’t work"),
                         line: Text(
                             undone.result == .putBack
-                                ? "\(host.serverName) is back on \(status.running), as before. Nothing was lost."
-                                : "\(host.serverName) runs \(status.running)."),
+                                ? "The server is back on \(status.running). Nothing was lost."
+                                : "The server runs \(status.running)."),
                         actions: model.canUpdate ? [SettingsProblemAction("Try Again") { asksToUpdate = true }] : [])
                 }
                 if model.lostTrack {
                     SettingsProblemRow(
-                        title: Text("\(host.serverName) hasn’t come back yet"),
+                        title: Text("The Server Hasn’t Come Back Yet"),
                         line: Text("The app stopped waiting. Check again to see where it stands."),
                         actions: [SettingsProblemAction("Check Again") { Task { await model.load() } }])
                 }
                 if let error = model.error {
-                    OwnerProblemRow(title: "Couldn’t do that", failure: error, page: .account, host: host)
+                    OwnerProblemRow(title: "Couldn’t Update", failure: error, page: .account, host: host)
                 }
             }
         }
@@ -147,7 +149,7 @@ struct AccountMarfaSection: View {
             SettingsRow(title: title(status), line: Text(verbatim: line(status))) {
                 HStack(spacing: SettingsTokens.Metric.buttonGap) {
                     if model.needsMaintain {
-                        SettingsButton("Allow More…") { host.askForMore(naming: InstancePermission.instanceMaintain.rawValue) }
+                        SettingsButton("Allow More") { host.askForMore(naming: InstancePermission.instanceMaintain.rawValue) }
                     } else {
                         SettingsButton(model.isChecking ? "Checking…" : "Check for Updates", reserving: "Check for Updates") {
                             Task { await model.checkForUpdates() }
@@ -160,7 +162,7 @@ struct AccountMarfaSection: View {
                             copied = true
                         }
                     } else if model.ready != nil, !model.needsMaintain {
-                        SettingsButton("Update…", role: .update) { asksToUpdate = true }
+                        SettingsButton("Update", role: .update) { asksToUpdate = true }
                             .disabled(!model.canUpdate)
                     }
                 }
@@ -174,21 +176,24 @@ struct AccountMarfaSection: View {
                 .padding(.vertical, SettingsTokens.Metric.cardGap)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            SettingsRow("Check Automatically", line: model.status?.checksAutomatically == false ? "Turned off." : "Every few hours.") {
-                SettingsToggle(
-                    title: "Check Automatically",
-                    isOn: Binding { status.checksAutomatically } set: { on in Task { await model.setChecksAutomatically(on) } }
-                )
-                .disabled(!model.canChangeSettings || model.settings == nil || model.settingsFailure != nil || model.isSwitching)
+        }
+    }
+
+    @ViewBuilder private var automaticChecks: some View {
+        if !model.canChangeSettings {
+            locked("Check Automatically", permission: .configManage)
+        } else if let failure = model.settingsFailure {
+            OwnerProblemRow(title: "Couldn’t Read Automatic Update Settings", failure: failure, page: .account, host: host) {
+                Task { await model.loadAutomaticChecks() }
             }
-            if let failure = model.settingsFailure {
-                OwnerProblemRow(
-                    title: "Couldn’t read automatic update settings", failure: failure, page: .account, host: host,
-                    retry: { Task { await model.load() } })
-            } else if !model.canChangeSettings {
-                OwnerProblemRow(
-                    title: "Can’t change automatic update settings", failure: .notPermitted(InstancePermission.configManage.rawValue),
-                    page: .account, host: host)
+        } else if let settings = model.settings {
+            SettingsRow("Check Automatically") {
+                SettingsToggle(title: "Check Automatically", isOn: Binding { settings.checksForUpdates } set: { on in
+                    Task { await model.setChecksAutomatically(on) }
+                }).disabled(model.isSwitching)
+            }
+            if !host.grants.contains(.instanceRead), let error = model.error {
+                OwnerProblemRow(title: "Couldn’t Change Automatic Update Settings", failure: error, page: .account, host: host)
             }
         }
     }

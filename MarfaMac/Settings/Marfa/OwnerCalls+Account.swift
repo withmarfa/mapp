@@ -18,11 +18,6 @@ extension ClientOwnerCalls {
             pictureIsReadable: profile.avatar != nil, hasPicture: profile.avatar?.value != nil)
     }
 
-    func changeableProfile() -> Set<ProfileField> {
-        guard let server, let scopes = (try? server())?.credential?.scopes else { return [] }
-        return Set(ProfileField.allCases.filter { scopes.contains("profile.\($0.rawValue):write") || ($0 != .username && scopes.contains("profile:write")) })
-    }
-
     func setProfileName(_ name: String) async throws(OwnerFailure) -> OwnerProfile {
         try await run { client in
             Self.profile(try await client.updateProfile(body: .json(.init(name: name))).ok.body.json)
