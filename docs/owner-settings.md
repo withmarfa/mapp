@@ -68,7 +68,7 @@ The page gate checks connection and permissions. A configured Marfa keeps its Ac
 
 ## What a person typed
 
-- **A refusal preserves what the person typed.** A refused limit or free disk reserve returns to its last reported value. When the app shows the recovery notice, it copies the original input to the clipboard. Other fields keep the input and show the reason for the refusal.
+- **A refusal preserves what the person typed.** A refused limit or free disk reserve shows its last reported value and puts the typed input on the clipboard. Other fields keep the input and say why.
 - **A draft is handed back** at the end of the window or the app (`OwnerDrafts`, `Notices.notKept`). Where a call is in flight, its failure hands it back.
 - **A pop-up or switch sends at once; a field sends on Return or when left.** Emptied, it removes the stored value.
 - **A number out of range is never sent.** A separator the Mac's region does not use is refused, not guessed at.
@@ -96,9 +96,9 @@ The page gate checks connection and permissions. A configured Marfa keeps its Ac
 
 ## Words
 
-- **The server's own error texts are never shown**, because they name settings by key and requests by path. Pages word a title and one line; details go to the app's log. A field may show the server's reason where it holds no key, code or route.
+- **The server's own error texts are never shown**, because they name settings by key and requests by path. Pages word a title and one line; details go to the log. A field may show a reason without a key, code or route.
 - **A setting with no name in the app is counted or described**, never shown by its key.
-- **Problems and the Account badge share the server’s attention list.** Account refreshes it when opened. A problem opens the page that fixes it or offers a command to copy for settings the app cannot change. Without `instance.read`, Problems offers Allow More.
+- **Problems and the Account badge share the server’s attention list.** A problem opens the page that fixes it, or offers a command to copy where no page can.
 - **A problem row's title is a sentence.**
 
 ## Plugins, types and connectors
@@ -107,8 +107,7 @@ The page gate checks connection and permissions. A configured Marfa keeps its Ac
 - **An update to a plugin only adds.** Removing one keeps its types and their items and deletes its connector's mapping.
 - **Guidance has no rule of the app's own.** The server's answer decides: a sign-in again, a refusal that gives the command-line command, or a missing permission.
 - **A new type or link type is under `user.`**, with an id made from its name and checked against a fresh list. A field keeps its name when its label changes, because items hold values under it.
-- **A registered type changes when the sign-in holds `schema.write` and may write that type**, including one an app registered. One Marfa ships, or one a plugin brought, does not. Yours lists `user.*` only.
-- **Update and Remove of a plugin with a connector need `connectors.manage`.** Without it they stay on the page and offer Allow More.
+- **Editing a registered type needs `schema.write` and write access to it**, whichever tab lists it.
 - **A type in use is moved before it is deleted.** The move is previewed again just before it starts, and the type is deleted unforced only when no item is left.
 - **A mapping saves as it is made**, sending every other kind as stored, so one refused kind holds no other back. An older reading is never applied over a newer one.
 - **Existing items change only when the owner applies a mapping**, after a dry run of the saved mapping counted them.
@@ -116,7 +115,7 @@ The page gate checks connection and permissions. A configured Marfa keeps its Ac
 
 ## Folders and backups
 
-- **Folders is one list.** A copy's sign-in does not say which Mac it is on.
+- **Folders is one list**: a sign-in does not say which Mac holds a copy.
 - **A folder's record is pinned by the working copy** (`CopyFolderCalls`), because the copy's slice leaves out `system.folder`. A pin goes only with Stop Syncing.
 - **Stop Syncing cannot be undone**, and leaves items in Marfa and files on disk.
 - **A restore adds what a backup holds and changes nothing that is there**, and says what it leaves out.
