@@ -17,20 +17,11 @@ nonisolated enum PreferencesMerge {
     /// cannot read, which neither side takes until the store has set it aside.
     static func reconcile(
         local: PreferenceUnits, remote: PreferenceUnits, base: PreferenceUnits,
-        adopting: (PreferenceUnit) -> Bool = { _ in false },
         frozen: (PreferenceUnit) -> Bool = { _ in false }
     ) -> Outcome {
         var outcome = Outcome(merged: [:])
         for unit in Set(local.keys).union(remote.keys).union(base.keys) {
             let (mine, theirs, before) = (local[unit], remote[unit], base[unit])
-            if adopting(unit) {
-                // A returning member or row has no shared history. What the Marfa holds wins, even if a
-                // local store cannot read it and another member makes us write the whole field.
-                outcome.merged[unit] = theirs ?? mine
-                if let theirs, theirs != mine, !frozen(unit) { outcome.toLocal.insert(unit) }
-                if theirs == nil, mine != nil, !frozen(unit) { outcome.toRemote.insert(unit) }
-                continue
-            }
             if frozen(unit) {
                 outcome.merged[unit] = before
                 continue
@@ -54,7 +45,17 @@ nonisolated enum PreferencesMerge {
 
     /// Adopting an item another Mac made: what it holds wins, and what it lacks is filled from this Mac, once.
     static func adopt(remote: PreferenceUnits, local: PreferenceUnits) -> Outcome {
-        reconcile(local: local, remote: remote, base: [:], adopting: { _ in true })
+        var outcome = Outcome(merged: remote)
+        for (unit, value) in local {
+            if let held = remote[unit] {
+                if held != value { outcome.toLocal.insert(unit) }
+            } else {
+                outcome.merged[unit] = value
+                outcome.toRemote.insert(unit)
+            }
+        }
+        for unit in remote.keys where local[unit] == nil { outcome.toLocal.insert(unit) }
+        return outcome
     }
 
     /// The settings of the item the app uses, with what it lacks filled from the others, in the order they were made.

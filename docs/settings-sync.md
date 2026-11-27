@@ -41,7 +41,9 @@ Settings > General > Sync with This Marfa has nine switches, all on by default. 
 
 With a group off, edits, removals, imports and restores stay local. Other Macs can still change the shared values.
 
-Turning a group on requires a restore point. If saving fails, it stays off. Once the copy is whole, the Marfa's values win and local values fill gaps once. Settings files and restore points exclude the switches. Reset clears them and preserves remote values for groups previously off.
+Turning a group back on saves your settings in a restore point. If saving fails, the group stays off. Once the copy is whole, the group takes this Marfa's settings. The older item wins, the other supplies missing values, and anything neither holds takes its default. Turning the group on writes nothing to the Marfa.
+
+Settings files and restore points exclude the switches. Reset clears them and preserves remote values for groups previously off.
 
 ## The first launch against a Marfa
 

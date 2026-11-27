@@ -14,8 +14,13 @@ extension PreferencesSync {
             var frozen: [PreferenceUnit: Frozen] = [:]
             /// The app that judged `frozen`; another tries those settings again.
             var frozenBuild: String?
-            /// Local values still waiting to fill a gap. Another Mac may fill the gap before a retry.
-            var fills: Set<PreferenceUnit>?
+
+            /// A remote value rejected on resume is known separately from what was actually applied.
+            var comparisonBase: PreferenceUnits {
+                base.merging(frozen.compactMapValues(\.rejected)) { _, rejected in rejected }
+            }
+            /// Values taken from a later original while the followed item lacked them.
+            var fromOtherItems: Set<PreferenceUnit>?
             /// Set once this Mac removed the item or saw it in the bin, so an emptied bin does not bring it back.
             var removed: Bool?
 
@@ -25,11 +30,11 @@ extension PreferencesSync {
                 self.frozenBuild = frozenBuild
             }
 
-            mutating func pause(_ group: PreferenceGroup) {
+            mutating func forget(_ group: PreferenceGroup) {
                 // After time apart, neither an old base nor an unanswered write can identify the later change.
                 base = base.filter { $0.key.group != group }
                 frozen = frozen.filter { $0.key.group != group }
-                fills = fills?.filter { $0.group != group }
+                fromOtherItems = fromOtherItems?.filter { $0.group != group }
                 awaiting = awaiting.compactMapValues { write in
                     var write = write
                     write.members = write.members.filter { $0.key.group != group }
@@ -49,10 +54,11 @@ extension PreferencesSync {
         /// What the store left of a setting it could not read: nothing, or the part it could.
         struct Frozen: Codable, Equatable, Sendable {
             var left: String?
+            var rejected: String?
         }
 
         var marfas: [String: Adopted] = [:]
-        /// First-adoption rules survive Reset, relaunch, and a switch made before the first item arrives.
+        /// Groups that must take this Marfa's settings when next enabled with a whole copy.
         var paused: [String: Set<PreferenceGroup>]?
         var last: String?
         /// The Marfas whose settings were started again, whose next item is made from this Mac's settings.

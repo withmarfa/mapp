@@ -251,7 +251,7 @@ final class PreferencesSync {
             } else {
                 var record = Record.read(defaults)
                 record.setPaused((record.paused?[instance] ?? []).union([group]), in: instance)
-                record.marfas[instance]?.pause(group)
+                record.marfas[instance]?.forget(group)
                 record.save(defaults)
             }
             groups.set(on, for: group, in: instance)
@@ -323,6 +323,16 @@ final class PreferencesSync {
         for waiter in done { waiter.resume() }
     }
 
+    struct Remote {
+        let first: PreferenceUnits
+        let merged: PreferenceUnits
+
+        init(originals: [PreferenceUnits]) {
+            first = originals.first ?? [:]
+            merged = PreferencesMerge.filling(first, from: Array(originals.dropFirst()))
+        }
+    }
+
     /// This Mac's settings as a step read them.
     typealias Local = (units: PreferenceUnits, frozen: [SyncedSetting], off: Set<PreferenceGroup>)
 
@@ -345,7 +355,16 @@ final class PreferencesSync {
             let originals = items.filter { !$0.isConflictedCopy }
             var record = Record.read(defaults)
             let resuming = (record.paused?[instance] ?? []).subtracting(groups.off(in: instance))
-            if !resuming.isEmpty, !originals.isEmpty {
+            let local = readLocal()
+            let previous = record.marfas[instance]
+            let needsOthers = previous?.item != originals.first?.id || !resuming.isEmpty || previous?.fromOtherItems?.isEmpty == false
+            var values: [PreferenceUnits] = []
+            for original in originals.prefix(needsOthers ? originals.count : 1) {
+                values.append(local.off.excludingFrom(try await copy.units(of: original.id)))
+            }
+            let remote = Remote(originals: values)
+            guard generation == self.generation else { return }
+            if !resuming.isEmpty {
                 // The person may have edited these settings while the copy was filling. Protect those edits too.
                 do { try saveRestorePoint(.resumingGroup) } catch {
                     for group in resuming { groups.set(false, for: group, in: instance) }
@@ -354,20 +373,19 @@ final class PreferencesSync {
                     return
                 }
             }
-            let local = readLocal()
+            for group in resuming { record.marfas[instance]?.forget(group) }
             if let adopted = record.marfas[instance] {
                 if let chosen = originals.first, chosen.id == adopted.item {
                     guard let followed = try await follow(
-                        chosen, from: adopted, of: instance, local: local, switched: record.last != instance,
+                        chosen, remote: remote, from: adopted, of: instance, local: local, switched: record.last != instance,
                         resuming: resuming, winning: record.winning ?? [:], siblings: items.filter(\.isConflictedCopy), in: copy,
                         generation: generation)
                     else { return }
                     record.marfas[instance] = followed
-                } else if !originals.isEmpty {
+                } else if let chosen = originals.first {
                     // Two Macs made an item at once: the one made first is used from now on.
                     try saveRestorePoint(.adoption)
-                    guard let adopted = try await adopt(originals, local: local, in: copy, generation: generation) else { return }
-                    record.marfas[instance] = adopted
+                    record.marfas[instance] = try await adopt(chosen, remote: remote, local: local, resuming: resuming, in: copy)
                 } else if adopted.removed == true {
                     item = nil
                     return standing = .off(.removed)
@@ -381,17 +399,17 @@ final class PreferencesSync {
                 } else {
                     // The item went without passing through the bin, as a create discarded offline or a server
                     // restored from before leaves it: this Mac's settings are the Marfa's, so they make it again.
-                    guard let made = try await create(local: local, fresh: false, in: copy, generation: generation) else { return }
+                    guard let made = try await create(local: local, fresh: false, resuming: resuming, in: copy, generation: generation) else { return }
                     record.marfas[instance] = made
                 }
             } else {
                 try saveRestorePoint(originals.isEmpty ? .firstSync : .adoption)
                 let adopted: Record.Adopted?
-                if originals.isEmpty {
+                if let chosen = originals.first {
+                    adopted = try await adopt(chosen, remote: remote, local: local, resuming: resuming, in: copy)
+                } else {
                     let fresh = !record.marfas.isEmpty && !record.restarting.contains(instance)
                     adopted = try await create(local: local, fresh: fresh, resuming: resuming, in: copy, generation: generation)
-                } else {
-                    adopted = try await adopt(originals, local: local, in: copy, generation: generation)
                 }
                 guard let adopted else { return }
                 record.marfas[instance] = adopted
@@ -442,8 +460,8 @@ final class PreferencesSync {
 
     /// Throws `Moved` where a setting that owns one of `units` is no longer what the step read: a step awaits the copy
     /// between reading this Mac's settings and writing them, and the person's change is the later one.
-    func unchanged(since local: Local, writing units: Set<PreferenceUnit>) throws {
-        let settings = PreferencesMap.synced.filter { setting in units.contains { setting.owns($0) } }
+    func unchanged(since local: Local, writing units: Set<PreferenceUnit>, taking groups: Set<PreferenceGroup> = []) throws {
+        let settings = PreferencesMap.synced.filter { setting in groups.includes(setting.group) || units.contains { setting.owns($0) } }
         guard !settings.isEmpty else { return }
         let now = readLocal()
         for setting in settings {
@@ -457,18 +475,15 @@ final class PreferencesSync {
 
     /// The Marfa holds no item yet: it is made from this Mac's settings. A Mac that already adopted another Marfa
     /// (`fresh`) starts the settings every Marfa shares from the app's defaults, as a new Marfa should not take another's
-    /// arrangement. It keeps this Marfa's own settings and any groups explicitly turned back on.
-    private func create(local: Local, fresh: Bool, resuming: Set<PreferenceGroup> = [], in copy: any PreferencesCopy,
+    /// arrangement. A returning group takes the defaults because the Marfa has no values for it.
+    private func create(local: Local, fresh: Bool, resuming: Set<PreferenceGroup>, in copy: any PreferencesCopy,
                         generation: Int) async throws -> Record.Adopted? {
-        let own = local.units.filter { unit, _ in
-            resuming.includes(unit.group) || PreferencesMap.synced.contains { $0.isPerServer && $0.owns(unit) }
+        let start = resuming.excludingFrom(local.units).filter { unit, _ in
+            !fresh || PreferencesMap.synced.contains { $0.isPerServer && $0.owns(unit) }
         }
-        let start = fresh ? own : local.units
-        if fresh {
-            let shared = Set(local.units.keys).subtracting(own.keys)
-            try unchanged(since: local, writing: shared)
-            writeLocal(shared, from: [:])
-        }
+        let cleared = Set(local.units.keys).subtracting(start.keys)
+        try unchanged(since: local, writing: cleared, taking: resuming)
+        writeLocal(cleared, from: [:])
         let fields = Self.fields(of: start, changing: Set(start.keys))
         let id = try await copy.create(fields: fields)
         guard generation == self.generation else { return nil }
@@ -480,25 +495,19 @@ final class PreferencesSync {
 
     /// Takes up the item made first: what it holds wins, and what it lacks is filled from the other items, then from this
     /// Mac, once. The other items are left as they are.
-    private func adopt(_ originals: [PreferencesItem], local: Local, in copy: any PreferencesCopy, generation: Int) async throws
-        -> Record.Adopted?
+    private func adopt(_ chosen: PreferencesItem, remote: Remote, local: Local, resuming: Set<PreferenceGroup>,
+                       in copy: any PreferencesCopy) async throws -> Record.Adopted
     {
-        guard let chosen = originals.first else { return nil }
-        let own = local.off.excludingFrom(try await copy.units(of: chosen.id))
-        var others: [PreferenceUnits] = []
-        for other in originals.dropFirst() {
-            others.append(local.off.excludingFrom(try await copy.units(of: other.id)))
-        }
-        guard generation == self.generation else { return nil }
-        let filled = PreferencesMerge.filling(own, from: others)
+        let filled = resuming.excludingFrom(remote.merged)
         _ = setAsideUnreadable(filled, base: [:])
         let frozen = local.frozen
         var outcome = PreferencesMerge.adopt(
-            remote: filled, local: local.units.filter { unit, _ in !frozen.contains { $0.owns(unit) } })
+            remote: filled, local: resuming.excludingFrom(local.units).filter { unit, _ in !frozen.contains { $0.owns(unit) } })
         outcome.toLocal = outcome.toLocal.filter { unit in !frozen.contains { $0.owns(unit) } }
-        outcome.toRemote.formUnion(Set(filled.keys).subtracting(own.keys))
+        outcome.toRemote.formUnion(Set(filled.keys).subtracting(remote.first.keys))
         var adopted = Record.Adopted(item: chosen.id, base: [:])
-        try await apply(outcome, to: chosen, local: local, adopted: &adopted, retrying: [], in: copy)
+        try await apply(outcome, to: chosen, local: local, adopted: &adopted, retrying: [],
+                        resuming: resuming, from: remote, in: copy)
         item = chosen
         return adopted
     }
@@ -515,14 +524,18 @@ final class PreferencesSync {
     /// no other Mac's value of a member it carries is taken; once the server answers that it kept another Mac's field
     /// and wrote this one to a conflicted copy, each member it carried that this Mac still holds is written again, so
     /// only the same member's later write wins.
-    private func follow(_ chosen: PreferencesItem, from adopted: Record.Adopted, of instance: String, local: Local,
+    private func follow(_ chosen: PreferencesItem, remote originals: Remote, from adopted: Record.Adopted, of instance: String, local: Local,
                         switched: Bool, resuming: Set<PreferenceGroup>, winning: [String: Set<PreferenceUnit>], siblings: [PreferencesItem],
                         in copy: any PreferencesCopy, generation: Int) async throws -> Record.Adopted?
     {
         var adopted = adopted
         // The defaults hold the Marfa followed before, which this one's settings are about to replace.
         if switched { try saveRestorePoint(.switching) }
-        let remote = local.off.excludingFrom(try await copy.units(of: chosen.id))
+        let inherited = (adopted.fromOtherItems ?? []).filter { originals.first[$0] == nil && originals.merged[$0] != nil }
+        adopted.fromOtherItems = inherited.isEmpty ? nil : inherited
+        let remote = originals.merged.filter { unit, _ in
+            !resuming.includes(unit.group) && (originals.first[unit] != nil || inherited.contains(unit))
+        }
         let queued = try await copy.queued()
         var lost: PreferenceUnits = [:]
         var holding: Set<PreferenceUnit> = []
@@ -549,18 +562,11 @@ final class PreferencesSync {
         }
         guard generation == self.generation else { return nil }
 
-        let base = adopted.base
-        let fills = adopted.fills ?? []
-        func isAdopting(_ unit: PreferenceUnit) -> Bool {
-            (!resuming.isEmpty && resuming.includes(unit.group)) || fills.contains(unit)
-        }
+        let base = adopted.comparisonBase
         // A setting the store dropped on reading it stands as the Marfa holds it, until this Mac changes it or an app
         // that reads it runs here.
         let retrying = adopted.frozenBuild == build ? [] : Set(adopted.frozen.keys)
-        var mine = switched ? base : local.units
-        if switched {
-            mine.merge(local.units.filter { isAdopting($0.key) }) { _, here in here }
-        }
+        var mine = switched ? base : resuming.excludingFrom(local.units)
         for (unit, frozen) in adopted.frozen where !switched {
             // The person's own change to a dropped setting is theirs to send, so it is no longer held.
             if mine[unit] == frozen.left { mine[unit] = base[unit] } else { adopted.frozen[unit] = nil }
@@ -592,7 +598,7 @@ final class PreferencesSync {
             }, local: mine, remote: seen)
         }
         var outcome = PreferencesMerge.reconcile(
-            local: mine, remote: seen, base: before, adopting: isAdopting, frozen: { unit in unreadable.contains { $0.owns(unit) } })
+            local: mine, remote: seen, base: before, frozen: { unit in unreadable.contains { $0.owns(unit) } })
         outcome.toLocal.formUnion(retrying)
         // What this Mac lacks of such a setting comes here.
         outcome.toLocal.formUnion(outcome.merged.keys.filter { unit in
@@ -601,16 +607,14 @@ final class PreferencesSync {
         if switched {
             outcome.toLocal.formUnion(Set(local.units.keys).union(outcome.merged.keys).filter { unit in !unreadable.contains { $0.owns(unit) } })
         }
-        adopted.fills = nil
-        try await apply(outcome, to: chosen, local: local, adopted: &adopted, retrying: retrying, in: copy) {
+        try await apply(outcome, to: chosen, local: local, adopted: &adopted, retrying: retrying,
+                        resuming: resuming, from: originals, in: copy) {
             [defaults, before] partial, unsent in
             var record = Record.read(defaults)
             var partial = partial
             // What is still to be written keeps the base it was reconciled against, so the next step decides it as this
             // one did: a member another Mac's write beat is still sent again, though its answer is taken.
             for unit in unsent { partial.base[unit] = before[unit] }
-            let pendingFills = unsent.filter(isAdopting)
-            partial.fills = pendingFills.isEmpty ? nil : pendingFills
             record.marfas[instance] = partial
             record.setPaused(local.off, in: instance)
             // A switch wrote this Marfa's settings into the defaults before any write to the item.
@@ -622,7 +626,7 @@ final class PreferencesSync {
             }
             record.save(defaults)
         }
-        for sibling in siblings {
+        for sibling in siblings where resuming.isEmpty {
             // Another Mac can still use the conflicted values of a group this Mac leaves alone.
             if !local.off.isEmpty, try await copy.units(of: sibling.id).keys.contains(where: { local.off.includes($0.group) }) { continue }
             _ = try await copy.remove(sibling.id)

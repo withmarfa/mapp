@@ -36,7 +36,7 @@ actor FakePreferencesCopy: PreferencesCopy {
     private var made = 0
     private nonisolated let stream = AsyncStream<String?>.makeStream()
     /// Runs once, the next time an item's settings are read, as a person's change made while a step reads.
-    private var duringRead: (@MainActor () -> Void)?
+    private var duringRead: (@MainActor () async -> Void)?
     /// The id of each field write, in the order queued.
     private(set) var writeIDs: [String] = []
     /// Whether the next field write is answered as taken the moment it is queued. A test of a conflict answers it itself.
@@ -76,7 +76,7 @@ actor FakePreferencesCopy: PreferencesCopy {
     }
 
     /// Has `change` run the next time a step reads an item's settings.
-    func whileReading(_ change: @escaping @MainActor () -> Void) { duringRead = change }
+    func whileReading(_ change: @escaping @MainActor () async -> Void) { duringRead = change }
 
     /// The item goes from the copy without passing through the bin, as a discarded create or a restored server leaves it.
     func forget(_ id: String) { held[id] = nil }
@@ -172,11 +172,12 @@ actor FakePreferencesCopy: PreferencesCopy {
     }
 
     func units(of item: String) async throws -> PreferenceUnits {
+        let read = unitsHeld(item)
         if let change = duringRead {
             duringRead = nil
             await change()
         }
-        return unitsHeld(item)
+        return read
     }
 
     func create(fields: [PreferencesField: JSONObject]) async throws -> String {

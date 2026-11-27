@@ -46,7 +46,7 @@ import Testing
         #expect(defaults.object(forKey: PagePlacements.key) == nil)
     }
 
-    @Test func enablingWaitsForWholeCopyThenTakesAndFillsOnceEvenAfterRelaunch() async throws {
+    @Test func enablingWaitsForTheWholeCopyThenTakesItsSettingsEvenAfterRelaunch() async throws {
         let item = await copy.add([theme: #""light""#, accent: #""blue""#])
         let sync = await connect()
         try await sync.setSyncing(false, for: .appearance, in: instance)
@@ -65,10 +65,10 @@ import Testing
         await copy.set(.init(filled: true, holdsType: true, tablesWhole: true, instance: instance))
         await reopened.flush()
         #expect(defaults.string(forKey: AppearanceKey.theme) == "dark")
-        #expect(await copy.unitsHeld(item)[accent] == #""green""#)
-        defaults.removeObject(forKey: AppearanceKey.accent)
+        #expect(defaults.object(forKey: AppearanceKey.accent) == nil)
         await reopened.flush()
-        #expect(await copy.unitsHeld(item)[accent] == nil)
+        #expect(await copy.updates.isEmpty)
+        #expect(try points.snapshot(of: point.id).value(forKey: AppearanceKey.accent) as? String == "green")
     }
 
     @Test func editsMadeWhileWaitingForAWholeCopyMustAlsoHaveARestorePoint() async throws {
@@ -188,16 +188,44 @@ import Testing
         #expect(await copy.updates == [[.general]])
     }
 
-    @Test func aRefusedFillDoesNotReplaceAnotherMacsLaterRowOnRetry() async throws {
+    @Test func resumingBeforeFirstAdoptionUsesDefaultsForMissingValues() async throws {
+        await copy.set(.init(filled: false, holdsType: true, tablesWhole: false, instance: instance))
+        let sync = await connect()
+        try await sync.setSyncing(false, for: .appearance, in: instance)
+        defaults.set("green", forKey: AppearanceKey.accent)
+        try await sync.setSyncing(true, for: .appearance, in: instance)
+        await copy.set(.init(filled: true, holdsType: true, tablesWhole: true, instance: instance))
+        await sync.flush()
+        let item = try #require(await copy.activeIDs.first)
+        #expect(defaults.object(forKey: AppearanceKey.accent) == nil)
+        #expect(await copy.unitsHeld(item).isEmpty)
+    }
+
+    @Test func resumingLeavesANewerFieldOnAnotherMacAfterAConflict() async throws {
+        let item = await copy.add([:])
+        let sync = await connect()
+        try await sync.setSyncing(false, for: .appearance, in: instance)
+        defaults.set("green", forKey: AppearanceKey.accent)
+        await copy.holdNextAnswer()
+        try await sync.setSyncing(true, for: .appearance, in: instance)
+        await copy.change(item, [accent: #""red""#])
+        if let write = await copy.writeIDs.last { await copy.answer(write, .lost) }
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[accent] == #""red""#)
+        #expect(defaults.string(forKey: AppearanceKey.accent) == "red")
+        #expect(await copy.writeIDs.isEmpty)
+    }
+
+    @Test func resumingLeavesARowWrittenAfterThisMacReadTheItem() async throws {
         let existing = PreferenceUnit.row(.types, setting: "pagePlacements", key: "core.task")
         let item = await copy.add([existing: #"{"pins":[]}"#])
         let sync = await connect()
         try await sync.setSyncing(false, for: .layouts, in: instance)
         defaults.set(#"{"core.note":{"pins":["here"]},"core.task":{"pins":["local"]}}"#, forKey: PagePlacements.key)
-        await copy.refuseNextWrite(to: .types)
+        await copy.whileReading { await copy.change(item, [row: #"{"pins":["other"]}"#]) }
         try await sync.setSyncing(true, for: .layouts, in: instance)
-        await copy.change(item, [row: #"{"pins":["other"]}"#])
         await sync.flush()
+        #expect(await copy.batches.isEmpty)
         #expect(await copy.unitsHeld(item)[row] == #"{"pins":["other"]}"#)
         #expect(defaults.string(forKey: PagePlacements.key) == #"{"core.note":{"pins":["other"]},"core.task":{"pins":[]}}"#)
     }
@@ -224,18 +252,73 @@ import Testing
         #expect(exclusions.leaveOut(for: "two").sources == ["mail"])
     }
 
-    @Test func fillingOneMemberPreservesAnotherThatThisMacCannotRead() async throws {
+    @Test func resumingReadsBothOriginalItemsWhileFollowingTheOlderOne() async throws {
+        let older = await copy.add([theme: #""dark""#])
+        let sync = await connect()
+        try await sync.setSyncing(false, for: .appearance, in: instance)
+        let newer = await copy.add([theme: #""light""#, accent: #""red""#], createdAt: "2026-01-02")
+        defaults.set("green", forKey: AppearanceKey.accent)
+        try await sync.setSyncing(true, for: .appearance, in: instance)
+        await sync.flush()
+        #expect(defaults.string(forKey: AppearanceKey.theme) == "dark")
+        #expect(defaults.string(forKey: AppearanceKey.accent) == "red")
+        #expect(await copy.unitsHeld(older) == [theme: #""dark""#])
+        #expect(await copy.unitsHeld(newer) == [theme: #""light""#, accent: #""red""#])
+        #expect(await copy.updates.isEmpty)
+        #expect(await copy.batches.isEmpty)
+        #expect(await copy.removed.isEmpty)
+
+        // An explicit edit goes to the older item. Clearing it later must not bring the second item's value back.
+        defaults.set("blue", forKey: AppearanceKey.accent)
+        await sync.flush()
+        defaults.removeObject(forKey: AppearanceKey.accent)
+        await sync.flush()
+        await sync.flush()
+        #expect(defaults.object(forKey: AppearanceKey.accent) == nil)
+        #expect(await copy.unitsHeld(older) == [theme: #""dark""#])
+    }
+
+    @Test func resumingDoesNotRecordAnExclusionTheStoreRejectedAsShared() async throws {
+        let exclusions = PreferenceUnit.member(.search, SearchLeaveOuts.defaultsKey)
+        let item = await copy.add([:])
+        let store = SearchLeaveOuts(defaults: defaults)
+        let sync = PreferencesSync(defaults: defaults, domain: defaults.suite, enabled: true,
+                                   restorePoints: points, reload: store.reload)
+        sync.attach(copy, library: "one", name: { nil })
+        await sync.flush()
+        try await sync.setSyncing(false, for: .search, in: instance)
+        let unreadable = #""unknown format""#
+        await copy.change(item, [exclusions: unreadable])
+        try await sync.setSyncing(true, for: .search, in: instance)
+        let adopted = try #require(PreferencesSync.Record.read(defaults).marfas[instance])
+        #expect(adopted.base[exclusions] == nil)
+        #expect(store.leaveOut(for: "one").isEmpty)
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[exclusions] == unreadable)
+        #expect(await copy.updates.isEmpty)
+        #expect(defaults.array(forKey: SearchLeaveOuts.setAsideKey)?.count == 1)
+        #expect(PreferencesSync.Record.read(defaults).marfas[instance]?.base[exclusions] == nil)
+    }
+
+    @Test func settingAsideUnreadableSearchDataOnResumeKeepsTheRemoteExclusions() async throws {
         let exclusions = PreferenceUnit.member(.search, SearchLeaveOuts.defaultsKey)
         let snippets = PreferenceUnit.member(.search, SearchOptions.showsSnippetsKey)
         let remote = #"{"sources":["rss"],"types":[]}"#
-        let item = await copy.add([exclusions: remote])
-        let sync = await connect()
+        let item = await copy.add([exclusions: remote, snippets: "true"])
+        let store = SearchLeaveOuts(defaults: defaults)
+        let sync = PreferencesSync(defaults: defaults, domain: defaults.suite, enabled: true,
+                                   restorePoints: points, reload: store.reload)
+        sync.attach(copy, library: "one", name: { nil })
+        await sync.flush()
         try await sync.setSyncing(false, for: .search, in: instance)
         let unreadable = Data("unreadable".utf8)
         defaults.set(unreadable, forKey: SearchLeaveOuts.defaultsKey)
         defaults.set(false, forKey: SearchOptions.showsSnippetsKey)
         try await sync.setSyncing(true, for: .search, in: instance)
-        #expect(await copy.unitsHeld(item) == [exclusions: remote, snippets: "false"])
-        #expect(defaults.data(forKey: SearchLeaveOuts.defaultsKey) == unreadable)
+        await sync.flush()
+        #expect(defaults.array(forKey: SearchLeaveOuts.setAsideKey) as? [Data] == [unreadable])
+        #expect(store.leaveOut(for: "one").sources == ["rss"])
+        #expect(await copy.unitsHeld(item) == [exclusions: remote, snippets: "true"])
+        #expect(await copy.updates.isEmpty)
     }
 }
