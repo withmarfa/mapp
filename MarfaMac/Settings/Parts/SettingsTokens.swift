@@ -262,7 +262,6 @@ enum SettingsTokens {
         /// The sidebar's tile.
         static let sidebarTile: CGFloat = 24
         static let sidebarRow: CGFloat = 32
-        static let sidebarGroupGap: CGFloat = 2
         static let sidebarHalfGap: CGFloat = 32
         static let sidebarRowLeading: CGFloat = 2
         static let sidebarFooterInset: CGFloat = 18
