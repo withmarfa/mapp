@@ -202,19 +202,9 @@ final class SettingsFilesModel {
 
     /// What a sheet says about who it reaches, where the settings sync and where they don't.
     func reach(_ importing: Bool) -> String {
-        guard preferences.syncs else {
-            return importing
-                ? String(localized: "Importing changes these settings on this Mac only. A restore point is saved first.")
-                : String(localized: "Restoring changes the settings on this Mac only. A restore point is saved first.")
-        }
-        guard let name = preferences.marfaName else {
-            return importing
-                ? String(localized: "Importing changes these settings on every Mac connected to this Marfa. A restore point is saved first.")
-                : String(localized: "Restoring changes the settings on every Mac connected to this Marfa. A restore point is saved first.")
-        }
-        return importing
-            ? String(localized: "Importing changes these settings on every Mac connected to \(name). A restore point is saved first.")
-            : String(localized: "Restoring changes the settings on every Mac connected to \(name). A restore point is saved first.")
+        importing
+            ? String(localized: "Import replaces the selected settings on this Mac. Groups you sync also change on Macs that sync those groups. A restore point is saved first.")
+            : String(localized: "Restore replaces this Mac’s settings and keeps your sync switches as they are. Groups you sync also change on Macs that sync those groups. A restore point is saved first.")
     }
 }
 

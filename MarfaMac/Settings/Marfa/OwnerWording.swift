@@ -239,7 +239,7 @@ nonisolated enum AppDataWording {
         if data.trashed > 0 { parts.append(String(localized: "\(data.trashed) in the trash")) }
         let counts = parts.isEmpty ? String(localized: "No items.") : String(localized: "Items: \(parts.formatted(.list(type: .and))).")
         let who = keptByApp
-            ? String(localized: "These are this app’s settings, which every Mac that connects uses. Remove them in Connection, where the app keeps them in step.")
+            ? String(localized: "These are the settings this app shares between Macs. Remove them in Connection.")
             : String(localized: "Only \(appName) and you can read it.")
         return counts + " " + who
     }

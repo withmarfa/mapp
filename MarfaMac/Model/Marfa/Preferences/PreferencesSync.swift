@@ -3,8 +3,7 @@ import Marfa
 import Observation
 import os
 
-/// Keeps the app's own settings in the connected Marfa's `app.marfa-mac.preferences` item, so every Mac that connects to it uses
-/// them.
+/// Shares the groups enabled on this Mac through the connected Marfa's `app.marfa-mac.preferences` item.
 ///
 /// The defaults stay the store the app's code reads, as this Mac's copy of the Marfa's settings, so a launch reads nothing
 /// from the network. Each step compares this Mac's settings and the item's with what both held after the last step

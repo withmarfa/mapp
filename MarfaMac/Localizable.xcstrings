@@ -2569,6 +2569,9 @@
     "Allow more removals before pausing?" : {
 
     },
+    "Allow the app to keep the groups you sync in %@." : {
+
+    },
     "Allowed" : {
 
     },
@@ -4587,6 +4590,9 @@
     "Each Mac keeps its own window sizes and positions, column widths, global shortcuts, and On This Mac settings." : {
 
     },
+    "Each Mac uses the groups it syncs." : {
+
+    },
     "Each Option" : {
 
     },
@@ -4807,12 +4813,6 @@
     "Every Item" : {
 
     },
-    "Every Mac that connects to %@ loses them. This Mac keeps its own, and your items stay." : {
-
-    },
-    "Every Mac that connects to it uses them." : {
-
-    },
     "Every Marfa has these. Base a type on one to add to it." : {
 
     },
@@ -4850,12 +4850,6 @@
 
     },
     "Every installed connector has a machine. A new one comes with its plugin." : {
-
-    },
-    "Every setting on this Mac starts over. Your items and sign-in stay. A restore point is saved first, and Restore Earlier Settings brings it back." : {
-
-    },
-    "Every setting on this Mac. Your items stay." : {
 
     },
     "Every shortcut as Marfa ships it." : {
@@ -5367,6 +5361,15 @@
     "Groups Hidden" : {
 
     },
+    "Groups that were off take their settings from the Marfa when they sync again. Your items and sign-in stay." : {
+
+    },
+    "Groups that were on also reset on Macs that sync them with %@." : {
+
+    },
+    "Groups that were on also reset on Macs that sync them with the same Marfa." : {
+
+    },
     "Guidance" : {
 
     },
@@ -5578,6 +5581,9 @@
     "Import Shortcuts" : {
 
     },
+    "Import replaces the selected settings on this Mac. Groups you sync also change on Macs that sync those groups. A restore point is saved first." : {
+
+    },
     "Important" : {
 
     },
@@ -5585,15 +5591,6 @@
 
     },
     "Imported Shortcuts" : {
-
-    },
-    "Importing changes these settings on every Mac connected to %@. A restore point is saved first." : {
-
-    },
-    "Importing changes these settings on every Mac connected to this Marfa. A restore point is saved first." : {
-
-    },
-    "Importing changes these settings on this Mac only. A restore point is saved first." : {
 
     },
     "Import…" : {
@@ -7665,9 +7662,6 @@
     "On an item’s page." : {
 
     },
-    "On every Mac that connects to this Marfa. Your items stay." : {
-
-    },
     "On the Calendar" : {
 
     },
@@ -8722,6 +8716,12 @@
     "Reset Widths" : {
 
     },
+    "Reset saves a restore point and turns all sync groups on." : {
+
+    },
+    "Reset settings and turn all sync groups on. Your items stay." : {
+
+    },
     "Reset…" : {
 
     },
@@ -8752,6 +8752,9 @@
     "Restore Version" : {
       "extractionState" : "manual"
     },
+    "Restore replaces this Mac’s settings and keeps your sync switches as they are. Groups you sync also change on Macs that sync those groups. A restore point is saved first." : {
+
+    },
     "Restore the Backup From %@" : {
 
     },
@@ -8771,15 +8774,6 @@
 
     },
     "Restore…" : {
-
-    },
-    "Restoring changes the settings on every Mac connected to %@. A restore point is saved first." : {
-
-    },
-    "Restoring changes the settings on every Mac connected to this Marfa. A restore point is saved first." : {
-
-    },
-    "Restoring changes the settings on this Mac only. A restore point is saved first." : {
 
     },
     "Restoring…" : {
@@ -8903,7 +8897,7 @@
     "Save as New View…" : {
 
     },
-    "Save every setting to a file." : {
+    "Save settings to a file." : {
 
     },
     "Save the text as %@.md beside %@.json." : {
@@ -10227,9 +10221,6 @@
     "The app isn’t allowed to install, update or remove plugins." : {
 
     },
-    "The app isn’t allowed to keep them in %@ yet. Once it is, every Mac that connects uses them." : {
-
-    },
     "The app isn’t allowed to list and end your sign-ins." : {
 
     },
@@ -10839,6 +10830,9 @@
     "The settings could not be written to “%@”. Choose another place and try again." : {
 
     },
+    "The shared settings are removed from %@. Each Mac keeps its current settings. Your items stay." : {
+
+    },
     "The shortcuts could not be written to “%@”. Choose another place and try again." : {
 
     },
@@ -11013,7 +11007,7 @@
     "These are the settings as the server last gave them." : {
       "extractionState" : "manual"
     },
-    "These are this app’s settings, which every Mac that connects uses. Remove them in Connection, where the app keeps them in step." : {
+    "These are the settings this app shares between Macs. Remove them in Connection." : {
 
     },
     "These changed on the server since you opened this page: %@. Nothing was sent. Check what you typed, then save again." : {
@@ -11182,12 +11176,6 @@
 
     },
     "This app isn’t allowed to change it. Allow more, or change it where it was made, first." : {
-
-    },
-    "This app’s settings start over on every Mac that connects to %@. Your items and sign-in stay. A restore point is saved first, and Restore Earlier Settings brings it back." : {
-
-    },
-    "This app’s settings start over on every Mac that connects to this Marfa. Your items and sign-in stay. A restore point is saved first, and Restore Earlier Settings brings it back." : {
 
     },
     "This change came from a copy that the app could only partly read, so it was held. Try again to send it, or undo it to put the item back as the server has it." : {
@@ -12321,7 +12309,7 @@
     "Window Layout" : {
 
     },
-    "Window sizes, error reports and shortcuts that work in any app stay on this Mac." : {
+    "Window sizes, your choice to send error reports, and shortcuts that work in any app stay on this Mac." : {
 
     },
     "With %@." : {

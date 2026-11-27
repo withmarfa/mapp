@@ -228,7 +228,7 @@ struct GeneralPage: View {
                     }
                 }
             }
-            SettingsNote("Window sizes, error reports and shortcuts that work in any app stay on this Mac.")
+            SettingsNote("Window sizes, your choice to send error reports, and shortcuts that work in any app stay on this Mac.")
         }
     }
 
@@ -236,7 +236,7 @@ struct GeneralPage: View {
 
     private var appSettings: some View {
         SettingsSection("This App’s Settings") {
-            SettingsRow("Export Settings", line: "Save every setting to a file.") {
+            SettingsRow("Export Settings", line: "Save settings to a file.") {
                 SettingsButton("Export…") { files.export() }
                     .accessibilityIdentifier("ExportSettings")
             }
@@ -251,22 +251,21 @@ struct GeneralPage: View {
                 SettingsButton("Restore…") { files.chooseRestorePoint() }
                     .accessibilityIdentifier("RestoreSettings")
             }
-            SettingsRow("Reset This App’s Settings", line: libraries.preferences.syncs ? "On every Mac that connects to this Marfa. Your items stay." : "Every setting on this Mac. Your items stay.") {
+            SettingsRow("Reset This App’s Settings", line: "Reset settings and turn all sync groups on. Your items stay.") {
                 SettingsButton("Reset…", role: .destructive) { isConfirmingReset = true }
                     .accessibilityIdentifier("ResetSettings")
             }
         }
     }
 
-    /// Where the settings sync, a reset reaches every Mac that connects to the Marfa. Either way a restore point is saved first.
     private var resetMessage: String {
-        guard libraries.preferences.syncs else {
-            return String(localized: "Every setting on this Mac starts over. Your items and sign-in stay. A restore point is saved first, and Restore Earlier Settings brings it back.")
+        let shared = if let name = libraries.preferences.marfaName {
+            String(localized: "Groups that were on also reset on Macs that sync them with \(name).")
+        } else {
+            String(localized: "Groups that were on also reset on Macs that sync them with the same Marfa.")
         }
-        guard let name = libraries.preferences.marfaName else {
-            return String(localized: "This app’s settings start over on every Mac that connects to this Marfa. Your items and sign-in stay. A restore point is saved first, and Restore Earlier Settings brings it back.")
-        }
-        return String(localized: "This app’s settings start over on every Mac that connects to \(name). Your items and sign-in stay. A restore point is saved first, and Restore Earlier Settings brings it back.")
+        return [String(localized: "Reset saves a restore point and turns all sync groups on."), shared,
+                String(localized: "Groups that were off take their settings from the Marfa when they sync again. Your items and sign-in stay.")].joined(separator: " ")
     }
 
     private func resetSettings() {

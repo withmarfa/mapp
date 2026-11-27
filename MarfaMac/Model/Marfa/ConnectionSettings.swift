@@ -29,9 +29,9 @@ nonisolated struct ConnectionSettings: Equatable, Sendable {
 
     var line: String? {
         switch standing {
-        case .syncing: String(localized: "Every Mac that connects to it uses them.")
+        case .syncing: String(localized: "Each Mac uses the groups it syncs.")
         case .off(.needsPermission):
-            String(localized: "The app isn’t allowed to keep them in \(name) yet. Once it is, every Mac that connects uses them.")
+            String(localized: "Allow the app to keep the groups you sync in \(name).")
         case .off(.notFilled): String(localized: "The app keeps them in \(name) once this Mac has finished downloading it.")
         case .off(.removed): String(localized: "They were removed from \(name). This Mac keeps its own.")
         case .off(.noMarfa): nil
@@ -64,7 +64,7 @@ nonisolated struct ConnectionSettings: Equatable, Sendable {
     /// The question before Remove… takes the settings out of the Marfa.
     var removeTitle: String { String(localized: "Remove This App’s Settings from \(name)?") }
     var removeMessage: String {
-        String(localized: "Every Mac that connects to \(name) loses them. This Mac keeps its own, and your items stay.")
+        String(localized: "The shared settings are removed from \(name). Each Mac keeps its current settings. Your items stay.")
     }
 
     /// The checkbox on Disconnect's alert.

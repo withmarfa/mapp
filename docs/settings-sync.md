@@ -84,5 +84,5 @@ Turning a group on requires a restore point. If saving fails, it stays off. Once
 - **They run between sync steps** (`PreferencesSync`). For enabled groups, their writes win over remote changes still to arrive. These marks survive relaunch.
 - **Import replaces each chosen section whole** (`SettingsFile`): a setting the file lacks goes to its default; other sections are untouched. A file not the app's, or from a later version, changes nothing. Every value is checked before any is written.
 - **Restore puts back exactly what the point holds**, removes the keys it lacks and saves a point of its own, so it can be undone.
-- **Reset clears `MacSettings.keys`.** It keeps the library's copy, the queue, the sign-in and the sync's record, and its alert says every connected Mac follows.
+- **Reset clears `MacSettings.keys`.** Other Macs follow the reset for groups both Macs sync. Groups previously off on this Mac take the Marfa's values when they resume. Reset keeps the library's copy, queue, sign-in and sync record.
 - **A system-wide shortcut that another app holds is kept as it was** and counted as skipped.

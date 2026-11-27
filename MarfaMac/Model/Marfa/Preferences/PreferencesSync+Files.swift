@@ -3,7 +3,7 @@ import Foundation
 /// Export, Import and restore points: what Settings > General's Export Settings…, Import Settings… and Restore Earlier
 /// Settings… call. Export and Import read and write the defaults as the sync does, for `settingsLibrary`; a restore point
 /// is the app's own defaults themselves (`SettingsSnapshot`). With no Marfa connected they change this Mac only; where the
-/// settings sync, what they wrote wins at the next step (`Record.winning`) and so reaches every Mac.
+/// settings sync, what they wrote wins at the next step (`Record.winning`) for each group this Mac shares.
 extension PreferencesSync {
     /// What an import or a restore did.
     nonisolated struct Applied: Equatable, Sendable {
