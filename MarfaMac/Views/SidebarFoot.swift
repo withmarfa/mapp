@@ -16,16 +16,16 @@ struct SidebarFoot: View {
         let name = LibraryDescription.name(libraries)
         if let host, host.source != nil {
             SyncFootReading(host: host) { line in
-                row(name, line: line, canRefresh: host.canRefresh, refresh: host.refresh, host: host)
+                row(name, line: line, refresh: (canRefresh: host.canRefresh, run: host.refresh), host: host)
             }
         } else {
-            row(name, line: nil, canRefresh: false, refresh: {}, host: nil)
+            row(name, line: nil, refresh: nil, host: nil)
         }
     }
 
-    private func row(_ name: String, line: SyncFootLine?, canRefresh: Bool, refresh: @escaping () -> Void, host: MarfaHost?) -> some View {
+    private func row(_ name: String, line: SyncFootLine?, refresh: (canRefresh: Bool, run: () -> Void)?, host: MarfaHost?) -> some View {
         SidebarFootRow(
-            name: name, line: line, refresh: host == nil ? nil : (canRefresh: canRefresh, run: refresh), isPanelOpen: showsPanel,
+            name: name, line: line, refresh: refresh, isPanelOpen: showsPanel,
             openPanel: host == nil ? nil : { showsPanel.toggle() },
             openProblems: { browser.showSettings(.connection) },
             openSettings: { browser.showSettings() })

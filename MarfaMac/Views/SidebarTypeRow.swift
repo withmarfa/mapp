@@ -64,6 +64,13 @@ struct SidebarTypeRow: View {
     /// Measured so that a count here ends where the system's count on the rows above does.
     private static let countInset: CGFloat = 4
 
+    /// The plus ends this far past the count's trailing edge.
+    private static let plusOverhang: CGFloat = 4
+
+    /// How much of the plus lies over the count column, so a column this wide keeps the plus off the name and off the
+    /// chevron's hit area. A row with no Add needs none.
+    private var plusReach: CGFloat { add == nil ? 0 : 18 - Self.plusOverhang }
+
     var body: some View {
         HStack(spacing: 0) {
             Color.clear.frame(width: CGFloat(depth) * Self.indent, height: 0).accessibilityHidden(true)
@@ -76,7 +83,7 @@ struct SidebarTypeRow: View {
             if row.isExpandable {
                 HStack(spacing: 0) {
                     disclosure
-                    SidebarCount(count: count, widest: widestFoldingCount).hidden().accessibilityHidden(true)
+                    SidebarCount(count: count, widest: widestFoldingCount, minWidth: plusReach).hidden().accessibilityHidden(true)
                 }
                 .padding(.trailing, Self.countInset)
             }
@@ -97,7 +104,7 @@ struct SidebarTypeRow: View {
             label
             Spacer(minLength: 8)
             if row.isExpandable { disclosure.hidden().accessibilityHidden(true) }
-            SidebarCount(count: count, widest: row.isExpandable ? widestFoldingCount : 0)
+            SidebarCount(count: count, widest: row.isExpandable ? widestFoldingCount : 0, minWidth: plusReach)
                 .opacity(isHovering && add != nil ? 0 : 1)
                 // An overlay, so that the plus takes the count's place without changing the row's layout.
                 .overlay(alignment: .trailing) {
@@ -107,7 +114,7 @@ struct SidebarTypeRow: View {
                             isHovering = false
                             add()
                         }
-                        .padding(.trailing, -4)
+                        .padding(.trailing, -Self.plusOverhang)
                     }
                 }
         }
@@ -129,16 +136,18 @@ struct SidebarTypeRow: View {
 }
 
 /// A row's count, in the size of the system's own on the rows above, which does not follow the base text size. A
-/// column no narrower than `widest` keeps what stands beside it in one place.
+/// column no narrower than `widest` or `minWidth` keeps what stands beside it in one place.
 private struct SidebarCount: View {
     let count: Int
     let widest: Int
+    var minWidth: CGFloat = 0
 
     var body: some View {
         ZStack(alignment: .trailing) {
             if widest > 0 { Text(widest, format: .number).hidden().accessibilityHidden(true) }
             if count > 0 { Text(count, format: .number) }
         }
+        .frame(minWidth: minWidth, alignment: .trailing)
         .monospacedDigit()
         .font(.subheadline)
         .foregroundStyle(.tertiary)
