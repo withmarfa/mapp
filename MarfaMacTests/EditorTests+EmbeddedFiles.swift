@@ -220,19 +220,57 @@ extension EditorTests {
 
     @Test func imagesTheLibraryCannotKeepAreReportedInThePersonsWords() async throws {
         let library = FakeItemLibrary(items: [FakeItemLibrary.note("Plan", modified: .now)])
-        library.attaching = { AttachReport(failed: [(name: "Photo.png", reason: "The server is out of space.")]) }
+        library.attaching = {
+            AttachReport(failed: [AttachmentFailure(index: 0, name: "Photo.png", reason: "The server is out of space.")])
+        }
         let editor = try await attachingEditor(library)
         #expect(editor.insertImages(Self.pasted))
         #expect(await eventually { library.notices.waiting.last != nil })
         #expect(try await markdown(editor) == nil, "nothing is inserted")
-        #expect(library.notices.waiting.last?.title == "Can’t Attach Images")
-        #expect(library.notices.waiting.last?.message == "“Photo.png” couldn’t be attached. The server is out of space.")
+        let copy = try #require(library.askedSameBytes.flatMap(\.self).last?.resolvingSymlinksInPath())
+        let notice = try #require(library.notices.waiting.last)
+        #expect(notice.title == "Can’t Attach Images")
+        #expect(notice.message == "“Photo.png” couldn’t be attached. It couldn’t be saved to Downloads. The copy is still at \(copy.path).")
+        #expect(FileManager.default.fileExists(atPath: copy.path), "a failed attach keeps the staged copy")
+        #expect(notice.action == .showInFinder([copy]))
+    }
+
+    @Test func twoPastedImagesWithTheSameNameKeepSeparateOutcomes() async throws {
+        let library = FakeItemLibrary(items: [FakeItemLibrary.note("Plan", modified: .now)])
+        library.attaching = {
+            AttachReport(
+                embeds: [Embed(link: "Attachments/Photo.png", name: "Photo")],
+                failed: [AttachmentFailure(index: 1, name: "Photo.png", reason: "The server is out of space.")]
+            )
+        }
+        let editor = try await attachingEditor(library)
+        #expect(editor.insertImages([
+            .data(name: "Photo.png", Data("one".utf8)),
+            .data(name: "Photo.png", Data("two".utf8)),
+        ]))
+        try #require(await eventually { library.notices.waiting.last != nil })
+        let bytes = try #require(library.attachedBatchBytes.last)
+        #expect(bytes.map { String(decoding: $0, as: UTF8.self) } == ["one", "two"])
+        let staged = try #require(library.askedSameBytes.last)
+        #expect(staged.count == 2)
+        #expect(staged.allSatisfy { $0.lastPathComponent == "Photo.png" })
+        let kept = staged[1].resolvingSymlinksInPath()
+        #expect(!FileManager.default.fileExists(atPath: staged[0].resolvingSymlinksInPath().path))
+        #expect(FileManager.default.fileExists(atPath: kept.path))
+        let notice = try #require(library.notices.waiting.last)
+        #expect(notice.message.contains("“Photo.png” couldn’t be attached."))
+        #expect(notice.message.contains(kept.path))
+        #expect(notice.action == .showInFinder([kept]))
+        #expect(try await eventuallyAsking { try await markdown(editor)?.contains("![Photo](Attachments/Photo.png)") == true })
     }
 
     @Test func imagesThatWereAttachedAreInsertedAndThoseThatWerentAreNamed() async throws {
         let library = FakeItemLibrary(items: [FakeItemLibrary.note("Plan", modified: .now)])
         library.attaching = {
-            AttachReport(embeds: [Embed(link: "Attachments/Photo.png", name: "Photo")], failed: [(name: "Other.png", reason: "The server is out of space.")])
+            AttachReport(
+                embeds: [Embed(link: "Attachments/Photo.png", name: "Photo")],
+                failed: [AttachmentFailure(index: 1, name: "Other.png", reason: "The server is out of space.")]
+            )
         }
         let folder = try TemporaryFolder()
         let large = folder.url.appending(path: "Large.png")

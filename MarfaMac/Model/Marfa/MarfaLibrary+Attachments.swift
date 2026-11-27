@@ -14,7 +14,7 @@ extension MarfaLibrary {
             do {
                 url = try staged.get()
             } catch {
-                report.failed.append((file.name, error.localizedDescription))
+                report.failed.append(AttachmentFailure(index: index, name: file.name, reason: error.localizedDescription))
                 try? FileManager.default.removeItem(at: directory.appending(path: String(index), directoryHint: .isDirectory))
                 continue
             }
@@ -29,7 +29,9 @@ extension MarfaLibrary {
                 } catch {
                     // The temporary directory is a symlink, so the path told is the file itself.
                     let path = url.resolvingSymlinksInPath().path
-                    report.failed.append((file.name, String(localized: "It couldn’t be saved to Downloads. The copy is still at \(path).")))
+                    report.failed.append(AttachmentFailure(
+                        index: index, name: file.name,
+                        reason: String(localized: "It couldn’t be saved to Downloads. The copy is still at \(path).")))
                 }
             }
         }
@@ -113,6 +115,11 @@ extension MarfaLibrary {
     func attach(file: URL, to id: ItemID) async throws -> Embed {
         sendWaitingText()
         return try await source.embeds.attach(file, to: id)
+    }
+
+    func itemsWithSameBytes(as files: [URL]) async -> FileMatches {
+        guard reachesServer, !files.isEmpty else { return .noAnswer }
+        return await source.itemsWithSameBytes(as: files)
     }
 
     func addFile(_ file: URL, title: String?, parentID: ItemID?, tier: Tier, tags: [String]) async -> ItemID? {

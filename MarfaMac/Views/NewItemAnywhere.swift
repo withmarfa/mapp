@@ -32,6 +32,11 @@ final class NewItemAnywhere {
         let front = NSWorkspace.shared.frontmostApplication
         previous = front?.processIdentifier == ProcessInfo.processInfo.processIdentifier ? nil : front
         let browser = Browser()
+        browser.showsMatchesElsewhere = { [weak library] ids in
+            NSApp.activate()
+            guard let library, let window = FrontBrowser.shared.last, window.isShowing(library) else { return }
+            window.showMatches(ids, in: library, order: ItemOrder())
+        }
         browser.openNewItem(form: .line, in: library)
         guard browser.quickAdd.draft != nil else { return }
         self.browser = browser

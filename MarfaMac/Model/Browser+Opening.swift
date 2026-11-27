@@ -23,6 +23,29 @@ extension Browser {
         return true
     }
 
+    /// Opens items the person asked to see after skipping files already in Marfa. One opens the way Open Items says,
+    /// including an item the library does not hold. Several open in windows where Open Items says so, and otherwise
+    /// are all chosen together. Nothing here changes what was added.
+    func showMatches(_ ids: [ItemID], in library: any ItemLibrary, order: ItemOrder, defaults: UserDefaults = .standard) {
+        var unique: [ItemID] = []
+        for id in ids where !unique.contains(id) { unique.append(id) }
+        guard let first = unique.first else { return }
+        if !isShowing(library), let showsMatchesElsewhere {
+            showsMatchesElsewhere(unique)
+            return
+        }
+        if unique.count == 1 {
+            _ = open(Set(unique), defaults: defaults)
+            return
+        }
+        if itemOpening(defaults: defaults) == .newWindow {
+            _ = open(Set(unique), as: .newWindow, defaults: defaults)
+            return
+        }
+        if let item = library.item(first) { reveal(item, in: library, order: order) }
+        selection = Set(unique)
+    }
+
     /// Opens the selection, which is what Return opens.
     @discardableResult
     func openSelection(as way: ItemOpening? = nil) -> Bool { open(selection, as: way) }

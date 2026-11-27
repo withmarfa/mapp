@@ -66,6 +66,11 @@ final class EditorController: NSObject {
     private(set) var isEditable = true
     /// Whether the window is asking which images to attach to the item, from the toolbar or the menu bar.
     var isChoosingImages = false
+    /// Asks, over the page, about images to attach that are already in Marfa (`AlreadyInMarfa`).
+    @ObservationIgnored let alreadyInMarfa = AlreadyInMarfa.Asking()
+    /// Opens items a skipped image matched, from the toast's Show. It changes nothing that was attached. A main window
+    /// opens them as its list does. An item window opens one window for each.
+    @ObservationIgnored var onShowMatches: (([ItemID]) -> Void)?
 
     /// An edit to an item, with the markdown the item now holds and the version of the text it was typed on.
     @ObservationIgnored var onChange: (ItemID, String, ItemVersion) -> Void = { _, _, _ in }

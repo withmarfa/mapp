@@ -5,14 +5,48 @@ import WebKit
 /// Images put into the item, and the files it embeds opened or shown.
 extension EditorController {
     /// Takes images for the item that is open now and tries to place their links at the drop point or caret.
-    /// Reports each image that could not be attached or placed in the text.
+    /// Reports each image that could not be attached or placed in the text. Files and pasted bytes already in Marfa
+    /// are asked about first (`AlreadyInMarfa`): Cancel attaches nothing, Skip Duplicates attaches only the images
+    /// with no match, and Add Anyway attaches every image. The choice is final then. Where images were skipped, the
+    /// toast says so and offers Show, which opens the matches and changes nothing that was attached. A pasted image
+    /// is staged for the check and stays until the check and the attach have both ended. One whose attach could not
+    /// be saved is kept, and the notice names that copy. The page moving on does not drop an image: it is still
+    /// attached to the item that was open, and only the insertion into the text is skipped.
     @discardableResult
     func insertImages(_ sources: [PastedImages.Source], at point: CGPoint? = nil) -> Bool {
-        guard isEditable, let pageItemID, let library, !sources.isEmpty else { return false }
+        guard isEditable, let pageItemID, let asked = library, !sources.isEmpty else { return false }
         let height = webView.bounds.height
+        let prepared: [(PastedImages.Source, ScopedChoice?)] = sources.map { source in
+            guard case .file(let url) = source else { return (source, nil) }
+            let held = ScopedChoice(url)
+            return (.file(held.resolved), held)
+        }
         Task {
-            let (files, skipped) = await PastedImages.read(sources)
-            let report = files.isEmpty ? AttachReport() : await library.attach(files, to: pageItemID)
+            let held = prepared.compactMap(\.1)
+            let staged = Self.stageForChecking(prepared.map(\.0))
+            let lifetime = AlreadyInMarfa.FileLifetime()
+            var kept: Set<URL> = []
+            defer {
+                lifetime.afterLookup { [kept, directory = staged.directory] in
+                    ImageCheckBatch.remove(directory, keeping: kept)
+                    held.forEach { $0.close() }
+                }
+            }
+            let plan = await AlreadyInMarfa.check(staged.urls, in: asked, asking: alreadyInMarfa, lifetime: lifetime)
+            let skipped = staged.urls.count - plan.adding.count
+            guard !plan.isCancelled else { return }
+            let adding = Set(plan.adding)
+            let chosen = staged.entries.filter { entry in
+                guard let index = entry.checkIndex else { return true }
+                return adding.contains(index)
+            }
+            guard !chosen.isEmpty else {
+                tellSkipped(skipped, matches: plan.show)
+                return
+            }
+            let (files, unread) = await PastedImages.read(chosen.map(\.source))
+            // The page may have moved on. The files still belong to the item that was open, and a refusal saves them.
+            let report = files.isEmpty ? AttachReport() : await asked.attach(files.map(\.file), to: pageItemID)
             let placed = self.pageItemID == pageItemID && isEditable && acceptsInsertion
             let embeds = report.embeds
             var notPlaced: [String] = []
@@ -20,13 +54,164 @@ extension EditorController {
                 await !place(embeds.map { ["src": $0.link, "alt": $0.name] }, at: point, height: height, in: pageItemID) {
                 notPlaced = embeds.map(\.name)
             }
+            let (failed, keptCopies) = Self.pasteFailures(report.failed, of: files.map { chosen[$0.index] })
             Self.reportUnplaced(
-                skipped: skipped, failed: report.failed, kept: report.kept, attached: embeds.count,
+                skipped: unread, failed: failed, kept: report.kept, attached: embeds.count,
                 unplaced: placed ? [] : embeds.map(\.name), refused: notPlaced,
-                in: library.item(pageItemID)?.title ?? "", to: library
+                copies: keptCopies, in: asked.item(pageItemID)?.title ?? "", to: asked
             )
+            kept = Set(keptCopies)
+            tellSkipped(skipped, matches: plan.show)
         }
         return true
+    }
+
+    /// A failed attach of a staged paste keeps that copy and names it. A file the person chose keeps the library's reason.
+    private static func pasteFailures(
+        _ failed: [AttachmentFailure], of readable: [ImageCheckBatch.Entry]
+    ) -> (failed: [AttachmentFailure], copies: [URL]) {
+        var told: [AttachmentFailure] = []
+        var copies: [URL] = []
+        for failure in failed {
+            guard readable.indices.contains(failure.index), case .data = readable[failure.index].source,
+                let url = readable[failure.index].url
+            else {
+                told.append(failure)
+                continue
+            }
+            let copy = url.resolvingSymlinksInPath()
+            copies.append(copy)
+            told.append(AttachmentFailure(
+                index: failure.index, name: failure.name,
+                reason: String(localized: "It couldn’t be saved to Downloads. The copy is still at \(copy.path).")))
+        }
+        return (told, copies)
+    }
+
+    /// Where images were left out because they are already in Marfa. Show opens the matches and attaches nothing more.
+    private func tellSkipped(_ count: Int, matches: [ItemID]) {
+        guard count > 0, let toasts = titleDrafts?.toasts else { return }
+        let show: (@MainActor () -> Void)?
+        if matches.isEmpty {
+            show = nil
+        } else {
+            show = { [weak self] in
+                guard let self else { return }
+                onShowMatches?(matches)
+            }
+        }
+        toasts.show(AlreadyInMarfa.skippedMessage(count), symbol: "doc.on.doc", showMatches: show)
+    }
+
+    /// Access to a file the person chose, held until its bytes have been hashed and read. The resolved file is the
+    /// one both of those use, so a symbolic link is not hashed as one file and read as another. It is not isolated
+    /// to the main actor, because releasing the file can happen as the value is destroyed.
+    private nonisolated final class ScopedChoice: @unchecked Sendable {
+        let resolved: URL
+        private let chosen: URL
+        private let scoped: Bool
+        private let lock = NSLock()
+        private var closed = false
+
+        init(_ chosen: URL) {
+            self.chosen = chosen
+            scoped = chosen.startAccessingSecurityScopedResource()
+            resolved = chosen.resolvingSymlinksInPath()
+            #if DEBUG
+            AlreadyInMarfa.grantWatch.start(chosen)
+            #endif
+        }
+
+        func close() {
+            lock.lock()
+            let should = !closed
+            closed = true
+            lock.unlock()
+            guard should else { return }
+            #if DEBUG
+            AlreadyInMarfa.grantWatch.stop(chosen)
+            #endif
+            if scoped { chosen.stopAccessingSecurityScopedResource() }
+        }
+
+        deinit { close() }
+    }
+
+    /// A pasted image written beside the files, so the same check can read its bytes.
+    private struct ImageCheckBatch {
+        struct Entry {
+            let source: PastedImages.Source
+            let url: URL?
+            /// The file's place in `urls`, when it could be staged. Bytes that could not be staged have none.
+            let checkIndex: Int?
+            var name: String {
+                switch source {
+                case .file(let url): url.lastPathComponent
+                case .data(let name, _): name
+                }
+            }
+        }
+
+        let directory: URL?
+        let entries: [Entry]
+        var urls: [URL] { entries.compactMap(\.url) }
+
+        /// Removes the staged copies. A URL in `kept` is left: its attach could not be saved, so the person can still get it.
+        static func remove(_ directory: URL?, keeping kept: Set<URL>) {
+            guard let directory else { return }
+            let kept = Set(kept.map { $0.resolvingSymlinksInPath() })
+            guard !kept.isEmpty else {
+                try? FileManager.default.removeItem(at: directory)
+                return
+            }
+            guard let folders = try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) else { return }
+            for folder in folders {
+                guard let files = try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil) else { continue }
+                for file in files where !kept.contains(file.resolvingSymlinksInPath()) {
+                    try? FileManager.default.removeItem(at: file)
+                }
+                if (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil))?.isEmpty == true {
+                    try? FileManager.default.removeItem(at: folder)
+                }
+            }
+            if (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil))?.isEmpty == true {
+                try? FileManager.default.removeItem(at: directory)
+            }
+        }
+    }
+
+    /// Stages each pasted image under a temporary directory. A file keeps its own URL. Bytes that cannot be staged
+    /// are still attached, unchecked, rather than dropped.
+    private static func stageForChecking(_ sources: [PastedImages.Source]) -> ImageCheckBatch {
+        let hasData = sources.contains { if case .data = $0 { true } else { false } }
+        let directory = hasData
+            ? URL.temporaryDirectory.appending(path: "marfa-mac-paste-\(UUID().uuidString)", directoryHint: .isDirectory)
+            : nil
+        var entries: [ImageCheckBatch.Entry] = []
+        var next = 0
+        for (index, source) in sources.enumerated() {
+            switch source {
+            case .file(let url):
+                entries.append(ImageCheckBatch.Entry(source: source, url: url, checkIndex: next))
+                next += 1
+            case .data(let name, let data):
+                guard let directory else {
+                    entries.append(ImageCheckBatch.Entry(source: source, url: nil, checkIndex: nil))
+                    continue
+                }
+                let folder = directory.appending(path: String(index), directoryHint: .isDirectory)
+                let url = folder.appending(path: name)
+                do {
+                    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                    try data.write(to: url, options: .atomic)
+                    entries.append(ImageCheckBatch.Entry(source: source, url: url, checkIndex: next))
+                    next += 1
+                } catch {
+                    entries.append(ImageCheckBatch.Entry(source: source, url: nil, checkIndex: nil))
+                }
+            }
+        }
+        return ImageCheckBatch(directory: directory, entries: entries)
     }
 
     /// Asks the page to put the images in, and again after the next paint while it refuses them for folded text,
@@ -56,8 +241,8 @@ extension EditorController {
     }
 
     private static func reportUnplaced(
-        skipped: [String], failed: [(name: String, reason: String)], kept: [KeptFile] = [],
-        attached: Int, unplaced: [String], refused: [String] = [],
+        skipped: [String], failed: [AttachmentFailure], kept: [KeptFile] = [],
+        attached: Int, unplaced: [String], refused: [String] = [], copies: [URL] = [],
         in title: String, to library: any ItemLibrary
     ) {
         guard !skipped.isEmpty || !failed.isEmpty || !kept.isEmpty || !unplaced.isEmpty || !refused.isEmpty else { return }
@@ -79,7 +264,7 @@ extension EditorController {
         } else {
             String(localized: "Some Images Weren’t Attached")
         }
-        let saved = kept.map(\.file)
+        let saved = kept.map(\.file) + copies
         library.notices.tell(title, lines.joined(separator: "\n"), action: saved.isEmpty ? nil : .showInFinder(saved))
     }
 

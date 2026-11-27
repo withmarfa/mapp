@@ -408,6 +408,9 @@ struct MainView: View {
             editor.onOpenItem = { [browser, library, order] id in
                 if let item = library.item(id) { browser.open(linked: item, in: library, order: order) }
             }
+            editor.onShowMatches = { [browser, library, order] ids in
+                browser.showMatches(ids, in: library, order: order)
+            }
             editor.onFollowItemLink = { [browser, library, order] id in
                 if let item = library.item(id) { browser.follow(link: item, in: library, order: order) }
             }
@@ -481,6 +484,7 @@ struct MainView: View {
         .libraryDialogs()
         .handlesFiles(in: browser, order: order)
         .deleteConfirmation(for: details)
+        .asksAboutFilesInMarfa(browser.alreadyInMarfa)
         .archiveQuestion(for: details)
         .feedLimitQuestion(for: details)
         .savedViewDialogs(browser: browser)

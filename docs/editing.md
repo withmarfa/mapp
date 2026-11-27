@@ -8,6 +8,8 @@ paths:
   - MarfaMac/Model/Items/TypeChange*.swift
   - MarfaMac/Model/Items/ItemWrite*.swift
   - MarfaMac/Model/FileImport.swift
+  - MarfaMac/Model/AlreadyInMarfa.swift
+  - MarfaMac/Views/AlreadyInMarfaAlert.swift
   - MarfaMac/Views/WindowFiles.swift
   - MarfaMac/Model/InPlaceRow.swift
   - MarfaMac/Model/Browser+InPlace.swift
@@ -16,7 +18,7 @@ paths:
 
 # Making and editing
 
-Item changes go through `ItemLibrary` as `ItemWrite` values. See `docs/value-panels.md` for value editing and `MarfaMac/Model/AGENTS.md` for write storage.
+Item changes use `ItemLibrary` and `ItemWrite` (`docs/value-panels.md`, `MarfaMac/Model/AGENTS.md`).
 
 ## What an item allows
 
@@ -57,17 +59,19 @@ Every editor asks `Item.allows(_:)` for the `ItemChange` it writes (`ValueEditKi
 
 ### Typed text is never lost
 
-`NewItemDrafts` keeps drafts by slot and instance through window closure, quit or refusal. `make` and `take` start and resume drafts. `update` and `escape` save edits immediately. `sending` and `sendingFile` freeze a draft. Further edits start another. `settle` checks the copy, `giveBack` restores refused text, and `release` and `drop` end drafts. An interrupted draft returns if its item is absent. Adding again asks first (`mayBeInMarfa`).
+`NewItemDrafts` keeps drafts by slot and instance through a window close, quit or refusal. Editing a submitted draft starts another. An interrupted draft returns if its item is absent. Cancel keeps the Add Again warning (`mayBeInMarfa`).
 
 ### Dropping
 
 - **Files dropped on a list join the place in view** (`Browser.fileDropTarget`): a collection, the Feed, else the Library.
 - **A collection's row, card or sidebar row takes items and files** (`dropsInto`).
 - **A drop is one undo step and one toast;** Undo unlinks, then moves them to Recently Deleted.
+- **Files already in Marfa ask once** (`AlreadyInMarfa`), pastes included. Add Anyway adds all, Skip Duplicates only unmatched, Cancel none. Final then. No answer still adds.
+- **Show opens matches, changing nothing.** Quick Add drops a skipped file by token, then sends. A paste stays on the open item. A failed one stays staged. Timeout adds after lookup.
 
 ## Changing type
 
-- **The title and text move to the new type's own keys in one edit** (`TypeChange`), because Marfa reads them from those keys. Marfa keeps every other value, as an unlisted property where the new type has no such field.
+- **The title and text move to the new type's own keys in one edit** (`TypeChange`). Marfa keeps every other value, as an unlisted property where the new type has no such field.
 - **The current type is a locked chip in the panel's field,** then rows: the sidebar's first five, then the rest by name under a line.
 - **A required field the items lack is asked for first** (`TypeValuesSheet`), once for the selection. It is the one sheet in editing. The title it needs starts as the item's name, for one item.
 - **Never offered:** a file's type, a type with no text for an item with text, or one whose field cannot hold the value under its key.
@@ -78,7 +82,7 @@ A right click on a property's name opens a menu with two parts (`FieldMenu`).
 
 - **The app's part is pin, move and hide.** It writes nothing to the item or the type, so a read-only item offers it too.
 - **Marfa's part is renaming a field or a choice, adding and removing choices, and removing the field** (`TypeDefinitionEdit`). It needs the server and is never queued: a type's definition has no version.
-- **The type is read again just before it is sent**, and the change is refused if the field changed. It narrows the race without closing it.
+- **The type is read again just before it is sent**, and the change is refused if the field changed.
 - **Only a field that the type itself declares, and no type above it does, can change** (`FieldLock`). A type Marfa ships, or one under `common`, changes nothing. A plugin's own root reads as editable until the server refuses.
 - **A choice word is never renamed**, only added, moved or removed: items hold the word.
 - **A field's key never changes**: items hold values under it. A rename changes its label.

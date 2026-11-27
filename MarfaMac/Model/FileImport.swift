@@ -11,12 +11,16 @@ extension Browser {
     /// Undo, the items it holds are still joined to the collection, and the person is told. The files are written to `library` whatever the window does meanwhile, since a write there is
     /// safe and a drop cut short would lose the rest; only the window's own steps (selecting what was added,
     /// revealing it) stop once the window has changed library, and once the person has moved to another place their
-    /// selection is left alone. Returns the items made.
+    /// selection is left alone. Before anything is added, the files already in Marfa are asked about once
+    /// (`AlreadyInMarfa`): Add Anyway adds every file, Skip Duplicates adds only the files with no match, and Cancel
+    /// adds nothing. The choice is final then. Where files were skipped, the toast says so and offers Show, which
+    /// opens the matches and changes nothing that was added. The files, and any copy made of them, stay until the
+    /// check has ended. Returns the items made.
     @discardableResult
     func importFiles(
         _ urls: [URL], unreadable: Int = 0, to target: FileDropTarget? = nil,
         in library: any ItemLibrary, order: ItemOrder, undoManager: UndoManager?, toasts: ToastPresenter? = nil,
-        waiting: Duration = .seconds(10)
+        waiting: Duration = .seconds(10), releaseCopies: @escaping @MainActor () -> Void = {}
     ) async -> [ItemID] {
         let target = target ?? fileDropTarget(in: library)
         var files: [QuickAdd.File] = []
@@ -29,11 +33,33 @@ extension Browser {
             }
         }
         QuickAdd.File.tellUnreadable(notRead, unreadable: unreadable, to: library.notices)
-        var added: [ItemID] = []
-        for file in files {
-            if let id = await library.addFile(file.url, title: nil, parentID: nil, tier: QuickAdd.startingTier(in: target.place), tags: []) { added.append(id) }
+        let lifetime = AlreadyInMarfa.FileLifetime()
+        defer { lifetime.afterLookup { [files] in withExtendedLifetime(files, releaseCopies) } }
+        let plan = await AlreadyInMarfa.check(files.map(\.url), in: library, asking: alreadyInMarfa, lifetime: lifetime)
+        guard !plan.isCancelled else { return [] }
+        let skipped = files.count - plan.adding.count
+        let show: (@MainActor () -> Void)?
+        if plan.show.isEmpty {
+            show = nil
+        } else {
+            show = { [weak self] in
+                guard let self else { return }
+                showMatches(plan.show, in: library, order: order)
+            }
         }
-        guard !added.isEmpty else { return [] }
+        var added: [ItemID] = []
+        for index in plan.adding {
+            let file = files[index]
+            if let id = await library.addFile(file.url, title: nil, parentID: nil, tier: QuickAdd.startingTier(in: target.place), tags: []) {
+                added.append(id)
+            }
+        }
+        guard !added.isEmpty else {
+            if skipped > 0 {
+                say(AlreadyInMarfa.skippedMessage(skipped), symbol: "arrow.down.doc", step: nil, showMatches: show, toasts: toasts)
+            }
+            return []
+        }
         // A drop is told, joined and given its Undo only for what the library holds: a source that has not shown an
         // item cannot move it to Recently Deleted or give it an edge.
         let holdsAll = await library.waitUntilHolding(added, within: waiting)
@@ -55,8 +81,9 @@ extension Browser {
         }
         let asked = files.count + notRead.count + unreadable
         let leftOut = target.collection == nil ? 0 : added.count - (joined ? held.count : 0)
-        say(addedMessage(added.count, of: asked, to: target.isOnCollection ? target.name : nil, leftOut: leftOut, from: target.name),
-            symbol: "arrow.down.doc", step: step, toasts: toasts)
+        say(addedMessage(
+            added.count, of: asked, to: target.isOnCollection ? target.name : nil, leftOut: leftOut, from: target.name,
+            skipped: skipped), symbol: "arrow.down.doc", step: step, showMatches: skipped > 0 ? show : nil, toasts: toasts)
         guard isShowing(library), shown.isSame(target.shown), let first = held.first else { return added }
         let listed = Set(placeItems(in: library).map(\.id))
         if (joined && target.collection == shownCollection) || held.allSatisfy(listed.contains) {
@@ -78,8 +105,7 @@ extension Browser {
             let gathered = await FileIntake.files(from: providers)
             await importFiles(
                 gathered.urls, unreadable: gathered.unreadable, to: target, in: library, order: order,
-                undoManager: undoManager, toasts: toasts)
-            gathered.remove()
+                undoManager: undoManager, toasts: toasts, releaseCopies: gathered.remove)
         }
     }
 
@@ -94,12 +120,17 @@ extension Browser {
     /// What the toast says of a drop: how many files were added, of how many asked for where some were not, and the
     /// collection they joined where the drop was on one. Where `leftOut` of them did not join the collection, it
     /// says so instead.
-    private func addedMessage(_ count: Int, of asked: Int, to collection: String?, leftOut: Int, from place: String) -> String {
+    private func addedMessage(_ count: Int, of asked: Int, to collection: String?, leftOut: Int, from place: String, skipped: Int = 0) -> String {
         let added = count == asked
             ? AttributedString(localized: "^[Added \(count) File](inflect: true)").text
             : String(localized: "Added \(count) of \(asked) Files")
-        if leftOut > 0 { return String(localized: "\(added), \(leftOut) not in \(place)") }
-        return collection.map { String(localized: "\(added) to \($0)") } ?? added
+        let placed = if leftOut > 0 {
+            String(localized: "\(added), \(leftOut) not in \(place)")
+        } else {
+            collection.map { String(localized: "\(added) to \($0)") } ?? added
+        }
+        guard skipped > 0 else { return placed }
+        return String(localized: "\(placed) \(AlreadyInMarfa.alreadyCounted(skipped))")
     }
 
     /// The collection the window shows.

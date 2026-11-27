@@ -7,6 +7,7 @@ struct ItemWindow: View {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openWindow) private var openWindow
     @State private var editorSlot = EditorSlot()
     @State private var details = DetailsPresentation()
     @State private var history = ItemWindowHistory()
@@ -24,7 +25,9 @@ struct ItemWindow: View {
     private var editor: EditorController? {
         guard let item else { return nil }
         return Self.pageEditor(for: library.pageLayout(of: item), in: editorSlot) {
-            Self.makeEditor(library: library, details: details, showing: $id, history: history)
+            Self.makeEditor(library: library, details: details, showing: $id, history: history) { ids in
+                ItemWindows.open(ids) { openWindow(value: $0) }
+            }
         }
     }
 
@@ -38,13 +41,15 @@ struct ItemWindow: View {
     /// handing the window's item over (`go`), and the window remembers that item for the next launch. The item it
     /// leaves is where Back returns to, in `history`.
     static func makeEditor(
-        library: any ItemLibrary, details: DetailsPresentation, showing id: Binding<ItemID?>, history: ItemWindowHistory? = nil
+        library: any ItemLibrary, details: DetailsPresentation, showing id: Binding<ItemID?>, history: ItemWindowHistory? = nil,
+        showsMatches: (([ItemID]) -> Void)? = nil
     ) -> EditorController {
         let editor = EditorController(library: library)
         editor.titleDrafts = details
         editor.onEscape = { [details] in details.escapeFromPage() }
         editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
         // The keyboard follows the link to the item it opened, as it does in a main window.
+        editor.onShowMatches = showsMatches
         editor.onOpenItem = { [weak editor, library] linked in
             guard let current = id.wrappedValue else { return }
             go(to: linked, in: library, editor: editor, showing: id) {

@@ -410,7 +410,7 @@ struct QuickAddTests {
         browser.quickAdd.draft?.files = [try disk.file("photo.png")]
         browser.quickAdd.draft?.title = "Holiday"
         let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
-        #expect(await eventually { browser.quickAdd.isSaving })
+        #expect(await eventually { library.filesStarted == 1 })
         let drafts = browser.quickAdd.drafts
         browser.quickAdd.leave(because: .closed, telling: library.notices)
         #expect(!drafts.holdsDraft(.line, in: library.serverKey), "the file and its title are being added, so nothing is kept")
@@ -429,7 +429,7 @@ struct QuickAddTests {
         browser.quickAdd.draft?.files = [photo]
         browser.quickAdd.draft?.title = "Holiday"
         let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
-        #expect(await eventually { browser.quickAdd.isSaving })
+        #expect(await eventually { library.filesStarted == 1 })
         let drafts = browser.quickAdd.drafts
         browser.quickAdd.leave(because: .closed, telling: library.notices)
         library.refusesFiles = true
@@ -453,7 +453,7 @@ struct QuickAddTests {
         browser.quickAdd.draft?.files = [try disk.file("photo.png")]
         browser.quickAdd.draft?.title = "Holiday"
         let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
-        #expect(await eventually { browser.quickAdd.isSaving })
+        #expect(await eventually { library.filesStarted == 1 })
         browser.quickAdd.draft = QuickAdd.Draft(typeID: TypeID.file.rawValue)
         library.refusesFiles = true
         released.yield()
@@ -493,6 +493,39 @@ struct QuickAddTests {
         #expect(library.addedFiles.count == 1)
     }
 
+    @Test func cancellingTheDuplicateQuestionKeepsTheInterruptedDraftWarning() async throws {
+        let library = FakeItemLibrary(now: start)
+        let beach = FakeItemLibrary.note("Holiday", modified: .now)
+        library.items = [beach]
+        library.sameBytes = AlreadyInMarfaTests.answering(["photo.png": [beach]])
+        let file = disk.directory.appending(path: "Drafts.json")
+        let photo = try disk.file("photo.png")
+        do {
+            let drafts = NewItemDrafts(file: file)
+            let id = drafts.make(.line, QuickAdd.Draft(typeID: TypeID.file.rawValue), in: library.serverKey)
+            var draft = QuickAdd.Draft(typeID: TypeID.file.rawValue)
+            draft.title = "Holiday"
+            draft.files = [photo]
+            drafts.update(id, draft)
+            #expect(drafts.sendingFile(id))
+        }
+        let browser = Browser()
+        browser.quickAdd.drafts = NewItemDrafts(file: file)
+        browser.quickAdd.alreadyInMarfa.viewAppeared()
+        browser.openNewItem(form: .text, in: library)
+        #expect(browser.quickAdd.mayBeInMarfa)
+        let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil, again: true) }
+        try #require(await eventually { browser.quickAdd.alreadyInMarfa.question != nil })
+        browser.quickAdd.alreadyInMarfa.answer(.cancel)
+        #expect(await saving.value == nil)
+        #expect(browser.quickAdd.mayBeInMarfa)
+        #expect(library.addedFiles.isEmpty)
+        library.sameBytes = { _ in .noAnswer }
+        #expect(await browser.saveQuickAdd(in: library, undoManager: nil) == nil)
+        #expect(browser.quickAdd.asksAgain)
+        #expect(library.addedFiles.isEmpty, "a failed lookup still does not send while the warning stands")
+    }
+
     @Test func aFileAddedAfterTheWindowClosesWaitsForMarfaWithItsTitle() async throws {
         let library = FakeItemLibrary(now: start)
         let (release, released) = AsyncStream<Void>.makeStream()
@@ -502,7 +535,7 @@ struct QuickAddTests {
         browser.quickAdd.draft?.files = [try disk.file("photo.png")]
         browser.quickAdd.draft?.title = "Holiday"
         let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
-        #expect(await eventually { browser.quickAdd.isSaving })
+        #expect(await eventually { library.filesStarted == 1 })
         let drafts = browser.quickAdd.drafts
         browser.quickAdd.leave(because: .closed, telling: library.notices)
         released.yield()
@@ -525,7 +558,7 @@ struct QuickAddTests {
         browser.quickAdd.draft?.files = [photo]
         browser.quickAdd.draft?.title = "Holiday"
         let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
-        #expect(await eventually { browser.quickAdd.isSaving })
+        #expect(await eventually { library.filesStarted == 1 })
         browser.quickAdd.draft?.title = ""
         browser.quickAdd.draft?.files = []
         library.refusesFiles = true
@@ -560,7 +593,7 @@ struct QuickAddTests {
         browser.openNewItem(kind: TypeID.file.rawValue, form: .text, in: library)
         browser.quickAdd.draft?.files = [try disk.file("photo.png")]
         let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
-        #expect(await eventually { browser.quickAdd.isSaving })
+        #expect(await eventually { library.filesStarted == 1 })
         browser.quickAdd.draft?.title = "Typed meanwhile"
         let drafts = browser.quickAdd.drafts
         browser.quickAdd.leave(because: .closed, telling: library.notices)
@@ -1060,7 +1093,7 @@ struct QuickAddTests {
         browser.quickAdd.draft?.files = [try disk.file("photo.png")]
         browser.quickAdd.draft?.setParent(project.id)
         let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
-        #expect(await eventually { browser.quickAdd.isSaving })
+        #expect(await eventually { library.filesStarted == 1 })
         let drafts = browser.quickAdd.drafts
         browser.quickAdd.leave(because: .closed, telling: library.notices)
         #expect(!drafts.holdsDraft(.line, in: library.serverKey), "the file and its parent are being added")

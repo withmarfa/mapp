@@ -789,6 +789,9 @@
     "%lld archived" : {
 
     },
+    "%lld are already in Marfa." : {
+
+    },
     "%lld canceled" : {
       "extractionState" : "manual"
     },
@@ -1030,6 +1033,9 @@
 
     },
     "%lld events." : {
+
+    },
+    "%lld files are already in Marfa." : {
 
     },
     "%lld files were skipped because Marfa sets this property." : {
@@ -1514,6 +1520,16 @@
     "%lld of %lld" : {
       "extractionState" : "manual"
     },
+    "%lld of %lld Files Already in Marfa" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld of %2$lld Files Already in Marfa"
+          }
+        }
+      }
+    },
     "%lld of %lld characters." : {
       "localizations" : {
         "en" : {
@@ -1856,7 +1872,13 @@
     "1 event." : {
 
     },
+    "1 file is already in Marfa." : {
+
+    },
     "1 hour" : {
+
+    },
+    "1 is already in Marfa." : {
 
     },
     "1 item" : {
@@ -2298,6 +2320,9 @@
     "Add Again" : {
 
     },
+    "Add Anyway" : {
+
+    },
     "Add Attachment…" : {
 
     },
@@ -2620,6 +2645,9 @@
     "Allowed" : {
 
     },
+    "Already in Marfa" : {
+
+    },
     "Already tagged." : {
 
     },
@@ -2701,6 +2729,9 @@
           }
         }
       }
+    },
+    "And ^[%lld more file](inflect: true)." : {
+
     },
     "And webhook deliveries." : {
 
@@ -5926,6 +5957,22 @@
 
     },
     "It gave no reason." : {
+
+    },
+    "It has the same contents as “%@” and ^[%lld other item](inflect: true)." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "It has the same contents as “%1$@” and ^[%2$lld other item](inflect: true)."
+          }
+        }
+      }
+    },
+    "It has the same contents as “%@” and other items." : {
+
+    },
+    "It has the same contents as “%@”." : {
 
     },
     "It has trouble syncing." : {
@@ -9780,6 +9827,9 @@
     "Sizes run from %@ to %@." : {
 
     },
+    "Skip Duplicates" : {
+
+    },
     "Sky" : {
 
     },
@@ -10886,6 +10936,9 @@
 
     },
     "The new item" : {
+
+    },
+    "The new item changed while its files were being checked, so nothing was added. Add it again." : {
 
     },
     "The new item changed while its parent was being checked, so nothing was added. Add it again." : {
@@ -13411,10 +13464,43 @@
     "“%@” has changed since, so that can’t be put back here. Earlier versions are in Version History." : {
       "extractionState" : "manual"
     },
+    "“%@” has the same contents as “%@” and ^[%lld other item](inflect: true)." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "“%1$@” has the same contents as “%2$@” and ^[%3$lld other item](inflect: true)."
+          }
+        }
+      }
+    },
+    "“%@” has the same contents as “%@” and other items." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "“%1$@” has the same contents as “%2$@” and other items."
+          }
+        }
+      }
+    },
+    "“%@” has the same contents as “%@”." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "“%1$@” has the same contents as “%2$@”."
+          }
+        }
+      }
+    },
     "“%@” holds no settings. No settings were changed." : {
 
     },
     "“%@” is already a choice." : {
+
+    },
+    "“%@” is already in Marfa." : {
 
     },
     "“%@” is in the list twice." : {

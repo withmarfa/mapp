@@ -620,9 +620,12 @@ final class FakeItemLibrary: ItemLibrary {
 
     /// Each batch attached, by the item it was attached to and the file names, in order.
     private(set) var attachedBatches: [(item: ItemID, names: [String])] = []
+    /// The bytes of each batch, in the same order as `attachedBatches`, so two files of one name stay distinct.
+    private(set) var attachedBatchBytes: [[Data]] = []
 
     func attach(_ files: [(name: String, data: Data)], to id: ItemID) async -> AttachReport {
         attachedBatches.append((item: id, names: files.map(\.name)))
+        attachedBatchBytes.append(files.map(\.data))
         return await attaching?() ?? AttachReport()
     }
 
@@ -753,10 +756,24 @@ final class FakeItemLibrary: ItemLibrary {
         items.append(contentsOf: withheld)
         withheld = []
     }
+    /// What `itemsWithSameBytes(as:)` answers, which a test sets; nil answers nothing, as a library that can't ask.
+    var sameBytes: (([URL]) async -> FileMatches)?
+    /// Each batch of files asked about, in order.
+    private(set) var askedSameBytes: [[URL]] = []
+
+    func itemsWithSameBytes(as files: [URL]) async -> FileMatches {
+        askedSameBytes.append(files)
+        return await sameBytes?(files) ?? .noAnswer
+    }
+
     /// Awaited before a file is added, so a test can act while it is being sent.
     var sendingFile: (() async -> Void)?
 
+    /// How many files have started on their way, held or not by `sendingFile`.
+    private(set) var filesStarted = 0
+
     func addFile(_ file: URL, title: String?, parentID: ItemID?, tier: Tier, tags: [String]) async -> ItemID? {
+        filesStarted += 1
         await sendingFile?()
         guard !refusesFiles else {
             notices.tell("Can’t Add File", "Refused")

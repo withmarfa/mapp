@@ -19,11 +19,15 @@ final class QuickAdd {
         let url: URL
         let byteCount: Int64?
         let contentType: UTType?
+        /// Set when the file joined a draft. Skip Duplicates removes by this, never by the path, so a file put in
+        /// its place is a different file.
+        let token: UUID
         private let access: FileAccess
 
         /// Nil for a folder, a package or anything else that is not one file that can be read. A symbolic link is
         /// taken as the file it points to.
         init?(_ link: URL) {
+            token = UUID()
             access = FileAccess(link)
             let url = link.resolvingSymlinksInPath()
             guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey, .contentTypeKey]),
@@ -76,9 +80,17 @@ final class QuickAdd {
         init(_ url: URL) {
             self.url = url
             scoped = url.startAccessingSecurityScopedResource()
+            #if DEBUG
+            AlreadyInMarfa.grantWatch.start(url)
+            #endif
         }
 
-        deinit { if scoped { url.stopAccessingSecurityScopedResource() } }
+        deinit {
+            #if DEBUG
+            AlreadyInMarfa.grantWatch.stop(url)
+            #endif
+            if scoped { url.stopAccessingSecurityScopedResource() }
+        }
     }
 
     /// A detail of the item the panel shows as a chip: its parent, one of its kind's fields, or, on the line, a tag.
@@ -295,6 +307,9 @@ final class QuickAdd {
     var mayBeInMarfa = false
     /// Whether the window asks the person to add again a draft that may be in Marfa already.
     var asksAgain = false
+    /// Asks, in the panel, about the draft's files that are already in Marfa (`AlreadyInMarfa`).
+    @ObservationIgnored let alreadyInMarfa = AlreadyInMarfa.Asking()
+
     /// What the line and the text form say of a draft that may be in Marfa already.
     static var mayBeInMarfaNotice: String {
         String(localized: "This may already be in Marfa. The app quit while it was being added, so check the library before you add it again.")
@@ -421,10 +436,10 @@ final class QuickAdd {
     private var sendingEntry: UUID?
     /// The window let go of what it held while the file was on its way.
     private var leftWhileSending = false
-    /// While the core is asked about the parent, before anything is sent. The draft is still the window's to hand
-    /// off, since nothing is on its way, so this only stops a second Add.
-    private var checkingParent = false
-    var isSaving: Bool { sending != nil || checkingParent }
+    /// While the core is asked about the parent, or Marfa and the person about the files, before anything is sent.
+    /// The draft is still the window's to hand off, since nothing is on its way, so this only stops a second Add.
+    private var checkingFirst = false
+    var isSaving: Bool { sending != nil || checkingFirst }
 
     /// Why a draft leaves the window before it is added.
     enum Departure {
@@ -518,7 +533,7 @@ final class QuickAdd {
     fileprivate func notCreated() {
         if let entry { drafts.notSent(entry) }
     }
-    fileprivate func checking(parent: Bool) { checkingParent = parent }
+    fileprivate func checking(_ isChecking: Bool) { checkingFirst = isChecking }
 
     /// Tells the person what an added draft held for fields or a parent its kind lacks, which was not sent, with it
     /// on the clipboard.
@@ -742,6 +757,26 @@ final class QuickAdd {
 }
 
 extension Browser {
+    /// Tells the person files were left out because they are already in Marfa, and offers Show where a toast can.
+    private func tellSkipped(
+        _ count: Int, matches: [ItemID], in library: any ItemLibrary, order: ItemOrder, toasts: ToastPresenter?
+    ) {
+        guard count > 0 else { return }
+        let message = AlreadyInMarfa.skippedMessage(count)
+        let show = showSkipped(matches, in: library, order: order)
+        if let toasts {
+            toasts.show(message, symbol: "doc.on.doc", showMatches: show)
+        } else {
+            library.notices.tell(String(localized: "Already in Marfa"), message)
+        }
+    }
+
+    /// Opens the matches after the add. Nil where there are none.
+    private func showSkipped(_ matches: [ItemID], in library: any ItemLibrary, order: ItemOrder) -> (@MainActor () -> Void)? {
+        guard !matches.isEmpty else { return nil }
+        return { [weak self] in self?.showMatches(matches, in: library, order: order) }
+    }
+
     /// Opens a new item: the one line or the text form, as General’s New item opens as setting says unless `form` is given,
     /// with `kind` chosen where one is given and `title` typed where the draft is new. This is every New's one way in,
     /// the search's "New Item" among them. A draft put away, or kept from a closed window or an earlier run, comes
@@ -881,13 +916,19 @@ extension Browser {
     /// it again. A file no longer where it was is taken out of the draft and named, and nothing is added until the
     /// person has seen that. Nothing empty is ever written. `toasts` hears the line's Added, with an Undo that takes
     /// back the add alone. A draft that may be in Marfa already (`QuickAdd.mayBeInMarfa`) is added only `again`.
+    /// The draft's files already in Marfa are asked about after the parent (`AlreadyInMarfa`): Cancel adds nothing
+    /// and keeps the draft as typed, including the warning that a recovered draft may already be in Marfa. Skip
+    /// Duplicates takes matched files out of the submitted draft as the person answers. A draft edited during the
+    /// check stays as typed. A file kind left with no file is not created, and the person is told. The warning is
+    /// cleared only once a write starts.
     @discardableResult
     func saveQuickAdd(
         in library: any ItemLibrary, undoManager: UndoManager?, opening: Bool = true, toasts: ToastPresenter? = nil,
-        again: Bool = false, now: Date = .now, calendar: Calendar = .current, locale: Locale = .current
+        again: Bool = false, order: ItemOrder = ItemOrder(), now: Date = .now, calendar: Calendar = .current,
+        locale: Locale = .current
     ) async -> ItemID? {
         // The line's words stay as typed until the item is made; only what is sent has the read words taken out.
-        guard let typed = quickAdd.draft else { return nil }
+        guard var typed = quickAdd.draft else { return nil }
         var draft = typed
         if quickAdd.form == .line {
             QuickAdd.finishLine(&draft, in: library, now: now, calendar: calendar, locale: locale)
@@ -899,12 +940,9 @@ extension Browser {
         }
         guard !quickAdd.isSaving, QuickAdd.canSave(draft, in: library), quickAdd.unfinishedLists.isEmpty else { return nil }
         // A draft back from a quit mid-add may be in Marfa already, so it is added again only once the person says so.
-        if quickAdd.mayBeInMarfa {
-            guard again else {
-                quickAdd.asksAgain = true
-                return nil
-            }
-            quickAdd.mayBeInMarfa = false
+        if quickAdd.mayBeInMarfa, !again {
+            quickAdd.asksAgain = true
+            return nil
         }
         let missing = draft.files.filter { !$0.isOnDisk }
         guard missing.isEmpty else {
@@ -925,9 +963,9 @@ extension Browser {
         // meanwhile. Nothing is on its way yet, so a window that closes or changes library meanwhile still keeps the
         // whole draft, and the draft no longer matching below stops the create.
         if let parent = draft.parentID {
-            quickAdd.checking(parent: true)
+            quickAdd.checking(true)
             let verdict = await library.newChildVerdict(under: parent)
-            quickAdd.checking(parent: false)
+            quickAdd.checking(false)
             // Text typed while the core was asked stays as typed; nothing is made from the draft as it was. A draft
             // that left the window is kept already.
             guard quickAdd.draft == typed else {
@@ -940,6 +978,49 @@ extension Browser {
             }
             if case .refused(let reason) = verdict {
                 library.notices.tell(String(localized: "Can’t Create Item"), reason)
+                return nil
+            }
+        }
+        var skippedFiles = 0
+        var matchesToShow: [ItemID] = []
+        if !draft.files.isEmpty {
+            quickAdd.checking(true)
+            let entry = quickAdd.entry
+            let asked = draft.files
+            func stillHolds(_ expected: QuickAdd.Draft) -> Bool {
+                guard quickAdd.entry == entry, let current = quickAdd.draft else { return false }
+                // File equality compares paths. Choosing the same path again gives it a new token.
+                return current == expected && current.files.map(\.token) == expected.files.map(\.token)
+            }
+            var changedBeforeSkip = false
+            quickAdd.alreadyInMarfa.onSkip = { [self] question in
+                guard stillHolds(typed) else {
+                    changedBeforeSkip = true
+                    return
+                }
+                let skipped = Set(question.rows.map(\.index))
+                typed.files = asked.indices.filter { !skipped.contains($0) }.map { asked[$0] }
+                quickAdd.draft?.files = typed.files
+            }
+            let lifetime = AlreadyInMarfa.FileLifetime()
+            let plan = await AlreadyInMarfa.check(asked.map(\.url), in: library, asking: quickAdd.alreadyInMarfa, lifetime: lifetime)
+            lifetime.afterLookup { withExtendedLifetime(asked) {} }
+            quickAdd.alreadyInMarfa.onSkip = nil
+            quickAdd.checking(false)
+            if plan.isCancelled { return nil }
+            guard !changedBeforeSkip, stillHolds(typed) else {
+                if quickAdd.draft != nil {
+                    library.notices.tell(
+                        String(localized: "Item Not Added"),
+                        String(localized: "The new item changed while its files were being checked, so nothing was added. Add it again."))
+                }
+                return nil
+            }
+            draft.files = plan.adding.map { asked[$0] }
+            skippedFiles = asked.count - draft.files.count
+            matchesToShow = plan.show
+            if QuickAdd.isFile(draft.typeID, in: library.catalogue), draft.files.isEmpty {
+                tellSkipped(skippedFiles, matches: matchesToShow, in: library, order: order, toasts: toasts)
                 return nil
             }
         }
@@ -957,6 +1038,7 @@ extension Browser {
                 return nil
             }
             let title = NameText.trimmed(draft.title)
+            quickAdd.mayBeInMarfa = false
             id = await library.addFile(
                 file.url, title: title.isEmpty ? nil : title, parentID: draft.parentID, tier: draft.tier, tags: draft.tags)
             let held = quickAdd.fileSent(id, telling: library.notices)
@@ -989,6 +1071,7 @@ extension Browser {
             }
             let opensGroup = startsGroup && undoManager?.groupsByEvent == false
             if opensGroup { undoManager?.beginUndoGrouping() }
+            quickAdd.mayBeInMarfa = false
             id = library.createItem(
                 as: made, typeID: draft.typeID, title: draft.title, body: draft.body,
                 properties: draft.properties.filter { $0.value != .null }, tags: draft.tags, parentID: draft.parentID,
@@ -1022,11 +1105,13 @@ extension Browser {
             }
             if !restored { chooseQuickAddType(draft.typeID, in: library) }
             let name = NameText.trimmed(draft.title).isEmpty ? catalogue.label(for: TypeID(draft.typeID)) : NameText.trimmed(draft.title)
-            let words = String(localized: "Added “\(name)”")
+            var words = String(localized: "Added “\(name)”")
+            if skippedFiles > 0 { words = String(localized: "\(words) \(AlreadyInMarfa.alreadyCounted(skippedFiles))") }
+            let show = showSkipped(matchesToShow, in: library, order: order)
             if let toasts {
                 var undo: (@MainActor () -> Void)?
                 if let step { undo = { step.perform() } }
-                let shown = toasts.show(words, symbol: "checkmark.circle", undo: undo)
+                let shown = toasts.show(words, symbol: "checkmark.circle", undo: undo, showMatches: skippedFiles > 0 ? show : nil)
                 step?.onLapse = { [weak toasts] in toasts?.dismiss(ifShowing: shown) }
             } else {
                 // A panel with no toast, as over another app, says it on its own line.
@@ -1034,6 +1119,9 @@ extension Browser {
                 quickAdd.lastUndo = step
                 step?.onLapse = { [weak quickAdd] in quickAdd?.lastUndo = nil }
             }
+        }
+        if opening, skippedFiles > 0 {
+            tellSkipped(skippedFiles, matches: matchesToShow, in: library, order: order, toasts: toasts)
         }
         finishNewItems(in: library)
         return id

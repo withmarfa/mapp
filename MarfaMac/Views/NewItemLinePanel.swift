@@ -14,6 +14,7 @@ import UniformTypeIdentifiers
 /// (`NewItemAnywhere`), with an Added message and Undo in the panel.
 struct NewItemLinePanel: View {
     @CurrentLibrary private var library
+    @StoredOrder private var order
     @Environment(Libraries.self) private var libraries
     @Environment(\.undoManager) private var windowUndo
     @Environment(\.colorScheme) private var scheme
@@ -92,6 +93,7 @@ struct NewItemLinePanel: View {
         .asksToAddAgain($quickAdd.asksAgain, isFile: QuickAdd.isFile(draft.typeID, in: library.catalogue)) {
             add(opening: addsOpening, again: true)
         }
+        .asksAboutFilesInMarfa(quickAdd.alreadyInMarfa)
         .onWindowResignsKey { keyWindowIsOwn in
             if browser.putAwayQuickAddLeftEmpty(usesOwnSurface: isChoosingFile || editing != nil, keyWindowIsOwn: keyWindowIsOwn) { onClose() }
         }
@@ -717,11 +719,11 @@ struct NewItemLinePanel: View {
         addsOpening = opening
         Task {
             if opening, let opensElsewhere {
-                guard let id = await browser.saveQuickAdd(in: library, undoManager: undo, opening: false, toasts: toasts, again: again)
+                guard let id = await browser.saveQuickAdd(in: library, undoManager: undo, opening: false, toasts: toasts, again: again, order: order)
                 else { return }
                 opensElsewhere(id, typeID)
             } else {
-                _ = await browser.saveQuickAdd(in: library, undoManager: undo, opening: opening, toasts: toasts, again: again)
+                _ = await browser.saveQuickAdd(in: library, undoManager: undo, opening: opening, toasts: toasts, again: again, order: order)
                 if opening, !quickAdd.isPresented { onClose() }
             }
         }
