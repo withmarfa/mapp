@@ -276,6 +276,47 @@ extension EditorTests {
         #expect(library.notices.waiting.last?.message == "“Photo” was attached to “Plan” but isn’t in its text, because the item was no longer open for editing.")
     }
 
+    @Test func anImageReadWhileThePageChangesIsAttachedToTheItemLeftAndNamed() async throws {
+        let first = FakeItemLibrary.note("Plan", modified: .now)
+        let second = FakeItemLibrary.note("Other", modified: .now)
+        let library = FakeItemLibrary(items: [first, second])
+        let (entered, enteredOpen) = AsyncStream<Void>.makeStream()
+        let (gate, open) = AsyncStream<Void>.makeStream()
+        defer {
+            PastedImages.reading.set(nil)
+            open.finish()
+        }
+        PastedImages.reading.set {
+            enteredOpen.yield()
+            for await _ in gate { break }
+        }
+        library.attaching = {
+            AttachReport(embeds: [Embed(link: "Attachments/Photo.png", name: "Photo")])
+        }
+        let editor = try await attachingEditor(library)
+        #expect(editor.insertImages(Self.pasted))
+        var started = false
+        for await _ in entered {
+            started = true
+            break
+        }
+        #expect(started)
+        editor.load(second)
+        try #require(await eventually { editor.pageItemID == second.id })
+        _ = try await editor.webView.evaluateJavaScript("1")
+        open.yield()
+        open.finish()
+        try #require(await eventually { library.attachedBatches.contains { $0.item == first.id } })
+        // Time for an insertion made from the late answer to reach the page, which nothing signals when none is made.
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(try await markdown(editor) == nil, "the item now on the page takes nothing")
+        #expect(editor.pageItemID == second.id)
+        #expect(library.attachedBatches.map(\.item) == [first.id])
+        #expect(library.attachedBatches.first?.names == ["Photo.png"])
+        #expect(library.notices.waiting.last?.title == "Images Weren’t Added to the Item")
+        #expect(library.notices.waiting.last?.message == "“Photo” was attached to “Plan” but isn’t in its text, because the item was no longer open for editing.")
+    }
+
     @Test func filesQuickAddAttachedGoAtTheEndOfTheNewItemOnceThePageShowsIt() async throws {
         let shown = FakeItemLibrary.note("Plan", modified: .now)
         let new = FakeItemLibrary.note("Trip", modified: .now)

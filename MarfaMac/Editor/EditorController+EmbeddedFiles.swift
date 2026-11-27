@@ -5,17 +5,16 @@ import WebKit
 /// Images put into the item, and the files it embeds opened or shown.
 extension EditorController {
     /// Attaches images to the item and links them where they were dropped, given in the page's own coordinates, or
-    /// at the caret. Whether there were images to take; they are read and placed once their files have been read,
-    /// if the item is still the one on the page. Each image that couldn't be taken is named, and the rest are
-    /// still placed, so trying again adds only those named. Images attached after the item left the page are named
-    /// too, since they are in the item's attachments but not in its text.
+    /// at the caret. Whether there were images to take. They are attached to the item that was open even if the page
+    /// moves on while they are read, and placed in its text only while it is still the page. Each image that couldn't
+    /// be taken is named, and the rest are still placed, so trying again adds only those named. Images attached after
+    /// the item left the page are named too, since they are in the item's attachments but not in its text.
     @discardableResult
     func insertImages(_ sources: [PastedImages.Source], at point: CGPoint? = nil) -> Bool {
-        guard isEditable, let pageItemID, library != nil, !sources.isEmpty else { return false }
+        guard isEditable, let pageItemID, let library, !sources.isEmpty else { return false }
         let height = webView.bounds.height
         Task {
             let (files, skipped) = await PastedImages.read(sources)
-            guard self.pageItemID == pageItemID, isEditable, let library else { return }
             let report = files.isEmpty ? AttachReport() : await library.attach(files, to: pageItemID)
             // The images are kept either way; they go into the item only if it is still the one on the page.
             let placed = self.pageItemID == pageItemID && isEditable

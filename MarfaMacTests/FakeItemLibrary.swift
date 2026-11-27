@@ -618,8 +618,12 @@ final class FakeItemLibrary: ItemLibrary {
         itemsToPurge.subtract(ids)
     }
 
+    /// Each batch attached, by the item it was attached to and the file names, in order.
+    private(set) var attachedBatches: [(item: ItemID, names: [String])] = []
+
     func attach(_ files: [(name: String, data: Data)], to id: ItemID) async -> AttachReport {
-        await attaching?() ?? AttachReport()
+        attachedBatches.append((item: id, names: files.map(\.name)))
+        return await attaching?() ?? AttachReport()
     }
 
     /// Every file attached one at a time, by name, and the names whose attach throws.
