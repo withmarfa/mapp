@@ -7,6 +7,40 @@ import WebKit
 /// Closing a window, quitting or changing library while a selection hands the last item over, or while the page
 /// leaves its item: the flush that asks for it waits for the hand-over, then hands over whatever is on the page.
 extension EditorTests {
+    @Test func aCancelledQuitLetsEveryWindowThatStaysInsertAgain() async {
+        let savedLibrary = FakeItemLibrary()
+        let saved = EditorController(library: savedLibrary)
+        var note = FakeItemLibrary.note("Plan", modified: .now)
+        note.titleRule = .property("title")
+        let refusedLibrary = FakeItemLibrary(items: [note])
+        let refused = EditorController(library: refusedLibrary)
+        let drafts = DetailsPresentation()
+        refused.titleDrafts = drafts
+        drafts.draft(for: note.id, key: "title").text = "Renamed"
+        drafts.draft(for: note.id, key: "title").isDirty = true
+        let goneLibrary = FakeItemLibrary()
+        let gone = EditorController(library: goneLibrary)
+        gone.windowWent()
+        defer {
+            saved.windowWent()
+            refused.windowWent()
+        }
+        saved.acceptsInsertion = false
+        refused.acceptsInsertion = false
+        let kept = await withCheckedContinuation { continuation in
+            EditorController.flushAll { success in
+                Task { continuation.resume(returning: success) }
+            }
+        }
+        #expect(!kept)
+        #expect(saved.acceptsInsertion)
+        #expect(refused.acceptsInsertion)
+        #expect(!saved.windowIsGone)
+        #expect(!refused.windowIsGone)
+        #expect(!gone.acceptsInsertion)
+        #expect(refusedLibrary.notices.waiting.last?.title == "Couldn’t Save Title")
+    }
+
     /// A page holding `typed` as the unreported edit of the item on it now, which only a flush brings in. While
     /// `window.held` is true it refuses every flush as a page in the middle of a composition does.
     private static func holdingAnEdit(_ typed: String, in page: Page) async throws -> Int {

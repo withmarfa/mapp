@@ -233,7 +233,13 @@ extension EditorController {
     /// capture does, since it would otherwise be lost; where they stay, as when an item is deleted, it waits.
     static func flushAll(leaving: Bool = true, trace: QuitTrace? = nil, then done: @escaping (Bool) -> Void) {
         let editors = open.allObjects
-        let gate = Gate(waitingFor: editors.count, then: done)
+        let gate = Gate(waitingFor: editors.count) { success in
+            // A quit that does not happen had stopped insertion on every window whose flush succeeded.
+            if leaving, !success {
+                for editor in editors where !editor.windowIsGone { editor.acceptsInsertion = true }
+            }
+            done(success)
+        }
         // One refusal is told, from the window that holds it, since that window comes forward and only one can.
         var told = false
         for editor in editors {
