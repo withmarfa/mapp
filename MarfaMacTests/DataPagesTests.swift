@@ -114,7 +114,7 @@ import Testing
         #expect(MarfaSettingsPage.fileStorage.missingPermission(in: [.configManage]) == nil)
         #expect(MarfaSettingsPage.fileStorage.missingPermission(in: []) == .configManage)
         #expect(MarfaSettingsPage.sources.permission == .keysManage)
-        #expect(MarfaSettingsPage.trash.permission == .itemsPurge)
+        #expect(MarfaSettingsPage.trash.permission == nil)
     }
 }
 

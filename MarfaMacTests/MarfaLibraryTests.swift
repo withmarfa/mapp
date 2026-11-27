@@ -511,6 +511,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(await eventually { library.notices.waiting.last != nil })
         #expect(library.notices.waiting.last?.title == String(localized: "Can’t Recover"))
         #expect(library.notices.waiting.last?.message == "The server doesn’t hold this item.")
+        #expect(library.deletedItems.contains { $0.id == F.n3 })
     }
 
     @Test func anItemTheCopyNoLongerHoldsIsNotRecovered() async throws {

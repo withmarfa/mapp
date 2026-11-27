@@ -35,6 +35,8 @@ struct MarfaDeletedItem: Identifiable, Hashable {
     let kind: String
     /// The name of the source that wrote it, where it has one.
     let source: String?
+    var typeID: String? = nil
+    var canWrite = true
 }
 
 /// A source as the Sources page lists it: the code items carry, the name and mark the server gives it, and how many items it wrote.
@@ -167,6 +169,7 @@ struct MarfaMarkSet: Identifiable, Hashable {
     func changeTypeIcon(_ icon: String?, ofType id: String) async -> OwnerFailure?
 
     /// Items shown in Trash.
+    var canReadTrash: Bool { get }
     var deletedItems: [MarfaDeletedItem] { get }
     var deletedCount: Int { get }
     /// How many days the server keeps deleted items, where it is known and limited.
@@ -291,7 +294,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .keys, .sources: .keysManage
         case .types, .links: .schemaWrite
         case .plugins: .schemaWrite
-        case .trash: .itemsPurge
+        case .trash: nil
         case .connectors: .connectorsManage
         case .webhooks: .webhooksManage
         case .folders: nil
@@ -317,7 +320,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .plugins: String(localized: "The app isn’t allowed to install, update or remove plugins.")
         case .sources: String(localized: "The app isn’t allowed to rename, mark or limit sources.")
         case .network: String(localized: "The app isn’t allowed to see or change the server’s addresses.")
-        case .trash: String(localized: "The app isn’t allowed to list or permanently delete deleted items.")
+        case .trash: String(localized: "The app isn’t allowed to read deleted items.")
         case .fileStorage: String(localized: "The app isn’t allowed to see or change how the server keeps files.")
         case .connectors: String(localized: "The app isn’t allowed to see, pause, run or set up connectors.")
         case .webhooks: String(localized: "The app isn’t allowed to list, make, change or remove webhooks.")

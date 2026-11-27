@@ -26,7 +26,7 @@ The page gate checks the connection and the sign-in’s permissions. A configure
 | Types | `schema.write` | Types, fields, status words, and rules |
 | Links | `schema.write` | Link types. Opens from Types |
 | Sources | `keys.manage` | Names and marks of sources. Both source rules need `config.manage` |
-| Trash | `items.purge` | Restore items or empty Trash. Choose Select Items or Show All to permanently delete selected items. Storage controls how long items stay in Trash |
+| Trash | Read access to items | Search and filter the working copy’s deleted items. Restore items of types the sign-in can write. Deleting items permanently and emptying Trash also need `items.purge`. Retention is in Storage |
 | Storage | `instance.read` or `config.manage` | File locations, sizes, and unused files need `instance.read`. Each configuration control needs `config.manage` |
 | Connectors | `connectors.manage` | Each connector's health, machine, sign-in, settings and mapping |
 | Webhooks | `webhooks.manage` | Webhooks by maker, their events and deliveries |
