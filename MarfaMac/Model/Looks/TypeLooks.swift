@@ -38,7 +38,7 @@ final class TypeLooks {
         chosen = readable
         guard let unreadable else { return }
         defaults.set((defaults.array(forKey: Self.setAsideKey) as? [Data] ?? []) + [unreadable], forKey: Self.setAsideKey)
-        save()
+        save(by: .store)
         Telemetry.typeLooksUnreadable(reporting: reporting)
     }
 
@@ -114,7 +114,7 @@ final class TypeLooks {
         var types = chosen[library] ?? [:]
         types[type.rawValue] = choice.isEmpty ? nil : choice
         chosen[library] = types.isEmpty ? nil : types
-        save()
+        save(by: .person)
     }
 
     /// Takes back every choice for `type`, so it shows what its preset and the types above it give. Other types' choices
@@ -122,7 +122,7 @@ final class TypeLooks {
     func restore(_ type: TypeID, in library: String) {
         guard var types = chosen[library], types.removeValue(forKey: type.rawValue) != nil else { return }
         chosen[library] = types.isEmpty ? nil : types
-        save()
+        save(by: .person)
     }
 
     // MARK: Export and import
@@ -169,7 +169,7 @@ final class TypeLooks {
         let kept: [String: TypeLookChoice]? = types.isEmpty ? nil : types
         guard kept != chosen[library] else { return }
         chosen[library] = kept
-        save()
+        save(by: .person)
     }
 
     /// How many types lie above `type` along the catalogue's `parent` links, however long the chain: `ancestors(of:)` stops
@@ -182,10 +182,12 @@ final class TypeLooks {
         return seen.count - 1
     }
 
-    private func save() {
+    /// `writer` is who made the change: the store's own reading, or the person.
+    private func save(by writer: PreferenceHolds.Writer) {
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
         guard let data = try? encoder.encode(chosen) else { return }
+        PreferenceHolds.willWrite(data, forKey: Self.defaultsKey, in: defaults, by: writer)
         defaults.set(data, forKey: Self.defaultsKey)
     }
 }

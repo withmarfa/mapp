@@ -97,7 +97,7 @@ import Testing
         PreferencesSync.Record.read(defaults).marfas["instance-1"]?.frozen[unit]
     }
 
-    private final class Count: @unchecked Sendable {
+    nonisolated private final class Count: @unchecked Sendable {
         var value = 0
     }
 
@@ -230,7 +230,7 @@ import Testing
         await flush(sync)
         sidebar.update(library, collapse)
         await flush(sync)
-        #expect(await copy.unitsHeld(item)[layout("collapsed")] == #"["\#(note)"]"#)
+        #expect(await copy.unitsHeld(item)[layout("collapsed")] == #"["type:\#(note)"]"#)
         for (unit, value) in sidebarRows { #expect(await copy.unitsHeld(item)[unit] == value) }
     }
 
@@ -242,7 +242,7 @@ import Testing
         sidebar.reload()
         sidebar.update(library, collapse)
         await flush(sync)
-        #expect(await copy.unitsHeld(item)[layout("collapsed")] == #"["\#(note)"]"#)
+        #expect(await copy.unitsHeld(item)[layout("collapsed")] == #"["type:\#(note)"]"#)
         for (unit, value) in sidebarRows { #expect(await copy.unitsHeld(item)[unit] == value) }
     }
 
@@ -255,7 +255,7 @@ import Testing
         await sync.flush()
         sidebar.update(library, collapse)
         await flush(sync)
-        #expect(await copy.unitsHeld(item)[layout("collapsed")] == #"["\#(note)"]"#)
+        #expect(await copy.unitsHeld(item)[layout("collapsed")] == #"["type:\#(note)"]"#)
         for (unit, value) in sidebarRows { #expect(await copy.unitsHeld(item)[unit] == value) }
         #expect(await copy.unitsHeld(item)[layout("tabs")] == "5")
     }
@@ -284,7 +284,7 @@ import Testing
         sidebar.reload()
         sidebar.update(library, collapse)
         await flush(sync)
-        #expect(await copy.unitsHeld(item)[layout("collapsed")] == #"["\#(note)"]"#)
+        #expect(await copy.unitsHeld(item)[layout("collapsed")] == #"["type:\#(note)"]"#)
         for (unit, value) in sidebarRows { #expect(await copy.unitsHeld(item)[unit] == value) }
     }
 

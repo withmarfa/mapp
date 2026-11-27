@@ -32,7 +32,7 @@ final class SearchLeaveOuts {
         held = readable
         guard let unreadable else { return }
         defaults.set((defaults.array(forKey: Self.setAsideKey) as? [Data] ?? []) + [unreadable], forKey: Self.setAsideKey)
-        save()
+        save(by: .store)
     }
 
     /// The entries that can be read, and the stored data of those that cannot: the whole of it where it is not an object
@@ -63,11 +63,13 @@ final class SearchLeaveOuts {
         guard leaveOut != self.leaveOut(for: library) else { return }
         // An empty choice is the default, so it takes no space.
         held[library] = leaveOut.isEmpty ? nil : leaveOut
-        save()
+        save(by: .person)
     }
 
-    private func save() {
+    /// `writer` is who made the change: the store's own reading, or the person.
+    private func save(by writer: PreferenceHolds.Writer) {
         guard let data = try? JSONEncoder().encode(held) else { return }
+        PreferenceHolds.willWrite(data, forKey: Self.defaultsKey, in: defaults, by: writer)
         defaults.set(data, forKey: Self.defaultsKey)
     }
 }

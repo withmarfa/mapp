@@ -88,15 +88,17 @@ nonisolated struct ViewOrders: Equatable, Sendable {
 
     /// The stored entries of `Value`, and the stored data that could not be read: the whole of it where it is not an
     /// object, otherwise an object of the entries that are not of `Value`.
-    private static func read<Value>(_ data: Data, as _: Value.Type) -> (readable: [String: Value], unreadable: Data?) {
-        guard let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return ([:], data) }
+    private static func read<Value>(_ data: Data, as _: Value.Type)
+        -> (readable: [String: Value], unreadable: Data?, dropped: PreferenceHolds.Dropped)
+    {
+        guard let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return ([:], data, .whole) }
         var readable: [String: Value] = [:]
         var unreadable: [String: Any] = [:]
         for (entry, value) in object {
             if let value = value as? Value { readable[entry] = value } else { unreadable[entry] = value }
         }
         let aside = unreadable.isEmpty ? nil : try? JSONSerialization.data(withJSONObject: unreadable, options: .sortedKeys)
-        return (readable, aside)
+        return (readable, aside, .entries(Set(unreadable.keys)))
     }
 
     /// The stored orders and hidden views; data that cannot be read is none, never a failure.
@@ -108,21 +110,30 @@ nonisolated struct ViewOrders: Equatable, Sendable {
 
     /// Changes the stored orders and hidden views, writing only the setting that changed. What a write would replace
     /// and cannot read is kept aside first.
+    @MainActor
     static func update(in defaults: UserDefaults = .standard, _ change: (inout ViewOrders) -> Void) {
         var setAside: Set<String> = []
+        var dropped: [String: PreferenceHolds.Dropped] = [:]
         func load<Value>(_ key: String, as type: Value.Type, setAside aside: String) -> [String: Value] {
-            guard let saved = defaults.data(forKey: key) else { return [:] }
-            let (readable, unreadable) = read(saved, as: type)
-            if let unreadable {
+            guard let saved = defaults.data(forKey: key) else {
+                if defaults.object(forKey: key) != nil { dropped[key] = .whole }
+                return [:]
+            }
+            let read = read(saved, as: type)
+            dropped[key] = read.dropped
+            if let unreadable = read.unreadable {
                 defaults.set((defaults.array(forKey: aside) as? [Data] ?? []) + [unreadable], forKey: aside)
                 setAside.insert(key)
             }
-            return readable
+            return read.readable
         }
         func save(_ entries: [String: Any], to key: String) {
+            let writer = PreferenceHolds.Writer.person(dropped: dropped[key] ?? .nothing, addressed: [])
             if entries.isEmpty {
+                PreferenceHolds.willWrite(nil, forKey: key, in: defaults, by: writer)
                 defaults.removeObject(forKey: key)
             } else if let data = try? JSONSerialization.data(withJSONObject: entries, options: .sortedKeys) {
+                PreferenceHolds.willWrite(data, forKey: key, in: defaults, by: writer)
                 defaults.set(data, forKey: key)
             }
         }

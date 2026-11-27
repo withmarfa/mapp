@@ -97,35 +97,40 @@ nonisolated extension SyncedSetting {
     /// What this Mac holds of the setting, for `library` where it is kept for each server. A stored value of another kind
     /// than the store keeps, such as text where it keeps data, is unreadable, so it is set aside rather than written over.
     func read(_ defaults: UserDefaults, library: String) -> PreferenceReading {
+        read(stored: defaults.object(forKey: key), library: library)
+    }
+
+    /// What `stored`, a value as the defaults keep it under this setting's key, holds of the setting, as `read` says.
+    func read(stored: Any?, library: String) -> PreferenceReading {
         switch place {
         case .member(let field):
-            guard let value = defaults.object(forKey: key) else { return .units([:]) }
+            guard let value = stored else { return .units([:]) }
             guard let text = PreferenceJSON.text(PreferenceJSON.json(fromDefaults: value)) else { return .unreadable }
             return .units([.member(field, key): text])
         case .serverMember(let field, _):
-            guard let servers = Self.storedObject(defaults, key, .data) else { return .unreadable }
+            guard let servers = Self.storedObject(stored, .data) else { return .unreadable }
             guard let entry = servers[library] else { return .units([:]) }
             guard let text = PreferenceJSON.text(PreferenceJSON.sortingWordLists(entry)) else { return .unreadable }
             return .units([.member(field, key): text])
         case .rows(let table, let setting, let storage, let wrapper, let local, _):
-            guard let stored = Self.storedObject(defaults, key, storage) else { return .unreadable }
-            var entries = stored
+            guard let object = Self.storedObject(stored, storage) else { return .unreadable }
+            var entries = object
             if let wrapper {
-                guard let inner = stored[wrapper].map({ $0 as? [String: Any] }) ?? [:] else { return .unreadable }
+                guard let inner = object[wrapper].map({ $0 as? [String: Any] }) ?? [:] else { return .unreadable }
                 entries = inner
             }
             return Self.rows(entries, table: table, setting: setting, dropping: local)
         case .serverRows(let table, let setting, _):
-            guard let servers = Self.storedObject(defaults, key, .data) else { return .unreadable }
+            guard let servers = Self.storedObject(stored, .data) else { return .unreadable }
             guard let entry = servers[library] else { return .units([:]) }
             guard let entries = entry as? [String: Any] else { return .unreadable }
             return Self.rows(entries, table: table, setting: setting, dropping: [])
         case .set(let table, let setting):
-            guard let stored = defaults.object(forKey: key) else { return .units([:]) }
+            guard let stored else { return .units([:]) }
             guard let text = stored as? String, let words = PreferenceJSON.value(text) as? [String] else { return .unreadable }
             return .units(Dictionary(words.map { (.row(table, setting: setting, key: $0), "true") }) { first, _ in first })
         case .sidebar:
-            guard let servers = Self.storedObject(defaults, key, .data) else { return .unreadable }
+            guard let servers = Self.storedObject(stored, .data) else { return .unreadable }
             guard let entry = servers[library] else { return .units([:]) }
             guard let layout = entry as? [String: Any], let units = PreferencesSidebar.rows(of: layout) else { return .unreadable }
             return .units(units)
@@ -216,7 +221,12 @@ nonisolated extension SyncedSetting {
     /// The JSON object stored under `key` as `storage` keeps it: an empty one where nothing is stored, nil where what is
     /// stored is not one, or is of another kind than `storage`.
     private static func storedObject(_ defaults: UserDefaults, _ key: String, _ storage: Storage) -> [String: Any]? {
-        guard let stored = defaults.object(forKey: key) else { return [:] }
+        storedObject(defaults.object(forKey: key), storage)
+    }
+
+    /// The JSON object `stored` is as `storage` keeps it, as `storedObject(_:_:_:)` says.
+    static func storedObject(_ stored: Any?, _ storage: Storage) -> [String: Any]? {
+        guard let stored else { return [:] }
         let data: Data? = switch storage {
         case .data: stored as? Data
         case .string: (stored as? String).map { Data($0.utf8) }

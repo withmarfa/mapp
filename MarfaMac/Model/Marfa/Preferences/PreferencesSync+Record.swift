@@ -37,6 +37,14 @@ extension PreferencesSync {
         /// What the store left of a setting it could not read: nothing, or the part it could.
         struct Frozen: Codable, Equatable, Sendable {
             var left: String?
+            /// Set where a store's report made the freeze (`PreferenceHolds`), so Import, Restore, Reset and the
+            /// person's own write can end it; nil for one the sync made when a store read what it wrote.
+            var reported: Bool?
+
+            init(left: String?, reported: Bool? = nil) {
+                self.left = left
+                self.reported = reported
+            }
         }
 
         var marfas: [String: Adopted] = [:]

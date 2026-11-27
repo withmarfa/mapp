@@ -179,13 +179,22 @@ nonisolated extension ViewLayouts {
         defaults.string(forKey: key).flatMap(ViewLayouts.init(rawValue:)) ?? ViewLayouts()
     }
 
-    static func update(in defaults: UserDefaults = .standard, _ change: (inout ViewLayouts) -> Void) {
+    /// Changes the stored settings. `addressing` names the views whose settings the person removes on purpose.
+    @MainActor
+    static func update(in defaults: UserDefaults = .standard, addressing: Set<String> = [], _ change: (inout ViewLayouts) -> Void) {
+        var dropped: PreferenceHolds.Dropped = .nothing
         // This write replaces every view's settings, so text it could not read is kept rather than lost.
-        if let text = defaults.string(forKey: key), !text.isEmpty, ViewLayouts(rawValue: text) == nil {
-            defaults.set((defaults.stringArray(forKey: setAsideKey) ?? []) + [text], forKey: setAsideKey)
+        if let text = defaults.string(forKey: key) {
+            if !text.isEmpty, ViewLayouts(rawValue: text) == nil {
+                defaults.set((defaults.stringArray(forKey: setAsideKey) ?? []) + [text], forKey: setAsideKey)
+                dropped = .whole
+            }
+        } else if defaults.object(forKey: key) != nil {
+            dropped = .whole
         }
         var value = stored(in: defaults)
         change(&value)
+        PreferenceHolds.willWrite(value.rawValue, forKey: key, in: defaults, by: .person(dropped: dropped, addressed: addressing))
         defaults.set(value.rawValue, forKey: key)
     }
 }

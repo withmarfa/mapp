@@ -74,9 +74,18 @@ extension PreferencesSync {
     /// win at the next step that follows the Marfa (`Record.winning`), even over another Mac's change not yet taken, but
     /// for the units `except` names by setting key, where this Mac kept what it held.
     func replaced(_ settings: [SyncedSetting], except: [String: Set<PreferenceUnit>] = [:]) {
+        // What the stores reported of the values replaced no longer stands; what they report on reading these does.
+        let kept = Set(except.values.joined())
+        PreferenceHolds.drop(Set(settings.map(\.key)), except: kept, in: defaults)
         storesReadAgain()
         guard enabled, !settings.isEmpty else { return }
         var record = Record.read(defaults)
+        if let last = record.last, var adopted = record.marfas[last] {
+            for (unit, frozen) in adopted.frozen where frozen.reported == true && !kept.contains(unit) {
+                if settings.contains(where: { $0.owns(unit) }) { adopted.frozen[unit] = nil }
+            }
+            record.marfas[last] = adopted
+        }
         var marked = record.winning ?? [:]
         for setting in settings {
             let left = except[setting.key] ?? []
