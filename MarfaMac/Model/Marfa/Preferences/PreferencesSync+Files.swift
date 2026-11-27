@@ -75,10 +75,12 @@ extension PreferencesSync {
     /// for the units `except` names by setting key, where this Mac kept what it held.
     func replaced(_ settings: [SyncedSetting], except: [String: Set<PreferenceUnit>] = [:]) {
         storesReadAgain()
-        guard enabled, !settings.isEmpty else { return }
+        let off = instance.map(groups.off(in:)) ?? []
+        let syncing = settings.filter { !off.includes($0.group) }
+        guard enabled, !syncing.isEmpty else { return }
         var record = Record.read(defaults)
         var marked = record.winning ?? [:]
-        for setting in settings {
+        for setting in syncing {
             let left = except[setting.key] ?? []
             // A unit either mark lets win still wins.
             marked[setting.key] = marked[setting.key].map { $0.intersection(left) } ?? left

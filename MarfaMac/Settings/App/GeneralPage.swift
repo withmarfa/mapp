@@ -31,6 +31,7 @@ struct GeneralPage: View {
             dates
             privacy
             updates
+            syncGroups
             appSettings
         }
         .accessibilityIdentifier("GeneralPage")
@@ -204,6 +205,30 @@ struct GeneralPage: View {
                     SettingsToggle(title: "Beta Versions", isOn: $betaVersions).accessibilityIdentifier("BetaVersions")
                 }
             }
+        }
+    }
+
+    private var syncGroups: some View {
+        let sync = libraries.preferences
+        let instance = sync.instance
+        return VStack(alignment: .leading, spacing: SettingsTokens.Metric.sectionGap) {
+            SettingsSection("Sync with This Marfa") {
+                ForEach(PreferenceGroup.allCases, id: \.self) { group in
+                    SettingsRow(title: Text(verbatim: group.title)) {
+                        SettingsToggle(verbatim: group.title, isOn: Binding {
+                            instance.map { sync.groups.isOn(group, in: $0) } ?? true
+                        } set: { on in
+                            guard let instance else { return }
+                            Task {
+                                try? await sync.setSyncing(on, for: group, in: instance)
+                                files.refresh()
+                            }
+                        })
+                        .disabled(instance == nil)
+                    }
+                }
+            }
+            SettingsNote("Window sizes, error reports and shortcuts that work in any app stay on this Mac.")
         }
     }
 

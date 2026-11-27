@@ -113,6 +113,11 @@ import MarfaTesting
             library: { [host] in host.libraryKey(for: host.configuredConnection) },
             refusedShortcuts: { [anyAppShortcuts] in Set(anyAppShortcuts.refused.map(\.rawValue)) },
             unsettled: { [librarySettings] library in librarySettings.unsettled[library] ?? [] },
+            groupNotSaved: { [notices = host.notices] in
+                notices.tell(
+                    String(localized: "Sync Couldn’t Turn On"),
+                    String(localized: "A restore point couldn’t be saved first, so nothing was changed. Check that this Mac has free space, then try again."))
+            },
             reload: { [sidebarLayouts, typeLooks, searchLeaveOuts, shortcuts, anyAppShortcuts, automaticExport] in
                 sidebarLayouts.reload()
                 typeLooks.reload()
@@ -157,6 +162,7 @@ import MarfaTesting
             shortcuts.restoreDefaults()
             anyAppShortcuts.clearAll()
             MacSettings.reset(in: defaults)
+            preferences.groups.reset()
             automaticExport.reset()
             preferences.replaced(PreferencesMap.synced)
             done()

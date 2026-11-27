@@ -3038,6 +3038,9 @@
     "Before Taking Another Mac’s Settings" : {
 
     },
+    "Before Turning Sync On" : {
+
+    },
     "Behind a date, a status or a tag you change." : {
 
     },
@@ -6247,6 +6250,9 @@
 
     },
     "Keyboard Shortcuts" : {
+
+    },
+    "Keyboard shortcuts" : {
 
     },
     "Keys" : {
@@ -9806,6 +9812,12 @@
     "Symbols on Subtypes" : {
 
     },
+    "Sync Couldn’t Turn On" : {
+
+    },
+    "Sync with This Marfa" : {
+
+    },
     "Synced Folders" : {
 
     },
@@ -12053,6 +12065,9 @@
     "Views" : {
 
     },
+    "Views and places" : {
+
+    },
     "View…" : {
 
     },
@@ -12306,6 +12321,9 @@
     "Window Layout" : {
 
     },
+    "Window sizes, error reports and shortcuts that work in any app stay on this Mac." : {
+
+    },
     "With %@." : {
 
     },
@@ -12469,6 +12487,9 @@
 
     },
     "Your settings are back as they were before the first sync, %@." : {
+
+    },
+    "Your settings are back as they were before turning sync on for a group, %@." : {
 
     },
     "Your sign-in is sent to %@ without encryption, so anyone on the network can read it. Use an https address unless this network is private." : {

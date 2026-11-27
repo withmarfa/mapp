@@ -18,23 +18,30 @@ paths:
 | This app's settings | Settings that follow the person to another Mac, such as New Opens |
 | This Mac only | Widths, last place, playback places, recent kinds, New Item's tags and parents, any-app shortcuts, error-report consent, export plans |
 
-- **A setting has the narrowest home a person would expect**, and one home only. `PreferencesMap` names it, and a test fails for a key it does not place.
-- **To add a setting:** add its key to `MacSettings.keys` and to `PreferencesMap` in the same change. Reset, export, restore points and the sample library then include it.
-- **The defaults are the store the app reads**, so a launch needs no network. Synced, they are this Mac's copy.
+- **Give each setting one home**, the narrowest a person would expect. Add its key to `MacSettings.keys` and `PreferencesMap` together. Tests check coverage.
+- **The app reads the defaults**, so launch needs no network.
 - **Store only what a person chose.** A default value is left out, so a better default reaches them.
 - **A new member of a stored value is optional**, so older values decode.
 - **A library's own settings are named by its Marfa,** else its copy's folder. `LibrarySettings` moves earlier names' first; losers go to `Restore Points/Library Settings Set Aside/`, unreadable or undecided stay unsynced.
 
 ## In the Marfa
 
-- **One hidden item a Marfa holds them** (`PreferencesType`): five object fields, one for each group of settings that come once, and five tables for settings that come once for a command, type, view, place or sidebar part.
+- **One hidden item per Marfa holds the settings** (`PreferencesType`) in five object fields and five tables.
 - **The type can never change shape.** Only the client that registered it may replace it, and every Mac is another client (withmarfa/marfa#3462). A new setting is a new member of a field or a new `setting` word in a table.
-- **Two Macs that change different settings both keep their change.** A field is written by member and a table by row, so split a value into rows where its parts change apart. A list whose order matters is one row, and the later arrangement wins whole.
+- **Different settings change independently**, by field member or table row. An ordered list occupies one row, so the later arrangement wins whole.
 - **A set is written sorted**, so saving it again is not a change.
 - **A hidden view is its own row, kept when shown again:** a row this Mac lacks of a `PreferencesMap.keptWhereAbsent` setting is taken, not deleted.
 - **What is kept for a place is keyed by its word** (`PlaceView.storageKey`), and for a saved view by its id, as its place can change; an earlier copy's keys are never removed (`EarlierPlace`).
 - **An earlier copy drops unknown members** from a row it rewrites. For example, it may drop `digest` from `viewLayout` or `placeDefaults`. It reads an unknown layout as List.
 - **A sign-in asks for `app.*:write`, never the app's own vendor scope**, because discovery lists no vendor scope before its first type exists (withmarfa/marfa#3522).
+
+## Groups you can keep on this Mac
+
+Settings > General > Sync with This Marfa has nine switches, all on by default. Each choice belongs to one Mac and one Marfa instance.
+
+With a group off, edits, removals, imports and restores stay local. Other Macs can still change the shared values.
+
+Turning a group on requires a restore point. If saving fails, it stays off. Once the copy is whole, the Marfa's values win and local values fill gaps once. Settings files and restore points exclude the switches. Reset clears them and preserves remote values for groups previously off.
 
 ## The first launch against a Marfa
 
@@ -43,14 +50,14 @@ paths:
 - **No item, and this Mac adopted another Marfa:** the shared settings start from the app's defaults, so a new Marfa does not take another's arrangement.
 - **An item exists:** it wins, and what it lacks is filled from this Mac once.
 - **Two items,** made by two Macs at once: the older is used, filled from the other.
-- **Switching Marfa** loads the other Marfa's settings whole.
+- **Switching Marfa** loads the groups that sync with that Marfa.
 
 ## Changes between Macs
 
-- **Each step compares this Mac, the item, and what both held after the last step** (`PreferencesMerge`). A drag is one write. What was just applied is not written back.
+- **Each step compares local, remote and last shared values** (`PreferencesMerge`). A drag makes one write.
 - **The record of what both hold is saved before the item is written**, so a refused write never sends another Mac's change back as this Mac's.
 - **The later write wins**, row by row and member by member. A table's change log can undo a batch from the command line.
-- **A conflicted copy of a field is answered by member:** what this Mac sent is written again, the rest is taken; the copy goes to the bin.
+- **Conflicts resolve by member.** This Mac reclaims members it sent and takes the rest. It leaves copies containing off groups for other Macs.
 - **After another Mac's change reaches the defaults, the stores read them again**, so open windows and shortcuts follow. A store that reads its value once joins the `reload` `Libraries` gives `PreferencesSync`.
 - **A row that no setting here owns is the Marfa's.** A later version may have written it, so it is never changed or deleted.
 
@@ -68,14 +75,13 @@ paths:
 
 ## Restore points
 
-- **Before anything replaces many settings at once, a restore point is saved** (`RestorePoints`): the first sync, adoption, switching Marfa, Reset, Import and Restore. If the point cannot be saved, nothing changes and the person is told.
-- **A point is the defaults themselves** (`SettingsSnapshot`): every key, every Marfa's entry, the settings that stay, and text its store cannot read. It reads only the app's own domain, so a restore never makes a system setting the app's.
+- **Save a restore point** (`RestorePoints`) before first sync, adoption, switching Marfa, resuming a group, Reset, Import and Restore. A failed save stops the change.
+- **A point holds the app's settings** (`SettingsSnapshot`), including every Marfa's entry, local settings and text a store cannot read. The sync switches are excluded. It reads only the app's own domain, so a restore never makes a system setting the app's.
 - **An identical point is not saved again**, so a retry pushes none out.
 
 ## Import, restore and reset
 
-- **They run between sync steps** (`PreferencesSync`): a step under way ends first and one runs after, so no step writes over them with what it read before.
-- **What they wrote wins at the next step**, even over another Mac's change not yet taken here. The marks that say so survive a relaunch.
+- **They run between sync steps** (`PreferencesSync`). For enabled groups, their writes win over remote changes still to arrive. These marks survive relaunch.
 - **Import replaces each chosen section whole** (`SettingsFile`): a setting the file lacks goes to its default; other sections are untouched. A file not the app's, or from a later version, changes nothing. Every value is checked before any is written.
 - **Restore puts back exactly what the point holds**, removes the keys it lacks and saves a point of its own, so it can be undone.
 - **Reset clears `MacSettings.keys`.** It keeps the library's copy, the queue, the sign-in and the sync's record, and its alert says every connected Mac follows.

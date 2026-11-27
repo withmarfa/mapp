@@ -224,6 +224,7 @@ extension RestorePoint.Reason {
         switch self {
         case .firstSync: String(localized: "Your settings are back as they were before the first sync, \(when).")
         case .adoption: String(localized: "Your settings are back as they were before taking another Mac’s settings, \(when).")
+        case .resumingGroup: String(localized: "Your settings are back as they were before turning sync on for a group, \(when).")
         case .reset: String(localized: "Your settings are back as they were before Reset, \(when).")
         case .import: String(localized: "Your settings are back as they were before Import, \(when).")
         case .switching: String(localized: "Your settings are back as they were before switching Marfa, \(when).")

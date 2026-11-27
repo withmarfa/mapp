@@ -122,7 +122,7 @@ enum PreferencesMap {
     /// synced either), a table's columns (mostly widths), and the shortcuts that work in any app (`inFilesOnly`).
     static let staysOnMac: [String] = [
         StartWith.lastPlaceKey, ReopenWindows.key, NewItemRecents.key, PlaybackPlaces.key, Reporting.switchKey, UpdateSettings.betaKey, ItemTableColumnLayouts.key,
-        InterfaceKey.inspectorWidth, AnyAppShortcuts.defaultsKey, AutomaticExport.plansKey,
+        InterfaceKey.inspectorWidth, AnyAppShortcuts.defaultsKey, AutomaticExport.plansKey, PreferenceGroups.key,
     ] + ColumnWidth.allCases.map(\.key)
 
     /// Every defaults key a synced setting reads or writes.
