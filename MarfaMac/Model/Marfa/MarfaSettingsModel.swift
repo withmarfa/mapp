@@ -83,6 +83,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
     let host: MarfaHost
     var address = ""
     var otherAddress = ""
+    var showsConnectSheet = false
     private(set) var notice: Notice?
     private(set) var isWorking = false
     private(set) var isAllowingMore = false

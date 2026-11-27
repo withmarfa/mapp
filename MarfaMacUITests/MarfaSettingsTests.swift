@@ -19,7 +19,7 @@ nonisolated final class MarfaSettingsTests: XCTestCase {
         app.terminate()
     }
 
-    @MainActor private func openLibraryPage() {
+    @MainActor private func openConnectionPage() {
         app.typeKey(",", modifierFlags: .command)
         XCTAssertTrue(settings.waitForExistence(timeout: 3))
         let page = app.descendants(matching: .any).matching(identifier: "SettingsPage-connection").element(boundBy: 0)
@@ -28,23 +28,36 @@ nonisolated final class MarfaSettingsTests: XCTestCase {
     }
 
     @MainActor private var address: XCUIElement { app.textFields["MarfaAddress"] }
+    @MainActor private var openConnect: XCUIElement { app.buttons["MarfaOpenConnect"] }
     @MainActor private var connect: XCUIElement { app.buttons["MarfaConnect"] }
     @MainActor private var connectWithCode: XCUIElement { app.buttons["MarfaConnectCode"] }
 
-    @MainActor func testTheLibraryPageAsksForAnAddressAndOffersTwoWaysToSignIn() {
-        openLibraryPage()
+    @MainActor private func openSignInSheet() {
+        XCTAssertTrue(openConnect.waitForExistence(timeout: 3))
+        openConnect.click()
         XCTAssertTrue(address.waitForExistence(timeout: 3))
+    }
+
+    @MainActor func testSignedOutConnectionOpensASheetWithTwoWaysToSignIn() {
+        openConnectionPage()
+        XCTAssertTrue(app.staticTexts["Not Signed In"].waitForExistence(timeout: 3))
+        XCTAssertFalse(address.exists)
+        attachScreenshot("SettingsMarfaSignedOut")
+        openSignInSheet()
         XCTAssertFalse(app.secureTextFields.firstMatch.exists, "no key is typed into the app")
-        XCTAssertTrue(connect.exists, "Sign In opens the server's own page")
-        XCTAssertTrue(connectWithCode.exists, "Use a Code Instead is for a Mac that cannot open the browser")
+        XCTAssertTrue(connect.exists, "Continue opens the server's own page")
+        XCTAssertTrue(connectWithCode.exists, "Sign In with a Code is for a Mac that cannot open the browser")
         XCTAssertFalse(app.buttons["MarfaDisconnect"].exists, "there is nothing to disconnect from")
-        XCTAssertTrue(app.descendants(matching: .any)["SettingsDetail"].staticTexts["Connect to a Marfa"].waitForExistence(timeout: 3))
-        attachScreenshot("SettingsMarfaDisconnected")
+        XCTAssertTrue(app.staticTexts["Connect to a Marfa"].waitForExistence(timeout: 3))
+        attachScreenshot("SettingsConnectToMarfa")
+        app.buttons["MarfaConnectCancel"].click()
+        XCTAssertFalse(address.exists)
+        XCTAssertTrue(openConnect.exists)
     }
 
     @MainActor func testSigningInWaitsForAnAddress() {
-        openLibraryPage()
-        XCTAssertTrue(address.waitForExistence(timeout: 3))
+        openConnectionPage()
+        openSignInSheet()
         XCTAssertFalse(connect.isEnabled)
         XCTAssertFalse(connectWithCode.isEnabled)
         address.click()
@@ -57,17 +70,16 @@ nonisolated final class MarfaSettingsTests: XCTestCase {
     }
 
     @MainActor func testAnAddressThatIsNoServerIsToldInPlainWords() {
-        openLibraryPage()
-        XCTAssertTrue(address.waitForExistence(timeout: 3))
+        openConnectionPage()
+        openSignInSheet()
         address.click()
         let invalidAddress = "marfa example"
         address.typeText(invalidAddress)
         XCTAssertEqual(address.value as? String, invalidAddress)
         XCTAssertTrue(connect.isEnabled)
         connect.click()
-        let detail = app.descendants(matching: .any)["SettingsDetail"]
-        XCTAssertTrue(detail.staticTexts["Check the Address"].waitForExistence(timeout: 3), app.debugDescription)
-        XCTAssertTrue(detail.staticTexts["Enter a Marfa server address, such as marfa.example."].exists)
+        XCTAssertTrue(app.staticTexts["Check the Address"].waitForExistence(timeout: 3), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["Enter a Marfa server address, such as marfa.example."].exists)
         XCTAssertFalse(app.buttons["MarfaDisconnect"].exists, "nothing was connected")
         attachScreenshot("SettingsMarfaNotAServer")
     }
