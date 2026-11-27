@@ -32,13 +32,6 @@ struct AccountSignInsPage: View {
             }
         }
         .task(id: host.serverAddress) { await load() }
-        .toolbar {
-            if page == .passkeys, model.hasLoaded, model.failure == nil {
-                ToolbarItem {
-                    Button("Add Passkey…") { Task { if let address = await model.passkeyAddress() { openURL(address) } } }
-                }
-            }
-        }
         .onAppear { host.ownerDrafts.register(model) }
         .settingsSheet(presenting: model.sheet != nil, dismiss: { model.closeRename() }) { AccountSheet(model: model) }
         .alert(
@@ -60,7 +53,9 @@ struct AccountSignInsPage: View {
     private func load() async { await model.loadSignIns(passkeysOnly: page == .passkeys) }
 
     private var passkeysSection: some View {
-        SettingsSection(name: nil, footer: Text("Your browser opens to add one.")) {
+        SettingsSection(name: Text("Passkeys"), footer: Text("Your browser opens to add one.")) {
+            SettingsButton("Add Passkey…") { Task { if let address = await model.passkeyAddress() { openURL(address) } } }
+        } content: {
             if model.passkeys.isEmpty {
                 SettingsEmptyCard(symbol: "person.badge.key", title: Text("No Passkeys"), line: Text("Add a passkey to sign in with it."))
             }
@@ -86,12 +81,19 @@ struct AccountSignInsPage: View {
             ForEach(model.browsers) { browser in
                 SettingsRow(
                     verbatim: browser.name, line: Self.line(added: browser.added, used: browser.lastUsed, signedIn: true),
-                    error: model.rowErrors[browser.id].map { OwnerWording.line($0, on: page) }, lead: .symbol("safari")
+                    error: model.rowErrors[browser.id].map { OwnerWording.line($0, on: page) }, lead: .symbol(Self.symbolName(for: browser))
                 ) {
                     SettingsMoreMenu { Button("Sign Out", role: .destructive) { model.askToEnd(browser) } }
                 }
             }
         }
+    }
+
+    static func symbolName(for browser: BrowserSignIn) -> String {
+        let shown = [browser.name, browser.userAgent].compactMap(\.self).joined(separator: " ")
+        if shown.localizedStandardContains("iPhone") { return "iphone" }
+        if browser.name.localizedStandardContains("Safari") { return "safari" }
+        return "globe"
     }
 
     /// "Added 3 October. Used today."

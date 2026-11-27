@@ -444,9 +444,6 @@
     "%@ to %@" : {
       "extractionState" : "manual"
     },
-    "%@ took another date" : {
-
-    },
     "%@ use it." : {
 
     },
@@ -650,7 +647,7 @@
         }
       }
     },
-    "%@, on the machine that runs this Marfa." : {
+    "%@, on the machine this Marfa runs on." : {
 
     },
     "%@, remove" : {
@@ -697,22 +694,6 @@
 
     },
     "%@’s Own Data" : {
-
-    },
-    "%@’s clock jumped to %@." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@’s clock jumped to %2$@."
-          }
-        }
-      }
-    },
-    "%@’s clock jumped." : {
-
-    },
-    "%@’s clock says so. If it’s right, clean-up starts again." : {
 
     },
     "%lld" : {
@@ -2660,9 +2641,6 @@
     "An App" : {
 
     },
-    "An IP address." : {
-
-    },
     "An Object Store" : {
 
     },
@@ -3548,9 +3526,6 @@
     "Changed" : {
 
     },
-    "Changed Elsewhere" : {
-
-    },
     "Changed Here" : {
 
     },
@@ -3591,6 +3566,9 @@
 
     },
     "Changed an item’s extension data" : {
+
+    },
+    "Changed elsewhere" : {
 
     },
     "Changed table rows" : {
@@ -4187,9 +4165,6 @@
     "Couldn’t Read Available Types" : {
 
     },
-    "Couldn’t Read Backups" : {
-
-    },
     "Couldn’t Read Connector Machines" : {
 
     },
@@ -4268,6 +4243,9 @@
     "Couldn’t change this" : {
 
     },
+    "Couldn’t check" : {
+
+    },
     "Couldn’t check for problems" : {
 
     },
@@ -4317,6 +4295,9 @@
 
     },
     "Couldn’t read backup settings" : {
+
+    },
+    "Couldn’t read backups" : {
 
     },
     "Couldn’t read downloaded files" : {
@@ -4580,12 +4561,6 @@
     "Deleted items kept for" : {
       "extractionState" : "manual"
     },
-    "Deleted items stay here for %@ days." : {
-
-    },
-    "Deleted items stay here for one day." : {
-
-    },
     "Deleted items stay here until you delete them permanently." : {
 
     },
@@ -4779,6 +4754,12 @@
 
     },
     "Each copy stops the next time it syncs. You can’t sync this folder again. Its items stay in Marfa and its files stay on disk. Push any unsent changes from each copy before stopping. Afterward, use marfa folders remove to detach each directory and keep its files as plain files." : {
+
+    },
+    "Each is deleted permanently %@ days after it’s moved here." : {
+
+    },
+    "Each is deleted permanently one day after it’s moved here." : {
 
     },
     "Each item keeps the value it holds, and %@ stops asking for it." : {
@@ -7645,13 +7626,13 @@
     "Not Updated" : {
 
     },
-    "Not Yet" : {
-
-    },
     "Not allowed" : {
 
     },
     "Not answering" : {
+
+    },
+    "Not changed" : {
 
     },
     "Not connected" : {
@@ -7678,7 +7659,13 @@
     "Not ready yet" : {
 
     },
+    "Not set" : {
+
+    },
     "Not set." : {
+
+    },
+    "Not yet" : {
 
     },
     "Note" : {
@@ -11433,6 +11420,18 @@
 
     },
     "This Marfa takes guidance only from the command line for now. Your text is kept here." : {
+
+    },
+    "This Marfa took another date" : {
+
+    },
+    "This Marfa’s clock jumped to %@." : {
+
+    },
+    "This Marfa’s clock jumped." : {
+
+    },
+    "This Marfa’s clock says so. If it’s right, clean-up starts again." : {
 
     },
     "This Marfa’s disk" : {

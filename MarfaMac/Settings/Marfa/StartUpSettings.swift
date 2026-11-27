@@ -1,18 +1,20 @@
 import SwiftUI
 
 struct StartUpSettings: View {
+    /// Wider than the shared setting column, so the next column starts where the board puts it.
+    private static let settingColumn: CGFloat = 262
     let rows: [StartUpSetting]
 
     private var columns: [SettingsTableColumn<StartUpSetting>] {
         [
-            SettingsTableColumn("Setting", width: SettingsTokens.Metric.Column.setting, truncation: .middle) { setting in
+            SettingsTableColumn("Setting", width: Self.settingColumn, truncation: .middle) { setting in
                 Text(verbatim: setting.name).settingsFont(.mono)
             },
             SettingsTableColumn("What It Does", lines: 2) { setting in
                 Text(verbatim: StartUpWording.what(setting.name)).foregroundStyle(SettingsTokens.secondaryText)
             },
             SettingsTableColumn("State", width: SettingsTokens.Metric.Column.state) { setting in
-                Text(setting.isSet ? "Set" : "Not Set").foregroundStyle(SettingsTokens.secondaryText)
+                Text(setting.isSet ? "Set" : "Not set").foregroundStyle(SettingsTokens.secondaryText)
             },
         ]
     }

@@ -40,9 +40,9 @@ struct TrashPage: View {
         if host.deletedRetentionDays == 0 {
             Text("Deleted items stay here until you delete them permanently.")
         } else if host.deletedRetentionDays == 1 {
-            Text("Deleted items stay here for one day.")
+            Text("Each is deleted permanently one day after it’s moved here.")
         } else if let days = host.deletedRetentionDays {
-            Text("Deleted items stay here for \(days.formatted()) days.")
+            Text("Each is deleted permanently \(days.formatted()) days after it’s moved here.")
         } else {
             Text("Deleted items wait here before they are permanently deleted.")
         }
@@ -89,12 +89,12 @@ struct TrashPage: View {
         let items = host.deletedItems.filter { filter.matches($0) }
         let preview = SettingsTablePreview(total: items.count, expanded: showsAll || showsEveryItem)
         let kinds = Set(host.deletedItems.map(\.kind)).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
-        return VStack(spacing: SettingsTokens.Metric.sectionGap) {
+        return VStack(spacing: SettingsTokens.Metric.sheetSpacing) {
             SettingsTableFilter(choice: $filter.kind, search: $filter.search) {
                 Text("All Types").tag(String?.none)
                 ForEach(kinds, id: \.self) { Text(verbatim: $0).tag(String?.some($0)) }
             }
-            .frame(maxWidth: .infinity, alignment: .trailing)
+            .frame(maxWidth: .infinity, minHeight: SettingsTokens.Metric.controlHeight, alignment: .trailing)
             SettingsCard {
                 if items.isEmpty {
                     SettingsEmptyCard(symbol: "magnifyingglass", title: Text("No Matching Items"))
@@ -103,38 +103,38 @@ struct TrashPage: View {
                     itemRow(item)
                 }
                 if let count = preview.countLabel {
-                    SettingsRow(verbatim: count, size: .compact) {
+                    HStack {
+                        Text(verbatim: count).settingsFont(.line).foregroundStyle(SettingsTokens.secondaryText)
+                        Spacer(minLength: 0)
                         SettingsShowAllButton { showsEveryItem = true }
                     }
+                    .padding(.horizontal, SettingsTokens.Metric.sectionTableInset)
+                    .frame(minHeight: SettingsTokens.Metric.tableFooterHeight)
                 }
             }
         }
     }
 
     private func itemRow(_ item: MarfaDeletedItem) -> some View {
-        SettingsRow(title: Text(verbatim: item.title), line: detail(item), lead: lead(item)) {
-            HStack(spacing: SettingsTokens.Metric.buttonGap) {
+        SettingsRow(title: Text(verbatim: item.title), line: detail(item), lead: .symbol("doc")) {
+            SettingsMoreMenu {
                 if item.canWrite {
-                    SettingsButton("Restore") { host.restoreDeleted([item.id]) }
+                    Button("Restore") { host.restoreDeleted([item.id]) }
                 } else {
-                    SettingsLockedValue(text: String(localized: "Restore"))
+                    Button("Restore") {}
+                        .disabled(true)
                         .help("Restoring this item needs write access to its type.")
                 }
-                if purgePermission != nil || !item.canWrite {
-                    SettingsLockedValue(text: String(localized: "Delete"))
-                        .help("Deleting this item permanently needs write access to its type and permission to empty Trash.")
+                if purgePermission == nil, item.canWrite, host.canDeletePermanently {
+                    Button("Delete", role: .destructive) { host.deleteDeletedPermanently([item.id]) }
                 } else {
-                    SettingsButton("Delete", role: .destructive) { host.deleteDeletedPermanently([item.id]) }
-                        .disabled(!host.canDeletePermanently)
+                    Button("Delete", role: .destructive) {}
+                        .disabled(true)
+                        .help("Deleting this item permanently needs write access to its type and permission to empty Trash.")
                 }
             }
         }
         .help(item.title)
-    }
-
-    private func lead(_ item: MarfaDeletedItem) -> SettingsLead {
-        guard let typeID = item.typeID else { return .symbol("doc") }
-        return .custom(host.typeMark(for: typeID))
     }
 
     private func detail(_ item: MarfaDeletedItem) -> Text {

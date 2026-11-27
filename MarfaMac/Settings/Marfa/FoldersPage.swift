@@ -77,7 +77,7 @@ struct FoldersPage: View {
                         let condition = model.condition(of: folder)
                         SettingsLinkRow(
                             verbatim: folder.title, line: line(folder, report: model.reports[folder.id]),
-                            lead: .tile("folder.fill", .blue), value: condition?.title, dot: condition.map(Self.dot)
+                            lead: .symbol("folder"), value: condition?.title, dot: condition.map(Self.dot)
                         ) { navigation?.push(Self.subpage(for: folder)) }
                     }
                 }

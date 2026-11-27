@@ -2,6 +2,10 @@ import Marfa
 import SwiftUI
 
 struct HousekeepingPage: View {
+    /// This table's columns. The shared day, label and state columns are narrower.
+    private static let everyColumn: CGFloat = 100
+    private static let lastRunColumn: CGFloat = 120
+    private static let resultColumn: CGFloat = 64
     let host: any MarfaSettingsHost
     @State private var model: HousekeepingModel
 
@@ -28,7 +32,7 @@ struct HousekeepingPage: View {
                 Button("Cancel", role: .cancel) {}
                 Button("Confirm Date") { Task { await model.confirm(date: date, health: host.health) } }
             } message: { _ in
-                Text("\(host.serverName)’s clock says so. If it’s right, clean-up starts again.")
+                Text("This Marfa’s clock says so. If it’s right, clean-up starts again.")
             }
             .accessibilityIdentifier("HousekeepingPage")
     }
@@ -93,12 +97,12 @@ struct HousekeepingPage: View {
                 if let hold {
                     SettingsProblemRow(
                         title: Text("Clean-up is paused"),
-                        line: hold.clockAt.map { Text("\(host.serverName)’s clock jumped to \(Self.date($0)).") } ?? Text("\(host.serverName)’s clock jumped."),
+                        line: hold.clockAt.map { Text("This Marfa’s clock jumped to \(Self.date($0)).") } ?? Text("This Marfa’s clock jumped."),
                         actions: [confirmAction(hold)])
                 }
                 if let instead = model.confirmedInstead {
                     SettingsProblemRow(
-                        title: Text("\(host.serverName) took another date"),
+                        title: Text("This Marfa took another date"),
                         line: Text("You were shown \(Self.date(instead.shown)), and its clock read \(Self.date(instead.confirmed)) when it confirmed."),
                         actions: [])
                 }
@@ -132,15 +136,15 @@ struct HousekeepingPage: View {
                     Text(verbatim: UpkeepWording.jobTitle(job.name))
                 }
             },
-            SettingsTableColumn("Every", width: SettingsTokens.Metric.Column.day) { job in
+            SettingsTableColumn("Every", width: Self.everyColumn) { job in
                 Text(verbatim: UpkeepWording.every(job.intervalSeconds)).foregroundStyle(SettingsTokens.secondaryText)
                     .help(job.nextRun.map { String(localized: "Next run: \(UpkeepWording.moment($0)).") } ?? "")
             },
-            SettingsTableColumn("Last Run", width: SettingsTokens.Metric.Column.label) { job in
-                Text(verbatim: job.lastFinished.map { UpkeepWording.moment($0, hasTime: job.lastFinishedHasTime) } ?? String(localized: "Not Yet"))
+            SettingsTableColumn("Last Run", width: Self.lastRunColumn) { job in
+                Text(verbatim: job.lastFinished.map { UpkeepWording.moment($0, hasTime: job.lastFinishedHasTime) } ?? String(localized: "Not yet"))
                     .foregroundStyle(SettingsTokens.secondaryText)
             },
-            SettingsTableColumn("Result", width: SettingsTokens.Metric.Column.state) { Text(verbatim: UpkeepWording.result($0.outcome)).foregroundStyle(SettingsTokens.secondaryText) },
+            SettingsTableColumn("Result", width: Self.resultColumn) { Text(verbatim: UpkeepWording.result($0.outcome)).foregroundStyle(SettingsTokens.secondaryText) },
         ]
     }
 

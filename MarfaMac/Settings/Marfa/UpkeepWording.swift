@@ -228,7 +228,7 @@ nonisolated enum UpkeepWording {
         case .succeeded?: String(localized: "Done")
         case .held?: String(localized: "Paused")
         case .failed?: String(localized: "Failed")
-        case nil: String(localized: "Not Yet")
+        case nil: String(localized: "Not yet")
         }
     }
 }
