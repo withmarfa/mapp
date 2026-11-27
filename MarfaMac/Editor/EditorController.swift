@@ -143,6 +143,8 @@ final class EditorController: NSObject {
     @ObservationIgnored var heldEdit: (markdown: String, generation: Int)?
     @ObservationIgnored var writingToolsObservation: NSKeyValueObservation?
     @ObservationIgnored var windowIsGone = false
+    /// False after the window's last flush is asked for, or once the window has gone, so a late image is not written into that page.
+    @ObservationIgnored var acceptsInsertion = true
 
     @ObservationIgnored let webView: EditorWebView
     /// The page with the system find bar above it, which is what the window shows.

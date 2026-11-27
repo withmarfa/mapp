@@ -13,7 +13,7 @@ extension EditorController {
         Task {
             let (files, skipped) = await PastedImages.read(sources)
             let report = files.isEmpty ? AttachReport() : await library.attach(files, to: pageItemID)
-            let placed = self.pageItemID == pageItemID && isEditable
+            let placed = self.pageItemID == pageItemID && isEditable && acceptsInsertion
             let embeds = report.embeds
             var notPlaced: [String] = []
             if placed, !embeds.isEmpty,
@@ -37,7 +37,7 @@ extension EditorController {
             "height": Double(height),
         ]
         for attempt in 0...Self.hiddenTextRetryLimit {
-            guard pageItemID == id, isEditable else { return false }
+            guard pageItemID == id, isEditable, acceptsInsertion else { return false }
             let outcome: Any?
             do {
                 outcome = try await webView.callAsyncJavaScript(
@@ -94,6 +94,10 @@ extension EditorController {
     /// does typing. Where the page never shows the item again, the files stay attached without being in its text.
     func append(_ embeds: [Embed], to id: ItemID) {
         guard !windowIsGone, !embeds.isEmpty else { return }
+        guard acceptsInsertion else {
+            notInText(embeds, of: id)
+            return
+        }
         pendingEmbeds[id, default: []] += embeds
         appendPendingEmbeds()
     }
@@ -106,7 +110,7 @@ extension EditorController {
             appendsAgain = true
             return
         }
-        guard let pageItemID, isReady, isEditable, let embeds = pendingEmbeds[pageItemID], !embeds.isEmpty else { return }
+        guard let pageItemID, isReady, isEditable, acceptsInsertion, let embeds = pendingEmbeds[pageItemID], !embeds.isEmpty else { return }
         isAppendingEmbeds = true
         appendsAgain = false
         let generation = generation
