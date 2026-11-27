@@ -146,11 +146,17 @@ struct KeysPage: View {
         }
         .help(Text(verbatim: key.label))
         if let failure = model.rowErrors[key.id] {
-            let line = failure == .unreachable
-                ? String(localized: "The app can’t reach the server to confirm whether this key was revoked.")
-                : OwnerWording.line(failure, on: .keys)
+            let line = switch failure {
+            case .unreachable: String(localized: "The app can’t reach the server to confirm whether this key was revoked.")
+            case .notFound: Self.unconfirmedRevocation
+            default: nil as String?
+            }
             OwnerProblemRow(title: "Couldn’t Revoke Key", failure: failure, line: line, page: .keys, host: host)
         }
+    }
+
+    static var unconfirmedRevocation: String {
+        String(localized: "The app couldn’t confirm whether this key was revoked.")
     }
 
     /// What the key reaches, then when it ends.
@@ -196,7 +202,11 @@ private struct KeyDetail: View {
                 SettingsButton("Rename…") { model.beginRename(key) }
             }
             if let failure = model.rowErrors[key.id] {
-                let line = failure == .unreachable ? String(localized: "The app can’t reach the server to confirm the result.") : nil
+                let line = switch failure {
+                case .unreachable: String(localized: "The app can’t reach the server to confirm the result.")
+                case .notFound: KeysPage.unconfirmedRevocation
+                default: nil as String?
+                }
                 SettingsSection(name: nil) {
                     OwnerProblemRow(title: "Couldn’t Change Key", failure: failure, line: line, page: .keys, host: host)
                 }

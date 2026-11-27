@@ -233,7 +233,7 @@ import Observation
     private static func notCopied(_ label: String) -> OwnerDraft {
         .told(
             title: String(localized: "Key Not Copied"),
-            message: String(localized: "The key “\(label)” was made, and its secret can’t be shown again. If you didn’t copy it, revoke the key on the Keys page."))
+            message: String(localized: "The key “\(label)” was made, and its secret can’t be shown again. If you didn’t copy it, revoke the key in Apps and Keys."))
     }
 
     /// Closes the sheet; the plaintext key goes with it, as it is shown only once.
@@ -339,7 +339,9 @@ import Observation
 
     func askToRevoke(_ key: KeyInfo) {
         var message = String(localized: "Anything using it stops at once. This can’t be undone.")
-        if isCurrent(key) {
+        if identityFailure != nil || identity == nil {
+            message += " " + String(localized: "If this Mac uses this key, revoking it signs this Mac out.")
+        } else if isCurrent(key) {
             message += " " + String(localized: "Revoking this key also signs this Mac out.")
         }
         question = Question(
@@ -368,13 +370,27 @@ import Observation
                 revoked = id
             } catch {
                 if error == .notFound {
-                    markGone(id)
+                    await checkAfterMissingRevoke(id)
                 } else {
                     rowErrors[id] = error
                 }
                 await context.learn(from: error)
             }
         }
+    }
+
+    private func checkAfterMissingRevoke(_ id: String) async {
+        do {
+            let read = try await context.calls.keys()
+            guard let actual = read.first(where: { $0.id == id }) else {
+                markGone(id)
+                return
+            }
+            if let index = keys.firstIndex(where: { $0.id == id }) { keys[index] = actual }
+        } catch {
+            await context.learn(from: error)
+        }
+        rowErrors[id] = .notFound
     }
 
     private func change(_ id: String, _ change: KeyChange) async {

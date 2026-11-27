@@ -258,7 +258,7 @@ nonisolated enum AppDataWording {
         case .unreachable: String(localized: "The app lost the server partway through.")
         case .conflict: String(localized: "It changed somewhere else partway through.")
         case .notConfirmed: String(localized: "The sign-in wasn’t confirmed partway through.")
-        default: OwnerWording.line(failure)
+        default: OwnerWording.problemLine(failure, on: .apps, canRetry: false)
         }
     }
 
@@ -266,7 +266,7 @@ nonisolated enum AppDataWording {
     /// what is left.
     static func unfinished(_ removal: AppDataRemoved, couldReadAgain: Bool = true) -> String {
         guard removal.removedItems > 0 else {
-            let reason = removal.stoppedBy.map { OwnerWording.line($0) }
+            let reason = removal.stoppedBy.map { OwnerWording.problemLine($0, on: .apps, canRetry: false) }
             let left = String(localized: "Some of it is still there. Remove it again to finish.")
             return [reason, left].compactMap { $0 }.joined(separator: " ")
         }

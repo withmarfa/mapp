@@ -176,7 +176,7 @@ private struct AppDetail: View {
             if let failure = model.rowErrors[app.id] {
                 let line = failure == .unreachable
                     ? String(localized: "The app can’t reach the server to confirm the result.")
-                    : OwnerWording.line(failure, on: .apps)
+                    : nil
                 SettingsSection(name: nil) {
                     OwnerProblemRow(title: "Couldn’t Change Access", failure: failure, line: line, page: .apps, host: host)
                 }
@@ -224,6 +224,14 @@ private struct AppDetail: View {
             }
             AppDataSection(model: model, app: app, host: host)
             SettingsSection("Disconnect") {
+                if let failure = model.disconnectDataFailures[app.id] {
+                    let line = disconnectFailureLine(failure)
+                    OwnerProblemRow(
+                        title: "Couldn’t Disconnect and Remove Data", failure: failure, line: line, page: .apps, host: host,
+                        additionalActions: [SettingsProblemAction("Disconnect Without Data Removal", isDestructive: true) {
+                            model.askToDisconnect(app, keepingData: true)
+                        }])
+                }
                 SettingsRow(
                     verbatim: String(localized: "Disconnect \(name)"),
                     line: String(localized: "Its webhooks are deleted. The keys it made keep working.")
@@ -232,6 +240,15 @@ private struct AppDetail: View {
                 }
             }
         }
+    }
+
+    private func disconnectFailureLine(_ failure: OwnerFailure) -> String? {
+        if let permission = AppsModel.dataRemovalPermissionLine(failure) { return permission }
+        if failure == .unreachable { return String(localized: "The app can’t reach the server to confirm the result.") }
+        if model.removedButConnected[app.id] != nil || (model.unfinished[app.id]?.removedItems ?? 0) > 0 {
+            return AppDataWording.stoppedAfterRemoving(failure)
+        }
+        return nil
     }
 }
 
@@ -262,10 +279,6 @@ private struct AppDataSection: View {
                         SettingsRow(verbatim: String(localized: "\(name) Keeps No Data"), look: .off)
                     }
                     ForEach(kept, id: \.vendor) { held in row(held, among: kept.count) }
-                    if !model.canRemoveData, kept.contains(where: { !model.isOwn($0.vendor) && !$0.types.isEmpty }) {
-                        OwnerProblemRow(
-                            title: "Remove App Data", failure: .notPermitted(InstancePermission.itemsPurge.rawValue), page: .apps, host: host)
-                    }
                     removalNote
                 }
             }
@@ -279,15 +292,21 @@ private struct AppDataSection: View {
         }
     }
 
-    private func row(_ held: AppData, among count: Int) -> some View {
+    @ViewBuilder private func row(_ held: AppData, among count: Int) -> some View {
         let title = count == 1 ? String(localized: "\(name)’s Own Data") : held.vendor
-        return SettingsRow(
+        let offersRemoval = !model.isOwn(held.vendor) && !held.types.isEmpty
+        let failure = model.dataRemovalFailure(for: app, vendor: held.vendor)
+        SettingsRow(
             verbatim: title, line: AppDataWording.line(held, appName: name, keptByApp: model.isOwn(held.vendor)), lines: nil
         ) {
-            if model.canRemoveData, !model.isOwn(held.vendor), !held.types.isEmpty {
+            if offersRemoval {
                 SettingsButton("Remove", role: .destructive) { model.askToRemoveData(app, vendor: held.vendor) }
-                    .disabled(model.removing.contains(app.id))
+                    .disabled(failure != nil || model.removing.contains(app.id))
             }
+        }
+        if offersRemoval, let failure {
+            OwnerProblemRow(
+                title: "Remove App Data", failure: failure, line: AppsModel.dataRemovalPermissionLine(failure), page: .apps, host: host)
         }
     }
 }

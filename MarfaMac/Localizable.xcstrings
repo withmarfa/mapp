@@ -4067,6 +4067,9 @@
     "Couldn’t Count" : {
 
     },
+    "Couldn’t Disconnect and Remove Data" : {
+
+    },
     "Couldn’t Export Automatically" : {
 
     },
@@ -4578,6 +4581,9 @@
 
     },
     "Disconnect %@?" : {
+
+    },
+    "Disconnect Without Data Removal" : {
 
     },
     "Disconnect it again to finish." : {
@@ -5598,6 +5604,9 @@
 
     },
     "If this Mac uses this app sign-in, disconnecting it signs this Mac out." : {
+
+    },
+    "If this Mac uses this key, revoking it signs this Mac out." : {
 
     },
     "Ignore" : {
@@ -10214,6 +10223,9 @@
     "The app couldn’t confirm that %@ ended its earlier approval." : {
 
     },
+    "The app couldn’t confirm whether this key was revoked." : {
+
+    },
     "The app couldn’t connect to the server. Check the address and make sure the server is running and reachable from this Mac, then try again." : {
 
     },
@@ -10628,7 +10640,7 @@
     "The key or app that created this webhook no longer has access. Create a new webhook for future deliveries." : {
 
     },
-    "The key “%@” was made, and its secret can’t be shown again. If you didn’t copy it, revoke the key on the Keys page." : {
+    "The key “%@” was made, and its secret can’t be shown again. If you didn’t copy it, revoke the key in Apps and Keys." : {
 
     },
     "The kind of item added can’t hold these, so they were left out." : {
@@ -11557,6 +11569,9 @@
 
     },
     "This sign-in holds %lld webhooks, the most the server allows." : {
+
+    },
+    "This sign-in needs access to this app’s namespace and its types." : {
 
     },
     "This type already has a field named “%@”." : {

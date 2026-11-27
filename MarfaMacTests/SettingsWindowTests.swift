@@ -23,7 +23,7 @@ struct SettingsWindowTests {
         let moved: [SettingsPage: SettingsPage] = [
             .passkeys: .account, .browsers: .account, .network: .account, .fileStorage: .account,
             .housekeeping: .account, .limits: .account, .monitoring: .account,
-            .apps: .keys, .links: .types,
+            .marfa(.apps): .keys, .links: .types,
         ]
         #expect(Set(sidebar + Array(moved.keys)) == Set(SettingsPage.allCases))
         for page in SettingsPage.allCases {
