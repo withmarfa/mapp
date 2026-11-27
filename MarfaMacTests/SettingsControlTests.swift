@@ -9,6 +9,36 @@ import Testing
 struct SettingsControlTests {
     enum Finish: CaseIterable { case escape, submit, blur }
 
+    @Test func pausedTelemetryLetsTheOwnerOpenTheirReportDestination() async throws {
+        let settings = StubMarfaHost(settings: InstanceSettingsModel { nil })
+        let calls = FakeInstanceCalls()
+        calls.changeElsewhere("telemetry_enabled", to: .bool(false))
+        settings.instanceCalls = calls
+        let model = MonitoringModel(context: OwnerContext(host: settings), calls: calls)
+        let window = host(MonitoringPage(host: settings, model: model))
+        defer { window.contentView = nil; window.close() }
+        try await press(in: window, matching: "Monitoring-postHogHost", attribute: "accessibilityIdentifier")
+        #expect(await eventually(within: .seconds(3)) { model.sheet?.secret == .postHogHost })
+    }
+
+    @Test func storageWithReadAccessLoadsFileDetailsWithoutRequestingConfiguration() async throws {
+        let settings = StubMarfaHost(settings: InstanceSettingsModel { nil })
+        settings.grants = [.instanceRead]
+        let calls = FakeOwnerCalls()
+        let configuration = FakeInstanceCalls()
+        calls.state.withLock { $0.metrics = InstanceMetricsReading(version: "1", databaseBytes: 256, fileBytes: 512) }
+        settings.ownerCalls = calls
+        settings.instanceCalls = configuration
+        let window = host(MarfaSettingsPageView(page: .fileStorage, host: settings))
+        defer { window.contentView = nil; window.close() }
+        #expect(await eventually(within: .seconds(3)) { calls.calls.contains("fileStores") && calls.calls.contains("instanceMetrics") })
+        #expect(configuration.calls.isEmpty)
+        #expect(await eventually(within: .seconds(3)) {
+            window.contentView?.layoutSubtreeIfNeeded()
+            return !elements(window.contentView, matching: "Database", attribute: "accessibilityValue").isEmpty
+        })
+    }
+
     @Test(arguments: [
         (OwnerFailure.signedOut, "Signed Out"), (.instanceChanged, "Another Marfa Answers"),
         (.notPermitted("profile:read"), "Needs a Permission"), (.unsupported, "No Server Settings"),
@@ -72,9 +102,11 @@ struct SettingsControlTests {
         let settings = StubMarfaHost(settings: InstanceSettingsModel { nil })
         let calls = FakeOwnerCalls()
         settings.ownerCalls = calls
+        let app = AppAccess(id: "studio", clientID: "studio", kind: .app, name: "Studio", origins: [], scopes: [], granted: nil, lastUsed: nil)
+        calls.state.withLock { $0.apps = [app] }
         let read = page == .account ? "profile" : "keys"
         let destination: MarfaSettingsPage = page == .account ? .network : .apps
-        let link = "SettingsLink-\(destination.rawValue)"
+        let link = page == .account ? "SettingsLink-\(destination.rawValue)" : "SettingsApp-\(app.id)"
         let pending = calls.hold(read)
         let window = host(MarfaSettingsPageView(page: page, host: settings))
         defer { pending.open(); window.contentView = nil; window.close() }
@@ -96,6 +128,7 @@ struct SettingsControlTests {
         } else {
             try await press(in: window, matching: link, attribute: "accessibilityIdentifier")
             #expect(settings.shown == [destination, destination])
+            #expect(settings.shownSubpages == [AppsPage.subpage(for: app), AppsPage.subpage(for: app)])
         }
     }
 

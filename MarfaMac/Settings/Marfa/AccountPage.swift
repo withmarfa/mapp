@@ -36,7 +36,7 @@ struct AccountPage: View {
             }
             if host.grants.contains(.configManage) {
                 let snapshot = try? await host.instanceCalls.storedSettings()
-                monitoringCount = snapshot?.enabledMonitoringCount
+                monitoringCount = snapshot?.activeMonitoringCount
             } else {
                 monitoringCount = nil
             }
@@ -236,9 +236,13 @@ struct AccountHeader: View {
     var body: some View {
         if let address = host.serverAddress {
             SettingsPageHeader(name: host.serverName, address: AddressesModel.display(address)) {
-                Button("Sign Out", action: host.requestSignOut)
-                    .buttonStyle(.bordered).buttonBorderShape(.capsule).controlSize(.regular)
-                    .accessibilityIdentifier("AccountSignOut")
+                HStack(spacing: SettingsTokens.Metric.buttonGap) {
+                    if host.isSignInBusy { ProgressView().controlSize(.small).accessibilityLabel("Working…") }
+                    Button("Sign Out", action: host.requestSignOut)
+                        .buttonStyle(.bordered).buttonBorderShape(.capsule).controlSize(.regular)
+                        .disabled(host.isSignInBusy)
+                        .accessibilityIdentifier("AccountSignOut")
+                }
             }
         }
     }
@@ -250,7 +254,7 @@ private struct ProfilePictureMark: View {
     let name: String?
 
     private var initials: String {
-        String((name ?? "").split(separator: " ").prefix(2).compactMap(\.first)).uppercased()
+        String((name ?? "").uppercased().split(separator: " ").prefix(2).compactMap(\.first))
     }
 
     var body: some View {
@@ -262,7 +266,10 @@ private struct ProfilePictureMark: View {
                     if initials.isEmpty {
                         SettingsTileGlyph(symbol: "person.fill", tileSize: SettingsTokens.Metric.tile)
                     } else {
-                        Text(verbatim: initials).settingsFont(.small)
+                        Text(verbatim: initials)
+                            .settingsFont(.small)
+                            .lineLimit(1)
+                            .minimumScaleFactor(SettingsTokens.Metric.avatarInitialsMinimumScale)
                     }
                 }
                 .foregroundStyle(SettingsTokens.tileForeground)

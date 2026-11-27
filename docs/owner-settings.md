@@ -12,34 +12,34 @@ These pages show and change what the server holds for its owner. Every call goes
 
 ## Pages
 
-The page gate checks the connection and the sign-in’s permissions. A configured Marfa keeps its Account header and Sign Out above any connection state. Each section that needs additional access identifies the permission. Account links to the server settings pages, and Apps and Keys links to Apps.
+The page gate checks connection and permissions. A configured Marfa keeps its Account header and Sign Out above any connection state. Sections identify additional permissions. Apps and Keys links to each connected app’s settings.
 
 | Page | Opens with | Its job |
 | --- | --- | --- |
 | Account | none | Profile, sign-out, sign-in controls and server settings. Problems and the release need `instance.read`. Updating needs `instance.maintain` |
 | Passkeys | `sign_ins.manage` | Add a passkey in the browser, rename one or remove it |
 | Browsers | `sign_ins.manage` | See and end browser sessions |
-| Apps | `grants.manage` | Connected apps: access, owner permissions, keys they made, data they keep |
-| Apps and Keys | `keys.manage` | The owner's keys and apps' keys. Making one needs `keys.mint` |
+| Apps and Keys | None | Connected apps need `grants.manage`. Listing all keys needs `keys.manage`. A sign-in with only `keys.mint` can create keys and manage keys within its reach |
+| App details | `grants.manage` | A connected app’s access, owner permissions, keys and data. Removing data also needs `items.purge` |
 | Network | `config.manage` | Sign-in and other addresses, websites allowed, private addresses |
 | Plugins | `schema.write` | Plugins installed, newer and available. One with a connector needs `connectors.manage` |
 | Types | `schema.write` | Types, fields, status words, and rules |
 | Links | `schema.write` | Link types. Opens from Types |
 | Sources | `keys.manage` | Names and marks of sources. Both source rules need `config.manage` |
-| Trash | `items.purge` | Restore items or empty Trash. Choose Select Items or Show All to permanently delete selected items. Changing how long items wait needs `config.manage` |
-| Storage | `config.manage` | Where files are kept, copies, reading text, removing unused files, and item version retention |
+| Trash | `items.purge` | Restore items or empty Trash. Choose Select Items or Show All to permanently delete selected items. Storage controls how long items stay in Trash |
+| Storage | `instance.read` or `config.manage` | File locations, sizes, and unused files need `instance.read`. Each configuration control needs `config.manage` |
 | Connectors | `connectors.manage` | Each connector's health, machine, sign-in, settings and mapping |
 | Webhooks | `webhooks.manage` | Webhooks by maker, their events and deliveries |
 | Folders | type access to `system.folder` | Synced folders: patterns, limits, copies, Stop Syncing |
 | Backups | `backups.manage` | Destination, backups, restore. Destination and interval need `config.manage` |
 | Housekeeping | `instance.read` or `config.manage` | Jobs need `instance.read`. Confirming the clock needs `instance.maintain`. Log retention needs `config.manage` |
 | Activity | `audit.read` | The audit log |
-| Monitoring | `config.manage` | Heartbeat, error reports and telemetry |
-| Limits | `config.manage` or `instance.read` | Changing limits needs `config.manage`. Either permission can read start-up setting names and whether each is set |
+| Monitoring | `config.manage` | Pausing telemetry pauses error reports. The owner can still change or remove the reporting destination |
+| Limits | `config.manage` or `instance.read` | Request, rate, inbound delivery, and live update limits need `config.manage`. Either permission can read start-up setting names and whether each is set |
 
 ## Permissions
 
-- **A page never shows content behind a missing permission.** It shows Needs a Permission in its own words, with Allow More, because a row that cannot load looks like a fault. `MarfaPageGate` decides.
+- **A missing page permission shows Needs a Permission with Allow More.** `MarfaPageGate` decides. Apps and Keys checks access to each section independently and shows a locked row for an unavailable action.
 - **A sign-in asks for every permission an app can hold**, and the owner grants what they choose. A page rereads the grants after approval and still says what is missing.
 - **A `forbidden` answer rereads the grants** and offers Allow More… in the problem row (`OwnerProblemRow`).
 - **Owner permissions are counted, never all or nothing**, and can only be turned off on a key's or an app's page (`OwnerPermissionsRow`).
@@ -51,7 +51,8 @@ The page gate checks the connection and the sign-in’s permissions. A configure
 - **Ask before anything that cannot be got back**, naming what goes and what stays: narrowing, revoking, disconnecting, emptying, shorter retention, less free disk, a raised folder limit, removing a type, plugin or data.
 - **A question holds its version.** What is confirmed is sent on the version it named, whatever is read while the alert is open.
 - **A typed safety number asks when the field is left**, because a person passes through other numbers while typing.
-- **A shorter or unknown retention always asks.** With no value the app can read, any choice may be shorter. Keep Versions asks on every change.
+- **Version history** asks before a change to any snapshot window or a possible reduction of the version cap. The server applies the cap after all three windows. Keep Versions asks on every change.
+- **Trash and log retention** ask before a shorter period. Use the server’s reported default for an unset period. If the default is unknown, ask when the change could shorten retention.
 - **Removing an app's data counts first and never half-tells.** It repeats until nothing is left, says how many went where it stops, and never says nothing changed once an item has gone.
 - **The app's own data is never removed here.** Connection's Remove… stops `PreferencesSync` first; a purge from here would delete the item under it.
 - **A disconnected app's keys still work** (`keys-and-oauth/grant-revoke-keeps-keys`); its webhooks go.
@@ -67,7 +68,7 @@ The page gate checks the connection and the sign-in’s permissions. A configure
 
 ## What a person typed
 
-- **A refusal keeps what was typed**, marks the field and says why under it. Clearing it loses work the person cannot see again.
+- **A refusal preserves what the person typed.** A refused limit or free disk reserve returns to its last reported value. When the app shows the recovery notice, it copies the original input to the clipboard. Other fields keep the input and show the reason for the refusal.
 - **A draft is handed back** at the end of the window or the app (`OwnerDrafts`, `Notices.notKept`). Where a call is in flight, its failure hands it back.
 - **A pop-up or switch sends at once; a field sends on Return or when left.** Emptied, it removes the stored value.
 - **A number out of range is never sent.** A separator the Mac's region does not use is refused, not guessed at.

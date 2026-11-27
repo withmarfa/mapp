@@ -4,7 +4,7 @@ import Observation
 
 /// The Housekeeping page: the jobs the server runs by itself, with how often, when each last ran and how that went, and the
 /// clock hold. While the server's clock reads more than 7 days past the time it last trusted, the jobs that delete wait;
-/// Confirm Date… tells the server the clock is right (`instance.maintain`), after the owner agrees.
+/// Confirm Date tells the server the clock is right (`instance.maintain`), after the owner agrees.
 @Observable @MainActor final class HousekeepingModel {
     private let context: OwnerContext
 
@@ -33,9 +33,9 @@ import Observation
         })
     }
 
-    /// The jobs the page lists, in its order, with the rest left out.
+    /// Every job the server reports, ordered by its displayed name.
     var listed: [HousekeepingJob] {
-        UpkeepWording.jobs.compactMap { listed in jobs.first { $0.name == listed.name } }
+        jobs.sorted { UpkeepWording.jobTitle($0.name).localizedStandardCompare(UpkeepWording.jobTitle($1.name)) == .orderedAscending }
     }
 
     // MARK: The clock

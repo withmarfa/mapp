@@ -12,8 +12,6 @@ struct TrashPage: View {
     @State private var kind: String?
     @State private var selection: Set<String> = []
 
-    private var settings: InstanceSettingsModel { host.instanceSettings }
-    private var canChangeRetention: Bool { host.grants.contains(.configManage) && settings.isAvailable }
 
     private var kinds: [String] { Set(host.deletedItems.map(\.kind)).sorted { $0.localizedStandardCompare($1) == .orderedAscending } }
 
@@ -58,26 +56,19 @@ struct TrashPage: View {
         Group {
             if showsAll { allPage } else { overview }
         }
-        .task(id: host.serverAddress) { if host.grants.contains(.configManage) { await settings.load() } }
-        .instanceSettingsQuestion(settings)
     }
 
     private var overview: some View {
         SettingsPageColumn {
             SettingsSection(
                 "Cleanup",
-                footer: canChangeRetention ? nil : host.deletedRetentionDays.map { LocalizedStringKey("Deleted items are kept for \($0) days.") },
+                footer: host.deletedRetentionDays.map { LocalizedStringKey("Deleted items are kept for \($0) days.") },
                 accessory: {
                     if !items.isEmpty && items.count <= SettingsTokens.Metric.tablePreviewThreshold {
                         SettingsButton("Select Items") { navigation?.push(Self.allDeleted) }
                     }
                 }
             ) {
-                if canChangeRetention {
-                    InstanceChoiceRow(
-                        model: settings, setting: .trashRetentionDays, among: [.trashRetentionDays],
-                        line: "Items wait here first, so they can come back.")
-                }
                 SettingsRow(
                     "Trash",
                     line: host.deletedCount == 0 ? "Nothing is waiting here." : "Permanently deletes \(host.deletedCount.formatted()) items."
@@ -87,7 +78,6 @@ struct TrashPage: View {
                         .accessibilityIdentifier("TrashEmpty")
                 }
             }
-            if canChangeRetention { InstanceStatusLine(model: settings, settings: [.trashRetentionDays]) }
             SettingsSection(name: Text("Deleted Items"), accessory: { filter }) {
                 if host.deletedCount == 0 {
                     SettingsEmptyCard(

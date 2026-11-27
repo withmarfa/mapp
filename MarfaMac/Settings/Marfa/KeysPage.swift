@@ -1,18 +1,19 @@
 import Marfa
 import SwiftUI
 
-/// The Keys page: the owner's keys and the keys apps made, each opening a page of its own, and New Key…. A key's page
-/// holds its expiry (with Extend…), its source, what it may reach (which can only be narrowed) and Revoke.
+/// Apps with standing access and the keys the current sign-in can manage.
 struct KeysPage: View {
     let host: any MarfaSettingsHost
     let subpage: SettingsSubpage?
     @State private var model: KeysModel
+    @State private var apps: AppsModel
     @Environment(\.settingsNavigation) private var navigation
 
     init(host: any MarfaSettingsHost, subpage: SettingsSubpage?) {
         self.host = host
         self.subpage = subpage
         _model = State(initialValue: KeysModel(context: OwnerContext(host: host)))
+        _apps = State(initialValue: AppsModel(context: OwnerContext(host: host), ownVendor: host.ownAppVendor))
     }
 
     static func subpage(for key: KeyInfo) -> SettingsSubpage {
@@ -28,7 +29,9 @@ struct KeysPage: View {
 
     var body: some View {
         content
-            .task(id: host.serverAddress) { await model.load() }
+            .task(id: host.grants.intersection([.keysManage, .keysMint])) {
+                if model.canReadKeys { await model.load() }
+            }
             .onAppear { host.ownerDrafts.register(model) }
             .settingsSheet(presenting: model.sheet != nil, dismiss: { model.dismissSheet() }) { KeySheet(model: model) }
             .alert(
@@ -40,33 +43,31 @@ struct KeysPage: View {
             } message: { asked in
                 Text(verbatim: asked.message)
             }
-            .onChange(of: model.revoked) { if $1 != nil { navigation?.back() } }
+            .onChange(of: model.revoked) { if $1 == openKeyID, $1 != nil { navigation?.back() } }
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("KeysPage")
     }
 
     @ViewBuilder private var content: some View {
-        if model.failure != nil || !model.hasLoaded {
-            if openKeyID == nil {
-                SettingsStandingState {
-                    AppsSettingsSection(host: host)
-                } state: {
-                    loadState
-                }
-            } else {
-                loadState
-            }
-        } else if let id = openKeyID {
-            if let key = model.key(id) {
-                if isShowingPermissions {
-                    KeyPermissions(model: model, key: key, host: host)
-                } else {
-                    KeyDetail(model: model, key: key, host: host)
-                }
-            } else {
+        if let id = openKeyID {
+            if !model.canReadKeys {
                 SettingsPageState(
-                    symbol: "key", title: Text("This Key Is Gone"), line: Text("It was revoked, or it expired, somewhere else."),
-                    action: ("Back", { navigation?.back() }))
+                    symbol: "lock", title: Text("Needs a Permission"), line: Text(verbatim: MarfaSettingsPage.keys.permissionLine),
+                    action: ("Allow More", { host.askForMore(naming: InstancePermission.keysManage.rawValue) }))
+            } else if model.failure != nil || !model.hasLoaded {
+                loadState
+            } else {
+                if let key = model.key(id) {
+                    if isShowingPermissions {
+                        KeyPermissions(model: model, key: key, host: host)
+                    } else {
+                        KeyDetail(model: model, key: key, host: host)
+                    }
+                } else {
+                    SettingsPageState(
+                        symbol: "key", title: Text("This Key Is Gone"), line: Text("It was revoked, or it expired, somewhere else."),
+                        action: ("Back", { navigation?.back() }))
+                }
             }
         } else {
             list
@@ -83,47 +84,94 @@ struct KeysPage: View {
 
     private var list: some View {
         SettingsPageColumn {
-            SettingsSection("Yours") {
-                ForEach(model.ownersKeys) { row($0) }
-                newKeyRow
-            }
-            if !model.appKeys.isEmpty {
-                SettingsSection("Made by Apps", line: "They keep working when the app is disconnected.") {
-                    ForEach(model.appKeys) { row($0) }
+            SignedInAppsSection(model: apps, host: host)
+            SettingsSection("Your Keys", footer: "Keys made by connected apps are on those apps’ pages.") {
+                if model.canMake {
+                    SettingsButton("New Key…") { model.beginNewKey() }
+                }
+            } content: {
+                if !model.canExtend {
+                    OwnerProblemRow(
+                        title: "Manage All Keys", failure: .notPermitted(InstancePermission.keysManage.rawValue),
+                        line: MarfaSettingsPage.keys.permissionLine, page: .keys, host: host)
+                }
+                if model.canReadKeys {
+                    if let failure = model.failure {
+                        OwnerProblemRow(title: "Couldn’t Read Keys", failure: failure, page: .keys, host: host) {
+                            Task { await model.load() }
+                        }
+                    } else if !model.hasLoaded {
+                        OwnerLoading()
+                    } else if model.ownersKeys.isEmpty {
+                        SettingsEmptyCard(symbol: "key", title: Text("No Keys"), line: Text("You haven’t made any keys this sign-in can see."))
+                    } else {
+                        ForEach(model.ownersKeys) { row($0) }
+                    }
+                }
+                if !model.canMake {
+                    SettingsAddRow(
+                        off: "New Key…", line: "The app isn’t allowed to make keys.",
+                        remedy: (host.isAllowingMore ? "Waiting…" : "Allow More…", {
+                            Task { _ = await host.allowMore([.keysMint]) }
+                        }))
                 }
             }
-            AppsSettingsSection(host: host)
+            if model.canReadKeys, model.hasLoaded, model.failure == nil, !otherAppKeys.isEmpty {
+                SettingsSection("Made by Apps", line: "They keep working when the app is disconnected.") {
+                    ForEach(otherAppKeys) { row($0) }
+                }
+            }
         }
     }
 
-    @ViewBuilder private var newKeyRow: some View {
-        if model.canMake {
-            SettingsAddRow("New Key…") { model.beginNewKey() }
-        } else {
-            SettingsAddRow(
-                off: "New Key…", line: "The app isn’t allowed to make keys.",
-                remedy: (host.isAllowingMore ? "Waiting…" : "Allow More…", {
-                    let host = host
-                    Task { _ = await host.allowMore([.keysMint]) }
-                }))
-        }
+    private var otherAppKeys: [KeyInfo] {
+        guard apps.canReadApps, apps.hasLoaded, apps.failure == nil else { return model.appKeys }
+        let connected = Set(apps.apps.map(\.clientID))
+        return model.appKeys.filter { !connected.contains($0.appClientID ?? "") }
     }
 
+    @ViewBuilder
     private func row(_ key: KeyInfo) -> some View {
-        SettingsLinkRow(
-            verbatim: key.label, line: Self.line(key, names: model.typeNames), lead: .tile("key.fill", .amber),
-            value: OwnerWording.used(key.lastUsed)
-        ) { navigation?.push(Self.subpage(for: key)) }
+        SettingsRow(
+            verbatim: key.label, line: Self.line(key, names: model.typeNames, isCurrent: model.isCurrent(key)), lead: .symbol("key")
+        ) {
+            HStack(spacing: SettingsTokens.Metric.buttonGap) {
+                SettingsValue(verbatim: OwnerWording.used(key.lastUsed)).fixedSize()
+                SettingsMoreMenu {
+                    Button("Open Key Settings") { navigation?.push(Self.subpage(for: key)) }
+                    Button("Revoke", role: .destructive) { model.askToRevoke(key) }
+                }
+                .accessibilityLabel(Text("Actions for \(key.label)"))
+            }
+        }
+        .help(Text(verbatim: key.label))
+        if let failure = model.rowErrors[key.id] {
+            let line = switch failure {
+            case .unreachable: String(localized: "The app can’t reach the server to confirm whether this key was revoked.")
+            case .notFound: Self.unconfirmedRevocation
+            default: nil as String?
+            }
+            OwnerProblemRow(title: "Couldn’t Revoke Key", failure: failure, line: line, page: .keys, host: host)
+        }
+    }
+
+    static var unconfirmedRevocation: String {
+        String(localized: "The app couldn’t confirm whether this key was revoked.")
     }
 
     /// What the key reaches, then when it ends.
-    static func line(_ key: KeyInfo, names: [String: String]) -> String {
-        let reach = AccessScopes.summary(KeyAccess.parsed(key), names: names)
-        let ends = key.expires.map { String(localized: "Expires \(OwnerWording.day($0)).") } ?? String(localized: "Never expires.")
-        return reach + " " + ends
+    static func line(_ key: KeyInfo, names: [String: String], isCurrent: Bool = false) -> String {
+        let identity = isCurrent ? String(localized: "Used to sign in on this Mac.") + " " : ""
+        let reach = AppsPage.accessLine(KeyAccess.parsed(key), names: names)
+        return identity + reach + " " + expiryLine(key)
+    }
+
+    static func expiryLine(_ key: KeyInfo, now: Date = .now) -> String {
+        guard let expiry = key.expires else { return String(localized: "Never expires.") }
+        let day = OwnerWording.day(expiry)
+        return expiry <= now ? String(localized: "Expired \(day).") : String(localized: "Expires \(day).")
     }
 }
-
 /// A key's types as the entries an app's access is read as.
 nonisolated enum KeyAccess {
     static func parsed(_ key: KeyInfo) -> AccessScopes.Parsed {
@@ -144,7 +192,8 @@ private struct KeyDetail: View {
 
     private var line: String {
         let made = key.created.map { String(localized: "Made \(OwnerWording.day($0)).") }
-        return [made, OwnerWording.used(key.lastUsed) + "."].compactMap { $0 }.joined(separator: " ")
+        let identity = model.isCurrent(key) ? String(localized: "Used to sign in on this Mac.") : nil
+        return [identity, made, OwnerWording.used(key.lastUsed) + "."].compactMap { $0 }.joined(separator: " ")
     }
 
     var body: some View {
@@ -152,7 +201,16 @@ private struct KeyDetail: View {
             SettingsHead(symbol: "key.fill", tone: .amber, title: Text(verbatim: key.label), line: Text(verbatim: line)) {
                 SettingsButton("Rename…") { model.beginRename(key) }
             }
-            if let failure = model.rowErrors[key.id] { OwnerProblem(title: "Not Changed", failure: failure, page: .keys, host: host) }
+            if let failure = model.rowErrors[key.id] {
+                let line = switch failure {
+                case .unreachable: String(localized: "The app can’t reach the server to confirm the result.")
+                case .notFound: KeysPage.unconfirmedRevocation
+                default: nil as String?
+                }
+                SettingsSection(name: nil) {
+                    OwnerProblemRow(title: "Couldn’t Change Key", failure: failure, line: line, page: .keys, host: host)
+                }
+            }
             SettingsSection("Key") {
                 expires
                 SettingsRow("New Items Go To", line: "The feed, or straight into the library.") {
@@ -179,7 +237,7 @@ private struct KeyDetail: View {
             }
             SettingsSection("Revoke") {
                 SettingsRow(verbatim: String(localized: "Revoke \(key.label)"), line: String(localized: "Anything using it stops at once.")) {
-                    SettingsButton("Revoke…", role: .destructive) { model.askToRevoke(key) }
+                    SettingsButton("Revoke", role: .destructive) { model.askToRevoke(key) }
                 }
             }
         }
@@ -228,16 +286,5 @@ private struct KeyPermissions: View {
             held: KeyAccess.parsed(key).permissions, line: "The owner’s permissions. A key can only lose them.",
             problem: model.rowErrors[key.id], page: .keys, host: host
         ) { model.askToRemove(permission: $0, from: key) }
-    }
-}
-
-// Temporary until Account and Types are rebuilt in session 266c.
-struct AppsSettingsSection: View {
-    let host: any MarfaSettingsHost
-
-    var body: some View {
-        SettingsSection("Connected Apps") {
-            MarfaSettingsPageRow(page: .apps, host: host)
-        }
     }
 }

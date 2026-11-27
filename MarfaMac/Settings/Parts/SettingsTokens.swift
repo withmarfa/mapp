@@ -251,6 +251,7 @@ enum SettingsTokens {
         static let shortcutPlaceholderInset: CGFloat = 8
         static let shortcutMinimumLabelScale: CGFloat = 0.75
         static let tile: CGFloat = 24
+        static let avatarInitialsMinimumScale: CGFloat = 0.35
         /// A tile's corner radius and the box its symbol is fitted in, as shares of its side: the symbol keeps even
         /// padding whatever its shape, as in System Settings' sidebar.
         static let tileRounding: CGFloat = 0.27

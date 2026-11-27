@@ -54,7 +54,7 @@ import Testing
         let words = model.pending.map { $0.shortenings.map(InstanceWording.consequence).joined() } ?? ""
         #expect(words.contains("30 days"))
         #expect(words.contains("activity and webhook deliveries"))
-        #expect(words.contains("can’t be recovered"))
+        #expect(words.contains("The next cleanup can permanently delete older data"))
         model.agree(model.pending!)
         #expect(model.pending == nil)
         #expect(await eventually { source.sent.count == 1 })
@@ -90,32 +90,29 @@ import Testing
     }
 
     @Test func theChoicesKeepAValueTheServerHoldsAndAlwaysOfferDefault() {
-        let held = InstanceChoices.options(for: .versionRecentDays, holding: 45)
+        let held = InstanceChoices.options(for: .versionRecentDays, holding: 45, defaultValue: 30)
         #expect(held.first == InstanceChoices.Option(value: nil, title: "Default (30 Days)"))
-        #expect(InstanceChoices.options(for: .name, holding: nil).first?.title == "Default")
+        #expect(InstanceChoices.options(for: .name, holding: nil, defaultValue: nil).first?.title == "Default")
         #expect(held.contains { $0.value == 45 && $0.title == "45 Days" })
         let values = held.dropFirst().compactMap(\.value)
         #expect(values == values.sorted())
-        // Zero days means no limit where it keeps things, and is never offered for a version window.
-        #expect(InstanceChoices.options(for: .auditRetentionDays, holding: nil).contains { $0.value == 0 && $0.title == "No Limit" })
-        #expect(!InstanceChoices.options(for: .versionRecentDays, holding: nil).contains { $0.value == 0 })
+        #expect(InstanceChoices.options(for: .auditRetentionDays, holding: nil, defaultValue: nil).contains { $0.value == 0 && $0.title == "No Limit" })
+        #expect(InstanceChoices.options(for: .versionRecentDays, holding: nil, defaultValue: nil).contains { $0.value == 0 && $0.title == "0 Days" })
         #expect(InstanceChoices.title(.versionRecentDays, 365) == "1 Year")
         #expect(InstanceChoices.title(.versionMaxVersions, 500) == "500 Versions")
         #expect(InstanceChoices.title(.blobCleanupGraceSeconds, 86_400) == "1 Day")
         #expect(InstanceChoices.title(.blobCleanupGraceSeconds, 3_600) == "1 Hour")
     }
 
-    @Test func aPopUpShowsTheDefaultsValueWhereTheServerHoldsNone() {
-        #expect(InstanceChoices.shown(for: .trashRetentionDays, holding: nil) == 60)
-        #expect(InstanceChoices.title(.trashRetentionDays, 60) == "60 Days")
-        #expect(InstanceChoices.shown(for: .trashRetentionDays, holding: 14) == 14)
-        #expect(InstanceChoices.shown(for: .name, holding: nil) == nil)
-        // The menu still offers the server's default by its own item, which says what it is.
-        #expect(InstanceChoices.options(for: .trashRetentionDays, holding: 60).first?.title == "Default (60 Days)")
+    @Test func aMenuUsesTheDefaultTheServerReports() {
+        #expect(InstanceChoices.options(for: .trashRetentionDays, holding: 60, defaultValue: 14).first?.title == "Default (14 Days)")
     }
 
     @Test func eachPageNamesThePermissionItNeeds() {
         #expect(MarfaSettingsPage.fileStorage.permission == .configManage)
+        #expect(MarfaSettingsPage.fileStorage.missingPermission(in: [.instanceRead]) == nil)
+        #expect(MarfaSettingsPage.fileStorage.missingPermission(in: [.configManage]) == nil)
+        #expect(MarfaSettingsPage.fileStorage.missingPermission(in: []) == .configManage)
         #expect(MarfaSettingsPage.sources.permission == .keysManage)
         #expect(MarfaSettingsPage.trash.permission == .itemsPurge)
     }
@@ -355,6 +352,27 @@ import Testing
 
     private let rows = [OwnerSource(code: "readwise", name: "Readwise"), OwnerSource(code: "rss", name: "RSS")]
 
+    @Test func bothRuleValuesComeFromOneReadAndAnUnreadRuleHasNoValue() async {
+        let bench = OwnerBench(grants: [.configManage])
+        let model = model(bench, sources: rows)
+        #expect(model.status(of: .filter) == nil)
+        bench.calls.state.withLock {
+            $0.sourceLimit.allowlist = (types: ["core.note"], sources: ["rss"])
+        }
+        await model.load(choices: false)
+        #expect(model.status(of: .filter) == "Off")
+        #expect(model.status(of: .allowlist) == "On")
+        bench.calls.state.withLock {
+            $0.sourceLimit.set(.filter, to: SourceRuleValue(types: ["core.note"], sources: []))
+        }
+        await model.load(choices: false)
+        #expect(model.status(of: .filter) == "On", "A stored rule allowing zero sources still restricts the named types")
+        #expect(model.checkedSources.isEmpty)
+        bench.calls.fail("sourceLimit", with: .unreachable)
+        await model.load(choices: false)
+        #expect(model.status(of: .allowlist) == nil)
+    }
+
     @Test func theLimitIsReadWithTheTypesAndSourcesItNames() async {
         let bench = OwnerBench(grants: [.configManage])
         bench.calls.state.withLock {
@@ -571,6 +589,17 @@ import Testing
     }
 
     private let sets = [MarfaMarkSet(id: "lucide", title: "Lucide"), MarfaMarkSet(id: "simple-icons", title: "Simple Icons")]
+
+    @Test func sourcesAreOrderedByCountThenNameAndKeepTheirFullNames() {
+        let server = Server()
+        let name = String(repeating: "Studio", count: 33) + " A"
+        server.rows.append(.init(code: "studio", name: name, mark: nil, count: 318, nameOrigin: .app))
+        server.rows.insert(.init(code: "unknown", name: "A", mark: nil, count: nil, nameOrigin: .code), at: 0)
+        let model = SourcesModel(access: server.access, markSets: sets)
+        #expect(model.rows.map(\.code) == ["github", "studio", "rss", "unknown"])
+        model.beginRename("studio")
+        #expect(model.name == name)
+    }
 
     @Test func aRenameIsSentAndClosesTheSheet() async {
         let server = Server()

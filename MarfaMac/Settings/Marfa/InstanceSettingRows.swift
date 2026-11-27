@@ -10,17 +10,16 @@ nonisolated enum InstanceChoices {
         let title: String
     }
 
-    static func options(for setting: InstanceSetting, holding current: Int?) -> [Option] {
+    static func options(for setting: InstanceSetting, holding current: Int?, defaultValue: Int?) -> [Option] {
         var steps = steps(for: setting)
+        if setting.isNumber {
+            steps = Array(Set(steps + [setting.range.lowerBound, setting.range.upperBound]))
+        }
         if let current, !steps.contains(current) { steps.append(current) }
         steps.sort()
-        let standard = setting.documentedDefault.map { String(localized: "Default (\(title(setting, $0)))") } ?? String(localized: "Default")
+        let standard = defaultValue.map { String(localized: "Default (\(title(setting, $0)))") } ?? String(localized: "Default")
         return [Option(value: nil, title: standard)] + steps.map { Option(value: $0, title: title(setting, $0)) }
     }
-
-    /// What the pop-up shows: the value held, or where none is, the one the server's own default gives, so the pop-up reads
-    /// "30 Days" and only the menu's item for the default says "Default (30 Days)".
-    static func shown(for setting: InstanceSetting, holding current: Int?) -> Int? { current ?? setting.documentedDefault }
 
     private static func steps(for setting: InstanceSetting) -> [Int] {
         switch setting {
@@ -38,9 +37,9 @@ nonisolated enum InstanceChoices {
         if setting.zeroMeansNoLimit && value == 0 { return String(localized: "No Limit") }
         switch setting {
         case .versionMaxVersions: return value == 1 ? String(localized: "1 Version") : String(localized: "\(value) Versions")
-        case .blobMinCopies: return String(value)
+        case .blobMinCopies: return value == 1 ? String(localized: "1 Copy") : String(localized: "\(value) Copies")
         case .blobCleanupGraceSeconds:
-            if value == 0 { return String(localized: "Right Away") }
+            if value == 0 { return String(localized: "Next Sweep") }
             if value % 86_400 == 0 { return dayTitle(value / 86_400) }
             if value % 3_600 == 0 { return value == 3_600 ? String(localized: "1 Hour") : String(localized: "\(value / 3_600) Hours") }
             return String(localized: "\(value) Seconds")
@@ -50,7 +49,7 @@ nonisolated enum InstanceChoices {
 
     private static func dayTitle(_ days: Int) -> String {
         if days == 1 { return String(localized: "1 Day") }
-        if days % 365 == 0 { return days == 365 ? String(localized: "1 Year") : String(localized: "\(days / 365) Years") }
+        if days > 0 && days % 365 == 0 { return days == 365 ? String(localized: "1 Year") : String(localized: "\(days / 365) Years") }
         return String(localized: "\(days) Days")
     }
 }
@@ -79,63 +78,63 @@ nonisolated enum InstanceChoices {
     }
 }
 
-/// A number the server holds, chosen from a pop-up and sent at once. A shorter retention asks first
-/// (`instanceSettingsQuestion`), and a refusal keeps the choice with the red ring and one line.
+/// A number the server holds, chosen from a pop-up. A change that may remove data asks first.
 struct InstanceChoiceRow: View {
     let model: InstanceSettingsModel
     let setting: InstanceSetting
     let among: [InstanceSetting]
+    let catalog: LimitsModel
     var line: LocalizedStringKey?
 
-    private var held: Int? {
-        if case .value(.number(let number)) = setting.entry(from: model.draft[setting] ?? "") { number } else { nil }
-    }
-
-    private var shown: Int? { InstanceChoices.shown(for: setting, holding: held) }
+    private var standard: Int? { catalog.setting(setting.serverKey)?.defaultValue?.int }
+    private var shown: Int? { model.loaded?.number(setting) ?? standard }
 
     var body: some View {
         let errors = InstanceRowErrors(model: model, settings: among)
-        SettingsRow(title: Text(verbatim: setting.title), line: line.map { Text($0) }, error: errors.message(for: setting)) {
-            SettingsPopUp(
-                title: LocalizedStringKey(setting.title),
-                selection: Binding { shown } set: { choice in
-                    guard choice != held else { return }
-                    model.draft[setting] = choice.map { String($0) } ?? ""
-                    Task { await model.save([setting]) }
+        if catalog.setting(setting.serverKey)?.value != nil {
+            SettingsRow(title: Text(verbatim: setting.title), line: line.map { Text($0) }, error: errors.message(for: setting)) {
+                SettingsPopUp(
+                    title: LocalizedStringKey(setting.title),
+                    selection: Binding { shown } set: { choice in
+                        Task { await model.choose(choice, for: setting, defaultValue: standard) }
+                    }
+                ) {
+                    ForEach(InstanceChoices.options(for: setting, holding: shown, defaultValue: standard), id: \.self) { option in
+                        Text(verbatim: option.title).tag(option.value)
+                    }
                 }
-            ) {
-                ForEach(InstanceChoices.options(for: setting, holding: shown), id: \.self) { option in
-                    Text(verbatim: option.title).tag(option.value)
-                }
+                .disabled(model.isSaving || model.pending != nil)
+                .settingsErrorRing(errors.isError(setting))
+                .accessibilityIdentifier("Instance" + setting.rawValue)
             }
-            .disabled(model.isSaving)
-            .settingsErrorRing(errors.isError(setting))
-            .accessibilityIdentifier("Instance" + setting.rawValue)
         }
     }
 }
 
-/// A switch the server holds, sent at once. Where the server holds none, it shows what the server documents as its default.
+/// A stored switch, with the default reported by the connected server.
 struct InstanceToggleRow: View {
     let model: InstanceSettingsModel
     let setting: InstanceSetting
     let among: [InstanceSetting]
+    let catalog: LimitsModel
     var line: LocalizedStringKey?
 
     var body: some View {
         let errors = InstanceRowErrors(model: model, settings: among)
-        SettingsRow(title: Text(verbatim: setting.title), line: line.map { Text($0) }, error: errors.message(for: setting)) {
-            SettingsToggle(
-                title: LocalizedStringKey(setting.title),
-                isOn: Binding {
-                    if case .value(.flag(let flag)) = setting.entry(from: model.draft[setting] ?? "") { flag } else { setting.documentedFlag }
-                } set: { isOn in
-                    model.draft[setting] = isOn ? "true" : "false"
-                    Task { await model.save([setting]) }
-                }
-            )
-            .disabled(model.isSaving)
-            .accessibilityIdentifier("Instance" + setting.rawValue)
+        if catalog.setting(setting.serverKey)?.value != nil {
+            SettingsRow(title: Text(verbatim: setting.title), line: line.map { Text($0) }, error: errors.message(for: setting)) {
+                SettingsToggle(
+                    title: LocalizedStringKey(setting.title),
+                    isOn: Binding {
+                        if case .value(.flag(let flag)) = setting.entry(from: model.draft[setting] ?? "") { flag } else { catalog.setting(setting.serverKey)?.defaultValue?.bool == true }
+                    } set: { isOn in
+                        model.draft[setting] = isOn ? "true" : "false"
+                        Task { await model.save([setting], revertsOnFailure: true) }
+                    }
+                )
+                .disabled(model.isSaving)
+                .accessibilityIdentifier("Instance" + setting.rawValue)
+            }
         }
     }
 }
@@ -145,19 +144,31 @@ struct InstanceNumberRow: View {
     let model: InstanceSettingsModel
     let setting: InstanceSetting
     let among: [InstanceSetting]
+    let catalog: LimitsModel
     let unit: LocalizedStringKey
     var line: LocalizedStringKey?
 
+    private var standard: Int? {
+        guard let bytes = catalog.setting(setting.serverKey)?.defaultValue?.int, bytes.isMultiple(of: InstanceSetting.bytesPerMegabyte) else { return nil }
+        return bytes / InstanceSetting.bytesPerMegabyte
+    }
+
+    private func save() {
+        Task { await model.save([setting], revertsOnFailure: true, defaults: standard.map { [setting: $0] } ?? [:]) }
+    }
+
     var body: some View {
         let errors = InstanceRowErrors(model: model, settings: among)
-        SettingsRow(title: Text(verbatim: setting.title), line: line.map { Text($0) }, error: errors.message(for: setting)) {
-            SettingsNumberField(
-                title: LocalizedStringKey(setting.title), text: Binding { model.draft[setting] ?? "" } set: { model.draft[setting] = $0 },
-                unit: unit, prompt: setting.documentedDefault.map { String($0) }, isError: errors.isError(setting),
-                onSubmit: { Task { await model.save([setting]) } }, onEndEditing: { Task { await model.save([setting]) } }
-            )
-            .disabled(model.isSaving)
-            .accessibilityIdentifier("Instance" + setting.rawValue)
+        if catalog.setting(setting.serverKey)?.value != nil {
+            SettingsRow(title: Text(verbatim: setting.title), line: line.map { Text($0) }, error: errors.message(for: setting)) {
+                SettingsNumberField(
+                    title: LocalizedStringKey(setting.title), text: Binding { model.draft[setting] ?? "" } set: { model.draft[setting] = $0 },
+                    unit: unit, prompt: standard.map { String($0) }, isError: errors.isError(setting),
+                    onSubmit: save, onEndEditing: save
+                )
+                .disabled(model.isSaving)
+                .accessibilityIdentifier("Instance" + setting.rawValue)
+            }
         }
     }
 }
@@ -197,23 +208,29 @@ extension View {
         ) { pending in
             Button(InstanceSettingsQuestion.button(pending), role: .destructive) { model.agree(pending) }
         } message: { pending in
-            Text(pending.shortenings.map(InstanceWording.consequence).joined(separator: "\n\n"))
+            Text(InstanceSettingsQuestion.message(pending))
         }
     }
 }
 
-/// The words of the question, which say what is being lowered.
 enum InstanceSettingsQuestion {
     private static func onlyReserve(_ pending: InstanceSettingsModel.Pending) -> Bool {
         pending.shortenings.allSatisfy { $0.setting == .diskReserveMegabytes }
     }
 
     static func title(_ pending: InstanceSettingsModel.Pending) -> String {
-        onlyReserve(pending) ? String(localized: "Keep less free on disk?") : String(localized: "Keep things for less time?")
+        if pending.shortenings.contains(where: { $0.change == .versionPolicy }) { return String(localized: "Change Retention Settings?") }
+        return onlyReserve(pending) ? String(localized: "Keep less free on disk?") : String(localized: "Keep things for less time?")
     }
 
     static func button(_ pending: InstanceSettingsModel.Pending) -> String {
-        onlyReserve(pending) ? String(localized: "Lower and Save") : String(localized: "Shorten and Save")
+        if pending.shortenings.contains(where: { $0.change == .versionPolicy }) { return String(localized: "Change and Save") }
+        return onlyReserve(pending) ? String(localized: "Lower and Save") : String(localized: "Shorten and Save")
+    }
+
+    static func message(_ pending: InstanceSettingsModel.Pending) -> String {
+        var seen = Set<String>()
+        return pending.shortenings.map(InstanceWording.consequence).filter { seen.insert($0).inserted }.joined(separator: "\n\n")
     }
 }
 
@@ -223,7 +240,15 @@ struct InstanceSettingsGate<Content: View>: View {
     /// The page the gate stands in, which words what the app isn't allowed to do there.
     let page: MarfaSettingsPage
     let host: any MarfaSettingsHost
-    @ViewBuilder let content: Content
+    let content: (LimitsModel) -> Content
+    @State private var catalog: LimitsModel
+
+    init(page: MarfaSettingsPage, host: any MarfaSettingsHost, @ViewBuilder content: @escaping (LimitsModel) -> Content) {
+        self.page = page
+        self.host = host
+        self.content = content
+        _catalog = State(initialValue: LimitsModel(context: OwnerContext(host: host), calls: host.instanceCalls))
+    }
 
     private var model: InstanceSettingsModel { host.instanceSettings }
 
@@ -231,13 +256,37 @@ struct InstanceSettingsGate<Content: View>: View {
         Group {
             if let failure = model.failure, !model.isAvailable {
                 OwnerFailureState(page: page, failure: OwnerFailure(failure), host: host) { Task { await model.load() } }
-            } else if !model.isAvailable {
+            } else if let failure = catalog.failure {
+                OwnerFailureState(page: page, failure: failure, host: host) { Task { await catalog.load() } }
+            } else if !model.isAvailable || !catalog.isLoaded {
                 OwnerLoading()
             } else {
-                content
+                content(catalog)
             }
         }
-        .task(id: host.serverAddress) { await model.load() }
+        .task(id: host.serverAddress) {
+            async let settings: Void = model.load()
+            await catalog.load()
+            await settings
+        }
+        .onAppear { host.ownerDrafts.register(catalog) }
+        .onDisappear { host.ownerDrafts.pageLeft(catalog) }
+        .onChange(of: model.failure) { _, failure in
+            if failure == .notPermitted { Task { await host.refreshGrants() } }
+        }
         .instanceSettingsQuestion(model)
+    }
+}
+
+struct LockedInstanceRow: View {
+    let title: String
+    let permission: InstancePermission
+    let host: any MarfaSettingsHost
+
+    var body: some View {
+        SettingsLinkRow(verbatim: title, lock: String(localized: "Not allowed")) {
+            host.askForMore(naming: permission.rawValue)
+        }
+        .disabled(host.isAllowingMore)
     }
 }

@@ -38,7 +38,7 @@ import Observation
 
     /// Whether a webhook is sending, as the list says it.
     enum Sending: Equatable {
-        case sending, off, failing, unread
+        case checking, sending, off, failing, unread
     }
 
     struct Draft: Equatable {
@@ -96,6 +96,7 @@ import Observation
     private(set) var sendingFailures: [String: OwnerFailure] = [:]
     /// Whether each webhook is sending, read from its latest delivery after the list shows.
     private(set) var sending: [String: Sending] = [:]
+    @ObservationIgnored private var deliveryReads: [String: DeliveryRead] = [:]
     /// One line under a webhook's rows whose change was refused, by the webhook's id.
     private(set) var rowErrors: [String: OwnerFailure] = [:]
     var question: Question?
@@ -156,8 +157,8 @@ import Observation
         return .standing
     }
 
-    /// The webhooks grouped by who made them: this sign-in's own first, always, so New Webhook… has its place; then each
-    /// app, then each key, by name, a maker that has expired or is gone last. Oldest first within a group.
+    /// Groups this sign-in’s webhooks first, then the other apps and keys. Expired or missing makers come last.
+    /// Each group lists its oldest webhook first.
     var groups: [Group] {
         let sorted = webhooks.sorted { ($0.created ?? .distantFuture) < ($1.created ?? .distantFuture) }
         let own = sorted.filter(isOwn)
@@ -235,8 +236,11 @@ import Observation
 
     func isSending(_ webhook: OwnerWebhook) -> Sending {
         guard webhook.active else { return .off }
-        if sendingFailures[webhook.id] != nil { return .unread }
-        return sending[webhook.id] ?? .sending
+        switch standing(of: webhook.maker) {
+        case .expired, .gone: return .off
+        case .unread: return .unread
+        case .standing: return sendingFailures[webhook.id] == nil ? sending[webhook.id] ?? .checking : .unread
+        }
     }
 
     // MARK: Reading
@@ -260,17 +264,20 @@ import Observation
     private func readList(waitForPrevious: Bool = false) async {
         await loader.load(in: context, waitForPrevious: waitForPrevious, primary: { () throws(OwnerFailure) in
             let every = seesEvery
-            if every {
+            let listed = try await context.calls.webhooks()
+            if every && !listed.isEmpty {
                 if identity == nil { identity = try await context.calls.identity() }
             } else {
                 (identity, keys) = (nil, [])
             }
-            webhooks = try await context.calls.webhooks()
+            webhooks = listed
             listedEvery = every
             gone = gone.filter { id in !webhooks.contains { $0.id == id } }
         }, secondary: [
             .required(keysRead) { [self] () throws(OwnerFailure) in
-                if listedEvery { keys = try await context.calls.keys() }
+                if listedEvery && webhooks.contains(where: { $0.maker?.kind == .key }) {
+                    keys = try await context.calls.keys()
+                }
             },
         ], showBeforeFinishing: true)
     }
@@ -291,42 +298,74 @@ import Observation
             return
         }
         webhooks = []
+        deliveryReads = [:]
         sending = [:]
         sendingFailures = [:]
         await load()
     }
 
-    private func mayChange(_ id: String) -> Bool { webhook(id).map(isOwn) ?? true }
+    private func mayChange(_ id: String) -> Bool { canMake && webhook(id).map(isOwn) == true }
+
+    private struct DeliveryRead: Sendable {
+        let token = UUID()
+        let webhook: String
+        let includesHistory: Bool
+
+        nonisolated func fetch(from calls: any OwnerCalls) async -> Result<[WebhookDeliveryInfo], OwnerFailure> {
+            do {
+                return .success(try await calls.deliveries(of: webhook, limit: includesHistory ? 50 : 1))
+            } catch {
+                return .failure(error)
+            }
+        }
+    }
+
+    private func startRead(of id: String, history: Bool) -> DeliveryRead {
+        // A list refresh that supersedes an open detail read also owes that page its full history.
+        let read = DeliveryRead(webhook: id, includesHistory: history || deliveryReads[id]?.includesHistory == true)
+        deliveryReads[id] = read
+        return read
+    }
 
     /// Checks the latest deliveries a few at a time, after the list is available.
     private func loadSending() async {
         let calls = context.calls
         let every = listedEvery
         await readEach(
-            of: webhooks.filter(\.active).map(\.id),
-            read: { id -> Result<WebhookDeliveryInfo?, OwnerFailure> in
-                do throws(OwnerFailure) { return .success(try await calls.deliveries(of: id).first) } catch { return .failure(error) }
-            },
-            take: { id, answer in
-                guard seesEvery == every, listedEvery == every, webhook(id)?.active == true else { return }
-                switch answer {
-                case .success(let latest):
-                    sendingFailures[id] = nil
-                    sending[id] = latest?.status == .failed ? .failing : .sending
-                case .failure(let failure):
-                    sendingFailures[id] = failure
-                    await context.learn(from: failure)
-                }
+            of: webhooks.filter(\.active).map { startRead(of: $0.id, history: false) },
+            read: { await $0.fetch(from: calls) },
+            take: { read, answer in
+                guard seesEvery == every, listedEvery == every, webhook(read.webhook)?.active == true else { return }
+                await take(answer, for: read)
             })
     }
 
+    private func recordLatest(_ delivery: WebhookDeliveryInfo?, of id: String) {
+        sendingFailures[id] = nil
+        let failed = delivery?.status == .failed || (delivery?.status == .pending && delivery?.error != nil)
+        sending[id] = failed ? .failing : .sending
+    }
+
     func loadDeliveries(of id: String) async {
-        do {
-            deliveries[id] = try await context.calls.deliveries(of: id)
-            deliveriesFailure[id] = nil
-        } catch {
-            deliveriesFailure[id] = error
-            await context.learn(from: error)
+        let read = startRead(of: id, history: true)
+        await take(read.fetch(from: context.calls), for: read)
+    }
+
+    private func take(_ answer: Result<[WebhookDeliveryInfo], OwnerFailure>, for read: DeliveryRead) async {
+        let id = read.webhook
+        guard deliveryReads[id]?.token == read.token else { return }
+        deliveryReads[id] = nil
+        switch answer {
+        case .success(let latest):
+            if read.includesHistory {
+                deliveries[id] = latest
+                deliveriesFailure[id] = nil
+            }
+            recordLatest(latest.first, of: id)
+        case .failure(let failure):
+            if read.includesHistory { deliveriesFailure[id] = failure }
+            sendingFailures[id] = failure
+            await context.learn(from: failure)
         }
     }
 
@@ -337,6 +376,7 @@ import Observation
         rowErrors[id] = nil
         do {
             try await apply(id, change)
+            await loadDeliveries(of: id)
         } catch {
             rowErrors[id] = error
         }
@@ -348,18 +388,13 @@ import Observation
     private func changeEvents(of id: String, _ build: (OwnerWebhook) -> [String]) async {
         guard mayChange(id) else { return }
         rowErrors[id] = nil
-        do throws(OwnerFailure) {
-            let current: OwnerWebhook
-            do throws(OwnerFailure) {
-                current = try await context.calls.webhook(id)
-            } catch {
-                if error == .notFound { markGone(id) }
-                await context.learn(from: error)
-                throw error
-            }
-            try await apply(id, WebhookChange(events: build(current)))
+        do {
+            let current = try await context.calls.webhook(id)
+            await change(id, WebhookChange(events: build(current)))
         } catch {
+            if error == .notFound { markGone(id) }
             rowErrors[id] = error
+            await context.learn(from: error)
         }
     }
 
@@ -380,10 +415,10 @@ import Observation
             updated.maker = webhooks[index].maker
             webhooks[index] = updated
         }
-        sending[webhook.id] = nil
     }
 
     private func markGone(_ id: String) {
+        deliveryReads[id] = nil
         gone.insert(id)
         webhooks.removeAll { $0.id == id }
     }
@@ -448,6 +483,7 @@ import Observation
             rowErrors[id] = nil
             do {
                 try await context.calls.delete(webhook: id)
+                deliveryReads[id] = nil
                 webhooks.removeAll { $0.id == id }
                 deliveries[id] = nil
                 deleted = id
@@ -479,14 +515,17 @@ import Observation
     func saveAddress() async {
         guard case .address(let id)? = sheet, canSaveAddress, mayChange(id) else { return }
         isSavingAddress = true
-        defer { isSavingAddress = false }
         do {
             try await apply(id, WebhookChange(url: Self.normalized(addressDraft)))
-            sheet = nil
-            addressError = nil
         } catch {
             addressError = OwnerWording.line(error)
+            isSavingAddress = false
+            return
         }
+        isSavingAddress = false
+        addressError = nil
+        sheet = nil
+        await loadDeliveries(of: id)
     }
 
     /// An address as typed, with `https://` where it has no scheme.
@@ -511,10 +550,11 @@ import Observation
         deliveryErrors[webhook.id] = nil
         do {
             let queued = try await context.calls.redeliver(delivery.id, of: webhook.id)
+            deliveryReads[webhook.id] = nil
             if let index = deliveries[webhook.id]?.firstIndex(where: { $0.id == queued.id }) {
                 deliveries[webhook.id]?[index] = queued
             }
-            sending[webhook.id] = nil
+            if let latest = deliveries[webhook.id]?.first { recordLatest(latest, of: webhook.id) }
         } catch {
             deliveryErrors[webhook.id] = error
             if error == .notFound { markGone(webhook.id) }
@@ -564,19 +604,19 @@ import Observation
         if closedWhileMaking {
             closedWhileMaking = false
             sheet = nil
-            context.lateDraft(Self.notCopied(made.webhook.url))
+            context.lateDraft(Self.creationNotice(made.webhook.url))
         } else {
             created = made
             sheet = .secret
         }
+        recordLatest(nil, of: made.webhook.id)
         await readList(waitForPrevious: true)
         await reloadIfScopeChanged()
     }
 
-    /// The notice for a webhook made whose signing secret was never copied: it can't be shown again.
-    private static func notCopied(_ address: String) -> OwnerDraft {
+    private static func creationNotice(_ address: String) -> OwnerDraft {
         .told(
-            title: String(localized: "Signing Secret Not Copied"),
+            title: String(localized: "Webhook Created"),
             message: String(localized: "The webhook “\(display(address))” was made, and its signing secret can’t be shown again. If you didn’t copy it, delete the webhook on the Webhooks page and make it again."))
     }
 
@@ -607,7 +647,7 @@ import Observation
         }
         switch sheet {
         case .secret:
-            return created.map { [Self.notCopied($0.webhook.url)] } ?? []
+            return created.map { [Self.creationNotice($0.webhook.url)] } ?? []
         case .new:
             return typedDraft().map { [$0] } ?? []
         case .address(let id):

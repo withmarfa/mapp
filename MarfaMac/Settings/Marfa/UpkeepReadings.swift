@@ -15,15 +15,12 @@ nonisolated struct BackupRecord: Identifiable, Hashable, Sendable {
 
 /// The settings of Backups and Updates, as `GET /config` gives them: where and how often the server backs itself up, and whether it checks for updates.
 nonisolated struct UpkeepSettings: Hashable, Sendable {
-    /// How often the server backs up when it has something new, unless it was set: the contract's default, an hour.
-    static let defaultInterval = 3600
-
     var instanceID: String?
     /// The folder on the machine the server runs on, where one is set.
     var folder: String?
     /// Whether an object store is the destination, which the server allows only with no folder.
     var objectStore: Bool
-    var intervalSeconds: Int
+    var intervalSeconds: Int?
     /// Whether the server checks for a newer release by itself.
     var checksForUpdates: Bool
 }
@@ -114,6 +111,8 @@ nonisolated struct HousekeepingJob: Identifiable, Hashable, Sendable {
     let name: String
     let intervalSeconds: Int
     var lastFinished: Date?
+    var nextRun: Date?
+    var runningSince: Date?
     var lastFinishedHasTime = true
     /// Nil until a run has finished.
     var outcome: Outcome?

@@ -45,7 +45,7 @@ nonisolated final class MarfaSettingsTests: XCTestCase {
         XCTAssertFalse(app.secureTextFields.firstMatch.exists, "no key is typed into the app")
         XCTAssertTrue(connect.exists, "Continue opens the server's own page")
         XCTAssertTrue(connectWithCode.exists, "Sign In with a Code is for a Mac that cannot open the browser")
-        XCTAssertFalse(app.buttons["MarfaDisconnect"].exists, "there is nothing to disconnect from")
+        XCTAssertFalse(app.buttons["AccountSignOut"].exists, "there is no sign-in to end")
         XCTAssertTrue(app.staticTexts["Connect to a Marfa"].waitForExistence(timeout: 3))
         attachScreenshot("SettingsConnectToMarfa")
         app.buttons["MarfaConnectCancel"].click()
@@ -78,7 +78,7 @@ nonisolated final class MarfaSettingsTests: XCTestCase {
         connect.click()
         XCTAssertTrue(app.staticTexts["Check the Address"].waitForExistence(timeout: 3), app.debugDescription)
         XCTAssertTrue(app.staticTexts["Enter a Marfa server address, such as marfa.example."].exists)
-        XCTAssertFalse(app.buttons["MarfaDisconnect"].exists, "nothing was connected")
+        XCTAssertFalse(app.buttons["AccountSignOut"].exists, "nothing was connected")
         attachScreenshot("SettingsMarfaNotAServer")
     }
 

@@ -40,6 +40,8 @@ nonisolated final class FakeMarfaSource: MarfaMac.ItemSource {
 
     /// The text of the first writes the report counts, as the copy reads it from its queue.
     let unsentTexts = Mutex<[SyncContent]>([])
+    /// The current queue count when it differs from the published report.
+    let unsentCount = Mutex<Int?>(nil)
     /// The copy's store, whose own writes the queue names first, so a discard of what it reports names the
     /// store's writes and their removal is checked by id, as a real copy's is.
     let store = Mutex<URL?>(nil)
@@ -56,7 +58,8 @@ nonisolated final class FakeMarfaSource: MarfaMac.ItemSource {
     func unsentWrites() async -> UnsentChanges? {
         let report = report.value
         guard report.queueRead, let stored = try? await storeWrites else { return nil }
-        let names = (0..<report.changesNotSent).map { $0 < stored.count ? stored[$0] : "w\($0)" }
+        let count = unsentCount.withLock { $0 } ?? report.changesNotSent
+        let names = (0..<count).map { $0 < stored.count ? stored[$0] : "w\($0)" }
         var unsent = UnsentChanges(ids: Set(names))
         unsent.texts = unsentTexts.withLock { $0 }.enumerated().filter { $0.offset < names.count }.map { index, content in
             UnsentChanges.Text(id: names[index], change: .edit, content: content, date: Date(timeIntervalSinceReferenceDate: Double(index)))

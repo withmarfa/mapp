@@ -1,5 +1,6 @@
 import Foundation
 import Marfa
+import MarfaAPI
 import Synchronization
 import Testing
 @testable import MarfaMac
@@ -44,6 +45,12 @@ nonisolated private func record(_ name: String, hoursAgo: Int = 0) -> BackupReco
 
 @MainActor
 @Suite(.hangLimit) struct BackupsModelTests {
+    @Test func anUnreportedBackupIntervalHasNoNumericValue() {
+        let interval: Int? = ClientOwnerCalls.upkeep(.init(instanceId: "instance-1")).intervalSeconds
+        #expect(interval == nil)
+        #expect(ClientOwnerCalls.upkeep(.init(instanceId: "instance-1", backupIntervalSeconds: 0)).intervalSeconds == 0)
+    }
+
     private func bench(grants: Set<InstancePermission> = [.backupsManage, .configManage]) -> OwnerBench {
         let bench = OwnerBench(grants: grants)
         bench.calls.state.withLock { $0.backups = [record("c", hoursAgo: 0), record("b", hoursAgo: 1), record("a", hoursAgo: 2)] }
@@ -387,6 +394,19 @@ nonisolated private func record(_ name: String, hoursAgo: Int = 0) -> BackupReco
             ]
         }
         return bench
+    }
+
+    @Test func theJobsComeFromTheServerIncludingNewJobsAndFailedRuns() async {
+        let bench = bench()
+        let model = HousekeepingModel(context: bench.context)
+        bench.calls.state.withLock { $0.jobs = [] }
+        await model.load()
+        #expect(model.hasLoaded && model.listed.isEmpty)
+        let failed = job("new-job", every: 73, .failed)
+        bench.calls.state.withLock { $0.jobs = [failed] }
+        await model.load()
+        #expect(model.listed == [failed])
+        #expect(UpkeepWording.result(model.listed.first?.outcome) == "Failed")
     }
 
     @Test func confirmingAsksFirstAndSendsNothingUntilTheOwnerAgrees() async {

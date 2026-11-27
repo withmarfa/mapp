@@ -92,6 +92,7 @@ private struct NewKeySheet: View {
                             showsSourceOptions = true
                         }
                     }, isError: model.draftError != nil, width: nil)
+                    .accessibilityLabel("Name")
                 }
                 if showsSourceOptions { sourceOptions }
                 accessSection
@@ -194,6 +195,7 @@ private struct NewKeySheet: View {
         VStack(alignment: .leading, spacing: SettingsTokens.Metric.sheetFormGap) {
             SettingsSheetField(label: "Source", error: model.sourceError) {
                 SettingsField(title: "Source", text: $model.draft.source, isError: model.sourceError != nil, isMonospaced: true, width: nil)
+                    .accessibilityLabel("Source")
             }
             SettingsSection(name: nil, footer: Text("The source is stamped on what the key writes and can’t change later.")) {
                 SettingsRow("New items go to") {
@@ -212,8 +214,9 @@ private struct NewKeySheet: View {
         ) {
             SettingsSection(name: nil) {
                 ForEach(model.givablePermissions, id: \.self) { permission in
-                    SettingsRow(verbatim: OwnerWording.title(of: permission), size: .compact) {
-                        SettingsToggle(title: "Allowed", isOn: Binding { model.draft.permissions.contains(permission) } set: { on in
+                    let title = OwnerWording.title(of: permission)
+                    SettingsRow(verbatim: title, size: .compact) {
+                        SettingsToggle(verbatim: title, isOn: Binding { model.draft.permissions.contains(permission) } set: { on in
                             if on {
                                 guard model.givablePermissions.contains(permission) else { return }
                                 model.draft.permissions.insert(permission)

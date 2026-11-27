@@ -190,7 +190,7 @@ actor MarfaSync {
 
     /// The person signs in again in Settings; nothing is sent until then.
     nonisolated static var keyRefused: String {
-        String(localized: "The Marfa server no longer accepts this library’s sign-in. Sign in again in Settings, or disconnect the library there and start again.")
+        String(localized: "The Marfa server no longer accepts this library’s sign-in. Sign in again in Connection, or choose Sign Out in Account and start again.")
     }
 
     // MARK: Updates
