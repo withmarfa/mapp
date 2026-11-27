@@ -9,7 +9,8 @@ import Observation
     private(set) var stores: FileStores?
     private let loader = OwnerLoader()
     var failure: OwnerFailure? { loader.failure }
-    private(set) var fileBytes: Int?
+    private(set) var metrics: InstanceMetricsReading?
+    var fileBytes: Int? { metrics?.fileBytes }
     private let metricsRead = OwnerLoader.ReadStatus()
     var fileBytesFailure: OwnerFailure? { metricsRead.failure }
 
@@ -21,7 +22,7 @@ import Observation
         await loader.load(in: context, primary: { () throws(OwnerFailure) in
             stores = try await context.calls.fileStores()
         }, secondary: [
-            .required(metricsRead) { [self] () throws(OwnerFailure) in fileBytes = try await context.calls.instanceMetrics().fileBytes },
+            .required(metricsRead) { [self] () throws(OwnerFailure) in metrics = try await context.calls.instanceMetrics() },
         ])
     }
 }

@@ -48,39 +48,13 @@ nonisolated enum InstanceSetting: String, CaseIterable, Hashable, Sendable {
         case .trashRetentionDays, .versionRecentDays, .versionDailyDays, .versionWeeklyDays, .auditRetentionDays, .eventLogRetentionDays,
             .rowLogRetentionDays, .inboundHandledRetentionDays, .inboundPendingRetentionDays:
             0...36500
-        case .versionMaxVersions: 1...9_007_199_254_740_991
+        case .versionMaxVersions: 1...1_000_000
         case .blobMinCopies: 1...1_000_000
         case .diskReserveMegabytes: 0...(1_099_511_627_776 / Self.bytesPerMegabyte)
         case .mcpFetchMaxMegabytes: 1...(1_099_511_627_776 / Self.bytesPerMegabyte)
         case .blobCleanupGraceSeconds: 0...31_536_000
         }
     }
-
-    /// What the server uses while the setting is unset and whoever runs it has set nothing else. A key cannot read the
-    /// server's environment, so this is only the documented value, which the page says may differ. It is shown, never
-    /// compared with: whether a change keeps things for less time is judged only against a value the server holds.
-    var documentedDefault: Int? {
-        switch self {
-        case .name, .enrichmentEnabled, .enrichmentOcrEnabled, .mcpFetchEnabled, .blobCleanupEnabled: nil
-        case .trashRetentionDays: 60
-        case .versionRecentDays: 30
-        case .versionDailyDays: 90
-        case .versionWeeklyDays: 365
-        case .versionMaxVersions: 500
-        case .auditRetentionDays: 90
-        case .eventLogRetentionDays: 30
-        case .rowLogRetentionDays: 30
-        case .inboundHandledRetentionDays: 7
-        case .inboundPendingRetentionDays: 30
-        case .blobMinCopies: 1
-        case .diskReserveMegabytes: 128
-        case .mcpFetchMaxMegabytes: 50
-        case .blobCleanupGraceSeconds: 86_400
-        }
-    }
-
-    /// What a switch is while the setting is unset: the documented default, which is on for every switch.
-    var documentedFlag: Bool { true }
 
     /// The settings each page shows, in the order it shows them.
     static let versionSettings: [InstanceSetting] = [.versionRecentDays, .versionDailyDays, .versionWeeklyDays, .versionMaxVersions]
@@ -95,34 +69,58 @@ nonisolated enum InstanceSetting: String, CaseIterable, Hashable, Sendable {
     /// The settings whose windows must not decrease, in order: recent, then daily, then weekly.
     static let versionWindows: [InstanceSetting] = [.versionRecentDays, .versionDailyDays, .versionWeeklyDays]
 
+    var serverKey: String {
+        switch self {
+        case .name: "name"
+        case .trashRetentionDays: "trash_retention_days"
+        case .versionRecentDays: "version_recent_days"
+        case .versionDailyDays: "version_daily_snapshot_days"
+        case .versionWeeklyDays: "version_weekly_snapshot_days"
+        case .versionMaxVersions: "version_max_versions"
+        case .auditRetentionDays: "audit_retention_days"
+        case .eventLogRetentionDays: "event_log_retention_days"
+        case .rowLogRetentionDays: "row_log_retention_days"
+        case .inboundHandledRetentionDays: "inbound_handled_retention_days"
+        case .inboundPendingRetentionDays: "inbound_pending_retention_days"
+        case .blobMinCopies: "blob_min_copies"
+        case .diskReserveMegabytes: "disk_reserve_bytes"
+        case .enrichmentEnabled: "enrichment_enabled"
+        case .enrichmentOcrEnabled: "enrichment_ocr_enabled"
+        case .mcpFetchEnabled: "mcp_fetch_enabled"
+        case .mcpFetchMaxMegabytes: "mcp_fetch_max_bytes"
+        case .blobCleanupEnabled: "blob_cleanup_enabled"
+        case .blobCleanupGraceSeconds: "blob_cleanup_grace_seconds"
+        }
+    }
+
     var title: String {
         switch self {
         case .name: String(localized: "Name")
-        case .trashRetentionDays: String(localized: "Permanently Delete After")
-        case .versionRecentDays: String(localized: "Keep Every Version For")
-        case .versionDailyDays: String(localized: "Then One a Day Up To")
-        case .versionWeeklyDays: String(localized: "Then One a Week Up To")
-        case .versionMaxVersions: String(localized: "At Most")
+        case .trashRetentionDays: String(localized: "Delete from Trash after")
+        case .versionRecentDays: String(localized: "Keep every version for")
+        case .versionDailyDays: String(localized: "Then one a day up to")
+        case .versionWeeklyDays: String(localized: "Then one a week up to")
+        case .versionMaxVersions: String(localized: "Most versions per item")
         case .auditRetentionDays: String(localized: "Activity")
         case .eventLogRetentionDays: String(localized: "Events")
-        case .rowLogRetentionDays: String(localized: "Table Changes")
-        case .inboundHandledRetentionDays: String(localized: "Connector Deliveries, Handled")
-        case .inboundPendingRetentionDays: String(localized: "Connector Deliveries, Waiting")
-        case .blobMinCopies: String(localized: "Copies of Each File")
-        case .diskReserveMegabytes: String(localized: "Keep Free on Disk")
-        case .enrichmentEnabled: String(localized: "Read Text in Files")
-        case .enrichmentOcrEnabled: String(localized: "Read Text in Pictures")
-        case .mcpFetchEnabled: String(localized: "Let Chats Save Files")
-        case .mcpFetchMaxMegabytes: String(localized: "Largest File")
-        case .blobCleanupEnabled: String(localized: "Remove Unused Files")
-        case .blobCleanupGraceSeconds: String(localized: "After")
+        case .rowLogRetentionDays: String(localized: "Table changes")
+        case .inboundHandledRetentionDays: String(localized: "Connector deliveries handled")
+        case .inboundPendingRetentionDays: String(localized: "Connector deliveries waiting")
+        case .blobMinCopies: String(localized: "Copies of each file")
+        case .diskReserveMegabytes: String(localized: "Keep free on disk")
+        case .enrichmentEnabled: String(localized: "Read text in files")
+        case .enrichmentOcrEnabled: String(localized: "Read text in pictures")
+        case .mcpFetchEnabled: String(localized: "Let agents fetch files")
+        case .mcpFetchMaxMegabytes: String(localized: "Largest file")
+        case .blobCleanupEnabled: String(localized: "Remove unused files")
+        case .blobCleanupGraceSeconds: String(localized: "Remove after")
         }
     }
 
     /// Whether a shorter value removes something that cannot be recovered, so the person agrees to it first.
     var isRetention: Bool {
         switch self {
-        case .trashRetentionDays, .versionRecentDays, .versionDailyDays, .versionWeeklyDays, .versionMaxVersions, .auditRetentionDays,
+        case .blobCleanupGraceSeconds, .trashRetentionDays, .auditRetentionDays,
             .eventLogRetentionDays, .rowLogRetentionDays, .inboundHandledRetentionDays, .inboundPendingRetentionDays:
             true
         default: false
@@ -146,11 +144,10 @@ nonisolated enum InstanceSetting: String, CaseIterable, Hashable, Sendable {
     /// Whether `value` is so long that nothing a server could be set to keeps more: no limit where zero means it, and the
     /// largest the contract takes for every other setting.
     func isUnlimited(_ value: Int) -> Bool {
-        (zeroMeansNoLimit && value == 0) || value >= range.upperBound
+        zeroMeansNoLimit ? value == 0 : value >= range.upperBound
     }
 
-    /// Whether `value` reaches further than `other` in what it keeps. Zero where it means no limit is the furthest; a zero
-    /// version window is empty, so it is the least.
+    /// Whether a single retention period or disk reserve keeps more. A period with no limit keeps the most.
     func keepsLonger(_ value: Int, than other: Int) -> Bool {
         if zeroMeansNoLimit {
             if value == 0 { return other != 0 }

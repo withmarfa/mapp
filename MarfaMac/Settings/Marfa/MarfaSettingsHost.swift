@@ -103,6 +103,7 @@ struct MarfaMarkSet: Identifiable, Hashable {
     func showConnection()
     /// Starts the app’s usual sign-out flow, including any changes waiting to be sent.
     func requestSignOut()
+    var isSignInBusy: Bool { get }
     /// The package's client over the current server, which a page's own calls go through.
     func client() throws -> Client
     /// What opens something in the app, such as Show in the app; nil where the app has no such place.
@@ -178,6 +179,7 @@ struct MarfaMarkSet: Identifiable, Hashable {
 }
 
 extension MarfaSettingsHost {
+    var isSignInBusy: Bool { false }
     func show(_ page: MarfaSettingsPage) { show(page, subpage: nil) }
 }
 
@@ -300,7 +302,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
     /// What the app isn't allowed to do on this page without its permission, in the page's own words from what the
     /// permission opens there. Pages that share a permission still say different things, since each opens a different part.
     func missingPermission(in grants: Set<InstancePermission>) -> InstancePermission? {
-        if self == .limits || self == .housekeeping, !grants.isDisjoint(with: [.instanceRead, .configManage]) { return nil }
+        if self == .fileStorage || self == .limits || self == .housekeeping, !grants.isDisjoint(with: [.instanceRead, .configManage]) { return nil }
         return permission.flatMap { grants.contains($0) ? nil : $0 }
     }
 
@@ -368,11 +370,12 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .trash:
             [
                 String(localized: "Deleted Items"), String(localized: "Restore"), String(localized: "Permanently Delete"),
-                String(localized: "Empty Trash"), String(localized: "Recently Deleted"), InstanceSetting.trashRetentionDays.title,
+                String(localized: "Empty Trash"), String(localized: "Recently Deleted"),
             ]
         case .fileStorage:
-            [String(localized: "Where Files Are"), String(localized: "Reading Files"), String(localized: "Files From the Web"), String(localized: "Unused Files")]
-                + (InstanceSetting.fileSettings + InstanceSetting.versionSettings).map(\.title) + [String(localized: "Versions")]
+            [String(localized: "Files"), String(localized: "Reading Files"), String(localized: "Files from the Web"), String(localized: "Trash")]
+                + (InstanceSetting.fileSettings + InstanceSetting.versionSettings + [.trashRetentionDays]).map(\.title)
+                + LimitSetting.storageFields.map(\.title) + [String(localized: "Versions")]
         case .connectors:
             [
                 String(localized: "Pause"), String(localized: "Run Now"), String(localized: "Runs On"), String(localized: "Settings"),
@@ -395,16 +398,16 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
                 String(localized: "Restore"), String(localized: "Folder"),
             ]
         case .housekeeping:
-            [String(localized: "Jobs"), String(localized: "Clean-up"), String(localized: "Confirm Date"), String(localized: "Clock"), String(localized: "Logs")] + InstanceSetting.logSettings.map(\.title)
+            [String(localized: "Jobs"), String(localized: "Clean-up"), String(localized: "Confirm Date"), String(localized: "Clock"), String(localized: "Keep Records For")] + InstanceSetting.logSettings.map(\.title)
         case .activity:
             [String(localized: "Audit Log"), String(localized: "Who Did What")]
         case .monitoring:
             [
-                String(localized: "Heartbeat"), String(localized: "Error Reports"), String(localized: "Telemetry"), String(localized: "PostHog Host"),
-                String(localized: "Project Token"), String(localized: "Report Errors"),
+                String(localized: "Heartbeat"), String(localized: "Error Reports"), String(localized: "Telemetry"), String(localized: "Error reports address"),
+                String(localized: "Project token"), String(localized: "Report errors"),
             ]
         case .limits:
-            LimitSetting.all.map(\.title) + [String(localized: "Rate Limits"), String(localized: "Limit Requests"), String(localized: "Requests"), String(localized: "Start-Up"), String(localized: "Environment")]
+            LimitSetting.limitFields.map(\.title) + [String(localized: "Rate Limits"), String(localized: "Limit requests"), String(localized: "Requests"), String(localized: "Start-Up"), String(localized: "Set Where It Runs")]
         case .links:
             [String(localized: "Links Between Items"), String(localized: "New Link Type")]
         }

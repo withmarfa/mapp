@@ -36,7 +36,7 @@ struct AccountPage: View {
             }
             if host.grants.contains(.configManage) {
                 let snapshot = try? await host.instanceCalls.storedSettings()
-                monitoringCount = snapshot?.enabledMonitoringCount
+                monitoringCount = snapshot?.activeMonitoringCount
             } else {
                 monitoringCount = nil
             }
@@ -236,9 +236,13 @@ struct AccountHeader: View {
     var body: some View {
         if let address = host.serverAddress {
             SettingsPageHeader(name: host.serverName, address: AddressesModel.display(address)) {
-                Button("Sign Out", action: host.requestSignOut)
-                    .buttonStyle(.bordered).buttonBorderShape(.capsule).controlSize(.regular)
-                    .accessibilityIdentifier("AccountSignOut")
+                HStack(spacing: SettingsTokens.Metric.buttonGap) {
+                    if host.isSignInBusy { ProgressView().controlSize(.small).accessibilityLabel("Working…") }
+                    Button("Sign Out", action: host.requestSignOut)
+                        .buttonStyle(.bordered).buttonBorderShape(.capsule).controlSize(.regular)
+                        .disabled(host.isSignInBusy)
+                        .accessibilityIdentifier("AccountSignOut")
+                }
             }
         }
     }

@@ -204,9 +204,9 @@ enum LibraryDescription {
 
     func tryAgain() { host.refresh() }
 
+    var isSignInBusy: Bool { libraries.marfaSettings.isWorking }
+
     func requestSignOut() {
-        guard !libraries.marfaSettings.isWorking, host.configuredConnection != nil else { return }
-        showConnection()
         libraries.marfaSettings.requestDisconnect()
     }
 

@@ -114,10 +114,13 @@ struct BackupsPage: View {
                     SettingsRow("Back Up Every", line: "Only when something changed.") {
                         SettingsPopUp(
                             title: "Back Up Every",
-                            selection: Binding { settings.intervalSeconds } set: { choice in Task { await model.setInterval(choice) } }
+                            selection: Binding { settings.intervalSeconds } set: { choice in
+                                if let choice { Task { await model.setInterval(choice) } }
+                            }
                         ) {
+                            if settings.intervalSeconds == nil { Text("Default").tag(nil as Int?) }
                             ForEach(intervals(holding: settings.intervalSeconds), id: \.self) { seconds in
-                                Text(verbatim: UpkeepWording.interval(seconds)).tag(seconds)
+                                Text(verbatim: UpkeepWording.interval(seconds)).tag(Optional(seconds))
                             }
                         }
                         .disabled(model.isChanging || model.settingsFailure != nil)
@@ -131,8 +134,9 @@ struct BackupsPage: View {
         }
     }
 
-    private func intervals(holding current: Int) -> [Int] {
-        UpkeepWording.intervals.contains(current) ? UpkeepWording.intervals : (UpkeepWording.intervals + [current]).sorted()
+    private func intervals(holding current: Int?) -> [Int] {
+        guard let current, !UpkeepWording.intervals.contains(current) else { return UpkeepWording.intervals }
+        return (UpkeepWording.intervals + [current]).sorted()
     }
 
     @ViewBuilder private var keepIn: some View {

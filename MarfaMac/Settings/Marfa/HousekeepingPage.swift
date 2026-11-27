@@ -1,8 +1,6 @@
 import Marfa
 import SwiftUI
 
-/// The Housekeeping page: the jobs the server runs by itself, how often, when each last ran and how it went, and the problem
-/// that holds clean-up: the server's clock reading far past the time it last trusted. Confirm Date… asks first.
 struct HousekeepingPage: View {
     let host: any MarfaSettingsHost
     @State private var model: HousekeepingModel
@@ -39,16 +37,20 @@ struct HousekeepingPage: View {
         SettingsPageColumn {
             jobsContent
             if host.grants.contains(.configManage) {
-                InstanceSettingsGate(page: .housekeeping, host: host) {
-                    SettingsSection("Logs") {
+                InstanceSettingsGate(page: .housekeeping, host: host) { catalog in
+                    SettingsSection("Keep Records For") {
                         ForEach(InstanceSetting.logSettings, id: \.self) { setting in
-                            InstanceChoiceRow(model: host.instanceSettings, setting: setting, among: InstanceSetting.logSettings, line: Self.logLine(setting))
+                            InstanceChoiceRow(model: host.instanceSettings, setting: setting, among: InstanceSetting.logSettings, catalog: catalog, line: Self.logLine(setting))
                         }
                         InstanceStatusLine(model: host.instanceSettings, settings: InstanceSetting.logSettings)
                     }
                 }
             } else {
-                OwnerProblem(title: "Log Retention", failure: .notPermitted(InstancePermission.configManage.rawValue), page: .housekeeping, host: host)
+                SettingsSection("Keep Records For") {
+                    ForEach(InstanceSetting.logSettings, id: \.self) { setting in
+                        LockedInstanceRow(title: setting.title, permission: .configManage, host: host)
+                    }
+                }
             }
         }
     }
@@ -64,7 +66,9 @@ struct HousekeepingPage: View {
 
     @ViewBuilder private var jobsContent: some View {
         if !host.grants.contains(.instanceRead) {
-            OwnerProblem(title: "Jobs", failure: .notPermitted(InstancePermission.instanceRead.rawValue), page: .housekeeping, host: host)
+            SettingsSection("Jobs") {
+                LockedInstanceRow(title: String(localized: "Scheduled jobs"), permission: .instanceRead, host: host)
+            }
         } else if let failure = model.failure {
             OwnerFailureState(page: .housekeeping, failure: failure, host: host) { Task { await model.load() } }
         } else if !model.hasLoaded {
@@ -111,9 +115,9 @@ struct HousekeepingPage: View {
 
     private func confirmAction(_ hold: ClockHold) -> SettingsProblemAction {
         if host.grants.contains(.instanceMaintain) {
-            SettingsProblemAction("Confirm Date…") { Task { await model.askToConfirm(health: host.health) } }
+            SettingsProblemAction("Confirm Date") { Task { await model.askToConfirm(health: host.health) } }
         } else {
-            SettingsProblemAction("Allow More…") { host.askForMore(naming: InstancePermission.instanceMaintain.rawValue) }
+            SettingsProblemAction("Allow More") { host.askForMore(naming: InstancePermission.instanceMaintain.rawValue) }
         }
     }
 
@@ -121,9 +125,16 @@ struct HousekeepingPage: View {
 
     private var columns: [SettingsTableColumn<HousekeepingJob>] {
         [
-            SettingsTableColumn("Job") { Text(verbatim: UpkeepWording.jobTitle($0.name)) },
-            SettingsTableColumn("Every", width: SettingsTokens.Metric.Column.day) {
-                Text(verbatim: UpkeepWording.every($0.intervalSeconds)).foregroundStyle(SettingsTokens.secondaryText)
+            SettingsTableColumn("Job", lines: 2) { job in
+                if let since = job.runningSince {
+                    Text("\(UpkeepWording.jobTitle(job.name)) (running)").help(Text("Running since \(UpkeepWording.moment(since))."))
+                } else {
+                    Text(verbatim: UpkeepWording.jobTitle(job.name))
+                }
+            },
+            SettingsTableColumn("Every", width: SettingsTokens.Metric.Column.day) { job in
+                Text(verbatim: UpkeepWording.every(job.intervalSeconds)).foregroundStyle(SettingsTokens.secondaryText)
+                    .help(job.nextRun.map { String(localized: "Next run: \(UpkeepWording.moment($0)).") } ?? "")
             },
             SettingsTableColumn("Last Run", width: SettingsTokens.Metric.Column.label) { job in
                 Text(verbatim: job.lastFinished.map { UpkeepWording.moment($0, hasTime: job.lastFinishedHasTime) } ?? String(localized: "Not Yet"))
@@ -135,10 +146,10 @@ struct HousekeepingPage: View {
 
     private var jobs: some View {
         SettingsSection(
-            name: Text("Jobs"), line: Text("\(host.serverName) runs these by itself. Jobs that delete pause while its clock looks wrong.")
+            "Jobs", footer: "These run by themselves. Jobs that delete pause while the clock looks wrong."
         ) {
             if model.listed.isEmpty {
-                SettingsEmptyCard(symbol: "sparkles", title: Text("No Jobs Yet"), line: Text("\(host.serverName) lists its jobs once it has started them."))
+                SettingsEmptyCard(symbol: "sparkles", title: Text("No Jobs"), line: Text("The server reports no scheduled jobs."))
             } else {
                 SettingsSectionTable(rows: model.listed, columns: columns)
             }

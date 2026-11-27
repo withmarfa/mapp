@@ -1,9 +1,10 @@
 import Foundation
 import Marfa
+import Synchronization
 import Testing
 @testable import MarfaMac
 
-/// General’s settings in each state, and Disconnect’s choice to remove them first.
+/// General’s settings in each state, and Sign Out’s choice to remove them first.
 @Suite(.hangLimit)
 @MainActor struct ConnectionSettingsTests {
     private let first = try! MarfaConnection(address: "http://first.test:8210")
@@ -110,6 +111,25 @@ import Testing
         #expect(connectedWhenRemoving == true, "the sign-in is still held when they are removed")
         #expect(!model.isConnected)
         #expect(model.settingsRemovalFailure == nil)
+    }
+
+    @Test func anOldQueueCountDoesNotLoseTheCheckedSettingsChoice() async throws {
+        let log = Log()
+        let (model, bench) = try await connected(removal: { sendsOtherChanges in
+            log.steps.append(sendsOtherChanges ? "send everything" : "remove settings")
+        })
+        let source = try #require(bench.servers.last)
+        source.report.set(SyncReport(waiting: 1, queueRead: true))
+        source.unsentCount.withLock { $0 = 0 }
+        try #require(await eventually { model.host.waitingChanges == 1 })
+
+        model.requestDisconnect()
+        try #require(await eventually { model.isConfirmingDisconnect })
+        model.alsoRemovesSettings = true
+        await model.disconnect()
+
+        #expect(log.steps == ["remove settings"])
+        #expect(!model.isConnected)
     }
 
     @Test func aRemovalThatFailsSignsNothingOutAndAsks() async throws {
@@ -243,6 +263,30 @@ import Testing
         await model.answer(.keepCopy)
         #expect(await copy.sentLibraryWrites == ["library-write"])
         #expect(sync.standing == .off(.removed))
+        #expect(!model.isConnected)
+    }
+
+    @Test(arguments: [true, false])
+    func aChangeArrivingWhileSignOutIsConfirmedWaitsForKeepCopy(sendable: Bool) async throws {
+        let copy = FakePreferencesCopy()
+        let (model, sync, bench) = try await overSync(copy)
+        model.requestDisconnect()
+        #expect(model.isConfirmingDisconnect)
+        model.alsoRemovesSettings = true
+        if sendable { await copy.queueLibraryWrite() }
+        // Refused writes are visible in the departure question but excluded from the removal's send check.
+        try #require(bench.servers.last).unsentCount.withLock { $0 = 1 }
+
+        await model.disconnect()
+
+        #expect(model.isConnected && model.alsoRemovesSettings)
+        #expect(model.settingsRemovalFailure == nil)
+        #expect(model.departure?.unsent?.count == 1)
+        #expect(await copy.sentLibraryWrites.isEmpty)
+        #expect(await copy.removed.isEmpty && sync.syncs)
+
+        await model.answer(.keepCopy)
+        #expect(await copy.sentLibraryWrites == (sendable ? ["library-write"] : []))
         #expect(!model.isConnected)
     }
 
