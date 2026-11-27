@@ -21,6 +21,7 @@ import Testing
     var isAllowingMore = false
     var instanceSettings: InstanceSettingsModel
     let ownerDrafts = OwnerDrafts()
+    var canReadTrash: Bool { !lacksScope }
     var deletedItems: [MarfaDeletedItem] = []
     var deletedCount = 0
     var deletedRetentionDays: Int? = 60
@@ -598,29 +599,72 @@ struct RenderedWindow<Detail: View>: View {
             named: "Storage, read only, \(appearance)", appearance: appearance, settle: .milliseconds(900))
     }
 
-    @Test func trash() async throws {
+    @Test(arguments: [ColorScheme.light, .dark]) func backups(appearance: ColorScheme) async throws {
+        try await renderBackups(failed: false, appearance: appearance)
+    }
+
+    @Test func backupsFailed() async throws {
+        try await renderBackups(failed: true, appearance: .light)
+    }
+
+    private func renderBackups(failed: Bool, appearance: ColorScheme) async throws {
+        let host = await stub()
+        let latest = Calendar.current.startOfDay(for: .now).addingTimeInterval(14 * 3600)
+        fake(host).state.withLock { state in
+            state.upkeep.intervalSeconds = 3600
+            state.backups = (failed ? 1..<8 : 0..<8).map { hour in
+                BackupRecord(instanceID: "instance-1", name: "backup-\(hour)", taken: latest.addingTimeInterval(-Double(hour) * 3600), bytes: 212_000_000)
+            }
+            state.health?.backups = BackupsHealth(
+                state: failed ? .failing : .ok, lastBackup: state.backups.first?.taken,
+                reason: failed ? .destinationUnusable : nil, destination: .folder,
+                faults: failed ? [.runFailed(count: 1), .destinationRefusing] : [], lastFailedAt: failed ? latest : nil)
+        }
+        host.bindOverview()
+        await host.health.load()
+        try await SettingsRender.png(
+            windowed(.backups, host: host, badge: failed ? 2 : 1), size: CGSize(width: Self.size.width, height: 1000),
+            named: failed ? "Backups, Failed" : "Backups, \(appearance)", appearance: appearance)
+    }
+
+    @Test(arguments: [ColorScheme.light, .dark]) func trash(appearance: ColorScheme) async throws {
         let titles = [
             "Order oak for the Harbour Joinery worktops", "Lisbon zine: first cover ideas", "Kiln hire in East Sussex",
             "“The joint is the detail that tells you who made it”", "Lewes Trust site walk", "Allotment shed: felt roof quote",
-            "Tom Hartley", "Oak species and their grain",
+            "Tom Hartley", "Oak species and their grain, with notes on choosing and preparing boards for joinery and furniture",
+            "Call the framer about the Lewes prints", "Shelf brackets, sizes", "Hand-cut dovetails, a primer", "Send Harbour Joinery the revised quote",
+            "Lisbon zine printer proofs.pdf", "Allotment planting plan, spring", "Kiln visit, East Sussex", "Southover allotments",
+            "Studio rates for next year", "Glue-up order for the oak top", "Return the Lewes Trust drawings", "Paper sizes for the studio",
         ]
         let host = await stub {
-            $0.deletedItems = titles.enumerated().map { index, title in
+            $0.deletedItems = (0..<124).map { index in
                 MarfaDeletedItem(
-                    id: "item-\(index)", title: title, deleted: Date.now.addingTimeInterval(-Double(index) * 86_400 * 2), kind: "Notes",
-                    source: "Marfa for Mac")
+                    id: "item-\(index)", title: titles[index % titles.count], deleted: Date.now.addingTimeInterval(-Double(index) * 86_400),
+                    kind: index.isMultiple(of: 2) ? "Bookmarks" : "Notes",
+                    source: "Marfa for Mac", typeID: index.isMultiple(of: 2) ? "core.bookmark" : "core.note")
             }
-            $0.deletedCount = 1_204
+            $0.deletedCount = $0.deletedItems.count
         }
+        let page = TrashPage(host: host, showsAll: false)
+        #expect(Set(host.deletedItems.map(\.kind)) == ["Bookmarks", "Notes"])
+        #expect(page.purgePermission == nil)
+        let size = CGSize(width: Self.size.width, height: 1400)
+        try await SettingsRender.png(windowed(.trash, host: host, badge: 1), size: size, named: "Trash, \(appearance)", appearance: appearance)
+        host.grants.remove(.itemsPurge)
+        #expect(page.purgePermission == .itemsPurge)
+        #expect(host.deletedItems.count == 124)
+        try await SettingsRender.png(windowed(.trash, host: host), size: size, named: "Trash, read only, \(appearance)", appearance: appearance)
+    }
+
+    @Test func trashEmpty() async throws {
+        let host = await stub()
+        #expect(TrashPage(host: host, showsAll: false).isEmpty)
         try await SettingsRender.png(
-            RenderedWindow(selection: .trash, detail: MarfaSettingsPageView(page: .trash, host: host)),
-            size: Self.size, named: "Recently Deleted")
-        try await SettingsRender.png(
-            windowed(.trash, host: host, subpage: TrashPage.allDeleted), size: Self.size, named: "All deleted items")
+            windowed(.trash, host: host, badge: 1), size: CGSize(width: Self.size.width, height: 900), named: "Trash, Empty")
     }
 
     @Test func needsAPermission() async throws {
-        let host = await stub { $0.grants = [] }
+        let host = await stub { $0.lacksScope = true }
         try await SettingsRender.png(
             RenderedWindow(selection: .trash, detail: MarfaSettingsPageView(page: .trash, host: host)),
             size: Self.size, named: "A page the app may not open")

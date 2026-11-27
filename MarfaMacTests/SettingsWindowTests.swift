@@ -96,8 +96,14 @@ struct SettingsWindowTests {
         #expect(expanded.countLabel == nil)
     }
 
+    @Test func trashReadAccessComesFromItemScopes() {
+        #expect(TrashPage.canReadItems(scopes: ["*:read"]))
+        #expect(TrashPage.canReadItems(scopes: ["core.note:write"]))
+        #expect(!TrashPage.canReadItems(scopes: ["items.purge", "edge.*:read", "metadata:read", "profile.username:write"]))
+    }
+
     @Test func theMarfasPagesNameThePermissionTheyNeed() {
-        #expect(MarfaSettingsPage.trash.permission == .itemsPurge)
+        #expect(MarfaSettingsPage.trash.permission == nil)
         #expect(MarfaSettingsPage.account.permission == nil, "Account opens without one and asks for sign_ins.manage from Change Password")
         #expect(MarfaSettingsPage.apps.permission == .grantsManage)
         #expect(MarfaSettingsPage.keys.permission == nil, "Apps and Keys checks each section’s permission")

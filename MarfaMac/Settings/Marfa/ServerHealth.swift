@@ -52,6 +52,7 @@ nonisolated struct BackupsHealth: Hashable, Sendable {
     var reason: Reason?
     var destination: Destination?
     var faults: [Fault] = []
+    var lastFailedAt: Date?
 }
 
 /// A job whose last run failed, by the server's name for it.
@@ -124,7 +125,7 @@ nonisolated struct ServerHealth: Hashable, Sendable {
             database: Condition(parts.database.status).worst(with: Condition(parts.databaseWrite.status)),
             disk: Condition(parts.disk.status), files: Condition(parts.blobStorage.status),
             backups: BackupsHealth(
-                state: state, lastBackup: backups.lastBackupAt, reason: reason, destination: destination, faults: faults),
+                state: state, lastBackup: backups.lastBackupAt, reason: reason, destination: destination, faults: faults, lastFailedAt: backups.lastFailedAt),
             housekeeping: health.housekeeping.map { housekeeping in
                 HousekeepingHealth(
                     failed: housekeeping.failed?.map { FailedJob(name: $0.name, at: $0.at) },

@@ -634,15 +634,18 @@
     "%@, edited" : {
       "extractionState" : "manual"
     },
-    "%@, on the machine %@ runs on." : {
+    "%@, from %@" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "%1$@, on the machine %2$@ runs on."
+            "value" : "%1$@, from %2$@"
           }
         }
       }
+    },
+    "%@, on the machine that runs this Marfa." : {
+
     },
     "%@, remove" : {
 
@@ -3075,9 +3078,6 @@
     "Backups can’t be kept there" : {
 
     },
-    "Backups of %@" : {
-
-    },
     "Base a type on one to make your own." : {
 
     },
@@ -3429,6 +3429,9 @@
     },
     "Can’t be shorter than “%@”." : {
       "extractionState" : "manual"
+    },
+    "Can’t reach the backup folder. Connect its disk, then back up." : {
+
     },
     "Card Density" : {
       "extractionState" : "manual"
@@ -3808,9 +3811,6 @@
     "Clean-up waits until the server’s clock is right." : {
 
     },
-    "Cleanup" : {
-
-    },
     "Clear" : {
       "extractionState" : "manual"
     },
@@ -3827,6 +3827,9 @@
       "extractionState" : "manual"
     },
     "Clear Shortcut" : {
+
+    },
+    "Clear the search and type filter to empty the whole Trash." : {
 
     },
     "Cleared" : {
@@ -4164,6 +4167,9 @@
 
     },
     "Couldn’t Read Available Types" : {
+
+    },
+    "Couldn’t Read Backups" : {
 
     },
     "Couldn’t Read Connector Machines" : {
@@ -4550,14 +4556,29 @@
     "Deleted items kept for" : {
       "extractionState" : "manual"
     },
+    "Deleted items stay here for %@ days." : {
+
+    },
+    "Deleted items stay here for one day." : {
+
+    },
+    "Deleted items stay here until you delete them permanently." : {
+
+    },
     "Deleted items stay in Recently Deleted this long, then the server permanently deletes them, with their history. 0 keeps them with no limit. Empty uses the server’s default." : {
       "extractionState" : "manual"
+    },
+    "Deleted items wait here before they are permanently deleted." : {
+
     },
     "Delete…" : {
 
     },
     "Deleting permanently needs the server, which can’t be reached right now. The items are still in Recently Deleted." : {
       "extractionState" : "manual"
+    },
+    "Deleting this item permanently needs write access to its type and permission to empty Trash." : {
+
     },
     "Delivered" : {
 
@@ -6081,9 +6102,6 @@
     "Items you add show here." : {
 
     },
-    "Items you delete wait here before they are permanently deleted." : {
-
-    },
     "Items you favorite show here." : {
 
     },
@@ -6502,6 +6520,9 @@
 
     },
     "Library" : {
+
+    },
+    "Limit sources" : {
 
     },
     "Library and Feed" : {
@@ -7513,9 +7534,6 @@
     "None selected" : {
 
     },
-    "None yet." : {
-
-    },
     "Not Added to the Item" : {
 
     },
@@ -7682,9 +7700,6 @@
 
     },
     "Nothing is sent until the address and token are set." : {
-
-    },
-    "Nothing is waiting here." : {
 
     },
     "Nothing is waiting to be removed." : {
@@ -8227,9 +8242,6 @@
 
     },
     "Permanently deleted an item" : {
-
-    },
-    "Permanently deletes %@ items." : {
 
     },
     "Permissions" : {
@@ -8934,6 +8946,9 @@
     "Restoring changes the settings on this Mac only. A restore point is saved first." : {
 
     },
+    "Restoring this item needs write access to its type." : {
+
+    },
     "Restoring…" : {
 
     },
@@ -9195,9 +9210,6 @@
     "Select All" : {
 
     },
-    "Select Items" : {
-
-    },
     "Selected" : {
       "extractionState" : "manual"
     },
@@ -9292,7 +9304,7 @@
     "Set a telemetry address or turn on error reports with an address and token." : {
 
     },
-    "Set on the machine %@ runs on." : {
+    "Set on the machine that runs this Marfa." : {
 
     },
     "Set or Not Set" : {
@@ -10169,6 +10181,9 @@
     "The Keychain wouldn’t keep or give the sign-in. Check that the app can use the Keychain, then try again." : {
       "extractionState" : "manual"
     },
+    "The Last Backup Failed" : {
+
+    },
     "The Marfa server can’t be reached. The items are still in Recently Deleted." : {
       "extractionState" : "manual"
     },
@@ -10418,9 +10433,6 @@
     "The app isn’t allowed to keep them in %@ yet. Once it is, every Mac that connects uses them." : {
 
     },
-    "The app isn’t allowed to list or permanently delete deleted items." : {
-
-    },
     "The app isn’t allowed to list, make, change or remove webhooks." : {
 
     },
@@ -10434,6 +10446,9 @@
 
     },
     "The app isn’t allowed to manage your passkeys." : {
+
+    },
+    "The app isn’t allowed to read deleted items." : {
 
     },
     "The app isn’t allowed to read or change which sources apps and keys read." : {
@@ -10535,7 +10550,16 @@
     "The app’s sign-in isn’t allowed to read this item’s history. Ask whoever runs the server to allow it." : {
       "extractionState" : "manual"
     },
+    "The backup destination isn’t available." : {
+
+    },
+    "The backup destination isn’t available. Check where backups are kept, then back up." : {
+
+    },
     "The backup folder may not belong to this server alone." : {
+
+    },
+    "The backups couldn’t be read from their destination." : {
 
     },
     "The clipboard changed while the files were being fetched, so it was left as it is. Try again." : {
@@ -10645,9 +10669,6 @@
     },
     "The filter on %@" : {
       "extractionState" : "manual"
-    },
-    "The first is taken once there is somewhere to keep it." : {
-
     },
     "The first version." : {
 
@@ -10817,6 +10838,9 @@
     "The next sweep can permanently remove files already reported as unused." : {
 
     },
+    "The object store isn’t accepting backups. Check the store, then back up." : {
+
+    },
     "The oldest Marfa this version works with." : {
 
     },
@@ -10908,6 +10932,9 @@
 
     },
     "The server couldn’t do that." : {
+
+    },
+    "The server couldn’t finish the backup. Try backing up again." : {
 
     },
     "The server didn’t accept that folder. It must already exist on the machine it runs on." : {
@@ -12332,6 +12359,9 @@
     "Waiting to download." : {
 
     },
+    "Webhook limit reached" : {
+
+    },
     "Waiting to start" : {
 
     },
@@ -12757,6 +12787,9 @@
 
     },
     "^[%lld change](inflect: true)" : {
+
+    },
+    "^[%lld item](inflect: true)" : {
 
     },
     "^[%lld item](inflect: true) already in %@" : {
