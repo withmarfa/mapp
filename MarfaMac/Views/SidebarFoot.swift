@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// The Marfa at the foot of the sidebar, below its places, types and views: its name with a line under it saying how
-/// the library stands with its server, a Refresh and a cog that opens Settings, the same size. The row opens the Marfa's panel (`MarfaPanel`); a line that asks the person to act opens Settings'
-/// Connection page instead, where the problems are listed.
+/// the library stands with its server, a Refresh and a cog that opens Settings, the same size. The row opens the
+/// Marfa's panel (`MarfaPanel`); a line that asks the person to act opens Settings' Connection page instead, where the
+/// problems are listed.
 struct SidebarFoot: View {
     @CurrentLibrary private var library
     @Environment(Libraries.self) private var libraries

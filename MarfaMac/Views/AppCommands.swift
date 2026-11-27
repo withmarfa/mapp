@@ -58,7 +58,7 @@ struct AppCommands: Commands {
                 }
                 .shortcut(.newWindow, shortcuts)
                 Divider()
-                // Pulls what the server has changed and sends what waits; the sidebar's instance menu and the palette have it too.
+                // Pulls what the server has changed and sends what waits; the sidebar foot's Refresh button and the palette have it too.
                 Button("Refresh", systemImage: "arrow.clockwise") { host.refresh() }
                     .shortcut(.refresh, shortcuts)
                     .disabled(!host.canRefresh)
