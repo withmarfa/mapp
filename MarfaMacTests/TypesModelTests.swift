@@ -160,13 +160,15 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
 @Suite(.hangLimit) struct TypesModelTests {
     private func model(
         _ calls: FakeTypeCalls, counts: [String: Int] = [:], late: LateDrafts = LateDrafts(),
-        grants: Set<InstancePermission> = [.schemaWrite], owner: FakeOwnerCalls = FakeOwnerCalls(),
+        grants: Set<InstancePermission> = [.schemaWrite], holds: @escaping (String) -> Bool = { $0 == "*:write" },
+        owner: FakeOwnerCalls = FakeOwnerCalls(),
         setIcon: @escaping (String?, String) async -> OwnerFailure? = { _, _ in nil }, ownVendor: String? = "app.marfa-mac"
     ) -> TypesModel {
         let access = TypeAccess(
             ownItems: { counts[$0] ?? 0 }, currentIcon: { _ in nil }, setIcon: setIcon,
             markSets: [MarfaMarkSet(id: "lucide", title: "Lucide")], marks: { _, _ in [] }, plural: { _ in nil })
-        let context = OwnerContext(calls: owner, grants: { grants }, lateDraft: { draft in late.drafts.withLock { $0.append(draft) } })
+        let context = OwnerContext(
+            calls: owner, grants: { grants }, holds: holds, lateDraft: { draft in late.drafts.withLock { $0.append(draft) } })
         return TypesModel(context: context, calls: calls, access: access, ownVendor: ownVendor)
     }
 
@@ -207,11 +209,17 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
                 creator: TypeCreator(kind: .app, id: "raycast", name: "Raycast")))
             $0.types.append(record(
                 "user.capture", "Capture", creator: TypeCreator(kind: .app, id: "raycast", name: "Raycast")))
+            $0.types.append(record("app.raycast", "Raycast"))
+            $0.types.append(record("publisher.widget", "Widget"))
         }
         let model = model(calls)
         await model.load()
         #expect(model.fromApps.map(\.id) == ["app.raycast.snippets"])
         #expect(model.showsFromApps)
+        #expect(!model.fromApps.map(\.id).contains("app.raycast"))
+        #expect(!model.yours.map(\.id).contains("publisher.widget"))
+        #expect(!model.yours.map(\.id).contains("app.raycast"))
+        #expect(model.rows(in: .all, sortedBy: .type(ascending: true)).map(\.id).contains("publisher.widget"))
         #expect(model.yours.map(\.id).contains("user.capture"))
         #expect(model.sourceTitle(of: model.record("app.raycast.snippets")!) == "Raycast")
         #expect(model.sourceTitle(of: model.record("user.job")!) == "You")
@@ -222,14 +230,22 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
 
     @Test func anUnknownOriginIsListedOnlyUnderAll() async {
         let calls = listing()
-        calls.state.withLock { $0.types.append(record("core.note", "Note", origin: .unknown, plural: "Notes")) }
+        calls.state.withLock {
+            $0.types.append(record("core.note", "Note", origin: .unknown, plural: "Notes"))
+            $0.types.append(record("user.lost", "Lost", origin: .unknown))
+            $0.types.append(record("user.shipped", "Shipped", origin: .platform))
+        }
         let model = model(calls)
         await model.load()
         #expect(!model.yours.map(\.id).contains("core.note"))
         #expect(!model.builtIn.map(\.id).contains("core.note"))
+        #expect(model.yours.map(\.id).contains("user.lost"))
+        #expect(model.builtIn.map(\.id).contains("user.shipped"))
+        #expect(!model.yours.map(\.id).contains("user.shipped"))
         #expect(model.rows(in: .all, sortedBy: .type(ascending: true)).map(\.id).contains("core.note"))
         #expect(model.sourceTitle(of: model.record("core.note")!) == "Unknown")
         #expect(!model.isEditable(model.record("core.note")!))
+        #expect(!model.isEditable(model.record("user.lost")!))
         #expect(model.count(in: .all) == model.count(in: .yours) + model.count(in: .builtIn) + model.count(in: .fromPlugins) + 1)
     }
 
@@ -280,11 +296,25 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         #expect(blocked.failure == .notPermitted("schema.write"))
     }
 
-    @Test func aTypesCountIsItsOwnItemsAndThoseBelowIt() async {
+    @Test func aTypesCountIsItsOwnItems() async {
         let model = model(listing(), counts: ["user.job": 18, "user.rework": 4, "core.task": 300])
         await model.load()
-        #expect(model.count(of: "user.job") == 22)
-        #expect(model.count(of: "core.task") == 322)
+        #expect(model.count(of: "user.job") == 18)
+        #expect(model.count(of: "user.rework") == 4)
+        #expect(model.count(of: "core.task") == 300)
+    }
+
+    @Test func itemsSortUsesATypesOwnCount() async {
+        let calls = listing()
+        calls.state.withLock {
+            $0.types.append(record("core.bookmark", "Bookmark", origin: .platform, plural: "Bookmarks"))
+            $0.types.append(record("rss.entry", "RSS Entry", parent: "core.bookmark", origin: .plugin, plural: "RSS Entries"))
+        }
+        let model = model(calls, counts: ["core.bookmark": 17, "rss.entry": 151, "user.job": 4, "user.rework": 18, "core.task": 1])
+        await model.load()
+        let ids = model.rows(in: .all, sortedBy: .items(ascending: true)).map(\.id)
+        #expect(ids.firstIndex(of: "core.bookmark")! < ids.firstIndex(of: "rss.entry")!)
+        #expect(ids.firstIndex(of: "user.job")! < ids.firstIndex(of: "user.rework")!)
     }
 
     @Test func aChildShowsWhatItIsBasedOnAndAParentWhatIsBasedOnIt() async {
@@ -294,12 +324,44 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         #expect(model.subtitle(of: model.record("common.ticket")!) == "From Tickets. Based on Tasks.")
     }
 
-    @Test func onlyTheOwnersTypeIsEditable() async {
-        let model = model(listing())
-        await model.load()
-        #expect(model.isEditable(model.record("user.job")!))
-        #expect(!model.isEditable(model.record("common.ticket")!))
-        #expect(!model.isEditable(model.record("core.task")!))
+    @Test func aRegisteredTypeIsEditableOnlyWithSchemaWriteAndWriteAccess() async {
+        let calls = listing()
+        calls.state.withLock {
+            $0.types.append(record("publisher.widget", "Widget"))
+            $0.types.append(record(
+                "app.raycast.snippets", "Snippet", creator: TypeCreator(kind: .app, id: "raycast", name: "Raycast")))
+        }
+        let writable = model(calls)
+        await writable.load()
+        #expect(writable.isEditable(writable.record("user.job")!))
+        #expect(writable.isEditable(writable.record("publisher.widget")!))
+        #expect(!writable.yours.map(\.id).contains("publisher.widget"))
+        #expect(!writable.isEditable(writable.record("app.raycast.snippets")!))
+        #expect(!writable.isEditable(writable.record("common.ticket")!))
+        #expect(!writable.isEditable(writable.record("core.task")!))
+
+        let noGrant = model(calls, grants: [])
+        await noGrant.load()
+        #expect(!noGrant.isEditable(noGrant.record("user.job")!))
+
+        let noWrite = model(calls, holds: { _ in false })
+        await noWrite.load()
+        #expect(!noWrite.isEditable(noWrite.record("user.job")!))
+
+        let appWrite = model(calls, holds: { $0 == "app.raycast.*:write" })
+        await appWrite.load()
+        #expect(appWrite.isEditable(appWrite.record("app.raycast.snippets")!))
+        #expect(!appWrite.isEditable(appWrite.record("user.job")!))
+
+        let exact = model(calls, holds: { $0 == "app.raycast.snippets:write" })
+        await exact.load()
+        #expect(exact.isEditable(exact.record("app.raycast.snippets")!))
+
+        let content = model(calls, holds: { $0 == "content:write" })
+        await content.load()
+        #expect(content.isEditable(content.record("user.job")!))
+        #expect(content.isEditable(content.record("publisher.widget")!))
+        #expect(!content.isEditable(content.record("app.raycast.snippets")!))
     }
 
     @Test func theWordsAParentGivesAreLockedAndTheTypesOwnAreNot() async {
@@ -1105,7 +1167,7 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         }
         let access = TypeAccess(
             ownItems: { _ in 0 }, currentIcon: { _ in nil }, setIcon: { _, _ in nil }, markSets: [], marks: { _, _ in [] }, plural: { _ in nil })
-        let context = OwnerContext(calls: owner, grants: { [.schemaWrite, .configManage, .keysManage] })
+        let context = OwnerContext(calls: owner, grants: { [.schemaWrite, .configManage, .keysManage] }, holds: { $0 == "*:write" })
         let types = TypesModel(context: context, calls: listing(), access: access)
         let writers = SourceLimitModel(rule: .allowlist, context: context)
         await types.load()
@@ -1136,7 +1198,8 @@ private func word(_ value: String, _ group: String) -> StatusWordRecord { Status
         var grants: Set<InstancePermission> = [.schemaWrite, .configManage]
         let access = TypeAccess(
             ownItems: { _ in 0 }, currentIcon: { _ in nil }, setIcon: { _, _ in nil }, markSets: [], marks: { _, _ in [] }, plural: { _ in nil })
-        let model = TypesModel(context: OwnerContext(calls: owner, grants: { grants }), calls: calls, access: access)
+        let model = TypesModel(
+            context: OwnerContext(calls: owner, grants: { grants }, holds: { $0 == "*:write" }), calls: calls, access: access)
         await model.load()
         grants = [.schemaWrite]
         await model.setStrict(true, of: "user.job")

@@ -2,10 +2,10 @@ import Foundation
 import Marfa
 import Observation
 
-/// The Types page: the types the server lists, in what the owner made, what plugins brought and what Marfa ships, and a type's
-/// own page. Only a type of the owner's changes; a plugin's or Marfa's takes a child type and an icon. A change is sent as the
-/// type's definition read again with that one change made, so what another app changed meanwhile is kept, and a refusal names
-/// the field it is about and keeps what was typed.
+/// The Types page: the types the server lists, under Yours (`user.*`), From Apps, From Plugins and Built In, and a type's own
+/// page. A registered type changes when the sign-in may write it; a plugin's or one Marfa ships takes a child type and an icon.
+/// A change is sent as the type's definition read again with that one change made, so what another app changed meanwhile is
+/// kept, and a refusal names the field it is about and keeps what was typed.
 @Observable @MainActor final class TypesModel: OwnerDraftHolding {
     /// What a refusal can be about on a type's page.
     enum Field: Hashable {
@@ -287,13 +287,12 @@ import Observation
         let access = access
         list = withObservationTracking {
             var next = TypeList()
-            var ownCounts: [String: Int] = [:]
             for type in records {
                 if let parent = type.parent { next.childrenByParent[parent, default: []].append(type) }
                 guard next.recordsByID[type.id] == nil else { continue }
                 next.recordsByID[type.id] = type
                 next.titles[type.id] = type.plural ?? readings[type.id]?.plural ?? access.plural(type.id) ?? type.label
-                ownCounts[type.id] = access.ownItems(type.id)
+                next.counts[type.id] = access.ownItems(type.id)
             }
             let titles = next.titles
             next.sorted = records.sorted {
@@ -310,10 +309,6 @@ import Observation
                 case nil: next.ungrouped.append(type)
                 }
             }
-            for (id, ownCount) in ownCounts {
-                let childCount = next.descendants(of: id).reduce(0) { $0 + ownCounts[$1.id, default: 0] }
-                next.counts[id] = ownCount + childCount
-            }
             return next
         } onChange: { [weak self] in
             // The working copy can change its plurals and counts without a new list from the server.
@@ -324,7 +319,7 @@ import Observation
         }
     }
 
-    /// The owner's own types. An app's namespace is From Apps, and an origin the server does not attribute stays in All only.
+    /// `user.*` types. An app's namespace is From Apps. A registered type under another root stays in All only.
     var yours: [TypeRecord] { list.yours }
     var fromPlugins: [TypeRecord] { list.fromPlugins }
     var builtIn: [TypeRecord] { list.builtIn }
@@ -333,17 +328,39 @@ import Observation
     /// From Apps is omitted while no listed type comes from an app.
     var showsFromApps: Bool { !list.fromApps.isEmpty }
 
-    /// Whether the owner can change the type: one they registered, outside an app's namespace.
-    func isEditable(_ type: TypeRecord) -> Bool { Self.group(of: type) == .yours }
+    /// Whether the sign-in can change the type. A registered type changes with `schema.write` and write access to it.
+    /// Which tab it sits on is separate: an app's type stays under From Apps and can still be edited.
+    func isEditable(_ type: TypeRecord) -> Bool {
+        type.origin == .registered && context.grants().contains(.schemaWrite) && Self.canWrite(type.id, holds: context.holds)
+    }
 
-    /// Which tab a type belongs on. Nil is All only.
+    /// An app grant's write reach: `*:write` and `content:write` miss `app.*` (`keys-and-oauth/content-excludes-app`).
+    static func canWrite(_ id: String, holds: (String) -> Bool) -> Bool {
+        let parts = id.split(separator: ".").map(String.init)
+        let root = parts.first ?? id
+        if root != "app", holds("*:write") { return true }
+        if !["system", "marfa", "app"].contains(root), holds("content:write") { return true }
+        if holds(id + ":write") { return true }
+        for end in 1...parts.count {
+            if holds(parts.prefix(end).joined(separator: ".") + ".*:write") { return true }
+        }
+        return false
+    }
+
+    /// Which tab a type belongs on. Nil is All only. Origin wins over the id; `created_by` is not used.
     static func group(of type: TypeRecord) -> TypeGroup? {
         switch type.origin {
         case .platform: .builtIn
         case .plugin: .fromPlugins
         case .registered, .unknown:
-            if isAppNamespace(type.id) { .fromApps } else if type.origin == .registered { .yours } else { nil }
+            if isUserNamespace(type.id) { .yours } else if isAppNamespace(type.id) { .fromApps } else { nil }
         }
+    }
+
+    /// `user.<rest>`, the owner's namespace. A bare `user` is not.
+    static func isUserNamespace(_ id: String) -> Bool {
+        let parts = id.split(separator: ".")
+        return parts.count >= 2 && parts[0] == "user" && parts.allSatisfy { !$0.isEmpty }
     }
 
     /// `app.<vendor>.<rest>`, which is an app's namespace. A shorter id is not.
@@ -354,10 +371,8 @@ import Observation
 
     func children(of id: String) -> [TypeRecord] { list.sortedChildrenByParent[id, default: []] }
 
-    /// How many items the type holds, its subtypes' included, as the library counts them.
-    func count(of id: String) -> Int {
-        list.counts[id] ?? (access.ownItems(id) + list.descendants(of: id).reduce(0) { $0 + access.ownItems($1.id) })
-    }
+    /// How many items the type holds itself, never those of its subtypes, as the library counts them.
+    func count(of id: String) -> Int { list.counts[id] ?? access.ownItems(id) }
 
     /// The type's name for a row: the plural, which is how every list of types reads.
     func title(of id: String) -> String { list.titles[id, default: id] }

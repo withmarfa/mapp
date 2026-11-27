@@ -2,9 +2,9 @@ import Marfa
 import SwiftUI
 
 /// The Types page: one list of the types the server lists, under tabs for where each came from, each opening a page of its
-/// own. A type of the owner's changes in place (its name, plural, icon, base, description and status words); a plugin's,
-/// an app's or Marfa's takes only a child type and an icon. Guidance is edited on the owner's types and shown, with the
-/// guidance of the types above, on the rest.
+/// own. A registered type the sign-in may write changes in place (its name, plural, icon, base, description and status
+/// words), including one an app registered; a plugin's or Marfa's takes only a child type and an icon. Guidance is edited
+/// on a type the sign-in may write and shown, with the guidance of the types above, on the rest.
 struct TypesPage: View {
     let host: any MarfaSettingsHost
     let subpage: SettingsSubpage?
