@@ -4848,7 +4848,7 @@
     "Every Item" : {
 
     },
-    "Every Mac that connects to %@ loses them. This Mac keeps its own, and your items stay." : {
+    "Every Mac that connects to %@ loses them. This Mac keeps its own." : {
 
     },
     "Every Mac that connects to it uses them." : {

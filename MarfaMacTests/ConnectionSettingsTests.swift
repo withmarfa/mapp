@@ -32,7 +32,7 @@ import Testing
     @Test func removingAsksFirstAndSaysEveryMacLosesThem() {
         let syncing = words(.syncing)
         #expect(syncing.removeTitle == "Remove This App’s Settings from Home?")
-        #expect(syncing.removeMessage == "Every Mac that connects to Home loses them. This Mac keeps its own, and your items stay.")
+        #expect(syncing.removeMessage == "Every Mac that connects to Home loses them. This Mac keeps its own. Removing this app’s settings can also move linked items to Trash.")
         #expect(syncing.title == "Kept in this Marfa")
         #expect(syncing.line == "Every Mac that connects to it uses them.")
         #expect(syncing.actionTitle == "Remove…")
