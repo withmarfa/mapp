@@ -76,6 +76,7 @@ struct ConnectToMarfaSheet: View {
                 .accessibilityIdentifier("MarfaConnectCancel")
             if model.code == nil {
                 SettingsButton("Continue", role: .confirm, action: continueSignIn)
+                    .buttonBorderShape(model.canConnect ? .automatic : .roundedRectangle)
                     .disabled(!model.canConnect)
                     .accessibilityIdentifier("MarfaConnect")
             }

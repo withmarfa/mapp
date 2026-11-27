@@ -203,6 +203,7 @@ enum SettingsTokens {
         static let smallControlHeight: CGFloat = 24
         static let fieldAccessoryInset: CGFloat = 8
         static let popUpMinimumWidth: CGFloat = 120
+        static let popUpLabelInset: CGFloat = 24
         static let smallNumberWidth: CGFloat = 64
         static let controlScaleForLarge: CGFloat = 1.3
         static let headerChoicePadding: CGFloat = 4
