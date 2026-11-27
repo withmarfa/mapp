@@ -95,10 +95,18 @@ Search this page before you propose a look. Each line is a refused design, then 
 - **Settings in the main window or with drawn controls.** Its own window and the system's controls.
 - **Three lines under a title.** Two at most.
 - **Gray cards, or a page split by segments.** White cards with a hairline.
-- **Back beside a page's title.** The toolbar.
+- **Back beside a page's title, or in the page's toolbar.** Back and forward at the top of the sidebar.
 - **Minus and plus for a number, or one text field for a list of words.** A short field or a menu; edit each line in place.
 - **A Paper theme, a Rows and Cards page, or Advanced as a page.**
 - **Setup inside the main window with the sidebar waiting** (the onboarding experiment).
+- **The Marfa half hidden until connected.** Both halves, always.
+- **The app's or the Marfa's name as a label or in a line.** Only Account's header names the Marfa.
+- **Overview, Updates, Addresses, File Storage, History, Start-Up, Links, Apps or Recently Deleted as pages.** Account's sections.
+- **Title Case for row labels and lines.** Sentence case.
+- **"…" with a fill, or on a button that opens no window.** A plain "…" where a window opens.
+- **Striped tables, or eight rows.** No stripes; about 50 rows, then Show All.
+- **A segmented control as tabs.** Text tabs with counts.
+- **Connecting inside the window, or words beside the address field.** A sheet; a symbol in the field.
 
 ## Toolbar, corner and opening
 

@@ -69,7 +69,7 @@ BUDGETS = {  # words
     "docs/look.md": 1200,
     "docs/model.md": 1100,
     "docs/owner-settings.md": 1800,
-    "docs/rejected.md": 1300,
+    "docs/rejected.md": 1350,
     "docs/settings-sync.md": 1100,
     "docs/settings-window.md": 1000,
     "docs/type-looks.md": 900,

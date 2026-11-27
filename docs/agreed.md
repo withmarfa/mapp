@@ -12,7 +12,15 @@ Read only the row you are building. A row says what was agreed; the boards it na
 - **The pull request that builds a row deletes it** and writes the rule it leaves behind in the page for that area. Part of a row built leaves the rest of the row.
 - **A row is not a promise of order.** `docs/concepts.md` has the model under all of them, and `docs/rejected.md` what was refused on the way.
 - **"Waits for Marfa"** means the server must change first. Build nothing that pretends otherwise.
-- **Not here, because they are being designed:** Settings' frame, Folders, connecting and the first run.
+- **Not here, because they are being designed:** Folders' full design and the first run.
+
+## Settings
+
+| Part | What it is | Lands in | Boards |
+| --- | --- | --- | --- |
+| Sync with This Marfa | One switch for each group `PreferencesMap` keeps apart, on General. A group switched off stops syncing on that Mac alone. Waits until the settings stores record a person's removal where it is made. | `GeneralPage.swift`, `PreferencesSync` | `SettingsProposal-App-General` |
+| Remove only the settings | Removing this app's settings from a Marfa moves only its settings items to the trash, never an item linked to them. **Waits for Marfa.** | `PreferencesCopy.swift` | – |
+| Create New Marfa | On the signed-out page, beside Sign In. **Waits for Marfa:** a way to run it on a Mac without the command line. | `ConnectionPage.swift` | `SettingsProposal-Edge-SignedOut` |
 
 ## Window and sidebar
 
@@ -24,7 +32,6 @@ Read only the row you are building. A row says what was agreed; the boards it na
 | Part | What it is | Lands in | Boards |
 | --- | --- | --- | --- |
 | Feed | No count on its row, no words of waiting. Its first view is named All. | `SidebarGroups.swift`, `Browser` | `Rethink-Inbox`, `Rethink-Inbox-View`, `Rethink-Inbox-Page`, `Rethink-Inbox-Modal` |
-| Default From | Settings > Lists offers All Items (the default) and Library. | `PreferencesMap`, Settings > Lists | `Rethink-Scope-Menu` |
 | A table stays in the Library | A table item is offered no Move to Feed, as a collection and a view are not. The package now says which types hold a table; the app does not use that yet. | `ItemMoves.swift`, `Catalogue` | `Rethink-Item-Menus` |
 | Quick Actions | Keep, Archive and Delete on the row under the pointer, a choice of each view, with the default that `docs/concepts.md` gives. | `ItemRow.swift`, `ViewMacSettings` | `Rethink-Inbox-Actions`, `Rethink-View-Quick-Actions` |
 
