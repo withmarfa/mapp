@@ -1,130 +1,89 @@
 import Foundation
 import Observation
+#if DEBUG
+import Synchronization
+#endif
 
-/// Checks a batch before an import or attachment. Only an explicit Open or Cancel can exclude a file.
+/// Checks a batch before an import or attachment. The person's answer is the whole decision: nothing opened or
+/// fetched afterwards changes which files are added.
 @MainActor
 enum AlreadyInMarfa {
     /// How long the whole check, hashing and lookup, may take before the files are added unasked.
     static let limit: Duration = .seconds(10)
 
     #if DEBUG
-    /// Replaces security-scoped access for a test, which an ordinary file on disk does not take.
-    nonisolated struct AccessHooks: Sendable {
-        var start: @Sendable (URL) -> Bool
+    /// Replaces `limit` for the check running in this task, including one a caller cannot pass a limit into, such as
+    /// a paste. Another task's check is left at `limit`.
+    @TaskLocal static var limitOverride: Duration?
+
+    /// Counts a caller's security-scoped access. The check itself takes none: the caller holds the grant until the
+    /// check, including one it cancelled, has ended.
+    nonisolated struct GrantHooks: Sendable {
+        var start: @Sendable (URL) -> Void
         var stop: @Sendable (URL) -> Void
     }
 
-    static let accessHooks = TestHook<AccessHooks>()
-    /// Replaces `limit` for a caller that has no other way to pass one, such as a paste.
-    static let limitOverride = TestHook<Duration>()
+    /// Every registered watch hears each grant. A test adds its own and removes it when it ends, so another test's
+    /// files are not mistaken for this one's and a watch is not replaced while a file is still held.
+    nonisolated final class GrantWatch: Sendable {
+        private let hooks = Mutex<[UUID: GrantHooks]>([:])
+
+        func add(_ hooks: GrantHooks) -> UUID {
+            let id = UUID()
+            self.hooks.withLock { $0[id] = hooks }
+            return id
+        }
+
+        func remove(_ id: UUID) {
+            hooks.withLock { $0[id] = nil }
+        }
+
+        func start(_ url: URL) {
+            let current = hooks.withLock { Array($0.values) }
+            current.forEach { $0.start(url) }
+        }
+
+        func stop(_ url: URL) {
+            let current = hooks.withLock { Array($0.values) }
+            current.forEach { $0.stop(url) }
+        }
+    }
+
+    /// Read from a file's access, which is not isolated to the main actor: releasing the file can happen as the value is destroyed.
+    nonisolated static let grantWatch = GrantWatch()
     #endif
 
     enum Choice: Equatable, Sendable {
         case addAnyway
-        case open
+        case skipDuplicates
         case cancel
     }
 
-    /// How long a cancelled lookup may keep the add waiting before the add goes on with its own access.
-    static let cancelGrace: Duration = .milliseconds(200)
-
-    /// What to do with a batch once it has been checked.
+    /// What to do with a batch once it has been checked. Positions are into the batch that was checked.
     struct Plan: Equatable {
-        /// The files to add, in the order given. A matched file whose item could not be opened is not here yet.
-        let add: [URL]
-        /// The items already in Marfa to open in place of their files.
-        let open: [ItemID]
+        /// The files to add, in batch order. Final when the person answers.
+        var adding: [Int]
+        /// Items holding a file the person skipped, for Show after the add. Opening them changes nothing that was added.
+        var show: [ItemID]
         /// Whether the person chose Cancel, so nothing at all is written.
         var isCancelled = false
-        /// Each matched file and the items holding it, so one that cannot be opened is added instead.
-        var matched: [Match] = []
-        /// Positions in the checked batch that are added before a match that could not be opened is put back.
-        var adding: [Int] = []
-        /// Finishes when the lookup has ended, including one cancelled after a time-out. Equality ignores it.
-        var lookup: Lookup = .finished
 
-        /// A file already in Marfa, and the items that hold its bytes. `index` is its place in the batch.
-        struct Match: Equatable, Sendable {
-            let index: Int
-            let file: URL
-            let items: [ItemID]
-        }
-
-        /// The lookup's lifetime. Two plans compare equal whatever their lookups are doing.
-        final class Lookup: @unchecked Sendable {
-            private let task: Task<Void, Never>
-
-            init(_ task: Task<Void, Never>) { self.task = task }
-
-            func ended() async { await task.value }
-
-            static let finished = Lookup(Task {})
-        }
-
-        static func == (lhs: Plan, rhs: Plan) -> Bool {
-            lhs.add == rhs.add && lhs.open == rhs.open && lhs.isCancelled == rhs.isCancelled
-                && lhs.matched == rhs.matched && lhs.adding == rhs.adding
-        }
-
-        /// Every file is added, with no question asked or Add Anyway chosen.
-        static func addingAll(_ files: [URL]) -> Plan {
-            Plan(add: files, open: [], adding: Array(files.indices))
-        }
-
-        /// Positions to add: those already chosen, then each fallback match, in batch order.
-        func indicesToAdd(fallback: [Match]) -> [Int] {
-            var chosen = Set(adding)
-            for match in fallback { chosen.insert(match.index) }
-            return chosen.sorted()
+        /// Every file is added, and nothing is offered to show.
+        static func addingAll(count: Int) -> Plan {
+            Plan(adding: Array(0..<count), show: [])
         }
     }
 
-    /// What opening a batch of matches managed: the items now open, and the matches to add instead.
-    struct Opened: Equatable, Sendable {
-        var opened: [ItemID]
-        var fallback: [Plan.Match]
+    /// What a toast says when files were left out because they are already in Marfa.
+    static func skippedMessage(_ count: Int) -> String {
+        if count == 1 { return String(localized: "1 file is already in Marfa.") }
+        return String(localized: "\(count) files are already in Marfa.")
     }
 
-    /// Brings each item into the library. Those it holds afterwards can be opened; the rest are added.
-    /// An item that leaves while a later one is fetched is missed, so its file is added.
-    static func reachable(_ ids: [ItemID], in library: any ItemLibrary) async -> (open: [ItemID], missed: [ItemID]) {
-        var open: [ItemID] = []
-        var missed: [ItemID] = []
-        for id in ids {
-            if library.item(id) != nil {
-                open.append(id)
-            } else if await library.holdForOpening(id) {
-                open.append(id)
-            } else {
-                missed.append(id)
-            }
-        }
-        let left = open.filter { library.item($0) == nil }
-        if !left.isEmpty {
-            open.removeAll { library.item($0) == nil }
-            missed.append(contentsOf: left)
-        }
-        return (open, missed)
-    }
-
-    /// Opens each match. A match whose items are all missed comes back in `fallback`, beside its file.
-    static func opening(_ matches: [Plan.Match], in library: any ItemLibrary) async -> Opened {
-        var ids: [ItemID] = []
-        for match in matches {
-            for id in match.items where !ids.contains(id) { ids.append(id) }
-        }
-        let reached = await reachable(ids, in: library)
-        let missed = Set(reached.missed)
-        let fallback = matches.filter { !$0.items.isEmpty && $0.items.allSatisfy { missed.contains($0) } }
-        return Opened(opened: reached.open, fallback: fallback)
-    }
-
-    /// What a toast or a notice says when matched files were added because their items could not be opened.
-    static func unopenedMessage(_ count: Int) -> String {
-        if count == 1 {
-            return String(localized: "1 file was added because the item already in Marfa couldn’t be opened.")
-        }
-        return String(localized: "\(count) files were added because the items already in Marfa couldn’t be opened.")
+    /// The same fact, after a toast that already says what was added.
+    static func alreadyCounted(_ count: Int) -> String {
+        if count == 1 { return String(localized: "1 is already in Marfa.") }
+        return String(localized: "\(count) are already in Marfa.")
     }
 
     /// One question for a batch: the files already in Marfa, each with the items holding its bytes.
@@ -167,7 +126,6 @@ enum AlreadyInMarfa {
             var lines = rows.prefix(Self.listLimit).map { Self.sentence(for: $0, named: $0.file.lastPathComponent) }
             let rest = rows.count - Self.listLimit
             if rest > 0 { lines.append(AttributedString(localized: "And ^[\(rest) more file](inflect: true).").text) }
-            if rows.count > 1 { lines.append(String(localized: "Open shows matches for all \(rows.count) files.")) }
             return lines.joined(separator: "\n")
         }
 
@@ -202,6 +160,9 @@ enum AlreadyInMarfa {
         @ObservationIgnored private var views = 0
         /// True after an alert is dismissed until the next one is allowed up. SwiftUI ignores a new question while one is up.
         @ObservationIgnored private var dismissalPending = false
+        /// Runs inside `answer` when the person chooses Skip Duplicates, before the check goes on, so a draft can drop
+        /// the matched files at that moment. Nil for an add that has no draft to change.
+        @ObservationIgnored var onSkip: ((Question) -> Void)?
 
         /// The person's choice, or nil where no view could ask them.
         func ask(_ question: Question) async -> Choice? {
@@ -213,12 +174,13 @@ enum AlreadyInMarfa {
         }
 
         /// The person's choice for the question shown. One for another question, as from an alert already gone, is
-        /// ignored. The next question waits until this alert has gone.
+        /// ignored. Skip Duplicates runs `onSkip` before this returns. The next question waits until this alert has gone.
         func answer(_ choice: Choice, to id: Question.ID? = nil) {
             guard let first = waiting.first, id == nil || first.question.id == id else { return }
             waiting.removeFirst()
             question = nil
             dismissalPending = true
+            if choice == .skipDuplicates { onSkip?(first.question) }
             first.answer.resume(returning: choice)
             scheduleNext()
         }
@@ -259,12 +221,16 @@ enum AlreadyInMarfa {
         }
     }
 
-    /// Checks `files` against what the library holds and, on a match, asks through `asking`. Each file is read under
-    /// its security scope while it is checked. A time-out cancels the lookup. Access stays until that lookup has
-    /// finished, but only for `cancelGrace` before the add goes on and the lookup releases access itself.
-    static func check(_ files: [URL], in library: any ItemLibrary, asking: Asking, within limit: Duration = limit) async -> Plan {
-        guard !files.isEmpty else { return .addingAll(files) }
-        let scoped = files.filter { beginAccess($0) }
+    /// Checks `files` against what the library holds and, on a match, asks through `asking`. The caller keeps each
+    /// file's access and any staged copy until this returns: a time-out cancels the lookup and waits until that
+    /// cancelled lookup has ended, then every file is added. The caller takes no access here.
+    static func check(_ files: [URL], in library: any ItemLibrary, asking: Asking, within requested: Duration = limit) async -> Plan {
+        guard !files.isEmpty else { return .addingAll(count: 0) }
+        #if DEBUG
+        let limit = limitOverride ?? requested
+        #else
+        let limit = requested
+        #endif
         let lookupTask = Task { @MainActor in
             await library.itemsWithSameBytes(as: files)
         }
@@ -284,31 +250,10 @@ enum AlreadyInMarfa {
         }
         switch outcome {
         case .answered(let answers):
-            for file in scoped { endAccess(file) }
             return await decide(files, answers: answers, in: library, asking: asking)
         case .timedOut:
-            let finished = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
-                let gate = ResumeOnce(continuation)
-                Task { @MainActor in
-                    _ = await lookupTask.value
-                    gate.resume(true)
-                }
-                Task { @MainActor in
-                    try? await Task.sleep(for: cancelGrace)
-                    gate.resume(false)
-                }
-            }
-            if finished {
-                for file in scoped { endAccess(file) }
-                return .addingAll(files)
-            }
-            let pending = Task { @MainActor in
-                _ = await lookupTask.value
-                for file in scoped { endAccess(file) }
-            }
-            var plan = Plan.addingAll(files)
-            plan.lookup = Plan.Lookup(pending)
-            return plan
+            _ = await lookupTask.value
+            return .addingAll(count: files.count)
         }
     }
 
@@ -339,38 +284,17 @@ enum AlreadyInMarfa {
             let items = matches.map { ($0.id, library.item($0.id)?.displayTitle ?? ($0.title.isEmpty ? String(localized: "Untitled") : $0.title)) }
             return Question.Row(index: index, file: file, items: items, more: more)
         }
-        guard !rows.isEmpty else { return .addingAll(files) }
+        guard !rows.isEmpty else { return .addingAll(count: files.count) }
         switch await asking.ask(Question(rows: rows, total: files.count)) {
         case nil, .addAnyway:
-            return .addingAll(files)
-        case .open:
+            return .addingAll(count: files.count)
+        case .skipDuplicates:
             let matched = Set(rows.map(\.index))
-            var opening: [ItemID] = []
-            for id in rows.flatMap({ $0.items.map(\.id) }) where !opening.contains(id) { opening.append(id) }
-            let adding = files.indices.filter { !matched.contains($0) }
-            return Plan(
-                add: adding.map { files[$0] }, open: opening,
-                matched: rows.map { Plan.Match(index: $0.index, file: $0.file, items: $0.items.map(\.id)) },
-                adding: Array(adding))
+            var show: [ItemID] = []
+            for id in rows.flatMap({ $0.items.map(\.id) }) where !show.contains(id) { show.append(id) }
+            return Plan(adding: files.indices.filter { !matched.contains($0) }, show: show)
         case .cancel:
-            return Plan(add: [], open: [], isCancelled: true)
+            return Plan(adding: [], show: [], isCancelled: true)
         }
-    }
-
-    private static func beginAccess(_ url: URL) -> Bool {
-        #if DEBUG
-        if let hooks = accessHooks.current { return hooks.start(url) }
-        #endif
-        return url.startAccessingSecurityScopedResource()
-    }
-
-    private static func endAccess(_ url: URL) {
-        #if DEBUG
-        if let hooks = accessHooks.current {
-            hooks.stop(url)
-            return
-        }
-        #endif
-        url.stopAccessingSecurityScopedResource()
     }
 }

@@ -33,6 +33,20 @@ import Testing
         #expect(undone == 0)
     }
 
+    @Test func showOpensTheMatchesAndLeavesTheToastAndItsUndo() {
+        var shown = 0
+        var undone = 0
+        presenter.show("1 file is already in Marfa.", undo: { undone += 1 }, showMatches: { shown += 1 })
+        presenter.showMatches()
+        presenter.showMatches()
+        #expect(shown == 2)
+        #expect(undone == 0)
+        #expect(presenter.current?.message == "1 file is already in Marfa.")
+        presenter.undo()
+        #expect(undone == 1)
+        #expect(presenter.current == nil)
+    }
+
     @Test func aToastWithNoUndoOffersNoneAndUndoDoesNotRemoveIt() {
         presenter.show("Copied")
         presenter.undo()

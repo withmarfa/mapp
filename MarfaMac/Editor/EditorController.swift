@@ -68,9 +68,9 @@ final class EditorController: NSObject {
     var isChoosingImages = false
     /// Asks, over the page, about images to attach that are already in Marfa (`AlreadyInMarfa`).
     @ObservationIgnored let alreadyInMarfa = AlreadyInMarfa.Asking()
-    /// Opens the items already in Marfa that the person chose to see in place of images they were attaching. A main
-    /// window opens them as its list does. An item window opens one window for each. With neither, each opens as a link would.
-    @ObservationIgnored var onOpenFound: (([ItemID]) -> Void)?
+    /// Opens items a skipped image matched, from the toast's Show. It changes nothing that was attached. A main window
+    /// opens them as its list does. An item window opens one window for each.
+    @ObservationIgnored var onShowMatches: (([ItemID]) -> Void)?
 
     /// An edit to an item, with the markdown the item now holds and the version of the text it was typed on.
     @ObservationIgnored var onChange: (ItemID, String, ItemVersion) -> Void = { _, _, _ in }

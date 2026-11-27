@@ -6,11 +6,12 @@ import WebKit
 extension EditorController {
     /// Takes images for the item that is open now and tries to place their links at the drop point or caret.
     /// Reports each image that could not be attached or placed in the text. Files and pasted bytes already in Marfa
-    /// are asked about first (`AlreadyInMarfa`): Cancel attaches nothing, and Open attaches the rest and opens
-    /// every item that matched. A match that cannot be opened is attached, and the person is told. A pasted
-    /// image is staged to a temporary file for the check. That copy is removed after Cancel, after Open skips it,
-    /// or once attaching it or saving it to Downloads has succeeded. The page moving on does not drop it: it is
-    /// still attached to the item that was open, and only the insertion into the text is skipped.
+    /// are asked about first (`AlreadyInMarfa`): Cancel attaches nothing, Skip Duplicates attaches only the images
+    /// with no match, and Add Anyway attaches every image. The choice is final then. Where images were skipped, the
+    /// toast says so and offers Show, which opens the matches and changes nothing that was attached. A pasted image
+    /// is staged for the check and stays until the check and the attach have both ended. One whose attach could not
+    /// be saved is kept, and the notice names that copy. The page moving on does not drop an image: it is still
+    /// attached to the item that was open, and only the insertion into the text is skipped.
     @discardableResult
     func insertImages(_ sources: [PastedImages.Source], at point: CGPoint? = nil) -> Bool {
         guard isEditable, let pageItemID, let asked = library, !sources.isEmpty else { return false }
@@ -24,36 +25,23 @@ extension EditorController {
             let held = prepared.compactMap(\.1)
             defer { held.forEach { $0.close() } }
             let staged = Self.stageForChecking(prepared.map(\.0))
-            #if DEBUG
-            let limit = AlreadyInMarfa.limitOverride.current ?? AlreadyInMarfa.limit
-            #else
-            let limit = AlreadyInMarfa.limit
-            #endif
-            let plan = await AlreadyInMarfa.check(staged.urls, in: asked, asking: alreadyInMarfa, within: limit)
+            let plan = await AlreadyInMarfa.check(staged.urls, in: asked, asking: alreadyInMarfa)
+            let skipped = staged.urls.count - plan.adding.count
             guard !plan.isCancelled else {
-                await plan.lookup.ended()
                 staged.remove()
                 return
             }
-            let reached = await AlreadyInMarfa.opening(plan.matched, in: asked)
-            let adding = Set(plan.indicesToAdd(fallback: reached.fallback))
-            let fallback = Set(reached.fallback.map(\.index))
+            let adding = Set(plan.adding)
             let chosen = staged.entries.filter { entry in
                 guard let index = entry.checkIndex else { return true }
                 return adding.contains(index)
             }
-            let recoveredNames = staged.entries.compactMap { entry -> String? in
-                guard let index = entry.checkIndex, fallback.contains(index) else { return nil }
-                return entry.name
-            }
-            // Opened only once the rest are placed, since opening an item takes the page from this one.
-            defer { openFound(reached.opened) }
             guard !chosen.isEmpty else {
-                await plan.lookup.ended()
                 staged.remove()
+                tellSkipped(skipped, matches: plan.show)
                 return
             }
-            let (files, skipped) = await PastedImages.read(chosen.map(\.source))
+            let (files, unread) = await PastedImages.read(chosen.map(\.source))
             // The page may have moved on. The files still belong to the item that was open, and a refusal saves them.
             let report = files.isEmpty ? AttachReport() : await asked.attach(files, to: pageItemID)
             let placed = self.pageItemID == pageItemID && isEditable && acceptsInsertion
@@ -63,18 +51,63 @@ extension EditorController {
                 await !place(embeds.map { ["src": $0.link, "alt": $0.name] }, at: point, height: height, in: pageItemID) {
                 notPlaced = embeds.map(\.name)
             }
-            let embedded = Set(embeds.map(\.name))
-            let told = recoveredNames.filter { embedded.contains($0) }
-            if !told.isEmpty { Self.tellUnopened(told, to: asked) }
+            let (failed, keptCopies) = Self.pasteFailures(report.failed, of: Self.readable(chosen))
             Self.reportUnplaced(
-                skipped: skipped, failed: report.failed, kept: report.kept, attached: embeds.count,
+                skipped: unread, failed: failed, kept: report.kept, attached: embeds.count,
                 unplaced: placed ? [] : embeds.map(\.name), refused: notPlaced,
-                in: asked.item(pageItemID)?.title ?? "", to: asked
+                copies: keptCopies, in: asked.item(pageItemID)?.title ?? "", to: asked
             )
-            await plan.lookup.ended()
-            staged.remove(keeping: Set(report.failed.map(\.name)))
+            staged.remove(keeping: Set(keptCopies))
+            tellSkipped(skipped, matches: plan.show)
         }
         return true
+    }
+
+    /// A failed attach of a staged paste keeps that copy and names it. A file the person chose keeps the library's reason.
+    private static func pasteFailures(
+        _ failed: [AttachmentFailure], of readable: [ImageCheckBatch.Entry]
+    ) -> (failed: [AttachmentFailure], copies: [URL]) {
+        var told: [AttachmentFailure] = []
+        var copies: [URL] = []
+        for failure in failed {
+            guard readable.indices.contains(failure.index), case .data = readable[failure.index].source,
+                let url = readable[failure.index].url
+            else {
+                told.append(failure)
+                continue
+            }
+            let copy = url.resolvingSymlinksInPath()
+            copies.append(copy)
+            told.append(AttachmentFailure(
+                index: failure.index, name: failure.name,
+                reason: String(localized: "It couldn’t be saved to Downloads. The copy is still at \(copy.path).")))
+        }
+        return (told, copies)
+    }
+
+    /// The sources `PastedImages.read` would hand to attach, in that order, so a failure's index finds its copy.
+    private static func readable(_ entries: [ImageCheckBatch.Entry]) -> [ImageCheckBatch.Entry] {
+        entries.filter { entry in
+            switch entry.source {
+            case .data: true
+            case .file(let url): PastedImages.readImage(url) != nil
+            }
+        }
+    }
+
+    /// Where images were left out because they are already in Marfa. Show opens the matches and attaches nothing more.
+    private func tellSkipped(_ count: Int, matches: [ItemID]) {
+        guard count > 0, let toasts = titleDrafts?.toasts else { return }
+        let show: (@MainActor () -> Void)?
+        if matches.isEmpty {
+            show = nil
+        } else {
+            show = { [weak self] in
+                guard let self else { return }
+                onShowMatches?(matches)
+            }
+        }
+        toasts.show(AlreadyInMarfa.skippedMessage(count), symbol: "doc.on.doc", showMatches: show)
     }
 
     /// Access to a file the person chose, held until its bytes have been hashed and read. The resolved file is the
@@ -91,6 +124,9 @@ extension EditorController {
             self.chosen = chosen
             scoped = chosen.startAccessingSecurityScopedResource()
             resolved = chosen.resolvingSymlinksInPath()
+            #if DEBUG
+            AlreadyInMarfa.grantWatch.start(chosen)
+            #endif
         }
 
         func close() {
@@ -98,7 +134,11 @@ extension EditorController {
             let should = !closed
             closed = true
             lock.unlock()
-            if should, scoped { chosen.stopAccessingSecurityScopedResource() }
+            guard should else { return }
+            #if DEBUG
+            AlreadyInMarfa.grantWatch.stop(chosen)
+            #endif
+            if scoped { chosen.stopAccessingSecurityScopedResource() }
         }
 
         deinit { close() }
@@ -123,17 +163,18 @@ extension EditorController {
         let entries: [Entry]
         var urls: [URL] { entries.compactMap(\.url) }
 
-        /// Removes the staged copies. A name in `failed` is left, because neither attaching nor Downloads kept it.
-        func remove(keeping failed: Set<String> = []) {
+        /// Removes the staged copies. A URL in `kept` is left: its attach could not be saved, so the person can still get it.
+        func remove(keeping kept: Set<URL> = []) {
             guard let directory else { return }
-            guard !failed.isEmpty else {
+            let kept = Set(kept.map { $0.resolvingSymlinksInPath() })
+            guard !kept.isEmpty else {
                 try? FileManager.default.removeItem(at: directory)
                 return
             }
             guard let folders = try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) else { return }
             for folder in folders {
                 guard let files = try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil) else { continue }
-                for file in files where !failed.contains(file.lastPathComponent) {
+                for file in files where !kept.contains(file.resolvingSymlinksInPath()) {
                     try? FileManager.default.removeItem(at: file)
                 }
                 if (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil))?.isEmpty == true {
@@ -180,17 +221,6 @@ extension EditorController {
         return ImageCheckBatch(directory: directory, entries: entries)
     }
 
-    private static func tellUnopened(_ names: [String], to library: any ItemLibrary) {
-        let lines = names.map { String(localized: "“\($0)” was attached because its item couldn’t be opened.") }
-        library.notices.tell(String(localized: "Couldn’t Open Item"), lines.joined(separator: "\n"))
-    }
-
-    /// Opens every item the person chose to see in place of the images they matched.
-    private func openFound(_ ids: [ItemID]) {
-        guard !ids.isEmpty else { return }
-        if let onOpenFound { onOpenFound(ids) } else { for id in ids { follow(id) } }
-    }
-
     /// Asks the page to put the images in, and again after the next paint while it refuses them for folded text,
     /// which Inkkit has opened by then, up to `hiddenTextRetryLimit` times. False when they were not placed.
     private func place(_ images: [[String: String]], at point: CGPoint?, height: CGFloat, in id: ItemID) async -> Bool {
@@ -218,8 +248,8 @@ extension EditorController {
     }
 
     private static func reportUnplaced(
-        skipped: [String], failed: [(name: String, reason: String)], kept: [KeptFile] = [],
-        attached: Int, unplaced: [String], refused: [String] = [],
+        skipped: [String], failed: [AttachmentFailure], kept: [KeptFile] = [],
+        attached: Int, unplaced: [String], refused: [String] = [], copies: [URL] = [],
         in title: String, to library: any ItemLibrary
     ) {
         guard !skipped.isEmpty || !failed.isEmpty || !kept.isEmpty || !unplaced.isEmpty || !refused.isEmpty else { return }
@@ -241,7 +271,7 @@ extension EditorController {
         } else {
             String(localized: "Some Images Weren’t Attached")
         }
-        let saved = kept.map(\.file)
+        let saved = kept.map(\.file) + copies
         library.notices.tell(title, lines.joined(separator: "\n"), action: saved.isEmpty ? nil : .showInFinder(saved))
     }
 

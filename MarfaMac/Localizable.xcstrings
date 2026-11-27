@@ -175,9 +175,6 @@
     "%@ answers on it too." : {
 
     },
-    "%@ are already in Marfa, but those items couldn’t be opened, so the files stay in the new item." : {
-
-    },
     "%@ are attached to “%@”, but they couldn’t be put in its text." : {
       "extractionState" : "manual"
     },
@@ -280,9 +277,6 @@
 
     },
     "%@ is %@’s." : {
-
-    },
-    "%@ is already in Marfa, but that item couldn’t be opened, so the file stays in the new item." : {
 
     },
     "%@ is attached to “%@”, but it couldn’t be put in its text." : {
@@ -805,6 +799,9 @@
     "%lld archived" : {
 
     },
+    "%lld are already in Marfa." : {
+
+    },
     "%lld canceled" : {
       "extractionState" : "manual"
     },
@@ -1049,9 +1046,6 @@
 
     },
     "%lld files are already in Marfa." : {
-
-    },
-    "%lld files were added because the items already in Marfa couldn’t be opened." : {
 
     },
     "%lld files were skipped because Marfa sets this property." : {
@@ -1878,10 +1872,13 @@
     "1 event." : {
 
     },
-    "1 file was added because the item already in Marfa couldn’t be opened." : {
+    "1 file is already in Marfa." : {
 
     },
     "1 hour" : {
+
+    },
+    "1 is already in Marfa." : {
 
     },
     "1 item" : {
@@ -2611,6 +2608,9 @@
 
     },
     "Allowed" : {
+
+    },
+    "Already in Marfa" : {
 
     },
     "Already tagged." : {
@@ -4121,12 +4121,6 @@
     },
     "Couldn’t Make This Change" : {
       "extractionState" : "manual"
-    },
-    "Couldn’t Open Item" : {
-
-    },
-    "Couldn’t Open Items" : {
-
     },
     "Couldn’t Print Item" : {
 
@@ -7914,9 +7908,6 @@
     "Open items in" : {
 
     },
-    "Open shows matches for all %lld files." : {
-
-    },
     "Open the file in another app to view it." : {
 
     },
@@ -9643,6 +9634,9 @@
       "extractionState" : "manual"
     },
     "Sizes run from %@ to %@." : {
+
+    },
+    "Skip Duplicates" : {
 
     },
     "Sky" : {
@@ -13302,9 +13296,6 @@
           }
         }
       }
-    },
-    "“%@” was attached because its item couldn’t be opened." : {
-
     },
     "“%@” was attached to “%@” but isn’t in its text, because the item was no longer open for editing." : {
       "extractionState" : "manual"

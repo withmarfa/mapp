@@ -1,6 +1,7 @@
 import Foundation
 import Synchronization
 import Testing
+import UniformTypeIdentifiers
 @testable import MarfaMac
 
 /// Files about to be added that Marfa already holds: one question for a batch, and every add going ahead as before
@@ -75,7 +76,6 @@ struct AlreadyInMarfaTests {
             “a.png” has the same contents as “Beach Day”.
             “b.png” has the same contents as “Trip” and 1 other item.
             “c.png” has the same contents as “Receipt” and other items.
-            Open shows matches for all 3 files.
             """)
         browser.alreadyInMarfa.answer(.cancel, to: question.id)
         #expect(await adding.value.isEmpty)
@@ -93,9 +93,8 @@ struct AlreadyInMarfaTests {
         let question = try #require(browser.alreadyInMarfa.question)
         #expect(question.title == "7 files are already in Marfa.")
         let lines = question.message.split(separator: "\n")
-        #expect(lines.count == 7)
-        #expect(lines.dropLast().last == "And 2 more files.")
-        #expect(lines.last == "Open shows matches for all 7 files.")
+        #expect(lines.count == 6)
+        #expect(lines.last == "And 2 more files.")
         browser.alreadyInMarfa.answer(.cancel, to: question.id)
         _ = await adding.value
     }
@@ -123,7 +122,7 @@ struct AlreadyInMarfaTests {
         #expect(!undo.canUndo)
     }
 
-    @Test func openAddsTheFilesWithNoMatchAndOpensTheMatchedItems() async throws {
+    @Test func skipDuplicatesAddsOnlyTheFilesWithNoMatch() async throws {
         let beach = FakeItemLibrary.note("Beach Day", modified: .now)
         let library = FakeItemLibrary(items: [beach])
         library.sameBytes = Self.answering(["a.png": [beach]])
@@ -133,15 +132,18 @@ struct AlreadyInMarfaTests {
             await browser.importFiles([disk.url("a.png"), disk.url("b.png")], in: library, order: ItemOrder(), undoManager: nil, toasts: toasts)
         }
         try #require(await eventually { browser.alreadyInMarfa.question != nil })
-        browser.alreadyInMarfa.answer(.open)
+        browser.alreadyInMarfa.answer(.skipDuplicates)
         let ids = await adding.value
         #expect(ids.count == 1)
         #expect(library.addedFiles.map(\.name) == ["b.png"], "the matched file is skipped, the other added")
-        #expect(toasts.current?.message == "Added 1 File")
-        #expect(browser.selection == [beach.id], "the item already in Marfa is opened")
+        #expect(toasts.current?.message == "Added 1 of 2 Files 1 is already in Marfa.")
+        #expect(browser.selection == Set(ids), "Show has not opened the match")
+        toasts.showMatches()
+        #expect(browser.selection == [beach.id])
+        #expect(library.addedFiles.map(\.name) == ["b.png"], "Show changes nothing that was added")
     }
 
-    @Test func openWithEveryFileMatchedAddsNothingAndOpensTheItem() async throws {
+    @Test func skipDuplicatesWithEveryFileMatchedAddsNothingAndShowOpensTheItem() async throws {
         let beach = FakeItemLibrary.note("Beach Day", modified: .now)
         let library = FakeItemLibrary(items: [beach])
         library.sameBytes = Self.answering(["a.png": [beach]])
@@ -149,11 +151,15 @@ struct AlreadyInMarfaTests {
         let toasts = ToastPresenter()
         let adding = Task { await browser.importFiles([disk.url("a.png")], in: library, order: ItemOrder(), undoManager: nil, toasts: toasts) }
         try #require(await eventually { browser.alreadyInMarfa.question != nil })
-        browser.alreadyInMarfa.answer(.open)
+        browser.alreadyInMarfa.answer(.skipDuplicates)
         #expect(await adding.value.isEmpty)
         #expect(library.addedFiles.isEmpty)
-        #expect(toasts.current == nil)
+        #expect(toasts.current?.message == "1 file is already in Marfa.")
+        #expect(toasts.current?.undo == nil)
+        #expect(browser.selection.isEmpty)
+        toasts.showMatches()
         #expect(browser.selection == [beach.id])
+        #expect(library.addedFiles.isEmpty)
     }
 
     @Test func cancelWritesNothing() async throws {
@@ -207,57 +213,48 @@ struct AlreadyInMarfaTests {
         let question = try #require(browser.alreadyInMarfa.question)
         #expect(question.rows.map(\.file.lastPathComponent) == ["match.png"])
         #expect(question.title == "1 of 3 Files Already in Marfa")
-        browser.alreadyInMarfa.answer(.open)
+        browser.alreadyInMarfa.answer(.skipDuplicates)
         #expect(await adding.value.count == 2)
         #expect(library.addedFiles.map(\.name) == ["none.png", "unanswered.png"], "a file with no answer is added, never skipped")
     }
 
-    @Test func aMatchTheLibraryDoesNotHoldIsNamedAsMarfaNamedIt() async throws {
+    @Test func showOpensAMatchTheLibraryDoesNotHold() async throws {
+        let id = ItemID.mint()
         let library = FakeItemLibrary()
-        library.sameBytes = { _ in FileMatches([.answered([FileMatch(id: .mint(), title: "Shared Photo")], more: false)]) }
+        library.sameBytes = { _ in FileMatches([.answered([FileMatch(id: id, title: "Shared Photo")], more: false)]) }
         let browser = browser(for: library)
         let toasts = ToastPresenter()
         let adding = Task { await browser.importFiles([disk.url("a.png")], in: library, order: ItemOrder(), undoManager: nil, toasts: toasts) }
         try #require(await eventually { browser.alreadyInMarfa.question != nil })
         #expect(browser.alreadyInMarfa.question?.message == "It has the same contents as “Shared Photo”.")
-        browser.alreadyInMarfa.answer(.open)
-        let added = await adding.value
-        #expect(added.count == 1)
-        #expect(library.addedFiles.map(\.name) == ["a.png"])
-        #expect(toasts.current?.message == "1 file was added because the item already in Marfa couldn’t be opened.")
-        #expect(browser.selection == Set(added), "the added file is selected, as any other drop is")
-    }
-
-    @Test func openFetchesAMatchTheLibraryDoesNotHoldYet() async throws {
-        let id = ItemID.mint()
-        let arriving = FakeItemLibrary.note("Shared Photo", modified: .now, id: id)
-        let library = FakeItemLibrary()
-        library.arrivals[id] = arriving
-        library.sameBytes = { _ in FileMatches([.answered([FileMatch(id: id, title: "Shared Photo")], more: false)]) }
-        let browser = browser(for: library)
-        let adding = Task { await browser.importFiles([disk.url("a.png")], in: library, order: ItemOrder(), undoManager: nil) }
-        try #require(await eventually { browser.alreadyInMarfa.question != nil })
-        browser.alreadyInMarfa.answer(.open)
+        browser.alreadyInMarfa.answer(.skipDuplicates)
         #expect(await adding.value.isEmpty)
         #expect(library.addedFiles.isEmpty)
-        #expect(library.heldForOpening == [id])
-        #expect(browser.selection == [id])
+        #expect(library.item(id) == nil)
+        toasts.showMatches()
+        #expect(browser.selection == [id], "Show opens the item by its id")
+        #expect(library.addedFiles.isEmpty)
+        #expect(library.item(id) == nil)
     }
 
-    @Test func openSelectsEveryMatchIncludingOneThePlaceDoesNotList() async throws {
+    @Test func showSelectsEveryMatchIncludingOneThePlaceDoesNotList() async throws {
         let libraryNote = FakeItemLibrary.note("Library", modified: .now)
         let feedNote = FakeItemLibrary.note("Feed", modified: .now, tier: .feed)
         let library = FakeItemLibrary(items: [libraryNote, feedNote])
         library.sameBytes = Self.answering(["a.png": [libraryNote, feedNote]])
         let browser = browser(for: library)
-        let adding = Task { await browser.importFiles([disk.url("a.png")], in: library, order: ItemOrder(), undoManager: nil) }
+        let toasts = ToastPresenter()
+        let adding = Task { await browser.importFiles([disk.url("a.png")], in: library, order: ItemOrder(), undoManager: nil, toasts: toasts) }
         try #require(await eventually { browser.alreadyInMarfa.question != nil })
-        browser.alreadyInMarfa.answer(.open)
+        browser.alreadyInMarfa.answer(.skipDuplicates)
         #expect(await adding.value.isEmpty)
+        #expect(browser.selection.isEmpty)
+        toasts.showMatches()
         #expect(browser.selection == [libraryNote.id, feedNote.id])
+        #expect(library.addedFiles.isEmpty)
     }
 
-    @Test func openInANewWindowOpensEveryMatch() async throws {
+    @Test func showInANewWindowOpensEveryMatch() async throws {
         let libraryNote = FakeItemLibrary.note("Library", modified: .now)
         let feedNote = FakeItemLibrary.note("Feed", modified: .now, tier: .feed)
         let library = FakeItemLibrary(items: [libraryNote, feedNote])
@@ -266,11 +263,15 @@ struct AlreadyInMarfaTests {
         browser.setOpening(.newWindow)
         var opened: Set<ItemID> = []
         browser.windowOpener = { opened = $0 }
-        let adding = Task { await browser.importFiles([disk.url("a.png")], in: library, order: ItemOrder(), undoManager: nil) }
+        let toasts = ToastPresenter()
+        let adding = Task { await browser.importFiles([disk.url("a.png")], in: library, order: ItemOrder(), undoManager: nil, toasts: toasts) }
         try #require(await eventually { browser.alreadyInMarfa.question != nil })
-        browser.alreadyInMarfa.answer(.open)
+        browser.alreadyInMarfa.answer(.skipDuplicates)
         #expect(await adding.value.isEmpty)
+        #expect(opened.isEmpty)
+        toasts.showMatches()
         #expect(opened == [libraryNote.id, feedNote.id])
+        #expect(library.addedFiles.isEmpty)
     }
 
     @Test func aFileGoneWhileTheQuestionWaitsIsToldAsAnyUnreadableFile() async throws {
@@ -289,24 +290,32 @@ struct AlreadyInMarfaTests {
 
     // MARK: The check itself
 
-    @Test func aCheckPastItsLimitAddsEveryFileUnasked() async {
+    @Test func aCheckPastItsLimitAddsEveryFileOnceTheLookupEnds() async {
         let library = FakeItemLibrary()
-        let beach = FakeItemLibrary.note("Beach Day", modified: .now)
-        let late = Self.answering(["a.png": [beach]])
-        let (release, released) = AsyncStream<Void>.makeStream()
-        library.sameBytes = { files in
-            for await _ in release { break }
-            return await late(files)
+        let gate = Parked()
+        let sawCancel = Mutex(false)
+        let finishedCancelled = Mutex(false)
+        library.sameBytes = { _ in
+            await withTaskCancellationHandler {
+                await gate.wait()
+            } onCancel: {
+                sawCancel.withLock { $0 = true }
+            }
+            finishedCancelled.withLock { $0 = Task.isCancelled }
+            return .noAnswer
         }
         let asking = AlreadyInMarfa.Asking()
         asking.viewAppeared()
-        let files = [disk.url("a.png")]
-        let plan = await AlreadyInMarfa.check(files, in: library, asking: asking, within: .milliseconds(200))
-        #expect(plan == .addingAll(files), "the add goes ahead without the answer")
-        released.yield()
-        released.finish()
-        // Time for the late answer to arrive, which must ask nothing.
-        try? await Task.sleep(for: .milliseconds(300))
+        let checking = await AlreadyInMarfa.$limitOverride.withValue(.milliseconds(50)) {
+            Task { await AlreadyInMarfa.check([disk.url("a.png")], in: library, asking: asking) }
+        }
+        #expect(await eventually { gate.isParked })
+        #expect(await eventually { sawCancel.withLock { $0 } })
+        #expect(!finishedCancelled.withLock { $0 }, "the cancelled lookup is still inside the read")
+        #expect(asking.question == nil)
+        gate.open()
+        #expect(await checking.value == .addingAll(count: 1))
+        #expect(finishedCancelled.withLock { $0 })
         #expect(asking.question == nil)
     }
 
@@ -314,37 +323,103 @@ struct AlreadyInMarfaTests {
         #expect(AlreadyInMarfa.limit == .seconds(10))
     }
 
-    @Test func aTimedOutLookupIsCancelledAndKeepsAccessUntilItFinishes() async {
-        #expect(AlreadyInMarfa.cancelGrace == .milliseconds(200))
-        defer { AlreadyInMarfa.accessHooks.set(nil) }
+    @Test func aTimedOutDeviceImportHoldsTheStagedCopyUntilTheCancelledLookupEnds() async throws {
         let library = FakeItemLibrary()
+        let browser = browser(for: library)
         let gate = Parked()
-        let cancelled = Mutex(false)
-        library.sameBytes = { _ in
-            await gate.wait()
-            cancelled.withLock { $0 = Task.isCancelled }
+        let sawCancel = Mutex(false)
+        let atEnd = Mutex<(cancelled: Bool, readable: Bool, stops: Int)?>(nil)
+        let stops = Mutex(0)
+        let watched = Mutex<String?>(nil)
+        let watch = AlreadyInMarfa.grantWatch.add(.init(
+            start: { _ in },
+            stop: { url in
+                guard watched.withLock({ $0 }) == url.resolvingSymlinksInPath().path else { return }
+                stops.withLock { $0 += 1 }
+            }
+        ))
+        defer { AlreadyInMarfa.grantWatch.remove(watch) }
+        library.sameBytes = { files in
+            await withTaskCancellationHandler {
+                await gate.wait()
+            } onCancel: {
+                sawCancel.withLock { $0 = true }
+            }
+            let readable = files.allSatisfy { FileManager.default.isReadableFile(atPath: $0.path) }
+            atEnd.withLock { $0 = (Task.isCancelled, readable, stops.withLock { $0 }) }
             return .noAnswer
         }
-        let files = [disk.url("a.png")]
-        let mine = files[0].path
-        let stops = Mutex(0)
-        AlreadyInMarfa.accessHooks.set(.init(
-            start: { $0.path == mine },
-            stop: { if $0.path == mine { stops.withLock { $0 += 1 } } }
-        ))
-        let asking = AlreadyInMarfa.Asking()
-        asking.viewAppeared()
-        let plan = await FirstAnswer.within(waitLimit, otherwise: nil) {
-            Optional(await AlreadyInMarfa.check(files, in: library, asking: asking, within: .milliseconds(50)))
+        let provider = try photoProvider(named: "IMG", bytes: "one")
+        await AlreadyInMarfa.$limitOverride.withValue(.milliseconds(50)) {
+            browser.importProviders([provider], in: library, order: ItemOrder(), undoManager: nil, toasts: nil)
         }
-        if plan == nil { gate.open() }
-        #expect(plan == .some(.addingAll(files)), "the add does not wait out a lookup that has already run over its limit")
-        #expect(gate.isParked, "the lookup is still inside the read when the add goes on")
-        #expect(stops.withLock { $0 } == 0, "file access stays until that read finishes")
+        #expect(await eventually { gate.isParked })
+        #expect(await eventually { sawCancel.withLock { $0 } })
+        let staged = try #require(library.askedSameBytes.last?.first)
+        watched.withLock { $0 = staged.resolvingSymlinksInPath().path }
+        #expect(FileManager.default.fileExists(atPath: staged.path), "the staged copy is held while the cancelled lookup runs")
+        #expect(stops.withLock { $0 } == 0)
+        #expect(library.addedFiles.isEmpty)
         gate.open()
-        #expect(await eventually { cancelled.withLock { $0 } })
-        #expect(await eventually { stops.withLock { $0 } == 1 })
-        #expect(asking.question == nil)
+        #expect(await eventually { library.addedFiles.map(\.name) == ["IMG.png"] })
+        let end = try #require(atEnd.withLock { $0 })
+        #expect(end.cancelled && end.readable && end.stops == 0)
+        #expect(await eventually { stops.withLock { $0 } == 1 && !FileManager.default.fileExists(atPath: staged.path) })
+    }
+
+    @Test func aTimedOutDropOfASymlinkHoldsAccessUntilTheCancelledLookupEnds() async throws {
+        let library = FakeItemLibrary()
+        let browser = browser(for: library)
+        let real = disk.url("photo.png", "pixels")
+        let link = disk.directory.appending(path: "alias.png")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: real)
+        let gate = Parked()
+        let sawCancel = Mutex(false)
+        let atEnd = Mutex<(cancelled: Bool, name: String, readable: Bool, stops: Int)?>(nil)
+        let stops = Mutex(0)
+        let watch = AlreadyInMarfa.grantWatch.add(.init(
+            start: { _ in },
+            stop: { if $0.lastPathComponent == "alias.png" { stops.withLock { $0 += 1 } } }
+        ))
+        defer { AlreadyInMarfa.grantWatch.remove(watch) }
+        library.sameBytes = { files in
+            await withTaskCancellationHandler {
+                await gate.wait()
+            } onCancel: {
+                sawCancel.withLock { $0 = true }
+            }
+            let name = files.map(\.lastPathComponent).joined(separator: ",")
+            let readable = files.allSatisfy { FileManager.default.isReadableFile(atPath: $0.path) }
+            atEnd.withLock { $0 = (Task.isCancelled, name, readable, stops.withLock { $0 }) }
+            return .noAnswer
+        }
+        let adding = await AlreadyInMarfa.$limitOverride.withValue(.milliseconds(50)) {
+            Task { await browser.importFiles([link], in: library, order: ItemOrder(), undoManager: nil) }
+        }
+        #expect(await eventually { gate.isParked })
+        try FileManager.default.removeItem(at: link)
+        #expect(await eventually { sawCancel.withLock { $0 } })
+        #expect(FileManager.default.isReadableFile(atPath: real.path))
+        #expect(stops.withLock { $0 } == 0)
+        #expect(library.addedFiles.isEmpty)
+        gate.open()
+        #expect(await adding.value.count == 1)
+        let end = try #require(atEnd.withLock { $0 })
+        #expect(end.cancelled && end.name == "photo.png" && end.readable && end.stops == 0)
+        #expect(stops.withLock { $0 } == 1)
+        #expect(library.addedFiles.map(\.name) == ["photo.png"])
+    }
+
+    /// A photo handed over as a nearby device does, copied into the import's own folder.
+    private func photoProvider(named name: String, bytes: String) throws -> NSItemProvider {
+        let source = disk.url("\(name)-\(bytes).png", bytes)
+        let provider = NSItemProvider()
+        provider.suggestedName = name
+        provider.registerFileRepresentation(for: .png, visibility: .all) { completion in
+            completion(source, false, nil)
+            return nil
+        }
+        return provider
     }
 
     @Test func twoCopiesOfOnePathAreNotBothTakenAsTheSameAnswer() async throws {
@@ -362,81 +437,36 @@ struct AlreadyInMarfaTests {
         let checking = Task { await AlreadyInMarfa.check([file, file], in: library, asking: asking) }
         try #require(await eventually { asking.question != nil })
         #expect(asking.question?.rows.count == 1, "only the copy Marfa could read is a match")
-        asking.answer(.open)
+        asking.answer(.skipDuplicates)
         let plan = await checking.value
-        #expect(plan.matched.map(\.index) == [0])
         #expect(plan.adding == [1])
-        #expect(plan.add.count == 1, "the copy Marfa could not read is added")
-        #expect(plan.open == [beach.id])
+        #expect(plan.show == [beach.id])
+        #expect(!plan.isCancelled)
     }
 
-    @Test func openAddsAMatchThatLeavesWhileAnotherIsFetched() async throws {
-        let beach = FakeItemLibrary.note("Beach", modified: .now)
-        let trip = FakeItemLibrary.note("Trip", modified: .now)
+    @Test func aNewDraftBegunWhileFilesAreCheckedIsLeftAlone() async throws {
+        let beach = FakeItemLibrary.note("Beach Day", modified: .now)
         let library = FakeItemLibrary(items: [beach])
-        library.arrivals[trip.id] = trip
-        library.sameBytes = Self.answering(["a.png": [beach], "b.png": [trip]])
-        library.holding = { id in
-            if id == trip.id { library.items.removeAll { $0.id == beach.id } }
-        }
-        let browser = browser(for: library)
-        let toasts = ToastPresenter()
-        let adding = Task {
-            await browser.importFiles([disk.url("a.png"), disk.url("b.png")], in: library, order: ItemOrder(), undoManager: nil, toasts: toasts)
-        }
-        try #require(await eventually { browser.alreadyInMarfa.question != nil })
-        browser.alreadyInMarfa.answer(.open)
-        let ids = await adding.value
-        #expect(ids.count == 1)
-        #expect(library.addedFiles.map(\.name) == ["a.png"], "the match that left is added")
-        #expect(toasts.current?.message == AlreadyInMarfa.unopenedMessage(1))
-        #expect(browser.selection == [trip.id])
-    }
-
-    @Test func aFileAddedWhileOpenFetchesStaysInTheDraft() async throws {
-        let beach = FakeItemLibrary.note("Beach Day", modified: .now)
-        let library = FakeItemLibrary()
-        library.arrivals[beach.id] = beach
-        library.sameBytes = Self.answering(["map.png": [beach]])
-        let browser = browser(for: library)
-        browser.openNewItem(kind: "core.note", form: .text, in: library)
-        browser.quickAdd.draft?.title = "Trip"
-        let extra = try disk.file("notes.txt")
-        browser.quickAdd.draft?.files = [try disk.file("map.png")]
-        library.holding = { _ in browser.quickAdd.draft?.files.append(extra) }
-        let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
-        try #require(await eventually { browser.quickAdd.alreadyInMarfa.question != nil })
-        browser.quickAdd.alreadyInMarfa.answer(.open)
-        #expect(await saving.value == nil)
-        #expect(browser.quickAdd.draft?.files == [extra], "the file chosen while Open was fetching stays")
-        #expect(browser.quickAdd.draft?.title == "Trip")
-        #expect(browser.selection == [beach.id])
-        #expect(library.created.isEmpty)
-    }
-
-    @Test func replacingTheDraftWhileOpenFetchesLeavesTheNewFiles() async throws {
-        let beach = FakeItemLibrary.note("Beach Day", modified: .now)
-        let library = FakeItemLibrary()
-        library.arrivals[beach.id] = beach
         library.sameBytes = Self.answering(["map.png": [beach]])
         let browser = browser(for: library)
         browser.openNewItem(kind: "core.note", form: .text, in: library)
         browser.quickAdd.draft?.title = "Trip"
         browser.quickAdd.draft?.files = [try disk.file("map.png")]
-        let extra = try disk.file("notes.txt")
-        library.holding = { _ in
-            browser.quickAdd.clearDraft()
-            browser.openNewItem(kind: "core.note", form: .text, in: library)
-            browser.quickAdd.draft?.title = "Next"
-            browser.quickAdd.draft?.files = [extra]
-        }
         let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
         try #require(await eventually { browser.quickAdd.alreadyInMarfa.question != nil })
-        browser.quickAdd.alreadyInMarfa.answer(.open)
+        let replacement = try disk.file("map.png")
+        // Clearing keeps a typed draft for the next New, which would be this same one. Dropping it is a new draft.
+        if let held = browser.quickAdd.entry { browser.quickAdd.drafts.drop(held) }
+        browser.quickAdd.clearDraft()
+        browser.openNewItem(kind: "core.note", form: .text, in: library)
+        browser.quickAdd.draft?.title = "Next"
+        browser.quickAdd.draft?.files = [replacement]
+        browser.quickAdd.alreadyInMarfa.answer(.skipDuplicates)
         #expect(await saving.value == nil)
         #expect(browser.quickAdd.draft?.title == "Next")
-        #expect(browser.quickAdd.draft?.files == [extra], "a draft begun while Open was fetching is left as the person left it")
-        #expect(library.created.isEmpty)
+        #expect(browser.quickAdd.draft?.files.map(\.token) == [replacement.token])
+        #expect(library.items.allSatisfy { $0.title != "Trip" && $0.title != "Next" })
+        #expect(library.notices.waiting.contains { $0.message.contains("while its files were being checked") })
     }
 
     @Test func questionsWaitTheirTurnAndAGoneViewLetsThemGoAhead() async throws {
@@ -454,11 +484,11 @@ struct AlreadyInMarfaTests {
         #expect(asking.question == firstQuestion, "an answer to another question is ignored")
         asking.answer(.addAnyway, to: firstQuestion.id)
         #expect(asking.question == nil, "the next question waits until this alert is gone")
-        #expect(await first.value == .addingAll([disk.directory.appending(path: "a.png")]))
+        #expect(await first.value == .addingAll(count: 1))
         try #require(await eventually { asking.question.map { $0 != firstQuestion } == true }, "the second is shown once the first is answered")
         #expect(asking.question?.rows.map(\.file.lastPathComponent) == ["b.png"])
         asking.viewDisappeared()
-        #expect(await second.value == .addingAll([disk.directory.appending(path: "b.png")]), "with no view left, it goes ahead unasked")
+        #expect(await second.value == .addingAll(count: 1), "with no view left, it goes ahead unasked")
         #expect(asking.question == nil)
     }
 
@@ -468,7 +498,7 @@ struct AlreadyInMarfaTests {
         library.sameBytes = Self.answering(["a.png": [beach]])
         let files = [disk.url("a.png")]
         let asking = AlreadyInMarfa.Asking()
-        #expect(await AlreadyInMarfa.check(files, in: library, asking: asking) == .addingAll(files))
+        #expect(await AlreadyInMarfa.check(files, in: library, asking: asking) == .addingAll(count: files.count))
         #expect(asking.question == nil)
     }
 
@@ -488,7 +518,7 @@ struct AlreadyInMarfaTests {
         #expect((await first.value).isCancelled)
         try #require(await eventually { asking.question?.rows.map(\.file.lastPathComponent) == ["b.png"] })
         asking.answer(.addAnyway, to: asking.question?.id)
-        #expect(await second.value == .addingAll([disk.directory.appending(path: "b.png")]))
+        #expect(await second.value == .addingAll(count: 1))
         #expect(await eventually { asking.question == nil })
     }
 
@@ -525,48 +555,74 @@ struct AlreadyInMarfaTests {
         #expect(library.addedFiles.map(\.name) == ["photo.png"])
     }
 
-    @Test func quickAddsOpenTakesTheMatchedFilesOutAndOpensTheItem() async throws {
+    @Test func quickAddSkipRemovesTheAskedFileByTokenAndSendsAReplacementAtTheSamePath() async throws {
         let beach = FakeItemLibrary.note("Beach Day", modified: .now)
         let library = FakeItemLibrary(items: [beach])
-        library.sameBytes = Self.answering(["map.png": [beach]])
+        library.sameBytes = Self.answering(["photo.png": [beach]])
         let browser = browser(for: library)
-        browser.openNewItem(kind: "core.note", form: .text, in: library)
-        browser.quickAdd.draft?.title = "Trip"
-        let kept = try disk.file("tickets.pdf")
-        browser.quickAdd.draft?.files = [try disk.file("map.png"), kept]
-        let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
+        let toasts = ToastPresenter()
+        browser.openNewItem(kind: TypeID.file.rawValue, form: .text, in: library)
+        let original = try disk.file("photo.png")
+        browser.quickAdd.draft?.files = [original]
+        let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil, toasts: toasts) }
         try #require(await eventually { browser.quickAdd.alreadyInMarfa.question != nil })
-        browser.quickAdd.alreadyInMarfa.answer(.open)
-        #expect(await saving.value == nil)
-        #expect(library.created.isEmpty && library.attachedFiles.isEmpty, "nothing is added until the person adds again")
-        #expect(browser.quickAdd.draft?.title == "Trip")
-        #expect(browser.quickAdd.draft?.files == [kept])
+        let replacement = try disk.file("photo.png")
+        browser.quickAdd.draft?.files.append(replacement)
+        browser.quickAdd.alreadyInMarfa.answer(.skipDuplicates)
+        #expect(browser.quickAdd.draft?.files.map(\.token) == [replacement.token])
+        let id = try #require(await saving.value)
+        #expect(library.addedFiles.map(\.name) == ["photo.png"])
+        #expect(toasts.current?.message == "1 file is already in Marfa.")
+        toasts.showMatches()
         #expect(browser.selection == [beach.id])
+        #expect(library.addedFiles.map(\.name) == ["photo.png"], "Show changes nothing that was added")
+        #expect(library.item(id) != nil)
     }
 
-    @Test func quickAddsOpenFromAPanelHandsTheMatchesToTheAppWindow() async throws {
+    @Test func quickAddSkipOfItsOnlyFileAddsNothing() async throws {
+        let beach = FakeItemLibrary.note("Beach Day", modified: .now)
+        let library = FakeItemLibrary(items: [beach])
+        library.sameBytes = Self.answering(["photo.png": [beach]])
+        let browser = browser(for: library)
+        let toasts = ToastPresenter()
+        browser.openNewItem(kind: TypeID.file.rawValue, form: .text, in: library)
+        browser.quickAdd.draft?.files = [try disk.file("photo.png")]
+        let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil, toasts: toasts) }
+        try #require(await eventually { browser.quickAdd.alreadyInMarfa.question != nil })
+        browser.quickAdd.alreadyInMarfa.answer(.skipDuplicates)
+        #expect(await saving.value == nil)
+        #expect(library.addedFiles.isEmpty)
+        #expect(browser.quickAdd.draft?.files.isEmpty == true)
+        #expect(toasts.current?.message == "1 file is already in Marfa.")
+        toasts.showMatches()
+        #expect(browser.selection == [beach.id])
+        #expect(library.addedFiles.isEmpty)
+    }
+
+    @Test func quickAddSkipSendsTheRestAndShowFromAPanelHandsTheMatchesOn() async throws {
         let beach = FakeItemLibrary.note("Beach Day", modified: .now)
         let library = FakeItemLibrary(items: [beach])
         library.sameBytes = Self.answering(["map.png": [beach]])
         let panel = Browser()
         panel.quickAdd.alreadyInMarfa.viewAppeared()
         var opened: [ItemID] = []
-        panel.opensFoundElsewhere = { ids in
-            opened = ids
-            return []
-        }
+        panel.showsMatchesElsewhere = { opened = $0 }
         panel.openNewItem(kind: "core.note", form: .text, in: library)
         panel.quickAdd.draft?.title = "Trip"
         let kept = try disk.file("tickets.pdf")
         panel.quickAdd.draft?.files = [try disk.file("map.png"), kept]
-        let saving = Task { await panel.saveQuickAdd(in: library, undoManager: nil) }
+        let toasts = ToastPresenter()
+        let saving = Task { await panel.saveQuickAdd(in: library, undoManager: nil, toasts: toasts) }
         try #require(await eventually { panel.quickAdd.alreadyInMarfa.question != nil })
-        panel.quickAdd.alreadyInMarfa.answer(.open)
-        #expect(await saving.value == nil)
+        panel.quickAdd.alreadyInMarfa.answer(.skipDuplicates)
+        let id = try #require(await saving.value)
+        try #require(await eventually { library.attachedFiles.map(\.name) == ["tickets.pdf"] })
+        #expect(toasts.current?.message == "1 file is already in Marfa.")
+        #expect(opened.isEmpty)
+        toasts.showMatches()
         #expect(opened == [beach.id])
-        #expect(panel.quickAdd.draft?.files == [kept])
-        #expect(panel.selection.isEmpty)
-        #expect(library.created.isEmpty)
+        #expect(panel.selection == [id])
+        #expect(library.attachedFiles.map(\.name) == ["tickets.pdf"])
     }
 
     @Test func quickAddsAttachmentsWithNoMatchAreAttachedUnasked() async throws {

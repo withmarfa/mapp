@@ -66,11 +66,12 @@ Every editor asks `Item.allows(_:)` for the `ItemChange` it writes (`ValueEditKi
 - **Files dropped on a list join the place in view** (`Browser.fileDropTarget`): a collection, the Feed, else the Library.
 - **A collection's row, card or sidebar row takes items and files** (`dropsInto`).
 - **A drop is one undo step and one toast;** Undo unlinks, then moves them to Recently Deleted.
-- **One duplicate alert covers the batch, including pasted images.** Open shows the matches and adds each file whose match cannot be opened. In Quick Add, a file added while Open fetches stays in the draft. No answer still adds. A pasted image stays with the item that was open.
+- **Files already in Marfa ask once** (`AlreadyInMarfa`), pastes included. Add Anyway adds all, Skip Duplicates only unmatched, Cancel none. Final then. No answer still adds.
+- **Show opens matches, changing nothing.** Quick Add drops a skipped file by token, then sends. A paste stays on the open item. A failed one stays staged. Timeout adds after lookup.
 
 ## Changing type
 
-- **The title and text move to the new type's own keys in one edit** (`TypeChange`), because Marfa reads them from those keys. Marfa keeps every other value, as an unlisted property where the new type has no such field.
+- **The title and text move to the new type's own keys in one edit** (`TypeChange`). Marfa keeps every other value, as an unlisted property where the new type has no such field.
 - **The current type is a locked chip in the panel's field,** then rows: the sidebar's first five, then the rest by name under a line.
 - **A required field the items lack is asked for first** (`TypeValuesSheet`), once for the selection. It is the one sheet in editing. The title it needs starts as the item's name, for one item.
 - **Never offered:** a file's type, a type with no text for an item with text, or one whose field cannot hold the value under its key.

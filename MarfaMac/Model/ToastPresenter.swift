@@ -7,7 +7,8 @@ import Observation
 /// pointer is over it (`hold`), and leaves at once when Undo is used.
 @Observable
 final class ToastPresenter {
-    /// One message, with the undo of the action it reports where there is one.
+    /// One message, with the undo of the action it reports where there is one, and Show where files already in Marfa
+    /// were left out. Show opens those items and changes nothing that was added.
     struct Toast: Identifiable {
         let id = UUID()
         let message: String
@@ -15,6 +16,18 @@ final class ToastPresenter {
         let symbol: String?
         /// Performs the action's undo. Nil where the action cannot be undone, so no Undo is offered.
         let undo: (@MainActor () -> Void)?
+        /// Opens the items a skipped file matched. Nil where there is nothing to show.
+        let showMatches: (@MainActor () -> Void)?
+
+        init(
+            message: String, symbol: String?, undo: (@MainActor () -> Void)?,
+            showMatches: (@MainActor () -> Void)? = nil
+        ) {
+            self.message = message
+            self.symbol = symbol
+            self.undo = undo
+            self.showMatches = showMatches
+        }
     }
 
     /// The design system gives a toast no time of its own.
@@ -34,11 +47,14 @@ final class ToastPresenter {
         self.clock = clock
     }
 
-    /// Shows `message`, in place of any toast showing, with Undo where `undo` is given. Answers the toast's identity,
-    /// for `dismiss(ifShowing:)`.
+    /// Shows `message`, in place of any toast showing, with Undo where `undo` is given and Show where `showMatches` is.
+    /// Answers the toast's identity, for `dismiss(ifShowing:)`.
     @discardableResult
-    func show(_ message: String, symbol: String? = nil, undo: (@MainActor () -> Void)? = nil) -> Toast.ID {
-        let toast = Toast(message: message, symbol: symbol, undo: undo)
+    func show(
+        _ message: String, symbol: String? = nil, undo: (@MainActor () -> Void)? = nil,
+        showMatches: (@MainActor () -> Void)? = nil
+    ) -> Toast.ID {
+        let toast = Toast(message: message, symbol: symbol, undo: undo, showMatches: showMatches)
         current = toast
         isHeld = false
         startTimer(for: toast.id)
@@ -64,6 +80,11 @@ final class ToastPresenter {
         guard let undo = current?.undo else { return }
         dismiss()
         undo()
+    }
+
+    /// Opens the items the showing toast offers. The toast stays, and nothing that was added changes.
+    func showMatches() {
+        current?.showMatches?()
     }
 
     /// Whether the pointer is over the toast. The time starts again, in full, when the pointer leaves.

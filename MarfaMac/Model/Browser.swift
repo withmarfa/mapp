@@ -98,9 +98,9 @@ final class Browser {
     }
     /// Opens items in windows of their own, which only a view can do. The window wires it where it makes its editor.
     @ObservationIgnored var windowOpener: ((Set<ItemID>) -> Void)?
-    /// Opens items already in Marfa when this browser is not showing the library, as the new-item line over another
-    /// app does. Returns the ids it could not open, whose files stay with the draft.
-    @ObservationIgnored var opensFoundElsewhere: (([ItemID]) async -> [ItemID])?
+    /// Where Show opens matches when this browser is not the library's window, as the new-item line over another app.
+    /// It runs only from the toast, after the add, and changes nothing that was added.
+    @ObservationIgnored var showsMatchesElsewhere: (([ItemID]) -> Void)?
     /// Asks, in this window, about files dropped or imported that are already in Marfa (`AlreadyInMarfa`).
     @ObservationIgnored let alreadyInMarfa = AlreadyInMarfa.Asking()
 

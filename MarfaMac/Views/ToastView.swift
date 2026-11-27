@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// A toast as the design system's `Toast` draws it: a solid, rounded bar 40 points tall with an optional symbol, the
-/// message and Undo where the action can be undone. It has no close button, since it leaves on its own (`docs/look.md`).
+/// message, Show where files already in Marfa were left out, and Undo where the action can be undone. It has no close
+/// button, since it leaves on its own (`docs/look.md`).
 struct ToastView: View {
     let toast: ToastPresenter.Toast
     let presenter: ToastPresenter
@@ -21,13 +22,17 @@ struct ToastView: View {
                 .font(.system(size: 13 * scale))
                 .lineLimit(1)
                 .padding(.trailing, 4 * scale)
+            if toast.showMatches != nil {
+                Button("Show") { presenter.showMatches() }
+                    .appButton(.secondary, size: .small)
+            }
             if toast.undo != nil {
                 Button("Undo") { presenter.undo() }
                     .appButton(.secondary, size: .small)
             }
         }
         .padding(.leading, 14 * scale)
-        .padding(.trailing, (toast.undo == nil ? 10 : 8) * scale)
+        .padding(.trailing, (toast.undo == nil && toast.showMatches == nil ? 10 : 8) * scale)
         .frame(height: 40 * scale)
         .background(.background, in: .rect(cornerRadius: 12 * scale, style: .continuous))
         // In dark the window's own fill would not show against the window, so the bar takes the chosen row's white

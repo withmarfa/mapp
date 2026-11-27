@@ -31,14 +31,17 @@ extension Browser {
         return true
     }
 
-    /// Shows `message` in the toast, with Undo where `step` is still the undo manager's latest.
-    func say(_ message: String, symbol: String, step: StepUndo?, toasts: ToastPresenter?) {
+    /// Shows `message` in the toast, with Undo where `step` is still the undo manager's latest, and Show where
+    /// `showMatches` opens items that were left out.
+    func say(
+        _ message: String, symbol: String, step: StepUndo?, showMatches: (@MainActor () -> Void)? = nil, toasts: ToastPresenter?
+    ) {
         guard let toasts else { return }
         guard let step, step.isCurrent else {
-            toasts.show(message, symbol: symbol)
+            toasts.show(message, symbol: symbol, showMatches: showMatches)
             return
         }
-        let id = toasts.show(message, symbol: symbol, undo: { step.perform() })
+        let id = toasts.show(message, symbol: symbol, undo: { step.perform() }, showMatches: showMatches)
         step.onLapse = { [weak toasts] in toasts?.dismiss(ifShowing: id) }
     }
 }

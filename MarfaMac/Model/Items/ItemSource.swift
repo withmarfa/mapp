@@ -85,12 +85,20 @@ nonisolated struct KeptFile: Sendable, Equatable {
     var file: URL
 }
 
+/// One file in an attach batch that was not attached. `index` is its place in that batch, so two files of one name
+/// stay two outcomes.
+nonisolated struct AttachmentFailure: Sendable, Equatable {
+    var index: Int
+    var name: String
+    var reason: String
+}
+
 /// What attaching files gave: the text to write for each file attached, in order, each file the item would not
-/// take, saved in Downloads, and the name of each that could not be saved, with why.
+/// take, saved in Downloads, and each that could not be saved, with why.
 nonisolated struct AttachReport: Sendable {
     var embeds: [Embed] = []
     var kept: [KeptFile] = []
-    var failed: [(name: String, reason: String)] = []
+    var failed: [AttachmentFailure] = []
 }
 
 /// The Marfa working copy behind the library, as the library and the host use it, so both are tested without a
@@ -135,8 +143,6 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
     /// For each of `files`, the items the person can read in Marfa whose file holds the same bytes, read from the
     /// server; a file it can't answer for, for any reason, is `noAnswer`. Reads only, and never stops an add.
     func itemsWithSameBytes(as files: [URL]) async -> FileMatches
-    /// Reads `id` into the copy whatever the slice says, so an item found by its bytes can be opened.
-    func pinForOpening(_ id: ItemID) async throws
 
     /// The instance id of the Marfa the copy holds, as its `GET /` names it; nil until the copy has read it, or where
     /// it can't be read. Reads only the copy.
@@ -193,9 +199,6 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
     func close(agreeing agreed: UnsentChanges?) async -> CloseOutcome
 }
 
-/// The copy cannot bring an item in to be opened.
-nonisolated struct OpeningUnavailable: Error {}
-
 nonisolated extension ItemSource {
     var engineActivity: EngineActivity? { nil }
 
@@ -206,8 +209,6 @@ nonisolated extension ItemSource {
     func moreItemsTaken(with ids: [ItemID]) async -> Int? { nil }
 
     func itemsWithSameBytes(as files: [URL]) async -> FileMatches { .noAnswer }
-
-    func pinForOpening(_ id: ItemID) async throws { throw OpeningUnavailable() }
 
     func instanceID() async -> String? { nil }
 

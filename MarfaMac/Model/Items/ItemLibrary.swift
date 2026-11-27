@@ -227,8 +227,6 @@ protocol ItemLibrary: AnyObject, Observable {
     /// For each of `files`, the items already in Marfa that hold the same bytes, which every add of a file asks
     /// first (`AlreadyInMarfa`). A file the library can't answer for is `noAnswer`, never "no match".
     func itemsWithSameBytes(as files: [URL]) async -> FileMatches
-    /// Brings `id` into the library so it can be opened, when the copy does not hold it yet. True once it is held.
-    func holdForOpening(_ id: ItemID) async -> Bool
     /// Registers the step that undoes adding the item `id`, named and run as a created item's is, for a file added
     /// where a person would undo it.
     func registerNewItemUndo(_ id: ItemID, undoManager: UndoManager?)
@@ -376,7 +374,6 @@ struct DeferredListing {
 }
 
 extension ItemLibrary {
-    func holdForOpening(_ id: ItemID) async -> Bool { item(id) != nil }
     func deferredListing(in place: PlaceView, listing: PlaceListing, preview: LibraryViewQuery?, above limit: Int) -> DeferredListing? { nil }
     var viewRevision: Int { 0 }
     func count(inView id: ItemID) -> Int { items(inView: id).count }

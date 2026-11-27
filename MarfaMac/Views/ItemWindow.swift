@@ -42,14 +42,14 @@ struct ItemWindow: View {
     /// leaves is where Back returns to, in `history`.
     static func makeEditor(
         library: any ItemLibrary, details: DetailsPresentation, showing id: Binding<ItemID?>, history: ItemWindowHistory? = nil,
-        opensFound: (([ItemID]) -> Void)? = nil
+        showsMatches: (([ItemID]) -> Void)? = nil
     ) -> EditorController {
         let editor = EditorController(library: library)
         editor.titleDrafts = details
         editor.onEscape = { [details] in details.escapeFromPage() }
         editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
         // The keyboard follows the link to the item it opened, as it does in a main window.
-        editor.onOpenFound = opensFound
+        editor.onShowMatches = showsMatches
         editor.onOpenItem = { [weak editor, library] linked in
             guard let current = id.wrappedValue else { return }
             go(to: linked, in: library, editor: editor, showing: id) {

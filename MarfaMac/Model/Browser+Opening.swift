@@ -23,56 +23,27 @@ extension Browser {
         return true
     }
 
-    /// Opens items already in Marfa that the person asked to see in place of the files they were adding
-    /// (`AlreadyInMarfa`): one as a link to it opens, several in windows where Open Items says so, and otherwise
-    /// all of them chosen together. An item the copy does not hold yet is fetched first. Returns the ids that
-    /// still could not be opened, whose files are added instead.
-    @discardableResult
-    func openFound(_ ids: [ItemID], in library: any ItemLibrary, order: ItemOrder, defaults: UserDefaults = .standard) async -> [ItemID] {
-        let reached = await AlreadyInMarfa.reachable(ids, in: library)
-        showFound(reached.open, in: library, order: order, defaults: defaults)
-        return reached.missed
-    }
-
-    /// Opens matches in this window. Each match that could not be opened comes back with its file, to be added.
-    func openFound(
-        _ matches: [AlreadyInMarfa.Plan.Match], in library: any ItemLibrary, order: ItemOrder, defaults: UserDefaults = .standard
-    ) async -> AlreadyInMarfa.Opened {
-        let opened = await AlreadyInMarfa.opening(matches, in: library)
-        showFound(opened.opened, in: library, order: order, defaults: defaults)
-        return opened
-    }
-
-    /// Opens matches in this window, or through `opensFoundElsewhere` when another window is showing the library,
-    /// as the new-item line over another app does. A match nobody could open comes back so its file is not dropped.
-    func openMatches(
-        _ matches: [AlreadyInMarfa.Plan.Match], in library: any ItemLibrary, order: ItemOrder
-    ) async -> AlreadyInMarfa.Opened {
-        if isShowing(library) { return await openFound(matches, in: library, order: order) }
-        let ids = matches.flatMap(\.items).reduce(into: [ItemID]()) { ids, id in
-            if !ids.contains(id) { ids.append(id) }
+    /// Opens items the person asked to see after skipping files already in Marfa. One opens the way Open Items says,
+    /// including an item the library does not hold. Several open in windows where Open Items says so, and otherwise
+    /// are all chosen together. Nothing here changes what was added.
+    func showMatches(_ ids: [ItemID], in library: any ItemLibrary, order: ItemOrder, defaults: UserDefaults = .standard) {
+        var unique: [ItemID] = []
+        for id in ids where !unique.contains(id) { unique.append(id) }
+        guard let first = unique.first else { return }
+        if !isShowing(library), let showsMatchesElsewhere {
+            showsMatchesElsewhere(unique)
+            return
         }
-        if let opensFoundElsewhere {
-            let missed = Set(await opensFoundElsewhere(ids))
-            let fallback = matches.filter { !$0.items.isEmpty && $0.items.allSatisfy { missed.contains($0) } }
-            return AlreadyInMarfa.Opened(opened: ids.filter { !missed.contains($0) }, fallback: fallback)
+        if unique.count == 1 {
+            _ = open(Set(unique), defaults: defaults)
+            return
         }
-        return AlreadyInMarfa.Opened(opened: [], fallback: matches)
-    }
-
-    /// Shows items the library already holds: one as a link to it opens, several in windows where Open Items says
-    /// so, and otherwise all of them chosen together, including one the open place does not list.
-    func showFound(_ ids: [ItemID], in library: any ItemLibrary, order: ItemOrder, defaults: UserDefaults = .standard) {
-        let held = ids.compactMap { library.item($0) }
-        guard let first = held.first else { return }
-        if held.count == 1 {
-            follow(link: first, in: library, order: order, defaults: defaults)
-        } else if itemOpening(defaults: defaults) == .newWindow {
-            open(Set(held.map(\.id)), as: .newWindow, defaults: defaults)
-        } else {
-            reveal(first, in: library, order: order)
-            selection = Set(held.map(\.id))
+        if itemOpening(defaults: defaults) == .newWindow {
+            _ = open(Set(unique), as: .newWindow, defaults: defaults)
+            return
         }
+        if let item = library.item(first) { reveal(item, in: library, order: order) }
+        selection = Set(unique)
     }
 
     /// Opens the selection, which is what Return opens.

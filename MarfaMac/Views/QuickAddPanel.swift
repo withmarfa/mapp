@@ -11,6 +11,7 @@ struct QuickAddPanel: View {
     @CurrentLibrary private var library
     @StoredOrder private var order
     @Environment(Libraries.self) private var libraries
+    @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
     @Environment(\.undoManager) private var undoManager
     let browser: Browser
     @Bindable var quickAdd: QuickAdd
@@ -639,7 +640,7 @@ struct QuickAddPanel: View {
     }
 
     private func save(again: Bool = false) {
-        Task { await browser.saveQuickAdd(in: library, undoManager: undoManager, again: again, order: order) }
+        Task { await browser.saveQuickAdd(in: library, undoManager: undoManager, toasts: details?.toasts, again: again, order: order) }
     }
 
     private func putAway() {

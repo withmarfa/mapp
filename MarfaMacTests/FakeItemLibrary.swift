@@ -160,22 +160,6 @@ final class FakeItemLibrary: ItemLibrary {
 
     func item(_ id: ItemID) -> Item? { items.first { $0.id == id } }
 
-    /// An item the copy does not hold yet, brought in when something asks to open it.
-    var arrivals: [ItemID: Item] = [:]
-    /// Each item something asked to open, in order, held or not.
-    private(set) var heldForOpening: [ItemID] = []
-    /// Runs after an item is asked for and before it is brought in, so a test can change the library mid-fetch.
-    var holding: ((ItemID) async -> Void)?
-
-    func holdForOpening(_ id: ItemID) async -> Bool {
-        heldForOpening.append(id)
-        await holding?(id)
-        if item(id) != nil { return true }
-        guard let arriving = arrivals[id] else { return false }
-        items.append(arriving)
-        return item(id) != nil
-    }
-
     /// How often a place's items were listed, for tests of what is kept rather than asked for again.
     @ObservationIgnored private(set) var placeReads = 0
 
@@ -636,9 +620,12 @@ final class FakeItemLibrary: ItemLibrary {
 
     /// Each batch attached, by the item it was attached to and the file names, in order.
     private(set) var attachedBatches: [(item: ItemID, names: [String])] = []
+    /// The bytes of each batch, in the same order as `attachedBatches`, so two files of one name stay distinct.
+    private(set) var attachedBatchBytes: [[Data]] = []
 
     func attach(_ files: [(name: String, data: Data)], to id: ItemID) async -> AttachReport {
         attachedBatches.append((item: id, names: files.map(\.name)))
+        attachedBatchBytes.append(files.map(\.data))
         return await attaching?() ?? AttachReport()
     }
 
