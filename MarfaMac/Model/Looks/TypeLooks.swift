@@ -38,7 +38,7 @@ final class TypeLooks {
         chosen = readable
         guard let unreadable else { return }
         defaults.set((defaults.array(forKey: Self.setAsideKey) as? [Data] ?? []) + [unreadable], forKey: Self.setAsideKey)
-        save()
+        save(settingAside: true)
         Telemetry.typeLooksUnreadable(reporting: reporting)
     }
 
@@ -182,10 +182,12 @@ final class TypeLooks {
         return seen.count - 1
     }
 
-    private func save() {
+    /// `settingAside` is set where `reload` removes what it cannot read, which the Marfa keeps (`PreferenceHolds`).
+    private func save(settingAside: Bool = false) {
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
         guard let data = try? encoder.encode(chosen) else { return }
+        if settingAside { PreferenceHolds.willWrite(data, forKey: Self.defaultsKey, in: defaults) }
         defaults.set(data, forKey: Self.defaultsKey)
     }
 }

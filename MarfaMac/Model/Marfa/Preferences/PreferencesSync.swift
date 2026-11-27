@@ -369,12 +369,14 @@ final class PreferencesSync {
             }
             let originals = items.filter { !$0.isConflictedCopy }
             let local = readLocal()
+            let holds = PreferenceHolds.read(defaults)
+            var kept: [PreferenceHolds.Entry] = []
             if let adopted = record.marfas[instance] {
                 if let chosen = originals.first, chosen.id == adopted.item {
                     guard let followed = try await follow(
-                        chosen, from: adopted, of: instance, local: local, switched: record.last != instance,
-                        winning: record.winning ?? [:], siblings: items.filter(\.isConflictedCopy), in: copy,
-                        generation: generation)
+                        chosen, from: adopted, of: instance, local: local, holds: holds, keeping: &kept,
+                        switched: record.last != instance, winning: record.winning ?? [:],
+                        siblings: items.filter(\.isConflictedCopy), in: copy, generation: generation)
                     else { return }
                     record.marfas[instance] = followed
                 } else if !originals.isEmpty {
@@ -414,6 +416,8 @@ final class PreferencesSync {
             let marked = (Record.read(defaults).winning ?? [:]).filter { key, units in read[key] != units }
             record.winning = marked.isEmpty ? nil : marked
             record.save(defaults)
+            // A step that switched, adopted or made the item drops the entries it read, as the Marfa's settings win there.
+            PreferenceHolds.finish(read: holds, keeping: kept, in: defaults)
             answered = answered.filter { id, _ in record.marfas.values.contains { $0.awaiting[id] != nil } }
             // What an earlier copy on another Mac kept for a place reaches this Mac only through the Marfa.
             EarlierPlace.readIn(in: defaults, synced: record.marfas[instance]?.base ?? [:])
@@ -519,8 +523,13 @@ final class PreferencesSync {
     /// no other Mac's value of a member it carries is taken; once the server answers that it kept another Mac's field
     /// and wrote this one to a conflicted copy, each member it carried that this Mac still holds is written again, so
     /// only the same member's later write wins.
+    ///
+    /// A unit a store's reading removed (`holds`) is held: this Mac neither sends nor takes it at this step, and the base
+    /// becomes the Marfa's value. While held it is never sent, a change from the Marfa is taken, and once this Mac holds a
+    /// value again it is decided against absence, as the store's removal left it. `keeping` gets the entries the next step
+    /// judges again.
     private func follow(_ chosen: PreferencesItem, from adopted: Record.Adopted, of instance: String, local: Local,
-                        switched: Bool, winning: [String: Set<PreferenceUnit>], siblings: [PreferencesItem],
+                        holds: [PreferenceHolds.Entry], keeping kept: inout [PreferenceHolds.Entry], switched: Bool, winning: [String: Set<PreferenceUnit>], siblings: [PreferencesItem],
                         in copy: any PreferencesCopy, generation: Int) async throws -> Record.Adopted?
     {
         var adopted = adopted
@@ -557,6 +566,22 @@ final class PreferencesSync {
         // A setting the store dropped on reading it stands as the Marfa holds it, until this Mac changes it or an app
         // that reads it runs here.
         let retrying = adopted.frozenBuild == build ? [] : Set(adopted.frozen.keys)
+        var held = switched ? [] : adopted.held ?? []
+        var toHold: Set<PreferenceUnit> = []
+        for entry in holds where !switched && (entry.library == nil || entry.library == library) {
+            if local.frozen.contains(where: { $0.key == entry.key }) {
+                kept.append(entry)
+            } else if adopted.frozen[entry.unit] != nil {
+                continue
+            } else if local.units[entry.unit] == nil, base[entry.unit] != nil {
+                toHold.insert(entry.unit)
+            } else if local.units[entry.unit] == entry.before, !entry.seenPending {
+                // The store has not written yet, as after a crash, or writes off the main actor.
+                var entry = entry
+                entry.seenPending = true
+                kept.append(entry)
+            }
+        }
         var mine = switched ? base : local.units
         for (unit, frozen) in adopted.frozen where !switched {
             // The person's own change to a dropped setting is theirs to send, so it is no longer held.
@@ -577,15 +602,27 @@ final class PreferencesSync {
         for unit in Set(remote.keys).union(base.keys) where mine[unit] == nil && isKeptAbsent(unit) && !winsHere(unit) {
             mine[unit] = base[unit]
         }
+        var released: Set<PreferenceUnit> = []
+        for unit in held where !toHold.contains(unit) && !local.frozen.contains(where: { $0.owns(unit) }) {
+            if local.units[unit] != nil { released.insert(unit) } else { mine[unit] = base[unit] }
+        }
+        held.subtract(released)
+        for unit in toHold {
+            held.insert(unit)
+            mine[unit] = holding.contains(unit) ? base[unit] : remote[unit]
+        }
         mine.merge(setAsideUnreadable(remote, base: base)) { _, unreadable in unreadable }
         var seen = remote
         for unit in holding { seen[unit] = base[unit] }
         let unreadable = local.frozen
-        var before = PreferencesMerge.base(base, reclaiming: lost, local: mine, remote: seen)
+        var before = PreferencesMerge.base(
+            base, reclaiming: lost.filter { !held.contains($0.key) }, local: mine, remote: seen)
+        for unit in released { before[unit] = nil }
+        for unit in toHold { before[unit] = seen[unit] }
         let won = switched ? [] : PreferencesMap.synced.filter { winning[$0.key] != nil }
         if !won.isEmpty {
-            before = PreferencesMerge.base(before, winning: { unit in
-                won.contains { $0.owns(unit) && winning[$0.key]?.contains(unit) == false }
+            before = PreferencesMerge.base(before, winning: { [held] unit in
+                !held.contains(unit) && won.contains { $0.owns(unit) && winning[$0.key]?.contains(unit) == false }
             }, local: mine, remote: seen)
         }
         var outcome = PreferencesMerge.reconcile(
@@ -598,7 +635,9 @@ final class PreferencesSync {
         if switched {
             outcome.toLocal.formUnion(Set(local.units.keys).union(outcome.merged.keys).filter { unit in !unreadable.contains { $0.owns(unit) } })
         }
-        try await apply(outcome, to: chosen, local: local, adopted: &adopted, retrying: retrying, in: copy) {
+        held.subtract(outcome.toLocal)
+        adopted.held = held.isEmpty ? nil : held
+        try await apply(outcome, to: chosen, local: local, adopted: &adopted, retrying: retrying, absent: held, in: copy) {
             [defaults, before] partial, unsent in
             var record = Record.read(defaults)
             var partial = partial

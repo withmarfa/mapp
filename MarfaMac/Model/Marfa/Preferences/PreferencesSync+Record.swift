@@ -14,6 +14,9 @@ extension PreferencesSync {
             var frozen: [PreferenceUnit: Frozen] = [:]
             /// The app that judged `frozen`; another tries those settings again.
             var frozenBuild: String?
+            /// The rows a store's reading removed because it could not read them (`PreferenceHolds`), which the Marfa
+            /// keeps: none is sent from this Mac, and none is written here but by a change taken from the Marfa.
+            var held: Set<PreferenceUnit>?
             /// Set once this Mac removed the item or saw it in the bin, so an emptied bin does not bring it back.
             var removed: Bool?
             /// Every item the last removal queued, including duplicates and conflicted copies.

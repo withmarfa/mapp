@@ -3,7 +3,8 @@ import Marfa
 
 extension PreferencesSync {
     /// Writes `outcome` to this Mac and the item, and records in `adopted` what both now hold, the field write that
-    /// waits for its answer, and each setting a store dropped when it read it again.
+    /// waits for its answer, and each setting a store dropped when it read it again. Each unit in `absent` that is not
+    /// taken stays absent from this Mac.
     ///
     /// `progress` is told once the defaults hold what this step wrote into them, before any write to the item, and again
     /// after each write to the item is queued: with `adopted` as it stands then, whose base is `outcome.merged`, and with
@@ -11,13 +12,15 @@ extension PreferencesSync {
     /// leaves a record that sends only what that write carried again, and never takes another Mac's value this step wrote
     /// into the defaults for a change of this Mac's.
     func apply(_ outcome: PreferencesMerge.Outcome, to item: PreferencesItem, local: Local, adopted: inout Record.Adopted,
-               retrying: Set<PreferenceUnit>, in copy: any PreferencesCopy,
+               retrying: Set<PreferenceUnit>, absent: Set<PreferenceUnit> = [], in copy: any PreferencesCopy,
                progress: ((Record.Adopted, Set<PreferenceUnit>) -> Void)? = nil) async throws
     {
         // A dropped setting the Marfa has not changed keeps what the store left, so it is not set aside again.
         let kept = adopted.frozen.filter { unit, _ in !retrying.contains(unit) && outcome.merged[unit] == adopted.base[unit] }
         var written = outcome.merged.filter { PreferenceJSON.value($0.value) != nil }
         for (unit, frozen) in kept { written[unit] = frozen.left }
+        // A held row is not this Mac's to write, so a sibling's change leaves it absent here.
+        for unit in absent where !outcome.toLocal.contains(unit) { written[unit] = nil }
         try unchanged(since: local, writing: outcome.toLocal)
         let settings = writeLocal(outcome.toLocal, from: written)
         if !settings.isEmpty {

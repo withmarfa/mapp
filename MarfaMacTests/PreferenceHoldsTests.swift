@@ -177,7 +177,7 @@ import Testing
         let copy = FakePreferencesCopy()
         let item = await copy.add([look(note): created, look(task): edited])
         let sync = await sync(copy)
-        let file = SettingsFile(units: [look(task): #"{"date":"bogus"}"#], build: "", date: .now)
+        let file = SettingsFile(units: [look(note): created, look(task): #"{"date":"bogus"}"#], build: "", date: .now)
         try await sync.importSettings(file, sections: [SettingsFile.Section(look(task))])
         await flush(sync)
         #expect(await copy.unitsHeld(item)[look(task)] == edited)

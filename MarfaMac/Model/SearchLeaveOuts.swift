@@ -32,7 +32,7 @@ final class SearchLeaveOuts {
         held = readable
         guard let unreadable else { return }
         defaults.set((defaults.array(forKey: Self.setAsideKey) as? [Data] ?? []) + [unreadable], forKey: Self.setAsideKey)
-        save()
+        save(settingAside: true)
     }
 
     /// The entries that can be read, and the stored data of those that cannot: the whole of it where it is not an object
@@ -66,8 +66,10 @@ final class SearchLeaveOuts {
         save()
     }
 
-    private func save() {
+    /// `settingAside` is set where `reload` removes what it cannot read, which the Marfa keeps (`PreferenceHolds`).
+    private func save(settingAside: Bool = false) {
         guard let data = try? JSONEncoder().encode(held) else { return }
+        if settingAside { PreferenceHolds.willWrite(data, forKey: Self.defaultsKey, in: defaults) }
         defaults.set(data, forKey: Self.defaultsKey)
     }
 }

@@ -617,7 +617,7 @@ final class SidebarLayouts {
         entries = kept
         guard let unreadable else { return }
         defaults.set((defaults.array(forKey: Self.setAsideKey) as? [Data] ?? []) + [unreadable], forKey: Self.setAsideKey)
-        save()
+        save(settingAside: true)
         Telemetry.sidebarLayoutsUnreadable(reporting: reporting)
     }
 
@@ -707,7 +707,10 @@ final class SidebarLayouts {
         save()
     }
 
-    private func save() {
-        defaults.set(Self.object(entries), forKey: Self.defaultsKey)
+    /// `settingAside` is set where `reload` removes what it cannot read, which the Marfa keeps (`PreferenceHolds`).
+    private func save(settingAside: Bool = false) {
+        let value = Self.object(entries)
+        if settingAside { PreferenceHolds.willWrite(value, forKey: Self.defaultsKey, in: defaults) }
+        defaults.set(value, forKey: Self.defaultsKey)
     }
 }

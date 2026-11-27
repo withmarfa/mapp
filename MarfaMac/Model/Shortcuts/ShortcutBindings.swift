@@ -54,6 +54,7 @@ final class ShortcutBindings {
         } else {
             chosen = [:]
             defaults.set((defaults.array(forKey: Self.setAsideKey) as? [Data] ?? []) + [saved], forKey: Self.setAsideKey)
+            PreferenceHolds.willWrite(nil, forKey: Self.defaultsKey, in: defaults)
             defaults.removeObject(forKey: Self.defaultsKey)
         }
     }
