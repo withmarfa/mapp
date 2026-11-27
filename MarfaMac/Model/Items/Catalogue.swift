@@ -1,4 +1,5 @@
 import Foundation
+import Marfa
 
 nonisolated struct ItemTypeInfo: Identifiable, Hashable, Sendable {
     struct Field: Identifiable, Hashable, Sendable {
@@ -40,6 +41,7 @@ nonisolated struct ItemTypeInfo: Identifiable, Hashable, Sendable {
     }
 
     let id: TypeID
+    let origin: Marfa.TypeOrigin
     /// The core's name for one item of the type, such as `Recipe`.
     let label: String
     /// The core's name for a list of the type's items, such as `Recipes`.
@@ -69,9 +71,10 @@ nonisolated struct ItemTypeInfo: Identifiable, Hashable, Sendable {
     init(
         id: TypeID, label: String, plural: String? = nil, fields: [Field], titleField: String?, bodyField: String?,
         parent: TypeID?, icon: String? = nil, description: String? = nil, version: Int64? = nil, roles: [String] = [],
-        linkField: String? = nil, feedDays: Int? = nil
+        linkField: String? = nil, feedDays: Int? = nil, origin: Marfa.TypeOrigin = .unknown
     ) {
         self.id = id
+        self.origin = origin
         self.label = label
         self.plural = plural ?? label
         self.fields = fields

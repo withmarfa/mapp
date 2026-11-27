@@ -38,6 +38,13 @@ struct SettingsWindowTests {
         #expect(SettingsPage.sidebarMatches("Download Everything Again") == [.connection])
     }
 
+    @Test func appPagesAreFoundByTheirControls() {
+        for (page, words) in [(SettingsPage.keyboard, "Search by Pressing a Shortcut"), (.lists, "From"),
+                              (.layouts, "From Plugins"), (.search, "Excluded"), (.search, "Included")] {
+            #expect(SettingsPage.sidebarMatches(words).contains(page))
+        }
+    }
+
     @Test func appearanceAndEditorRowsAppearInSidebarSearch() {
         for word in ["App icon", "Dock", "Interface text size", "Sidebar color"] {
             #expect(SettingsPage.sidebarMatches(word) == [.appearance])

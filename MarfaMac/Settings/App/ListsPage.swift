@@ -1,16 +1,23 @@
 import SwiftUI
 
-/// The Lists page: how much each row says, and the starting order of a place's list: the sort and the sections by date a
-/// place shows until its own Sort or Group is chosen in the View panel. What a
-/// list leaves out belongs to Search, never here.
+/// The starting density, scope, sort and grouping for lists.
 struct ListsPage: View {
     @AppStorage(ListKey.density) private var density = Density.standard
+    @AppStorage private var storedScope: ListScope
     @AppStorage(OrderKey.sort) private var sort = ItemOrder().sort
     @AppStorage(OrderKey.groupsByDate) private var groupsByDate = ItemOrder().groupsByDate
 
+    init(defaults: UserDefaults? = nil) {
+        _storedScope = AppStorage(wrappedValue: .all, ListScope.defaultScopeKey, store: defaults)
+    }
+
+    var scope: Binding<ListScope> {
+        Binding { storedScope == .library ? .library : .all } set: { storedScope = $0 }
+    }
+
     var body: some View {
         SettingsPageColumn {
-            SettingsSection("Density", line: "A view or a place can set its own.") {
+            SettingsSection("Density") {
                 ChoiceTiles(
                     choices: Density.allCases.map { option in
                         .init(value: option, title: Text(verbatim: option.title), picture: AnyView(DensityPicture(density: option)))
@@ -18,15 +25,22 @@ struct ListsPage: View {
                     selection: $density)
                     .accessibilityIdentifier("ListsDensity")
             }
-            SettingsSection("Order") {
-                SettingsRow("Sort By", line: "A view or a place can set its own.") {
-                    SettingsPopUp(title: "Sort By", selection: $sort) {
+            SettingsSection("Defaults", footer: "A view or a place can set its own.") {
+                SettingsRow("From", line: "What a type, a collection or a new view lists.", lines: nil) {
+                    SettingsPopUp(title: "From", selection: scope) {
+                        Text("All Items").tag(ListScope.all)
+                        Text("Library").tag(ListScope.library)
+                    }
+                    .accessibilityIdentifier("ListScope")
+                }
+                SettingsRow("Sort by") {
+                    SettingsPopUp(title: "Sort by", selection: $sort) {
                         ForEach(ItemSort.allCases, id: \.self) { Text($0.title).tag($0) }
                     }
                     .accessibilityIdentifier("ItemSort")
                 }
-                SettingsRow("Group By", look: sort == .title ? .off : .normal) {
-                    SettingsPopUp(title: "Group By", selection: $groupsByDate) {
+                SettingsRow("Group by", look: sort == .title ? .off : .normal) {
+                    SettingsPopUp(title: "Group by", selection: $groupsByDate) {
                         Text("None").tag(false)
                         Text("Date").tag(true)
                     }
@@ -45,32 +59,44 @@ private struct DensityPicture: View {
 
     private static let note = "lucide:sticky-note"
     private static let task = "lucide:square-check-big"
-    private static let event = "lucide:calendar"
     private static let bookmark = "lucide:bookmark"
 
     private var samples: [RowContent] {
         [
-            row(Self.note, String(localized: "Note"), String(localized: "Trip to Lisbon"), String(localized: "Flights and the hotel."), String(localized: "12 Nov")),
+            row(Self.note, String(localized: "Note"), String(localized: "Kiln log, firing 14"),
+                String(localized: "Bisque, 1000°C, nine hours. Two test tiles cracked on the lower shelf, both from the new clay."), String(localized: "Saturday")),
             row(
-                Self.task, String(localized: "Task"), String(localized: "Weekly Review"), String(localized: "Three things for next week."), String(localized: "Mon"),
-                status: String(localized: "In Progress")),
-            row(Self.note, String(localized: "Note"), String(localized: "Budget"), String(localized: "Where the month went."), String(localized: "4 Nov")),
-            row(Self.event, String(localized: "Event"), String(localized: "Dinner with Sam"), nil, String(localized: "3 Nov")),
-            row(Self.task, String(localized: "Task"), String(localized: "Renew passport"), nil, String(localized: "2 Nov")),
-            row(Self.bookmark, String(localized: "Bookmark"), String(localized: "Oiling an oak worktop"), nil, String(localized: "1 Nov")),
+                Self.task, String(localized: "Task"), String(localized: "Reply to Ines about the zine proofs"),
+                String(localized: "Pages 6 and 7 are the wrong way round in the second proofs."), String(localized: "Thursday"),
+                status: String(localized: "Not Started")),
+            row(Self.note, String(localized: "Note"), String(localized: "Lewes Trust: comments on the draft"), nil, String(localized: "Tuesday")),
+            row("lucide:user", String(localized: "Person"), String(localized: "Ines Barros"), nil, String(localized: "16 Nov")),
+            row(Self.task, String(localized: "Task"), String(localized: "Keep the gallery grid aligned when the window resizes"), nil, String(localized: "12 Nov")),
+            row(Self.bookmark, String(localized: "Bookmark"), String(localized: "Paper for the zine"), nil, String(localized: "8 Nov")),
         ]
     }
 
     /// What the list makes of an item of a type: the type's chip first, then its status.
     private func row(_ icon: String, _ type: String, _ title: String, _ line: String?, _ date: String, status: String? = nil) -> RowContent {
         var content = RowContent(title: title, date: date, secondary: line, typeIcon: icon, typeLabel: type, mixesTypes: true)
-        content.chips = [.type(icon: icon, label: type)] + (status.map { [.status(.inProgress, label: $0)] } ?? [])
+        content.chips = [.type(icon: icon, label: type)] + (status.map { [.status(.notStarted, label: $0)] } ?? [])
         return content
     }
 
     var body: some View {
+        GeometryReader { geometry in
+            let width = max(geometry.size.width, SettingsTokens.Metric.column / 2)
+            rows
+                .frame(width: width, height: width / SettingsTokens.Metric.choiceAspect, alignment: .topLeading)
+                .scaleEffect(geometry.size.width / width, anchor: .topLeading)
+        }
+        .background(SettingsTokens.card)
+        .allowsHitTesting(false)
+    }
+
+    private var rows: some View {
         let isCompact = density == .compact
-        VStack(alignment: .leading, spacing: 0) {
+        return VStack(alignment: .leading, spacing: 0) {
             ForEach(Array(samples.prefix(isCompact ? 6 : 2).enumerated()), id: \.offset) { index, content in
                 ItemRow(content: content, density: density, showsSample: !isCompact && index == 0)
                     .overlay(alignment: .top) {
@@ -86,7 +112,5 @@ private struct DensityPicture: View {
         .padding(.horizontal, SettingsTokens.Metric.previewRowSide)
         .padding(.top, SettingsTokens.Metric.previewCardInset)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(SettingsTokens.card)
-        .allowsHitTesting(false)
     }
 }

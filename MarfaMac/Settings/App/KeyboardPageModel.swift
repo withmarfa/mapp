@@ -205,7 +205,7 @@ final class KeyboardPageModel {
     var hasResults: Bool { !sections.isEmpty || !anyAppCommands.isEmpty }
 
     /// Whether a search is narrowing the list: words typed, or keys pressed with the keyboard button on. The page's own
-    /// sections (Your Shortcuts) show only while nothing narrows it.
+    /// file and restore buttons show only while nothing narrows it.
     var isSearching: Bool { searchesByKeys ? pressed != nil : !search.isEmpty }
 
     /// Says how many of a section's commands have the keys pressed, under its name while searching by keys.

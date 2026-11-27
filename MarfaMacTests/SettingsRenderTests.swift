@@ -123,6 +123,7 @@ nonisolated struct FakeDownloads: DownloadedFiles {
 /// has no window to give, so the strip only marks where they sit and is not their size or look; the pictures taken from
 /// the running app show them as the system draws them.
 struct RenderedWindow<Detail: View>: View {
+    @Environment(\.colorScheme) private var scheme
     let selection: SettingsPage
     var search = ""
     var sheet: AnyView?
@@ -141,7 +142,7 @@ struct RenderedWindow<Detail: View>: View {
                 selection: .constant(selection), search: .constant(search),
                 badges: { page in page == .account ? badge : nil })
                 .frame(width: SettingsTokens.Metric.sidebarWidth)
-                .background(Color(white: 0.93))
+                .background(scheme == .dark ? Color(nsColor: .windowBackgroundColor) : Color(white: 0.93))
             VStack(spacing: 0) {
                 HStack(spacing: 14) {
                     Image(systemName: "chevron.left").foregroundStyle(.tertiary)
@@ -282,6 +283,36 @@ struct RenderedWindow<Detail: View>: View {
         try await SettingsRender.png(RenderedWindow(selection: .lists, detail: ListsPage()), size: Self.size, named: "Lists")
     }
 
+    @Test func appSettingsBoards() async throws {
+        let (libraries, _) = try await connected()
+        let library = FakeItemLibrary(items: [])
+        library.catalogue = MarfaMapping.catalogue(itemTypes: [
+            ItemType(id: "user.job", label: "Job", plural: "Jobs", icon: "lucide:briefcase", origin: .registered),
+            ItemType(id: "core.note", label: "Note", plural: "Notes", icon: "lucide:file-text", origin: .platform),
+            ItemType(id: "studio.cuttings", label: "Press Cutting", plural: "Press Cuttings", icon: "lucide:scissors",
+                     origin: .plugin, plugin: .init(name: "studio", version: "1"))
+        ], edgeTypes: [])
+        library.sources.infos = ["github": SourceInfo(code: "github", name: "GitHub", mark: "lucide:code-xml", nameOrigin: .key)]
+        library.sources.counts = ["github": 47, "rss": 3]
+        libraries.searchLeaveOuts.update(libraries.libraryKey) { $0.sources = ["github"]; $0.types = [TypeID("studio.cuttings")] }
+        let launcher = SettingsLauncher()
+        let host = AppSettingsHost(libraries: libraries, launcher: launcher)
+        for page: SettingsPage in [.keyboard, .lists, .layouts, .search] {
+            launcher.navigation.show(page)
+            let detail = SettingsDetail(navigation: launcher.navigation, host: host, libraries: libraries)
+                .environment(libraries).environment(\.library, library)
+            let narrow = CGSize(width: SettingsTokens.Metric.windowMinWidth, height: Self.size.height)
+            let cases = [(ColorScheme.light, "light", InterfaceStyle.defaultTextSize, Self.size),
+                         (.dark, "dark", InterfaceStyle.defaultTextSize, Self.size), (.dark, "large", 24, narrow)]
+            for (appearance, name, textSize, size) in cases {
+                let window = RenderedWindow(selection: page, detail: detail.environment(\.settingsTextScale, InterfaceStyle.scale(for: textSize)))
+                try await SettingsRender.png(
+                    window.defaultAppStorage(libraries.preferences.defaults), size: size,
+                    named: "\(page.title) \(name)", appearance: appearance)
+            }
+        }
+    }
+
     @Test func editor() async throws {
         try await SettingsRender.png(RenderedWindow(selection: .editor, detail: EditorPage()), size: Self.size, named: "Editor")
     }
@@ -372,7 +403,7 @@ struct RenderedWindow<Detail: View>: View {
             size: Self.size, named: "Search")
     }
 
-    /// The limit of ten conditions reached: what is left offered is dimmed in the menu, and the footer says why.
+    /// Exclusions at the limit. The Add sheet explains which additions still fit.
     @Test func searchAtTheLimit() async throws {
         let library = FakeItemLibrary(items: [])
         let codes = (0..<12).map { "source-\($0)" }

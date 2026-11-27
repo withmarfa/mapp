@@ -5,18 +5,19 @@ import SwiftUI
 /// shows (`PagePlacements`, the same store as a row's menu on an item's page), which sync through the Marfa (`PreferencesSync`).
 struct LayoutTypePage: View {
     let type: TypeID
-    @Environment(Libraries.self) private var libraries
-    @Environment(\.library) private var library
+    let placements: PagePlacements
+    let defaults: UserDefaults
+    let typeLooks: TypeLooks
+    let key: String
+    let library: any ItemLibrary
     @Environment(\.settingsNavigation) private var navigation
     @Environment(\.colorScheme) private var scheme
-    @AppStorage(PagePlacements.key) private var placements = PagePlacements()
 
-    private var catalogue: Catalogue { library?.catalogue ?? Catalogue() }
-    private var key: String { libraries.libraryKey }
+    private var catalogue: Catalogue { library.catalogue }
     private var info: ItemTypeInfo? { catalogue.itemTypes[type] }
     private var choices: LayoutChoices { LayoutChoices(type: type, catalogue: catalogue) }
-    private var look: TypeLook { libraries.typeLooks.looks(in: catalogue, library: key)[type] ?? .empty }
-    private var hasChanges: Bool { libraries.typeLooks.hasChoice(for: type, in: key) || placements.hasChoice(for: type) }
+    private var look: TypeLook { typeLooks.looks(in: catalogue, library: key)[type] ?? .empty }
+    var hasChanges: Bool { typeLooks.hasChoice(for: type, in: key) || placements.hasChoice(for: type) }
 
     var body: some View {
         SettingsPageColumn {
@@ -38,7 +39,7 @@ struct LayoutTypePage: View {
 
     private var head: some View {
         let preset = LookPreset.suggested(for: type, in: catalogue)
-        let changes = libraries.typeLooks.changeCount(for: type, in: key) + (placements.hasChoice(for: type) ? 1 : 0)
+        let changes = typeLooks.changeCount(for: type, in: key) + (placements.hasChoice(for: type) ? 1 : 0)
         return SettingsHead(
             lead: TypeTile(icon: info?.icon, size: .large),
             title: Text(verbatim: info?.plural ?? type.rawValue),
@@ -60,8 +61,8 @@ struct LayoutTypePage: View {
     }
 
     @ViewBuilder private var preview: some View {
-        let items = Array((library?.items(in: .type(type)) ?? []).prefix(2))
-        if let library, !items.isEmpty {
+        let items = library.items(in: .type(type)).prefix(2)
+        if !items.isEmpty {
             let list = RowList(date: .look, format: DateFormat.stored(), day: Calendar.current.startOfDay(for: library.now()))
             SettingsSection("Preview") {
                 SettingsPreview {
@@ -86,7 +87,7 @@ struct LayoutTypePage: View {
                 }
                 .accessibilityIdentifier("LayoutDate")
             }
-            SettingsRow("Secondary Line", line: "Under the title. Up to two.") {
+            SettingsRow("Secondary line", line: "Under the title. Up to two.") {
                 SettingsMultiPopUp(
                     title: "Secondary Line",
                     options: choices.parts.map { SettingsListEntry(id: $0.word, title: choices.title(of: $0)) },
@@ -136,7 +137,7 @@ struct LayoutTypePage: View {
     // MARK: Page
 
     private var rows: [PageLayout.Row] {
-        if let sample = library?.items(in: .type(type)).first, let library {
+        if let sample = library.items(in: .type(type)).first {
             return PageLayout.rows(
                 of: sample, type: info, hidden: library.hiddenPropertyKeys(of: sample),
                 relationships: library.relationships(for: sample.id), catalogue: catalogue,
@@ -154,19 +155,22 @@ struct LayoutTypePage: View {
                 entries: Binding {
                     pinned.map { SettingsListEntry(id: $0.id, title: $0.label) }
                 } set: { entries in
-                    placements.setPins(entries.map(\.id) + pins.filter { id in !rows.contains { $0.id == id } }, of: type)
+                    PagePlacements.update(in: defaults) { current in
+                        let missing = current.pins(of: type, in: catalogue).filter { id in !rows.contains { $0.id == id } }
+                        current.setPins(entries.map(\.id) + missing, of: type)
+                    }
                 },
                 candidates: rows.filter { $0.id != PagePlacement.linkedFrom && !pins.contains($0.id) }
                     .map { SettingsListEntry(id: $0.id, title: $0.label) },
                 addTitle: "Pin a Property…",
                 isFull: pins.count >= PagePlacement.pinLimit,
-                onAdd: { added in placements.pin(added.id, of: type, in: catalogue) })
-            SettingsRow("Linked From", line: "What links to an item of this type.") {
+                onAdd: { added in pin(added.id) })
+            SettingsRow("Linked from", line: "What links to an item of this type.") {
                 SettingsPopUp(
                     title: "Linked From",
                     selection: Binding {
                         placements.placement(of: type, in: catalogue).linkedFromPlace
-                    } set: { placements.setLinkedFrom($0, of: type, in: catalogue) }
+                    } set: { setLinkedFrom($0) }
                 ) {
                     Text("At the Foot of the Page").tag(LinkedFromPlace.page)
                     Text("In the Panel").tag(LinkedFromPlace.inspector)
@@ -179,13 +183,21 @@ struct LayoutTypePage: View {
 
     // MARK: Writing
 
+    func pin(_ row: String) {
+        PagePlacements.update(in: defaults) { $0.pin(row, of: type, in: catalogue) }
+    }
+
+    func setLinkedFrom(_ place: LinkedFromPlace) {
+        PagePlacements.update(in: defaults) { $0.setLinkedFrom(place, of: type, in: catalogue) }
+    }
+
     private func change(_ edit: (inout TypeLook) -> Void) {
-        libraries.typeLooks.change(type, in: key, catalogue: catalogue, edit)
+        typeLooks.change(type, in: key, catalogue: catalogue, edit)
     }
 
     /// Takes back this type's choices and nothing else's: its look, and what its page shows.
-    private func restore() {
-        libraries.typeLooks.restore(type, in: key)
-        placements.reset(type)
+    func restore() {
+        typeLooks.restore(type, in: key)
+        PagePlacements.update(in: defaults) { $0.reset(type) }
     }
 }

@@ -1853,9 +1853,6 @@
     "1 Hour" : {
 
     },
-    "1 Nov" : {
-
-    },
     "1 Version" : {
 
     },
@@ -1937,7 +1934,7 @@
     "15 Minutes" : {
 
     },
-    "2 Nov" : {
+    "16 Nov" : {
 
     },
     "2 Spaces" : {
@@ -1946,16 +1943,13 @@
     "24-Hour" : {
 
     },
-    "3 Nov" : {
-
-    },
-    "4 Nov" : {
-
-    },
     "4 Spaces" : {
 
     },
     "6 Hours" : {
+
+    },
+    "8 Nov" : {
 
     },
     "8 Spaces" : {
@@ -2130,6 +2124,9 @@
     "A saved view can’t keep %@." : {
 
     },
+    "A search can have up to ten conditions. Remove an exclusion to make room." : {
+
+    },
     "A search can limit itself to ten types at most." : {
 
     },
@@ -2158,6 +2155,9 @@
     "A source. %@ items." : {
 
     },
+    "A source. 1 item." : {
+
+    },
     "A status word belongs to one of four groups." : {
 
     },
@@ -2183,6 +2183,12 @@
 
     },
     "A type." : {
+
+    },
+    "A type. %@ items." : {
+
+    },
+    "A type. 1 item." : {
 
     },
     "A view can save only conditions that all apply, or all of which any one may apply." : {
@@ -2481,6 +2487,9 @@
 
     },
     "Adds %@. Nothing is removed." : {
+
+    },
+    "Add…" : {
 
     },
     "Adobe" : {
@@ -2807,6 +2816,9 @@
     "Archived Items: %@" : {
 
     },
+    "Archived items" : {
+
+    },
     "Archived items leave your lists. You can find them in Library > Archive." : {
 
     },
@@ -2838,9 +2850,6 @@
 
     },
     "As a clip" : {
-
-    },
-    "As a file you can keep or share." : {
 
     },
     "As a message" : {
@@ -3060,6 +3069,9 @@
     "Beta Versions" : {
 
     },
+    "Bisque, 1000°C, nine hours. Two test tiles cracked on the lower shelf, both from the new clay." : {
+
+    },
     "Blank" : {
 
     },
@@ -3113,9 +3125,6 @@
       "extractionState" : "manual"
     },
     "Browsers" : {
-
-    },
-    "Budget" : {
 
     },
     "Built In" : {
@@ -4333,6 +4342,9 @@
     "Default widths" : {
 
     },
+    "Defaults" : {
+
+    },
     "Definitions: %@" : {
 
     },
@@ -4463,9 +4475,6 @@
 
     },
     "Dimensions" : {
-
-    },
-    "Dinner with Sam" : {
 
     },
     "Direction" : {
@@ -4868,9 +4877,6 @@
     "Every setting on this Mac. Your items stay." : {
 
     },
-    "Every shortcut as Marfa ships it." : {
-
-    },
     "Everything" : {
 
     },
@@ -4878,6 +4884,12 @@
 
     },
     "Excerpts" : {
+
+    },
+    "Exclude from Search" : {
+
+    },
+    "Excluded" : {
 
     },
     "Existing %@" : {
@@ -4923,9 +4935,6 @@
 
     },
     "Export Folder" : {
-
-    },
-    "Export Layouts" : {
 
     },
     "Export Layouts…" : {
@@ -4988,7 +4997,7 @@
     "Feed Is Empty" : {
 
     },
-    "Feed Items" : {
+    "Feed items" : {
 
     },
     "Fetched a file from a web address" : {
@@ -5154,9 +5163,6 @@
       "extractionState" : "manual"
     },
     "Fixed Value" : {
-
-    },
-    "Flights and the hotel." : {
 
     },
     "Focus" : {
@@ -5348,6 +5354,9 @@
 
     },
     "Group Nearby Items" : {
+
+    },
+    "Group by" : {
 
     },
     "Group by %@" : {
@@ -5570,9 +5579,6 @@
     "Import" : {
 
     },
-    "Import Layouts" : {
-
-    },
     "Import Layouts…" : {
 
     },
@@ -5666,6 +5672,9 @@
     "Include ⌘, ⌃, or ⌥." : {
 
     },
+    "Included" : {
+
+    },
     "Incomplete" : {
 
     },
@@ -5673,6 +5682,9 @@
 
     },
     "Indigo" : {
+
+    },
+    "Ines Barros" : {
 
     },
     "Info" : {
@@ -6201,6 +6213,9 @@
     "Keep the copy and the changes stay on this Mac. Install the previous version of the app and connect it to the same server, and it sends them. Discard the copy and they’re lost." : {
       "extractionState" : "manual"
     },
+    "Keep the gallery grid aligned when the window resizes" : {
+
+    },
     "Keep things for less time?" : {
       "extractionState" : "manual"
     },
@@ -6257,6 +6272,9 @@
 
     },
     "Keys keep working" : {
+
+    },
+    "Kiln log, firing 14" : {
 
     },
     "Kind" : {
@@ -6362,12 +6380,6 @@
     "Leave Focus" : {
 
     },
-    "Leave Out a Type or Source" : {
-
-    },
-    "Leave Out a Type or Source…" : {
-
-    },
     "Leave Them As They Are" : {
 
     },
@@ -6375,9 +6387,6 @@
 
     },
     "Leaves the Feed" : {
-
-    },
-    "Left Out of Search" : {
 
     },
     "Left out with %@" : {
@@ -6396,6 +6405,9 @@
 
     },
     "Lets webhooks and the heartbeat reach this network." : {
+
+    },
+    "Lewes Trust: comments on the draft" : {
 
     },
     "Library" : {
@@ -6454,6 +6466,9 @@
     },
     "Linked From" : {
       "extractionState" : "manual"
+    },
+    "Linked from" : {
+
     },
     "Links" : {
       "extractionState" : "manual"
@@ -6774,9 +6789,6 @@
 
     },
     "Minute" : {
-
-    },
-    "Mon" : {
 
     },
     "Monitoring" : {
@@ -7599,7 +7611,7 @@
     "Off" : {
 
     },
-    "Off until you set one. They work from any app while Marfa is running." : {
+    "Off until you set one. They work in any app while Marfa for Mac is open." : {
 
     },
     "Offline" : {
@@ -7634,9 +7646,6 @@
 
     },
     "Offline. Your change is saved once your Marfa server is back." : {
-
-    },
-    "Oiling an oak worktop" : {
 
     },
     "Older" : {
@@ -7688,9 +7697,6 @@
 
     },
     "One line, or a form that also takes text and files." : {
-
-    },
-    "One line, over any app." : {
 
     },
     "One of them removes this app’s settings from %@. Discard the copy and the settings stay there." : {
@@ -7944,9 +7950,6 @@
     "Over the List" : {
 
     },
-    "Over whatever you’re doing." : {
-
-    },
     "Overview" : {
 
     },
@@ -7986,6 +7989,9 @@
     "Pages" : {
 
     },
+    "Pages 6 and 7 are the wrong way round in the second proofs." : {
+
+    },
     "Pages on it can no longer call the server." : {
 
     },
@@ -8005,6 +8011,9 @@
 
     },
     "Panel" : {
+
+    },
+    "Paper for the zine" : {
 
     },
     "Paragraph spacing" : {
@@ -8106,6 +8115,9 @@
 
     },
     "Permanently deletes %@ items." : {
+
+    },
+    "Person" : {
 
     },
     "Photo" : {
@@ -8669,9 +8681,6 @@
     "Rendering diagram…" : {
 
     },
-    "Renew passport" : {
-
-    },
     "Reopen Windows" : {
 
     },
@@ -8688,6 +8697,9 @@
 
     },
     "Replacing" : {
+
+    },
+    "Reply to Ines about the zine proofs" : {
 
     },
     "Report Errors" : {
@@ -8895,6 +8907,9 @@
     "Satellite" : {
 
     },
+    "Saturday" : {
+
+    },
     "Save" : {
       "extractionState" : "manual"
     },
@@ -9018,6 +9033,9 @@
       "extractionState" : "manual"
     },
     "Secondary Line" : {
+
+    },
+    "Secondary line" : {
 
     },
     "Section" : {
@@ -9339,9 +9357,6 @@
     "Show Sidebar" : {
 
     },
-    "Show Snippets" : {
-
-    },
     "Show Spelling and Grammar" : {
 
     },
@@ -9381,6 +9396,9 @@
     "Show item title when scrolling" : {
 
     },
+    "Show matched words under each result" : {
+
+    },
     "Show on Page" : {
       "extractionState" : "manual"
     },
@@ -9400,6 +9418,9 @@
 
     },
     "Show or Hide Sidebar" : {
+
+    },
+    "Show snippets" : {
 
     },
     "Show the Month" : {
@@ -9585,9 +9606,6 @@
     "Some Typing Might Be Missing" : {
 
     },
-    "Some can’t be left out as well: a search can skip only so much. Stop leaving one out to make room." : {
-
-    },
     "Some files are waiting for their copy in the backup destination." : {
 
     },
@@ -9630,13 +9648,13 @@
     "Sort %@" : {
 
     },
-    "Sort By" : {
-
-    },
     "Sort Search by Relevance" : {
 
     },
     "Sort and Group" : {
+
+    },
+    "Sort by" : {
 
     },
     "Sort by %@" : {
@@ -9776,9 +9794,6 @@
     },
     "Still loading your items, so these results may be incomplete." : {
       "extractionState" : "manual"
-    },
-    "Stop Leaving Out" : {
-
     },
     "Stop Syncing" : {
 
@@ -10978,9 +10993,6 @@
     "The window closed or changed library before the item’s files were attached." : {
       "extractionState" : "manual"
     },
-    "The words that matched, under each result." : {
-
-    },
     "Their fields stay read-only until %@ exists again." : {
 
     },
@@ -11053,7 +11065,7 @@
     "They keep working when the app is disconnected." : {
 
     },
-    "They still show in their own place, in views and in Favorites." : {
+    "They still show in their own place." : {
 
     },
     "They were removed from %@. This Mac keeps its own." : {
@@ -11438,6 +11450,9 @@
     "This type has changed on the server since the app last read it, so nothing was changed. Look at the field again and try once more." : {
 
     },
+    "This type is no longer in this library." : {
+
+    },
     "This type no longer has that field." : {
 
     },
@@ -11486,13 +11501,13 @@
     "Thread" : {
 
     },
-    "Three things for next week." : {
-
-    },
     "Through %@." : {
 
     },
     "Thumbnail" : {
+
+    },
+    "Thursday" : {
 
     },
     "Tier: %@" : {
@@ -11615,9 +11630,6 @@
     "Tries" : {
 
     },
-    "Trip to Lisbon" : {
-
-    },
     "Try Again" : {
       "extractionState" : "manual"
     },
@@ -11625,6 +11637,9 @@
 
     },
     "Try new versions before they’re released." : {
+
+    },
+    "Tuesday" : {
 
     },
     "Turn Off" : {
@@ -11683,6 +11698,9 @@
 
     },
     "Type it again to change it" : {
+
+    },
+    "Type or source" : {
 
     },
     "Type to narrow the list" : {
@@ -11788,12 +11806,6 @@
     "Unknown" : {
 
     },
-    "Unknown source, kept until you remove it." : {
-
-    },
-    "Unknown type, kept until you remove it." : {
-
-    },
     "Unpin" : {
       "extractionState" : "manual"
     },
@@ -11868,12 +11880,6 @@
 
     },
     "Updates" : {
-
-    },
-    "Updates the shortcuts included in the file." : {
-
-    },
-    "Updates the type layouts included in the file." : {
 
     },
     "Update…" : {
@@ -12162,9 +12168,6 @@
     "Weekends" : {
 
     },
-    "Weekly Review" : {
-
-    },
     "What" : {
 
     },
@@ -12202,6 +12205,9 @@
 
     },
     "What a new window shows." : {
+
+    },
+    "What a type, a collection or a new view lists." : {
 
     },
     "What a word means can be %lld characters at most." : {
@@ -12296,9 +12302,6 @@
 
     },
     "Where the database is." : {
-
-    },
-    "Where the month went." : {
 
     },
     "Where you sign in, and where apps connect." : {
@@ -12424,9 +12427,6 @@
     "Your Content" : {
 
     },
-    "Your Layouts" : {
-
-    },
     "Your Marfa library can’t be opened right now. Check the connection in Settings, then open the link again." : {
 
     },
@@ -12446,12 +12446,6 @@
       "extractionState" : "manual"
     },
     "Your Profile" : {
-
-    },
-    "Your Shortcuts" : {
-
-    },
-    "Your Types" : {
 
     },
     "Your changes are kept here and not saved. Reload carries them onto what is there now." : {

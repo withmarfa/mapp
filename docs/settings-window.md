@@ -46,11 +46,11 @@ See `docs/owner-settings.md` for Marfa pages and `docs/settings-sync.md` for sto
 | --- | --- |
 | General | Reopen Windows follows the Mac until the person changes it, and only then writes `NSQuitAlwaysKeepsWindows`. Send Error Reports and Updates show only in a build that carries a destination or a feed |
 | Appearance | App icon updates the Dock at launch and on change. Sky uses the bundle icon. Alternatives are Cobalt, Sea, Leaf, Marigold, and Adobe. Sidebar color applies to the main window |
-| Keyboard | Every menu command with its shortcut, and the any-app ones (`docs/commands.md`) |
+| Keyboard | Search by command or keys. Export and Restore Defaults include menu and global shortcuts. Import updates commands in the file (`docs/commands.md`) |
 | Editor | Fonts load when the page opens. PDF background shares the choice in View › PDF Background. Inkkit replaces `EditorOptions` as a set. Edit pages as applies to items opened next |
-| Lists | The starting density, sort and group of a place, until a view or the place chooses its own |
-| Layouts | How each type looks, through the stores of `docs/type-looks.md`. Only what differs from the type's preset is kept, so a better preset still reaches it. Page pins properties and holds the one Linked From row, which reads and writes the type's stored choice (`PagePlacements.linkedFrom`) |
-| Search | What searches of the whole library leave out (`SearchLeaveOuts`). A search in one place leaves nothing out. A type or source that would pass a query's ten conditions is dimmed, with the reason |
+| Lists | Density, From (All Items or Library), sort, and grouping. A view or place can override these defaults |
+| Layouts | Types are grouped by origin. Export and Import transfer the date, secondary line, and facts (`docs/type-looks.md`). `PagePlacements` stores pins and Linked From. Restore Defaults resets both stores for one type |
+| Search | Excluded types and sources keep their names if missing (`SearchLeaveOuts`). Add explains the ten-condition limit. Included controls archived and Feed items. Results controls order and snippets. Searches within a place omit nothing |
 | On This Mac | Opens from Connection. The copy, downloaded files and exports, below |
 | Connection | Sign-in, other Marfas and Disconnect, which reads the queue in the same step and asks about changes that wait |
 

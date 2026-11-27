@@ -1,3 +1,4 @@
+import Marfa
 import SwiftUI
 
 /// Where a type's own page is among the Layouts sub-pages: one for each type, named by its identifier.
@@ -14,79 +15,84 @@ enum LayoutsSubpage {
     }
 }
 
-/// The Layouts page: one row for each type of the server, which opens that type's own page. Nothing is left out, so a type
-/// with no items yet is here too. Export Layouts and Import Layouts move every layout between Macs and servers as a file.
+/// A type in the library catalogue can have a layout before it has any items.
 struct LayoutsPage: View {
+    @Environment(Libraries.self) private var libraries
+    @Environment(\.settingsNavigation) private var navigation
     @Environment(\.settingsSubpage) private var subpage
     @Environment(\.library) private var library
+    @State private var placements = PagePlacements()
+
+    private var defaults: UserDefaults { libraries.preferences.defaults }
 
     var body: some View {
         Group {
-            if let type = LayoutsSubpage.type(of: subpage), library?.catalogue.itemTypes[type] != nil {
-                LayoutTypePage(type: type)
+            if let library, let subpage, let type = LayoutsSubpage.type(of: subpage) {
+                if library.catalogue.itemTypes[type] != nil {
+                    LayoutTypePage(type: type, placements: placements, defaults: defaults, typeLooks: libraries.typeLooks,
+                                   key: libraries.libraryKey, library: library)
+                } else if library.isLoaded {
+                    SettingsPageState(
+                        symbol: "rectangle.stack", title: Text(verbatim: MissingChoice.label(subpage.title)),
+                        line: Text("This type is no longer in this library."), action: ("Back", { navigation?.back() }))
+                } else {
+                    ProgressView()
+                }
+            } else if let library {
+                LayoutsList(catalogue: library.catalogue, placements: placements)
             } else {
-                LayoutsList()
+                SettingsPageState(
+                    symbol: "rectangle.stack", title: Text("No Library Open"),
+                    line: Text("Layouts are shown once a Marfa is connected."))
             }
+        }
+        .onAppear { placements = PagePlacements.stored(in: defaults) }
+        .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification, object: defaults)) { _ in
+            placements = PagePlacements.stored(in: defaults)
         }
         .accessibilityIdentifier("LayoutsPage")
     }
 }
 
 private struct LayoutsList: View {
+    let catalogue: Catalogue
+    let placements: PagePlacements
     @Environment(Libraries.self) private var libraries
-    @Environment(\.library) private var library
     @Environment(\.settingsNavigation) private var navigation
-    @AppStorage(PagePlacements.key) private var placements = PagePlacements()
-
-    private var types: [ItemTypeInfo] {
-        (library?.catalogue.itemTypes.values).map { Array($0) }?.sorted { $0.label.localizedStandardCompare($1.label) == .orderedAscending } ?? []
-    }
 
     var body: some View {
-        if let library {
-            list(of: library.catalogue)
-        } else {
-            SettingsPageState(
-                symbol: "rectangle.stack", title: Text("No Library Open"),
-                line: Text("Layouts are shown once a Marfa is connected."))
+        let types = catalogue.itemTypes.values.sorted {
+            let order = $0.plural.localizedStandardCompare($1.plural)
+            return order == .orderedSame ? $0.id.rawValue < $1.id.rawValue : order == .orderedAscending
         }
-    }
-
-    private func list(of catalogue: Catalogue) -> some View {
-        let own = types.filter { !$0.id.isShipped }
-        let builtIn = types.filter { $0.id.isShipped }
+        let yours = types.filter { $0.origin == .registered || $0.origin == .unknown }
+        let builtIn = types.filter { $0.origin == .platform }
+        let plugins = types.filter { $0.origin == .plugin }
         return SettingsPageColumn {
-            if !own.isEmpty {
-                SettingsSection("Your Types", line: "How each type shows in rows, on cards and on its own page.") {
-                    ForEach(own) { row($0, in: catalogue) }
+            if !yours.isEmpty {
+                SettingsSection("Yours", footer: "How each type shows in rows, on cards and on its own page.") {
+                    ForEach(yours) { row($0, describesLayout: true) }
                 }
             }
-            SettingsSection("Built In", line: own.isEmpty ? "How each type shows in rows, on cards and on its own page." : nil) {
-                ForEach(builtIn) { row($0, in: catalogue) }
+            if !builtIn.isEmpty {
+                SettingsSection("Built In") { ForEach(builtIn) { row($0) } }
             }
-            SettingsSection("Your Layouts") {
-                SettingsRow("Export Layouts", line: "As a file you can keep or share.") {
-                    SettingsButton("Export…") { LooksFiles.export(from: libraries) }.accessibilityIdentifier("ExportLayouts")
-                }
-                SettingsRow("Import Layouts", line: "Updates the type layouts included in the file.") {
-                    SettingsButton("Import…") { LooksFiles.importLooks(into: libraries) }.accessibilityIdentifier("ImportLayouts")
-                }
+            if !plugins.isEmpty {
+                SettingsSection("From Plugins") { ForEach(plugins) { row($0) } }
+            }
+            SettingsBar {
+                SettingsButton("Export…", small: true) { LooksFiles.export(from: libraries) }.accessibilityIdentifier("ExportLayouts")
+                SettingsButton("Import…", small: true) { LooksFiles.importLooks(into: libraries) }.accessibilityIdentifier("ImportLayouts")
             }
         }
     }
 
-    private func row(_ type: ItemTypeInfo, in catalogue: Catalogue) -> some View {
-        let preset = LookPreset.suggested(for: type.id, in: catalogue)
-        let changes = changeCount(of: type.id)
-        return Button {
+    private func row(_ type: ItemTypeInfo, describesLayout: Bool = false) -> some View {
+        let line = describesLayout ? LayoutsListWords.line(
+            startsAs: LookPreset.suggested(for: type.id, in: catalogue).startsAs, changes: changeCount(of: type.id)) : nil
+        return SettingsLinkRow(verbatim: type.plural, line: line, lead: .custom(AnyView(TypeTile(icon: type.icon))), lines: nil) {
             navigation?.push(LayoutsSubpage.subpage(for: type.id, label: type.plural))
-        } label: {
-            SettingsRow(
-                verbatim: type.plural, line: LayoutsListWords.line(startsAs: preset.startsAs, changes: changes),
-                lead: .custom(AnyView(TypeTile(icon: type.icon, size: .side)))
-            ) { SettingsChevron() }
         }
-        .buttonStyle(.plain)
         .accessibilityIdentifier("Layout-\(type.id.rawValue)")
     }
 

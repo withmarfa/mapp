@@ -61,6 +61,62 @@ struct LayoutsTests {
 
     // MARK: The page
 
+    @Test(arguments: [false, true])
+    func editingNotesChangesOnlyItsSyncedRow(reset: Bool) throws {
+        let defaults = ThrowawayDefaults.make("LayoutsTests.setAside")
+        let unreadable = #""missing\u002etype" : { "pins" : 4.20e1, "extra": ["},\"", null] }"#
+        let readable = #""core.task" : { "pins": ["prior\u0069ty"] }"#
+        let mixed = #"{"core.note":{"pins":["author"]},\#(unreadable),\#(readable)}"#
+        defaults.set(mixed, forKey: PagePlacements.key)
+        let setting = try #require(PreferencesMap.synced.first { $0.key == PagePlacements.key })
+        func rows() throws -> PreferenceUnits {
+            guard case .units(let units) = setting.read(defaults, library: server) else {
+                throw CocoaError(.coderReadCorrupt)
+            }
+            return units
+        }
+        let base = try rows()
+        let page = layoutPage(note, defaults: defaults)
+        #expect(page.hasChanges)
+        #expect(defaults.object(forKey: PagePlacements.setAsideKey) == nil)
+        if reset { page.restore() } else { page.pin("date") }
+
+        let active = try #require(defaults.string(forKey: PagePlacements.key))
+        #expect(active.contains(unreadable))
+        #expect(active.contains(readable))
+        #expect(defaults.stringArray(forKey: PagePlacements.setAsideKey) == [mixed])
+        let merge = try PreferencesMerge.reconcile(local: rows(), remote: base, base: base)
+        let notes = PreferenceUnit.row(.types, setting: PagePlacements.key, key: note.rawValue)
+        #expect(merge.toRemote == [notes])
+        let other = PreferenceUnit.row(.types, setting: PagePlacements.key, key: "missing.type")
+        #expect(merge.merged[other] == base[other])
+        page.pin("tags")
+        #expect(defaults.stringArray(forKey: PagePlacements.setAsideKey) == [mixed])
+        if reset {
+            #expect(merge.merged[notes] == nil)
+        } else {
+            #expect(merge.merged[notes] == #"{"pins":["author","date"],"rows":{}}"#)
+        }
+    }
+
+    @Test func pinsAndLinkedFromAreReadBackFromThePlacementsStore() {
+        let defaults = ThrowawayDefaults.make("LayoutsTests.pinsAndLinks")
+        let page = layoutPage(task, defaults: defaults)
+        PagePlacements.update(in: defaults) { $0.setPins([], of: task) }
+        page.pin("priority")
+        page.setLinkedFrom(.page)
+        let saved = PagePlacements.stored(in: defaults)
+        #expect(saved.pins(of: task, in: catalogue) == ["priority"])
+        #expect(saved.placement(of: task, in: catalogue).linkedFromPlace == .page)
+    }
+
+    private func layoutPage(_ type: TypeID, defaults: UserDefaults) -> LayoutTypePage {
+        let library = FakeItemLibrary()
+        library.catalogue = catalogue
+        return LayoutTypePage(type: type, placements: PagePlacements.stored(in: defaults), defaults: defaults,
+                              typeLooks: TypeLooks(defaults: defaults), key: server, library: library)
+    }
+
     @Test func aPageHoldsNoMoreThanFourPins() {
         var placements = PagePlacements()
         placements.setPins(["status", "due_at", "priority", "assignees"], of: task)

@@ -16,6 +16,20 @@ struct PlacesTests {
 
     typealias F = LibraryFixture
 
+    @Test func listsFromChangesTheDefaultScopeForAType() {
+        let defaults = ThrowawayDefaults.make("PlacesTests.listsFrom")
+        let browser = Browser()
+        browser.defaults = defaults
+        let page = ListsPage(defaults: defaults)
+        for scope: ListScope in [.library, .all] {
+            page.scope.wrappedValue = scope
+            #expect(ListScope.defaultScope(in: defaults) == scope)
+            #expect(browser.listing(in: PlaceView(.type(F.ticket))).scope == scope)
+        }
+        defaults.set(ListScope.feed.rawValue, forKey: ListScope.defaultScopeKey)
+        #expect(page.scope.wrappedValue == .all)
+    }
+
     // MARK: The home rule
 
     private static func home(_ query: LibraryViewQuery) -> Place {
