@@ -42,30 +42,51 @@ struct SettingsShortcutField: View {
     let record: (NSEvent) -> Void
     let clear: () -> Void
     @State private var monitor = SettingsKeyMonitor()
+    @Environment(\.settingsTextScale) private var scale
+
+    private typealias Metric = SettingsTokens.Metric
+
+    private var showsClear: Bool { keys != nil && !isRecording }
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: SettingsTokens.Metric.controlRadius, style: .continuous)
-        Button(action: startRecording) { label.frame(maxWidth: .infinity) }
-            .buttonStyle(.bordered)
-            .buttonBorderShape(.roundedRectangle(radius: SettingsTokens.Metric.controlRadius))
-            .buttonSizing(.flexible)
-            .settingsControlSize()
-            .overlay(alignment: .trailing) {
-                if keys != nil, !isRecording {
-                    Button(action: clear) {
-                        Image(systemName: "xmark.circle.fill")
-                            .settingsFont(.small)
-                            .foregroundStyle(SettingsTokens.tertiaryText)
-                            .padding(.horizontal, 6)
-                            .contentShape(.rect)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Clear Shortcut")
+        let shape = RoundedRectangle(cornerRadius: Metric.shortcutRadius, style: .continuous)
+        let height = Metric.smallControlHeight * max(1, scale)
+        Button(action: startRecording) {
+            label
+                .settingsFont(.small)
+                .lineLimit(1)
+                .minimumScaleFactor(Metric.shortcutMinimumLabelScale)
+                .padding(.horizontal, showsClear ? Metric.shortcutKeysInset : Metric.shortcutPlaceholderInset)
+                .frame(width: Metric.controlWidth, height: height)
+                .background(SettingsTokens.shortcutField, in: shape)
+                .overlay { shape.strokeBorder(SettingsTokens.shortcutEdge, lineWidth: Metric.shortcutEdgeWidth).allowsHitTesting(false) }
+                .contentShape(shape)
+        }
+        .buttonStyle(.plain)
+        .overlay(alignment: .trailing) {
+            if showsClear {
+                Button(action: clear) {
+                    Image(systemName: "xmark.circle.fill")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: Metric.shortcutClearSize, height: Metric.shortcutClearSize)
+                        .foregroundStyle(SettingsTokens.shortcutClear)
+                        .padding(.horizontal, Metric.shortcutClearInset)
+                        .frame(height: height)
+                        .contentShape(.rect)
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear Shortcut")
             }
-            .frame(width: SettingsTokens.Metric.controlWidth)
-            .overlay { if isRecording { shape.stroke(SettingsTokens.focusRing, lineWidth: ChipLooks.defaults.focusRingWidth).padding(-ChipLooks.defaults.focusRingWidth / 2).allowsHitTesting(false) } }
-            .settingsErrorRing(isError)
+        }
+        .overlay {
+            if isRecording {
+                shape.stroke(SettingsTokens.focusRing, lineWidth: ChipLooks.defaults.focusRingWidth)
+                    .padding(-ChipLooks.defaults.focusRingWidth / 2)
+                    .allowsHitTesting(false)
+            }
+        }
+        .settingsErrorRing(isError)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(title)
         .accessibilityValue(keys ?? "")
@@ -97,11 +118,11 @@ struct SettingsShortcutField: View {
 
     @ViewBuilder private var label: some View {
         if isRecording {
-            Text("Type Shortcut").foregroundStyle(.secondary)
+            Text("Type Shortcut").foregroundStyle(SettingsTokens.secondaryText)
         } else if let keys {
             Text(verbatim: keys)
         } else {
-            Text("Record Shortcut").foregroundStyle(.secondary)
+            Text("Record Shortcut").foregroundStyle(SettingsTokens.shortcutPlaceholder)
         }
     }
 }

@@ -25,7 +25,7 @@ struct SettingsSidebar: View {
             let kept = source.map { $0.filter { matches.contains($0) } }.filter { !$0.isEmpty }
             for (index, pages) in kept.enumerated() {
                 let gap = index == 0
-                    ? (result.isEmpty ? SettingsTokens.Metric.sidebarHeadingTop : SettingsTokens.Metric.sidebarHalfGap)
+                    ? (result.isEmpty ? 0 : SettingsTokens.Metric.sidebarHalfGap)
                     : SettingsTokens.Metric.sidebarGroupGap
                 result.append(Group(name: index == 0 ? name : nil, pages: pages, gap: gap, id: result.count))
             }
@@ -63,6 +63,7 @@ struct SettingsSidebar: View {
 
     private func rows(_ pages: [SettingsPage]) -> some View {
         ForEach(pages, id: \.self) { page in
+            let isSelected = selection.sidebarEntry == page
             HStack(spacing: SettingsTokens.Metric.buttonGap) {
                 SettingsTile(symbol: page.symbol, tone: page.tone, size: SettingsTokens.Metric.sidebarTile, rich: true)
 
@@ -70,10 +71,11 @@ struct SettingsSidebar: View {
                 Text(page.title)
                     .settingsFont(.sidebar)
                     .fontWeight(.regular)
-                    .environment(\.backgroundProminence, selection.sidebarEntry == page ? .increased : .standard)
+                    .foregroundStyle(isSelected ? SettingsTokens.sidebarSelectedText : Color.primary)
                 Spacer(minLength: 0)
                 if let badge = badges(page), badge > 0 { problemBadge(badge) }
             }
+            .padding(.leading, SettingsTokens.Metric.sidebarRowLeading)
             .frame(minHeight: SettingsTokens.Metric.sidebarRow * max(1, scale))
             .accessibilityElement(children: .combine)
             .listRowInsets(.vertical, 0)
@@ -108,7 +110,8 @@ struct SettingsSidebar: View {
         .buttonStyle(.plain)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, SettingsTokens.Metric.sidebarFooterInset)
-        .padding(.vertical, SettingsTokens.Metric.sidebarFooterPadding)
+        .padding(.top, SettingsTokens.Metric.sidebarFooterPadding)
+        .padding(.bottom, SettingsTokens.Metric.sidebarFooterBottom)
     }
 
     private struct SidebarGroupHeading: View {
