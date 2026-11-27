@@ -53,7 +53,9 @@ struct AddressSheet: View {
                         }
                     }
                 }
-                if let status {
+                if changingSignIn, model.currentPlan != nil, let notice = model.approvalNotice {
+                    SettingsSheetStatus(text: Text(verbatim: notice), isMet: false)
+                } else if let status {
                     SettingsSheetStatus(text: Text(verbatim: status))
                 } else if changingSignIn, error == nil, let plan = model.currentPlan,
                     plan.requiresConfirmation, plan.reach == .notChecked

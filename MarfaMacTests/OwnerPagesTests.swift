@@ -2173,7 +2173,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         #expect(model.settings?.signIn == "https://studio.castell.design")
     }
 
-    @Test func aMoveTheOwnerDidNotConfirmKeepsTheSheetAndTheInput() async {
+    @Test func aMoveTheOwnerDidNotConfirmKeepsTheDraftForAnotherAttempt() async {
         let bench = OwnerBench()
         bench.calls.state.withLock { $0.reach = .answers; $0.requiresConfirmation = true }
         let (model, _) = await model(bench)
@@ -2182,10 +2182,18 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         await model.check()
         bench.calls.fail("apply", with: .notConfirmed)
         await model.confirm()
-        #expect(model.inputError == "Nothing was changed: the sign-in wasn’t confirmed.")
+        #expect(model.approvalNotice == "Nothing was changed: the sign-in wasn’t confirmed.")
+        #expect(model.inputError == nil)
         #expect(model.input == "studio.castell.design")
         #expect(model.sheet == .changeSignIn)
         #expect(model.settings?.signIn == "https://marfa.test")
+        #expect(model.canConfirm)
+
+        bench.calls.fail("apply", with: nil)
+        await model.confirm()
+        #expect(model.approvalNotice == nil)
+        #expect(model.sheet == nil)
+        #expect(model.settings?.signIn == "https://studio.castell.design")
     }
 
     @Test func removingAnAddressChecksThenAsksThenWrites() async throws {
