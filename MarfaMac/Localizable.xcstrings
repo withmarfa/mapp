@@ -2563,6 +2563,9 @@
     "Allow more removals before pausing?" : {
 
     },
+    "Allow this app to read the server’s status." : {
+
+    },
     "Allowed" : {
 
     },
@@ -5615,6 +5618,9 @@
     "In Progress First" : {
 
     },
+    "In Terminal, run %@ for this Marfa, then enter the secret key when prompted." : {
+
+    },
     "In Two Weeks" : {
 
     },
@@ -7651,9 +7657,6 @@
     "On the local network." : {
 
     },
-    "On the server’s own page, in a sheet." : {
-
-    },
     "On this Mac" : {
 
     },
@@ -9100,6 +9103,9 @@
 
     },
     "Set the client settings the sign-in needs first." : {
+
+    },
+    "Set the object store secret key again" : {
 
     },
     "Set them again if you install it later." : {
@@ -10993,6 +10999,9 @@
     "Thinned old versions" : {
 
     },
+    "This app can’t check for problems" : {
+
+    },
     "This app can’t manage sign-ins" : {
 
     },
@@ -12308,6 +12317,9 @@
 
     },
     "You closed Settings before this was saved." : {
+
+    },
+    "You left the page before this was saved." : {
 
     },
     "You quit the app before saving the changes to this Marfa’s settings." : {

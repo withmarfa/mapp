@@ -97,7 +97,7 @@ The page gate checks the connection and the sign-in’s permissions. A configure
 
 - **The server's own error texts are never shown**, because they name settings by key and requests by path. Pages word a title and one line; details go to the app's log. A field may show the server's reason where it holds no key, code or route.
 - **A setting with no name in the app is counted or described**, never shown by its key.
-- **Problems and the Account badge share the server’s attention list.** Each problem opens the relevant settings page. A locked page offers Allow More.
+- **Problems and the Account badge share the server’s attention list.** Account refreshes it when opened. A problem opens the page that fixes it or offers a command to copy when the setting is available only in the CLI. Without `instance.read`, Problems offers Allow More.
 - **A problem row's title is a sentence.**
 
 ## Plugins, types and connectors

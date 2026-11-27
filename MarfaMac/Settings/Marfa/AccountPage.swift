@@ -17,11 +17,11 @@ struct AccountPage: View {
 
     var body: some View {
         Group {
-            if model.failure == .unreachable {
+            if let failure = model.gateFailure {
                 SettingsStandingState {
                     AccountHeader(host: host)
                 } state: {
-                    OwnerFailureState(page: .account, failure: .unreachable, host: host) { Task { await model.load() } }
+                    OwnerFailureState(page: .account, failure: failure, host: host) { Task { await model.load() } }
                 }
             } else {
                 account
@@ -42,7 +42,11 @@ struct AccountPage: View {
             }
             await profile
         }
+        .task(id: host.grants.contains(.instanceRead)) {
+            if host.grants.contains(.instanceRead) { await host.overview.load(waitForPrevious: true) }
+        }
         .onAppear { host.ownerDrafts.register(model) }
+        .onDisappear { host.ownerDrafts.pageLeft(model) }
         .settingsSheet(presenting: model.sheet != nil, dismiss: { model.closePasswordSheet() }) { AccountSheet(model: model) }
         .fileImporter(isPresented: $choosesPicture, allowedContentTypes: [.image]) { chosen in
             switch chosen {
@@ -102,16 +106,35 @@ struct AccountPage: View {
             } else if !overview.concerns.isEmpty {
                 SettingsSection("Problems") {
                     ForEach(overview.concerns) { concern in
-                        let page = concern.destination
                         SettingsProblemRow(
                             title: Text(verbatim: concern.shownTitle), line: concern.shownLine.map { Text(verbatim: $0) },
-                            actions: [
-                                SettingsProblemAction(verbatim: page == .keys ? String(localized: "Show Keys") : String(localized: "Show \(page.title)")) {
-                                    host.show(page)
-                                }
-                            ])
+                            actions: [action(for: concern)])
                     }
                 }
+            }
+        } else {
+            SettingsSection("Problems") {
+                SettingsProblemRow(
+                    title: Text("This app can’t check for problems"), line: Text("Allow this app to read the server’s status."),
+                    symbol: "lock", tone: nil,
+                    actions: [
+                        SettingsProblemAction("Allow More") {
+                            host.askForMore(naming: InstancePermission.instanceRead.rawValue)
+                        }
+                    ]
+                )
+                .disabled(host.isAllowingMore)
+            }
+        }
+    }
+
+    private func action(for concern: AttentionConcern) -> SettingsProblemAction {
+        switch concern.repair {
+        case .command(let command):
+            SettingsProblemAction("Copy Command") { OwnerClipboard.copyText(command) }
+        case .page(let page):
+            SettingsProblemAction(verbatim: page == .keys ? String(localized: "Show Keys") : String(localized: "Show \(page.title)")) {
+                host.show(page)
             }
         }
     }

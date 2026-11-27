@@ -60,6 +60,12 @@ nonisolated enum ProfileContactField: Hashable {
     /// Why the page can't be shown at all.
     private let loader = OwnerLoader()
     var failure: OwnerFailure? { loader.failure }
+    var gateFailure: OwnerFailure? {
+        switch failure {
+        case .signedOut, .unreachable, .instanceChanged, .unsupported, .notPermitted: failure
+        default: nil
+        }
+    }
     /// Why the passkeys and browsers couldn't be read, where the profile could.
     private let signInsRead = OwnerLoader.ReadStatus()
     var listsFailure: OwnerFailure? { signInsRead.failure }

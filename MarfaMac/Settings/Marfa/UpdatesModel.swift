@@ -94,7 +94,7 @@ import Observation
     /// answers 404 then.
     var canCheck: Bool {
         guard let status else { return false }
-        return status.checksAutomatically && !isChecking && !isUpdating
+        return !needsMaintain && status.checksAutomatically && !isChecking && !isUpdating
     }
 
     /// Whether the sign-in lacks `instance.maintain`, which Update and Check for Updates need: the page offers Allow More… first.
@@ -118,7 +118,7 @@ import Observation
     /// Whether Update can be pressed: a newer release is ready, the server can swap its own programs and nothing is running.
     var canUpdate: Bool {
         guard let status else { return false }
-        return status.available && status.updatesItself && !isUpdating && !isChecking && !lostTrack
+        return !needsMaintain && status.available && status.updatesItself && !isUpdating && !isChecking && !lostTrack
     }
 
     /// Starts the update the owner confirmed on Account. Where the status was not read yet, it is read first (and

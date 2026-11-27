@@ -207,6 +207,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     }
 
     func setProfileContact(_ field: ProfileContactField, to value: String) async throws(OwnerFailure) -> OwnerProfile {
+        await held("setProfileContact")
         try enter("setProfileContact")
         return state.withLock { state in
             switch field {

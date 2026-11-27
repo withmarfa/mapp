@@ -320,6 +320,23 @@ nonisolated private func record(_ name: String, hoursAgo: Int = 0) -> BackupReco
         #expect(bench.calls.state.withLock { $0.updatesStarted } == 1)
     }
 
+    @Test func retryingARolledBackUpdateRequiresMaintainAtConfirmation() async {
+        var status = ready()
+        status.last = UpdateOutcome(result: .putBack, release: "0.0.85", finished: someday)
+        let owner = bench(status)
+        let model = UpdatesModel(context: owner.context, pause: .zero)
+        await model.load()
+        #expect(model.canUpdate)
+        owner.grants.remove(.instanceMaintain)
+        #expect(!model.canUpdate)
+        #expect(!model.canCheck)
+        owner.calls.fail("startUpdate", with: .notPermitted("instance.maintain"))
+        await model.confirmUpdate()
+        await model.checkForUpdates()
+        #expect(!owner.calls.calls.contains("startUpdate"))
+        #expect(!owner.calls.calls.contains("checkForUpdates"))
+    }
+
     @Test func anUpdateRefusedForWantOfAPermissionNamesItAndReadsTheGrantsAgain() async {
         let bench = bench(ready())
         bench.calls.fail("startUpdate", with: .notPermitted("instance.maintain"))

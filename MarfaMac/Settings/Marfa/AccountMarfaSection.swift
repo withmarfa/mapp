@@ -27,6 +27,7 @@ struct AccountMarfaSection: View {
                     let model = model
                     Task { await model.confirmUpdate() }
                 }
+                .disabled(!model.canUpdate)
             } message: {
                 Text("\(host.serverName) restarts to finish the update. The app reconnects when it’s back.")
             }
@@ -129,7 +130,7 @@ struct AccountMarfaSection: View {
                             undone.result == .putBack
                                 ? "The server is back on \(status.running). Nothing was lost."
                                 : "The server runs \(status.running)."),
-                        actions: model.canUpdate ? [SettingsProblemAction("Try Again") { asksToUpdate = true }] : [])
+                        actions: retryActions(status))
                 }
                 if model.lostTrack {
                     SettingsProblemRow(
@@ -142,6 +143,13 @@ struct AccountMarfaSection: View {
                 }
             }
         }
+    }
+
+    private func retryActions(_ status: UpdateStatus) -> [SettingsProblemAction] {
+        if model.needsMaintain, status.available, status.updatesItself {
+            return [SettingsProblemAction("Allow More") { host.askForMore(naming: InstancePermission.instanceMaintain.rawValue) }]
+        }
+        return model.canUpdate ? [SettingsProblemAction("Try Again") { asksToUpdate = true }] : []
     }
 
     private func marfa(_ status: UpdateStatus) -> some View {
