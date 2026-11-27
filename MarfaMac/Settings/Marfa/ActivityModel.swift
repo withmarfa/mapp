@@ -169,7 +169,10 @@ struct ActivityOrder: Equatable, Sendable {
         let order = order
         return entries.sorted { lhs, rhs in
             let compared = Self.compare(lhs, rhs, by: order.column)
-            if compared == .orderedSame { return lhs.id < rhs.id }
+            if compared == .orderedSame {
+                // When keeps the server's order. A stable sort needs false both ways; an id tie-break would reorder equals.
+                return order.column == .when ? false : lhs.id < rhs.id
+            }
             let ascending = compared == .orderedAscending
             return order.ascending ? ascending : !ascending
         }
@@ -240,19 +243,22 @@ struct ActivityOrder: Equatable, Sendable {
             failure = nil
         } catch {
             guard mine == generation else { return }
+            let refused = if case .notPermitted = error { true } else { false }
             starts = Array(starts.prefix(pageIndex + 1))
-            if clearingOnFailure {
+            if clearingOnFailure || refused {
                 entries = []
                 next = nil
                 hasNext = false
             }
             failure = error
+            hasLoaded = true
             await context.learn(from: error)
+            return
         }
         hasLoaded = true
     }
 
-    /// A missing date is the oldest, and a missing name sorts as nothing. What is the words the page shows, not the server's key.
+    /// A missing date is the oldest. Who uses the name the page shows, so a missing actor is Unknown. What is those words, not the server's key.
     private static func compare(_ lhs: ActivityEntry, _ rhs: ActivityEntry, by column: ActivityColumn) -> ComparisonResult {
         switch column {
         case .when:
@@ -261,11 +267,13 @@ struct ActivityOrder: Equatable, Sendable {
             if left == right { return .orderedSame }
             return left < right ? .orderedAscending : .orderedDescending
         case .who:
-            return (lhs.who ?? "").localizedStandardCompare(rhs.who ?? "")
+            return who(lhs.who).localizedStandardCompare(who(rhs.who))
         case .what:
             return ActivityWording.what(lhs.action).localizedStandardCompare(ActivityWording.what(rhs.action))
         case .address:
             return (lhs.address ?? "").localizedStandardCompare(rhs.address ?? "")
         }
     }
+
+    private static func who(_ name: String?) -> String { name ?? String(localized: "Unknown") }
 }

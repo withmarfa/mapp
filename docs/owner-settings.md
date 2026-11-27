@@ -8,7 +8,7 @@ paths:
 
 # The Marfa's pages of Settings
 
-These pages show and change what the server holds for its owner. Every call goes to the server at once and none is queued. The contract's statement ids below are in the marfa repository.
+These pages show and change what the server holds for its owner. Every call goes to the server at once and none is queued.
 
 ## Pages
 
@@ -33,13 +33,13 @@ The page gate checks connection and permissions. A configured Marfa keeps its Ac
 | Folders | type access to `system.folder` | Synced folders: patterns, limits, copies, Stop Syncing |
 | Backups | `backups.manage` | Destination, backups, restore. Destination and interval need `config.manage` |
 | Housekeeping | `instance.read` or `config.manage` | Jobs need `instance.read`. Confirming the clock needs `instance.maintain`. Log retention needs `config.manage` |
-| Activity | none to open. Usage needs `instance.read`. Log needs `audit.read` | How many items this Marfa holds, and the audit log |
+| Activity | none. Counts need a readable type. Storage `instance.read`. Log `audit.read` | Counts and the audit log |
 | Monitoring | `config.manage` | Pausing telemetry pauses error reports. The owner can still change or remove the reporting destination |
 | Limits | `config.manage` or `instance.read` | Request, rate, inbound delivery, and live update limits need `config.manage`. Either permission can read start-up setting names and whether each is set |
 
 ## Permissions
 
-- **A missing page permission shows Needs a Permission with Allow More.** `MarfaPageGate` decides. Apps and Keys checks access to each section independently and shows a locked row for an unavailable action. Activity opens without one permission: a tab the sign-in lacks shows that state, and the other tab stays open.
+- **A missing page permission shows Needs a Permission with Allow More.** `MarfaPageGate` decides. Apps and Keys checks access to each section independently and shows a locked row for an unavailable action. Activity's counts, storage and Log follow their own access.
 - **A sign-in asks for every permission an app can hold**, and the owner grants what they choose. A page rereads the grants after approval and still says what is missing.
 - **A `forbidden` answer rereads the grants** and offers Allow More… in the problem row (`OwnerProblemRow`).
 - **Owner permissions are counted, never all or nothing**, and can only be turned off on a key's or an app's page (`OwnerPermissionsRow`).
@@ -96,7 +96,7 @@ The page gate checks connection and permissions. A configured Marfa keeps its Ac
 
 ## Words
 
-- **The server's own error texts are never shown**, because they name settings by key and requests by path. Pages word a title and one line; details go to the log. A field may show a reason without a key, code or route.
+- **The server's own error texts are never shown.** Pages word a title and one line; details go to the log. A field may show a reason without a key, code or route.
 - **A setting with no name in the app is counted or described**, never shown by its key.
 - **Problems and the Account badge share the server’s attention list.** A problem opens the page that fixes it, or offers a command to copy where no page can.
 - **A problem row's title is a sentence.**

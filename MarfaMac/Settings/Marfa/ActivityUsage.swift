@@ -30,8 +30,9 @@ nonisolated struct UsageMetrics: Hashable, Sendable {
 /// One type or source in the tables: how many items it holds, and how many changed in the period.
 nonisolated struct UsageRow: Identifiable, Hashable, Sendable {
     var key: String
-    var items: Int
-    var changed: Int
+    /// Nil when that read failed or was not asked for. A key the successful read did not name is zero.
+    var items: Int?
+    var changed: Int?
     var id: String { key }
 }
 
@@ -102,14 +103,25 @@ nonisolated enum UsageMath {
         return sums
     }
 
-    /// Every key either map names, including a zero, most items first.
-    static func rows(items: [String: Int], changed: [String: Int]) -> [UsageRow] {
-        Set(items.keys).union(changed.keys).map { key in
-            UsageRow(key: key, items: items[key] ?? 0, changed: changed[key] ?? 0)
+    /// Every key either map names. A missing key in a read that arrived is zero. A read that failed is nil on every row.
+    static func rows(items: [String: Int]?, changed: [String: Int]?) -> [UsageRow] {
+        var keys = Set<String>()
+        if let items { keys.formUnion(items.keys) }
+        if let changed { keys.formUnion(changed.keys) }
+        return keys.map { key in
+            UsageRow(key: key, items: count(items, key), changed: count(changed, key))
         }.sorted { lhs, rhs in
-            if lhs.items != rhs.items { return lhs.items > rhs.items }
+            let left = lhs.items ?? -1
+            let right = rhs.items ?? -1
+            if left != right { return left > right }
             return lhs.key < rhs.key
         }
+    }
+
+    /// Nil when the read failed. Zero when the read arrived and did not name the key.
+    private static func count(_ counts: [String: Int]?, _ key: String) -> Int? {
+        guard let counts else { return nil }
+        return counts[key] ?? 0
     }
 
     /// The busiest series first, which the chart draws at the bottom. More than four folds the rest into Other. A zero is not a series.
@@ -133,116 +145,232 @@ nonisolated enum UsageMath {
     }
 }
 
-/// Usage: how many items this Marfa holds, and how many changed in the period. A late answer never replaces a newer one.
+/// Which sign-in scopes can read an item, which is what item counts need. Profile, edge and metadata scopes are not item types.
+nonisolated enum ActivityAccess {
+    static func readsItems(_ scopes: some Sequence<String>) -> Bool {
+        scopes.contains { scope in
+            guard scope.hasSuffix(":read") else { return false }
+            let type = String(scope.dropLast(":read".count))
+            if type.isEmpty { return false }
+            if type == "profile" || type.hasPrefix("profile.") { return false }
+            if type == "edge" || type.hasPrefix("edge.") { return false }
+            if type == "metadata" || type.hasPrefix("metadata.") { return false }
+            return true
+        }
+    }
+}
+
+/// Usage: how many items this Marfa holds, and how many changed in the period. Period, grouping and the figures that
+/// arrived are published together, so a late answer never puts one period's counts under another.
 @Observable @MainActor final class ActivityUsageModel {
     private let context: OwnerContext
     private let calls: any InstanceCalls
-    private let now: Date
+    /// Read on every reload, so a window that stays open moves past midnight.
+    private let now: @Sendable () -> Date
     private let calendar: Calendar
 
     var period: UsagePeriod = .last7Days
     var grouping: UsageGrouping = .type
 
-    private(set) var hasStats = false
-    private(set) var hasMetrics = false
-    private(set) var statsFailure: OwnerFailure?
-    private(set) var metricsFailure: OwnerFailure?
+    private var snapshot: Snapshot?
     private(set) var isLoading = false
     private(set) var hasLoaded = false
-    private(set) var days: [Date] = []
-    private(set) var versionCount: Int?
-    private(set) var fileBytes: Int?
-    private(set) var databaseBytes: Int?
-    private var typeItems: [String: Int] = [:]
-    private var sourceItems: [String: Int] = [:]
-    private var otherChanged: [String: Int] = [:]
-    private var daily: [[String: Int]] = []
     private var generation = 0
+    /// What the last reload asked for, so Try Again asks for the same parts. A plain `reload()` still reads both until a
+    /// caller says otherwise.
+    private var loadItems = true
+    private var loadStorage = true
 
-    init(context: OwnerContext, calls: any InstanceCalls, now: Date = .now, calendar: Calendar = .current) {
+    init(
+        context: OwnerContext, calls: any InstanceCalls, now: @escaping @Sendable () -> Date = { Date() },
+        calendar: Calendar = .current
+    ) {
         self.context = context
         self.calls = calls
         self.now = now
         self.calendar = calendar
     }
 
-    /// The sum of items by type. Nil until a stats read has succeeded, so a failure is not shown as a new Marfa.
-    var storedItems: Int? { hasStats ? typeItems.values.reduce(0, +) : nil }
+    /// The period whose figures are on screen. Nil until the first read publishes.
+    var shownPeriod: UsagePeriod? { snapshot?.period }
+    /// The grouping those figures were read with. Changing the popup does not reinterpret what is already shown.
+    var shownGrouping: UsageGrouping { snapshot?.grouping ?? grouping }
+    var chartNow: Date { snapshot?.now ?? now() }
+    var chartCalendar: Calendar { calendar }
+    var hasStats: Bool { snapshot?.hasStats ?? false }
+    var hasMetrics: Bool { snapshot?.hasMetrics ?? false }
+    var hasDaily: Bool { snapshot?.daily != nil }
+    /// An all-time count or a day arrived, even where another item read failed.
+    var hasAnyItems: Bool { snapshot?.typeItems != nil || snapshot?.sourceItems != nil || snapshot?.daily != nil }
+    var statsFailure: OwnerFailure? { snapshot?.statsFailure }
+    var metricsFailure: OwnerFailure? { snapshot?.metricsFailure }
+    var askedItems: Bool { snapshot?.askedItems ?? false }
+    var askedStorage: Bool { snapshot?.askedStorage ?? false }
+    var days: [Date] { snapshot?.days ?? [] }
+    var versionCount: Int? { snapshot?.versionCount }
+    var fileBytes: Int? { snapshot?.fileBytes }
+    var databaseBytes: Int? { snapshot?.databaseBytes }
 
-    var typeRows: [UsageRow] { UsageMath.rows(items: typeItems, changed: typeChanged) }
-    var sourceRows: [UsageRow] { UsageMath.rows(items: sourceItems, changed: sourceChanged) }
+    /// The sum of items by type. Nil until that read has succeeded, so a failure is not shown as a new Marfa.
+    var storedItems: Int? { snapshot?.typeItems?.values.reduce(0, +) }
+    var typeRows: [UsageRow] { UsageMath.rows(items: snapshot?.typeItems, changed: snapshot?.typeChanged) }
+    var sourceRows: [UsageRow] { UsageMath.rows(items: snapshot?.sourceItems, changed: snapshot?.sourceChanged) }
+    var chart: UsageChartBuild { UsageMath.chart(daily: snapshot?.daily ?? []) }
 
-    var chart: UsageChartBuild { UsageMath.chart(daily: daily) }
+    /// Both reads were asked for and neither arrived. A section that was not asked for stays on the page as its own lock.
+    var failedEntirely: Bool {
+        guard let snapshot, hasLoaded, snapshot.askedItems, snapshot.askedStorage else { return false }
+        let itemsGone = snapshot.typeItems == nil && snapshot.sourceItems == nil && snapshot.daily == nil
+        let failed = snapshot.statsFailure != nil || snapshot.metricsFailure != nil
+        return itemsGone && !snapshot.hasMetrics && failed
+    }
 
-    /// What changed in the period, by the selected grouping, is the sum of the days. The other grouping is one read of the period.
-    private var typeChanged: [String: Int] { grouping == .type ? UsageMath.totals(daily) : otherChanged }
-    private var sourceChanged: [String: Int] { grouping == .source ? UsageMath.totals(daily) : otherChanged }
+    func reload() async { await reload(items: loadItems, storage: loadStorage) }
 
-    /// Reads metrics and the stats for the period and grouping as they are now. An older read that finishes later is dropped.
-    func reload() async {
+    /// Reads the parts this sign-in may see. An older read that finishes later is dropped, including one that waited on grants.
+    func reload(items: Bool, storage: Bool) async {
+        loadItems = items
+        loadStorage = storage
         generation += 1
         let mine = generation
-        let period = period
-        let grouping = grouping
+        let period = self.period
+        let grouping = self.grouping
+        let now = now()
         let windows = UsageMath.windows(count: period.dayCount, now: now, calendar: calendar)
         isLoading = true
         defer { if mine == generation { isLoading = false } }
-        let loaded = await Self.load(calls: calls, grouping: grouping, windows: windows)
+        let loaded = await Self.load(calls: calls, grouping: grouping, windows: windows, items: items, storage: storage)
         guard mine == generation, !Task.isCancelled else { return }
-        days = windows.map(\.start)
-        switch loaded.metrics {
-        case .success(let metrics):
-            versionCount = metrics.versionCount
-            fileBytes = metrics.fileBytes
-            databaseBytes = metrics.databaseBytes
-            hasMetrics = true
-            metricsFailure = nil
-        case .failure(let failure):
-            versionCount = nil
-            fileBytes = nil
-            databaseBytes = nil
-            hasMetrics = false
-            metricsFailure = failure
-            await context.learn(from: failure)
+        if let refusal = Self.refusal(in: loaded) {
+            await context.learn(from: refusal)
+            guard mine == generation, !Task.isCancelled else { return }
         }
-        switch loaded.stats {
-        case .success(let stats):
-            typeItems = stats.typeItems
-            sourceItems = stats.sourceItems
-            otherChanged = stats.otherChanged
-            daily = stats.daily
-            hasStats = true
-            statsFailure = nil
-        case .failure(let failure):
-            // The period on screen is this read's. Keeping the previous period's counts would put them under the new one.
-            typeItems = [:]
-            sourceItems = [:]
-            otherChanged = [:]
-            daily = []
-            hasStats = false
-            statsFailure = failure
-            await context.learn(from: failure)
-        }
+        snapshot = Self.snapshot(
+            period: period, grouping: grouping, now: now, windows: windows, loaded: loaded, items: items, storage: storage)
         hasLoaded = true
     }
 
+    private struct Snapshot: Sendable {
+        var period: UsagePeriod
+        var grouping: UsageGrouping
+        var now: Date
+        var days: [Date]
+        var typeItems: [String: Int]? = nil
+        var sourceItems: [String: Int]? = nil
+        var typeChanged: [String: Int]? = nil
+        var sourceChanged: [String: Int]? = nil
+        var daily: [[String: Int]]? = nil
+        var hasStats = false
+        var hasMetrics = false
+        var statsFailure: OwnerFailure? = nil
+        var metricsFailure: OwnerFailure? = nil
+        var versionCount: Int? = nil
+        var fileBytes: Int? = nil
+        var databaseBytes: Int? = nil
+        var askedItems: Bool
+        var askedStorage: Bool
+    }
+
     private struct Loaded: Sendable {
-        var metrics: Result<UsageMetrics, OwnerFailure>
-        var stats: Result<Stats, OwnerFailure>
+        var metrics: Result<UsageMetrics, OwnerFailure>?
+        var items: ItemPieces?
     }
 
-    private struct Stats: Sendable {
-        var typeItems: [String: Int]
-        var sourceItems: [String: Int]
-        var otherChanged: [String: Int]
-        var daily: [[String: Int]]
+    private struct ItemPieces: Sendable {
+        var typeItems: Result<[String: Int], OwnerFailure>
+        var sourceItems: Result<[String: Int], OwnerFailure>
+        var otherChanged: Result<[String: Int], OwnerFailure>
+        var daily: Result<[[String: Int]], OwnerFailure>
     }
 
-    /// Metrics and every stats read together. One stats failure drops the set, so a chart is never half a period.
-    private nonisolated static func load(calls: any InstanceCalls, grouping: UsageGrouping, windows: [UsageWindow]) async -> Loaded {
-        async let metricsRead = metrics(calls)
-        async let statsRead = stats(calls, grouping: grouping, windows: windows)
-        return await Loaded(metrics: metricsRead, stats: statsRead)
+    private nonisolated static func snapshot(
+        period: UsagePeriod, grouping: UsageGrouping, now: Date, windows: [UsageWindow], loaded: Loaded, items: Bool, storage: Bool
+    ) -> Snapshot {
+        var shot = Snapshot(period: period, grouping: grouping, now: now, days: windows.map(\.start), askedItems: items, askedStorage: storage)
+        if let metrics = loaded.metrics {
+            switch metrics {
+            case .success(let value):
+                shot.versionCount = value.versionCount
+                shot.fileBytes = value.fileBytes
+                shot.databaseBytes = value.databaseBytes
+                shot.hasMetrics = true
+            case .failure(let error):
+                shot.metricsFailure = error
+            }
+        }
+        if let pieces = loaded.items {
+            switch pieces.typeItems {
+            case .success(let counts): shot.typeItems = counts
+            case .failure(let error): shot.statsFailure = error
+            }
+            switch pieces.sourceItems {
+            case .success(let counts): shot.sourceItems = counts
+            case .failure(let error): shot.statsFailure = shot.statsFailure ?? error
+            }
+            let other: [String: Int]?
+            switch pieces.otherChanged {
+            case .success(let counts): other = counts
+            case .failure(let error):
+                other = nil
+                shot.statsFailure = shot.statsFailure ?? error
+            }
+            let selected: [String: Int]?
+            switch pieces.daily {
+            case .success(let days):
+                shot.daily = days
+                selected = UsageMath.totals(days)
+            case .failure(let error):
+                selected = nil
+                shot.statsFailure = shot.statsFailure ?? error
+            }
+            if grouping == .type {
+                shot.typeChanged = selected
+                shot.sourceChanged = other
+            } else {
+                shot.sourceChanged = selected
+                shot.typeChanged = other
+            }
+            shot.hasStats = shot.statsFailure == nil
+        }
+        return shot
+    }
+
+    private nonisolated static func refusal(in loaded: Loaded) -> OwnerFailure? {
+        var found: [OwnerFailure] = []
+        if let metrics = loaded.metrics, case .failure(let error) = metrics { found.append(error) }
+        if let items = loaded.items {
+            let totals: [Result<[String: Int], OwnerFailure>] = [items.typeItems, items.sourceItems, items.otherChanged]
+            for result in totals {
+                if case .failure(let error) = result { found.append(error) }
+            }
+            if case .failure(let error) = items.daily { found.append(error) }
+        }
+        return found.first { failure in
+            if case .notPermitted = failure { return true }
+            return false
+        }
+    }
+
+    private enum LoadPart: Sendable {
+        case metrics(Result<UsageMetrics, OwnerFailure>)
+        case items(ItemPieces)
+    }
+
+    private nonisolated static func load(
+        calls: any InstanceCalls, grouping: UsageGrouping, windows: [UsageWindow], items: Bool, storage: Bool
+    ) async -> Loaded {
+        await withTaskGroup(of: LoadPart.self) { group in
+            if storage { group.addTask { .metrics(await metrics(calls)) } }
+            if items { group.addTask { .items(await stats(calls, grouping: grouping, windows: windows)) } }
+            var loaded = Loaded()
+            for await part in group {
+                switch part {
+                case .metrics(let value): loaded.metrics = value
+                case .items(let value): loaded.items = value
+                }
+            }
+            return loaded
+        }
     }
 
     private nonisolated static func metrics(_ calls: any InstanceCalls) async -> Result<UsageMetrics, OwnerFailure> {
@@ -253,46 +381,57 @@ nonisolated enum UsageMath {
         case typeItems, sourceItems, otherChanged, day(Int)
     }
 
+    private struct Outcome: Sendable {
+        var piece: Piece
+        var counts: Result<[String: Int], OwnerFailure>
+    }
+
+    /// Each read stands on its own. A failed day does not discard the totals, and a failed total does not discard the days.
     private nonisolated static func stats(
         _ calls: any InstanceCalls, grouping: UsageGrouping, windows: [UsageWindow]
-    ) async -> Result<Stats, OwnerFailure> {
+    ) async -> ItemPieces {
         let other: UsageGrouping = grouping == .type ? .source : .type
         let period = UsageStatsQuery(grouping: other, updatedAfter: windows.first?.start, updatedBefore: windows.last?.end)
-        return await withTaskGroup(of: Result<(Piece, [String: Int]), OwnerFailure>.self) { group in
-            group.addTask { await piece(.typeItems, read(calls, UsageStatsQuery(grouping: .type))) }
-            group.addTask { await piece(.sourceItems, read(calls, UsageStatsQuery(grouping: .source))) }
-            group.addTask { await piece(.otherChanged, read(calls, period)) }
+        return await withTaskGroup(of: Outcome.self) { group in
+            group.addTask { await outcome(.typeItems, read(calls, UsageStatsQuery(grouping: .type))) }
+            group.addTask { await outcome(.sourceItems, read(calls, UsageStatsQuery(grouping: .source))) }
+            group.addTask { await outcome(.otherChanged, read(calls, period)) }
             for (index, window) in windows.enumerated() {
                 group.addTask {
-                    await piece(.day(index), read(calls, UsageStatsQuery(
+                    await outcome(.day(index), read(calls, UsageStatsQuery(
                         grouping: grouping, updatedAfter: window.start, updatedBefore: window.end)))
                 }
             }
-            var typeItems: [String: Int]?
-            var sourceItems: [String: Int]?
-            var otherChanged: [String: Int]?
-            var daily = Array(repeating: [String: Int](), count: windows.count)
-            var days = 0
-            var failure: OwnerFailure?
-            for await result in group {
-                switch result {
-                case .failure(let error):
-                    if failure == nil { failure = error }
-                    group.cancelAll()
-                case .success(let (piece, counts)):
-                    switch piece {
-                    case .typeItems: typeItems = counts
-                    case .sourceItems: sourceItems = counts
-                    case .otherChanged: otherChanged = counts
-                    case .day(let index):
-                        daily[index] = counts
-                        days += 1
-                    }
+            var typeItems: Result<[String: Int], OwnerFailure>?
+            var sourceItems: Result<[String: Int], OwnerFailure>?
+            var otherChanged: Result<[String: Int], OwnerFailure>?
+            var days = Array(repeating: Result<[String: Int], OwnerFailure>?.none, count: windows.count)
+            for await outcome in group {
+                switch outcome.piece {
+                case .typeItems: typeItems = outcome.counts
+                case .sourceItems: sourceItems = outcome.counts
+                case .otherChanged: otherChanged = outcome.counts
+                case .day(let index): days[index] = outcome.counts
                 }
             }
-            if let failure { return .failure(failure) }
-            guard let typeItems, let sourceItems, let otherChanged, days == windows.count else { return .failure(.unreachable) }
-            return .success(Stats(typeItems: typeItems, sourceItems: sourceItems, otherChanged: otherChanged, daily: daily))
+            let daily: Result<[[String: Int]], OwnerFailure>
+            if let failure = days.lazy.compactMap({ day -> OwnerFailure? in
+                guard let day else { return .unreachable }
+                if case .failure(let error) = day { return error }
+                return nil
+            }).first {
+                daily = .failure(failure)
+            } else {
+                daily = .success(days.map { day in
+                    if case .success(let counts) = day { return counts }
+                    return [:]
+                })
+            }
+            return ItemPieces(
+                typeItems: typeItems ?? .failure(.unreachable),
+                sourceItems: sourceItems ?? .failure(.unreachable),
+                otherChanged: otherChanged ?? .failure(.unreachable),
+                daily: daily)
         }
     }
 
@@ -302,9 +441,9 @@ nonisolated enum UsageMath {
         { try await calls.itemStats(query) }
     }
 
-    private nonisolated static func piece(
+    private nonisolated static func outcome(
         _ piece: Piece, _ call: @Sendable () async throws(OwnerFailure) -> [String: Int]
-    ) async -> Result<(Piece, [String: Int]), OwnerFailure> {
-        do throws(OwnerFailure) { return .success((piece, try await call())) } catch { return .failure(error) }
+    ) async -> Outcome {
+        do throws(OwnerFailure) { return Outcome(piece: piece, counts: .success(try await call())) } catch { return Outcome(piece: piece, counts: .failure(error)) }
     }
 }

@@ -10499,6 +10499,9 @@
     "The app isn’t allowed to read how many items this Marfa holds." : {
 
     },
+    "The app isn’t allowed to read how much this Marfa stores." : {
+
+    },
     "The app isn’t allowed to read or change which sources apps and keys read." : {
 
     },

@@ -85,6 +85,8 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
         var dayType: [String: Int] = [:]
         var daySource: [String: Int] = [:]
         var statQueries: [UsageStatsQuery] = []
+        /// A day-sized stats read fails, and the wider reads still answer.
+        var failDayStats = false
         /// A refusal the server gives a write, in its words, instead of taking it.
         var refusal: String?
         /// How long a write takes, so a second write can arrive while it runs.
@@ -169,7 +171,15 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
         try enter("itemStats")
         state.withLock { $0.statQueries.append(query) }
         if statsPause.isHolding { await statsPause.park() }
-        return state.withLock { Self.stats($0, query) }
+        let answer = state.withLock { state -> Result<[String: Int], OwnerFailure> in
+            let span = query.updatedAfter.flatMap { start in query.updatedBefore.map { $0.timeIntervalSince(start) } }
+            if state.failDayStats, let span, span < 36 * 60 * 60 { return .failure(.unreachable) }
+            return .success(Self.stats(state, query))
+        }
+        switch answer {
+        case .success(let counts): return counts
+        case .failure(let error): throw error
+        }
     }
 
     /// Lets every paused stats read finish.
@@ -942,10 +952,10 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
         model.toggleSort(.who)
         #expect(model.order.ascending)
         #expect(model.orderLabel == "A to Z")
-        #expect(model.listed.map(\.id) == ["a", "c", "b"], "a missing name sorts as nothing, before Ada")
+        #expect(model.listed.map(\.id) == ["c", "b", "a"], "a missing name is Unknown, after Ada and Mira")
         model.toggleSort(.who)
         #expect(model.orderLabel == "Z to A")
-        #expect(model.listed.map(\.id) == ["b", "c", "a"])
+        #expect(model.listed.map(\.id) == ["a", "b", "c"])
 
         model.toggleSort(.what)
         #expect(model.listed.map(\.id) == ["b", "c", "a"], "Changed an item, Changed the settings, Signed in")
@@ -959,6 +969,58 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
         #expect(model.entries.map(\.id) == ["b", "a", "c"], "sorting the page shown does not reorder what the server sent")
     }
 
+    @Test func equalTimesKeepTheServersOrder() async {
+        let calls = FakeInstanceCalls()
+        let date = Date(timeIntervalSince1970: 200)
+        calls.state.withLock {
+            $0.entries = [
+                ActivityEntry(id: "b", date: date, who: "Mira", action: "item.update", resourceType: "item", resourceID: nil, address: nil),
+                ActivityEntry(id: "a", date: date, who: "Ada", action: "item.create", resourceType: "item", resourceID: nil, address: nil),
+            ]
+        }
+        let model = model(calls)
+        await model.reload()
+        #expect(model.listed.map(\.id) == ["b", "a"])
+        model.toggleSort(.when)
+        #expect(model.listed.map(\.id) == ["b", "a"], "the same instant stays in the order the server sent")
+    }
+
+    @Test func anOlderPageRefusedForWantOfAPermissionClearsTheRows() async {
+        let calls = FakeInstanceCalls()
+        calls.state.withLock { $0.entries = entries(45) }
+        let refreshed = RefreshCount()
+        let model = ActivityModel(
+            context: OwnerContext(calls: FakeOwnerCalls(), grants: { [.auditRead] }, refreshGrants: { refreshed.count += 1 }), calls: calls)
+        await model.reload()
+        calls.fail("activity", with: .notPermitted("audit.read"))
+        await model.older()
+        #expect(model.entries.isEmpty)
+        #expect(model.failure == .notPermitted("audit.read"))
+        #expect(model.range == nil)
+        #expect(refreshed.count == 1)
+    }
+
+    @Test func aLateRefusalDoesNotClearANewerPage() async {
+        let calls = FakeInstanceCalls()
+        calls.state.withLock { $0.entries = entries(45) }
+        let pause = StatsPause()
+        pause.hold()
+        let model = ActivityModel(
+            context: OwnerContext(calls: FakeOwnerCalls(), grants: { [.auditRead] }, refreshGrants: { await pause.park() }), calls: calls)
+        await model.reload()
+        calls.fail("activity", with: .notPermitted("audit.read"))
+        let older = Task { await model.older() }
+        #expect(await eventually { pause.waiting >= 1 })
+        calls.fail("activity", with: nil)
+        await model.reload()
+        #expect(model.entries.first?.id == "e0")
+        #expect(model.failure == nil)
+        pause.release()
+        await older.value
+        #expect(model.entries.first?.id == "e0")
+        #expect(model.failure == nil)
+    }
+
     @Test func choosingWhenStartsNewestFirstAndAnyOtherColumnStartsAtA() {
         let model = model(FakeInstanceCalls())
         model.toggleSort(.who)
@@ -970,12 +1032,12 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
 
     @Test func eachTabNamesThePermissionItNeeds() {
         #expect(MarfaSettingsPage.activity.permission == nil)
-        #expect(ActivityTab.usage.permission == .instanceRead)
+        #expect(ActivityTab.usage.permission == nil, "item counts follow type access, and storage asks for instance.read itself")
         #expect(ActivityTab.log.permission == .auditRead)
         #expect(ActivityTab.log.permissionLine == "The app isn’t allowed to read the server’s audit log.")
         #expect(ActivityTab.usage.permissionLine == "The app isn’t allowed to read how many items this Marfa holds.")
         #expect(ActivityTab.usage.permissionLine != ActivityTab.log.permissionLine)
-        #expect(ActivityTab.usage.permissionLine != MarfaSettingsPage.overview.permissionLine)
+        #expect(ActivityTab.usage.permissionLine != MarfaSettingsPage.fileStorage.permissionLine)
     }
 }
 
@@ -988,7 +1050,7 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
 
     private func model(_ calls: FakeInstanceCalls, now: Date = Date(timeIntervalSince1970: 1_700_000_000)) -> ActivityUsageModel {
         ActivityUsageModel(
-            context: OwnerContext(calls: FakeOwnerCalls(), grants: { [.instanceRead] }), calls: calls, now: now, calendar: calendar())
+            context: OwnerContext(calls: FakeOwnerCalls(), grants: { [.instanceRead] }), calls: calls, now: { now }, calendar: calendar())
     }
 
     @Test func itemStatsAsksForTheGroupingAndTheDayBounds() {
@@ -1129,7 +1191,7 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
         let refreshed = RefreshCount()
         let model = ActivityUsageModel(
             context: OwnerContext(calls: FakeOwnerCalls(), grants: { [.instanceRead] }, refreshGrants: { refreshed.count += 1 }),
-            calls: calls, now: Date(timeIntervalSince1970: 1_700_000_000), calendar: calendar())
+            calls: calls, now: { Date(timeIntervalSince1970: 1_700_000_000) }, calendar: calendar())
         await model.reload()
         #expect(!model.hasStats)
         #expect(!model.hasMetrics)
@@ -1145,6 +1207,112 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
         #expect(rows.map(\.key) == ["c", "a", "b", "d"])
         #expect(rows.first { $0.key == "d" }?.items == 0)
         #expect(rows.first { $0.key == "b" }?.changed == 5)
+    }
+
+    @Test func anOlderReadThatWaitsOnGrantsDoesNotOverwriteANewerPeriod() async {
+        let calls = FakeInstanceCalls()
+        calls.fail("usageMetrics", with: .notPermitted("instance.read"))
+        calls.state.withLock {
+            $0.allTimeType = ["core.note": 9]
+            $0.dayType = ["core.note": 1]
+        }
+        let pause = StatsPause()
+        pause.hold()
+        let model = ActivityUsageModel(
+            context: OwnerContext(calls: FakeOwnerCalls(), grants: { [.instanceRead] }, refreshGrants: { await pause.park() }),
+            calls: calls, now: { Date(timeIntervalSince1970: 1_700_000_000) }, calendar: calendar())
+        model.period = .last30Days
+        let first = Task { await model.reload() }
+        #expect(await eventually { pause.waiting >= 1 })
+        calls.fail("usageMetrics", with: nil)
+        model.period = .last7Days
+        await model.reload()
+        #expect(model.shownPeriod == .last7Days)
+        #expect(model.days.count == 7)
+        #expect(model.typeRows.first { $0.key == "core.note" }?.changed == 7)
+        pause.release()
+        await first.value
+        #expect(model.shownPeriod == .last7Days)
+        #expect(model.days.count == 7)
+        #expect(model.typeRows.first { $0.key == "core.note" }?.changed == 7)
+    }
+
+    @Test func theWindowIsReadAgainSoItMovesPastMidnight() async {
+        let clock = Mutex(Date(timeIntervalSince1970: 1_700_000_000))
+        let calls = FakeInstanceCalls()
+        let model = ActivityUsageModel(
+            context: OwnerContext(calls: FakeOwnerCalls(), grants: { [.instanceRead] }), calls: calls,
+            now: { clock.withLock { $0 } }, calendar: calendar())
+        await model.reload()
+        let first = model.days.first
+        clock.withLock { $0 = $0.addingTimeInterval(2 * 86_400) }
+        await model.reload()
+        #expect(model.days.first != first)
+        #expect(model.days.count == 7)
+    }
+
+    @Test func changingTheGroupingDoesNotReinterpretTheDays() async {
+        let calls = FakeInstanceCalls()
+        calls.state.withLock {
+            $0.dayType = ["core.note": 1]
+            $0.allTimeType = ["core.note": 4]
+            $0.periodSource = ["studio": 3]
+            $0.allTimeSource = ["studio": 10]
+        }
+        let model = model(calls)
+        await model.reload()
+        #expect(model.shownGrouping == .type)
+        #expect(model.sourceRows.first { $0.key == "studio" }?.changed == 3)
+        #expect(model.chart.series.map(\.key) == ["core.note"])
+        model.grouping = .source
+        #expect(model.shownGrouping == .type)
+        #expect(model.sourceRows.first { $0.key == "studio" }?.changed == 3, "the shown source changes stay the period that was read")
+        #expect(model.chart.series.map(\.key) == ["core.note"])
+    }
+
+    @Test func aFailedDayKeepsTheAllTimeTotals() async {
+        let calls = FakeInstanceCalls()
+        calls.state.withLock {
+            $0.failDayStats = true
+            $0.allTimeType = ["core.note": 4]
+            $0.allTimeSource = ["studio": 4]
+            $0.periodSource = ["studio": 2]
+        }
+        let model = model(calls)
+        await model.reload()
+        #expect(model.storedItems == 4)
+        #expect(model.typeRows.first?.items == 4)
+        #expect(model.typeRows.first?.changed == nil)
+        #expect(model.sourceRows.first { $0.key == "studio" }?.changed == 2)
+        #expect(!model.hasDaily)
+        #expect(model.hasMetrics)
+        #expect(model.statsFailure == .unreachable)
+    }
+
+    @Test func storageIsNotReadWithoutInstanceRead() async {
+        let calls = FakeInstanceCalls()
+        let model = model(calls)
+        await model.reload(items: true, storage: false)
+        #expect(!calls.calls.contains("usageMetrics"))
+        #expect(calls.calls.contains("itemStats"))
+        await model.reload()
+        #expect(!calls.calls.contains("usageMetrics"), "Try Again repeats the parts that were asked for")
+    }
+
+    @Test func itemCountsFollowTypeAccessAndStorageFollowsInstanceRead() async {
+        #expect(ActivityAccess.readsItems(["*:read"]))
+        #expect(ActivityAccess.readsItems(["core.note:read"]))
+        #expect(ActivityAccess.readsItems(["instance.read", "core.note:read"]))
+        #expect(!ActivityAccess.readsItems(["*:write"]))
+        #expect(!ActivityAccess.readsItems(["instance.read", "audit.read"]))
+        #expect(!ActivityAccess.readsItems(["profile:read", "profile.name:read"]))
+        #expect(!ActivityAccess.readsItems(["edge.parent-of:read"]))
+        #expect(!ActivityAccess.readsItems(["metadata.edge_types:read"]))
+        let calls = FakeInstanceCalls()
+        let model = model(calls)
+        await model.reload(items: false, storage: true)
+        #expect(!calls.calls.contains("itemStats"))
+        #expect(calls.calls.contains("usageMetrics"))
     }
 }
 

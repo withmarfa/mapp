@@ -197,6 +197,7 @@ enum LibraryDescription {
     var grants: Set<InstancePermission> { host.grants }
     var lacksAsked: Bool { host.lacksAsked }
     func holds(_ scope: String) -> Bool { host.heldScopes.contains(scope) }
+    var readsItems: Bool { ActivityAccess.readsItems(host.heldScopes) }
 
     func allowMore(_ permissions: Set<InstancePermission>) async -> MarfaAllowMoreOutcome {
         await libraries.marfaSettings.allowMore(permissions)

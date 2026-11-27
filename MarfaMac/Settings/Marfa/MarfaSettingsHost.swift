@@ -85,6 +85,8 @@ struct MarfaMarkSet: Identifiable, Hashable {
     var lacksAsked: Bool { get }
     /// Whether the sign-in holds `scope`, one the app asks for beyond the owner's permissions.
     func holds(_ scope: String) -> Bool
+    /// Whether the sign-in can read at least one item type. Item counts need that, not `instance.read`.
+    var readsItems: Bool { get }
 
     /// Signs in again with the full request. The new sign-in holds what the owner approves.
     /// Returns `.allowed` when the new sign-in holds every permission in `permissions`.
@@ -283,7 +285,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
     /// The permission the page needs to open, which the owner may not have approved. Account needs none to open, since the
     /// profile needs none: its sign-ins need `sign_ins.manage`, which Change Password asks for where the sign-in lacks it.
     /// Folders needs none: a folder is read as an item, under the access the app holds to every type.
-    /// Activity needs none to open: Usage needs `instance.read` and Log needs `audit.read`, and each tab says so itself.
+    /// Activity needs none to open. Item counts follow a type the sign-in can read. Storage needs `instance.read`. Log needs `audit.read`.
     var permission: InstancePermission? {
         switch self {
         case .housekeeping: .instanceRead

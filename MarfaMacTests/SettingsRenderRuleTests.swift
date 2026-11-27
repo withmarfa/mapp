@@ -70,6 +70,21 @@ extension SettingsRenderTests {
         try await page(.activity, host, size: CGSize(width: SettingsTokens.Metric.windowWidth, height: 1700), named: "Activity, Usage")
     }
 
+    /// A new Marfa: every count is zero. Session 266d captures this render.
+    @Test func usageOnANewMarfa() async throws {
+        let host = owner()
+        let calls = FakeInstanceCalls()
+        calls.state.withLock {
+            $0.metrics = UsageMetrics(versionCount: 0, fileBytes: 0, databaseBytes: 0)
+            $0.allTimeType = [:]
+            $0.allTimeSource = [:]
+            $0.dayType = [:]
+            $0.periodSource = [:]
+        }
+        host.instanceCalls = calls
+        try await page(.activity, host, size: CGSize(width: SettingsTokens.Metric.windowWidth, height: 1100), named: "Activity, Usage, a new Marfa")
+    }
+
     @Test func activityLog() async throws {
         let host = owner()
         let calls = FakeInstanceCalls()
