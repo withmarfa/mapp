@@ -3231,6 +3231,9 @@
     "Can’t Edit This Property" : {
       "extractionState" : "manual"
     },
+    "Can’t Empty Trash" : {
+
+    },
     "Can’t Extend This Key" : {
 
     },
@@ -4012,6 +4015,9 @@
     "Copy the Signing Secret Now" : {
 
     },
+    "Copy the command, run it in Terminal, then enter the secret key when prompted." : {
+
+    },
     "Couldn’t Check" : {
 
     },
@@ -4746,6 +4752,9 @@
 
     },
     "Empty Trash" : {
+
+    },
+    "Empty Trash?" : {
 
     },
     "Emptying “%@” goes back to the server’s own default, which the app can’t read. That may remove items sooner than the server’s current setting, %@. What it removes can’t be recovered." : {
@@ -5619,9 +5628,6 @@
       "extractionState" : "manual"
     },
     "In Progress First" : {
-
-    },
-    "In Terminal, run %@ for this Marfa, then enter the secret key when prompted." : {
 
     },
     "In Two Weeks" : {
@@ -8069,6 +8075,9 @@
     "Permanently Delete…" : {
 
     },
+    "Permanently delete up to ^[%lld listed item](inflect: true)? Parts that went to Trash with their hosts may also be deleted. You can’t undo this." : {
+
+    },
     "Permanently deleted an item" : {
 
     },
@@ -10174,6 +10183,9 @@
     "The app doesn’t have permission for “%@”. Ask whoever runs the server to allow it, then make the change again." : {
       "extractionState" : "manual"
     },
+    "The app doesn’t have write access to ^[%lld item](inflect: true)." : {
+
+    },
     "The app dropped a sign-in it didn’t use, but couldn’t confirm that %@ ended its approval." : {
 
     },
@@ -10547,6 +10559,9 @@
       "extractionState" : "manual"
     },
     "The library sets this tag itself." : {
+
+    },
+    "The library whose Trash you opened is no longer open." : {
 
     },
     "The link could not be saved." : {
@@ -11414,6 +11429,9 @@
     "This server runs Marfa %@. Update the server to Marfa %@ or later to use this app." : {
       "extractionState" : "manual"
     },
+    "This sign-in doesn’t have permission to empty Trash." : {
+
+    },
     "This sign-in holds %lld webhooks, the most the server allows." : {
 
     },
@@ -12066,6 +12084,9 @@
     },
     "Wait for the current step to finish, then try again." : {
       "extractionState" : "manual"
+    },
+    "Wait until this Mac is connected to the library, then try again." : {
+
     },
     "Waiting" : {
 

@@ -37,6 +37,13 @@ nonisolated extension AttentionConcern {
         }
     }
 
+    /// The repair command bound to the given server, so it never reaches the command line's default server instead.
+    func repairCommand(serverAddress: String?) -> String? {
+        guard case .command(let command) = repair else { return nil }
+        guard let serverAddress, !serverAddress.isEmpty else { return command }
+        return "\(command) --url '\(serverAddress.replacingOccurrences(of: "'", with: "'\\''"))'"
+    }
+
     var shownTitle: String {
         guard kind == .setting else { return title }
         if case .command = repair { return String(localized: "Set the object store secret key again") }
@@ -65,8 +72,8 @@ nonisolated extension AttentionConcern {
         case .backup:
             return backupLine
         case .setting:
-            if case .command(let command) = repair {
-                return String(localized: "In Terminal, run \(command) for this Marfa, then enter the secret key when prompted.")
+            if case .command = repair {
+                return String(localized: "Copy the command, run it in Terminal, then enter the secret key when prompted.")
             }
             return String(localized: "The server can’t read this secret, so it can’t use it until it is set again.")
         case .clock:

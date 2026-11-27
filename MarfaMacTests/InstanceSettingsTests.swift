@@ -111,6 +111,7 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
         await model.choose(60, for: .versionWeeklyDays, defaultValue: 365)
         let pending = try #require(model.pending)
         source.config.withLock { $0.values[.versionWeeklyDays] = .number(180) }
+        await model.load()
         await model.confirm(pending)
         #expect(model.draft[.versionWeeklyDays] == "180")
         #expect(model.elsewhere == [.versionWeeklyDays])

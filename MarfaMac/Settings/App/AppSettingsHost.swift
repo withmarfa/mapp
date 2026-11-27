@@ -328,8 +328,58 @@ enum LibraryDescription {
     }
 
     func emptyDeleted() {
-        guard let library = libraries.current else { return }
-        library.itemsToPurge = Set(library.deletedItems.map(\.id))
+        guard let library = libraries.current, library.reachesServer, connection == .connected, grants.contains(.itemsPurge) else { return }
+        let shown = library.deletedItems
+        guard !shown.isEmpty else { return }
+        let message = AttributedString(
+            localized: "Permanently delete up to ^[\(shown.count) listed item](inflect: true)? Parts that went to Trash with their hosts may also be deleted. You can’t undo this."
+        ).text
+        SettingsAlert.confirm(
+            title: String(localized: "Empty Trash?"), message: message, confirm: String(localized: "Empty Trash"), window: NSApp.keyWindow
+        ) { confirmed, _ in
+            guard confirmed else { return }
+            let title = String(localized: "Can’t Empty Trash")
+            guard self.libraries.current === library else {
+                self.host.notices.tell(title, String(localized: "The library whose Trash you opened is no longer open."))
+                return
+            }
+            guard library.reachesServer else { return library.tellCannotPurge() }
+            guard self.connection == .connected else {
+                library.notices.tell(title, String(localized: "Wait until this Mac is connected to the library, then try again."))
+                return
+            }
+            guard self.grants.contains(.itemsPurge) else {
+                library.notices.tell(title, String(localized: "This sign-in doesn’t have permission to empty Trash."))
+                return
+            }
+            // App-vendor types are hidden from the working-copy list.
+            let access = SourceWriters.Access.app(scopes: Array(self.host.heldScopes), vendors: [])
+            Self.purgeUnchanged(shown, in: library, access: access)
+        }
+    }
+
+    /// The main actor checks and submits without suspending, so the ordinary purge sends each accepted row's original version.
+    static func purgeUnchanged(_ shown: [Item], in library: any ItemLibrary, access: SourceWriters.Access) {
+        var approved = Set<ItemID>()
+        var skips = BatchSkips()
+        for row in shown {
+            guard let current = library.item(row.id) else {
+                skips.skip(.gone)
+                continue
+            }
+            // Restore and re-trash leave the version unchanged. The row also holds the time it went to Trash.
+            guard current.state == .trashed, current == row else {
+                skips.skip(.changedSince)
+                continue
+            }
+            guard access.writes(current.type.rawValue) else {
+                skips.skip(.typeWriteDenied)
+                continue
+            }
+            approved.insert(row.id)
+        }
+        library.tellSkipped(skips, didChange: !approved.isEmpty, failing: String(localized: "Can’t Empty Trash"))
+        if !approved.isEmpty { library.deletePermanentlyOnConfirm(approved) }
     }
 
     // MARK: Closing
