@@ -208,21 +208,25 @@ struct RenderedWindow<Detail: View>: View {
     }
 
     /// The whole page, taller than the window, in place of the board's scrolled view.
-    @Test func appearanceWhole() async throws {
+    @Test(arguments: [ColorScheme.light, .dark], [13, 24])
+    func appearanceWhole(appearance: ColorScheme, textSize: Int) async throws {
+        let defaults = ThrowawayDefaults.make("SettingsRenderTests")
+        defaults.set(textSize, forKey: InterfaceKey.textSize)
         try await SettingsRender.png(
-            RenderedWindow(selection: .appearance, detail: AppearancePage()),
-            size: CGSize(width: Self.size.width, height: 1_300), named: "Appearance, whole page")
+            RenderedWindow(selection: .appearance, detail: AppearancePage())
+                .environment(\.settingsTextScale, InterfaceStyle.scale(for: textSize))
+                .defaultAppStorage(defaults),
+            size: CGSize(width: Self.size.width, height: textSize == 24 ? 2_400 : 1_400),
+            named: "Appearance, \(appearance), \(textSize) pt", appearance: appearance)
     }
 
-    /// A font chosen once and uninstalled since, and a color of the person's own.
-    @Test func appearanceWithAMissingFontAndACustomAccent() async throws {
+    @Test func appearanceWithACustomAccent() async throws {
         let defaults = ThrowawayDefaults.make("SettingsRenderTests")
-        defaults.set("Uninstalled Sans", forKey: AppearanceKey.textFont)
         defaults.set(AccentChoice.custom("#B4468C").rawValue, forKey: AppearanceKey.accent)
         defaults.set(AppTheme.dark.rawValue, forKey: AppearanceKey.theme)
         try await SettingsRender.png(
             RenderedWindow(selection: .appearance, detail: AppearancePage().defaultAppStorage(defaults)),
-            size: CGSize(width: Self.size.width, height: 1_300), named: "Appearance, a missing font and a custom accent")
+            size: CGSize(width: Self.size.width, height: 1_300), named: "Appearance, a custom accent")
     }
 
     private func keyboard(_ prepare: (KeyboardPageModel) -> Void = { _ in }) async throws -> (SettingsPage, KeyboardPage) {
@@ -283,10 +287,24 @@ struct RenderedWindow<Detail: View>: View {
     }
 
     /// The whole page, taller than the window, in place of the board's scrolled view.
-    @Test func editorWhole() async throws {
+    @Test(arguments: [ColorScheme.light, .dark], [13, 24])
+    func editorWhole(appearance: ColorScheme, textSize: Int) async throws {
+        let defaults = ThrowawayDefaults.make("SettingsRenderTests")
+        defaults.set(textSize, forKey: InterfaceKey.textSize)
         try await SettingsRender.png(
-            RenderedWindow(selection: .editor, detail: EditorPage()),
-            size: CGSize(width: Self.size.width, height: 1_500), named: "Editor, whole page")
+            RenderedWindow(selection: .editor, detail: EditorPage())
+                .environment(\.settingsTextScale, InterfaceStyle.scale(for: textSize))
+                .defaultAppStorage(defaults),
+            size: CGSize(width: Self.size.width, height: textSize == 24 ? 2_900 : 1_600),
+            named: "Editor, \(appearance), \(textSize) pt", appearance: appearance)
+    }
+
+    @Test func editorWithAMissingFont() async throws {
+        let defaults = ThrowawayDefaults.make("SettingsRenderTests")
+        defaults.set("Uninstalled Sans", forKey: AppearanceKey.textFont)
+        try await SettingsRender.png(
+            RenderedWindow(selection: .editor, detail: EditorPage().defaultAppStorage(defaults)),
+            size: Self.size, named: "Editor, a missing font")
     }
 
     @Test func connectionConnected() async throws {

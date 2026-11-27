@@ -1,13 +1,10 @@
 import SwiftUI
 
-/// The Appearance page: the theme, the colors, the fonts of an item's text, the materials the panels are made of, the
-/// window's toolbar and where each column starts.
 struct AppearancePage: View {
     @AppStorage(AppearanceKey.theme) private var theme = AppTheme.standard
     @AppStorage(AppearanceKey.accent) private var accent = AccentChoice.standard
     @AppStorage(AppearanceKey.highlights) private var highlight = HighlightChoice.standard
-    @AppStorage(AppearanceKey.textFont) private var textFont = ""
-    @AppStorage(AppearanceKey.codeFont) private var codeFont = ""
+    @AppStorage(AppIconChoice.key) private var appIcon = AppIconChoice.sky
     @AppStorage(AppearanceKey.typeChipTint) private var typeChipTint = TypeChipTint.standard
     @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
     @AppStorage(InterfaceKey.valuePanelStyle) private var panelStyle = ValuePanelStyle.standard
@@ -17,10 +14,6 @@ struct AppearancePage: View {
     @AppStorage(InterfaceKey.showsSidebarHistory) private var showsHistory = true
     @AppStorage(SidebarTypeRow.subtypeIconsKey) private var showsSubtypeIcons = true
     @AppStorage(SidebarColor.key) private var sidebarColor = SidebarColor.gray
-    /// Read when the page has appeared, since asking the system for every installed font is slow.
-    @State private var families: [String] = []
-    @State private var monospacedFamilies: [String] = []
-    @State private var hasListedFonts = false
     private var registry = ColumnWidthRegistry.shared
 
     /// Gray is the default, so choosing it stores nothing.
@@ -45,18 +38,17 @@ struct AppearancePage: View {
                     .accessibilityIdentifier("Theme")
             }
             color
-            SettingsSection("Text") {
-                SettingsRow("Text Size", line: "The sidebar, lists and controls.") {
-                    SettingsPopUp(title: "Text Size", selection: $textSize) {
+            SettingsSection("Size") {
+                SettingsRow("Interface text size") {
+                    SettingsPopUp(title: "Interface text size", selection: $textSize) {
                         ForEach(InterfaceStyle.textSizes, id: \.self) { Text("\($0) pt").tag($0) }
                     }
                     .accessibilityIdentifier("InterfaceTextSize")
                 }
             }
-            fonts
             SettingsSection("Materials") {
-                SettingsRow("Value Panels", line: "Behind a date, a status or a tag you change.") {
-                    SettingsPopUp(title: "Value Panels", selection: $panelStyle) {
+                SettingsRow("Value panels", line: "Behind a date, a status or a tag you change.") {
+                    SettingsPopUp(title: "Value panels", selection: $panelStyle) {
                         Text("Glass").tag(ValuePanelStyle.glass)
                         Text("Solid").tag(ValuePanelStyle.solid)
                     }
@@ -72,42 +64,36 @@ struct AppearancePage: View {
                 }
             }
             SettingsSection("Window") {
-                SettingsRow("Sidebar", line: "Gray, or white behind a hairline.") {
-                    SettingsPopUp(title: "Sidebar", selection: storedSidebarColor) {
+                SettingsRow("Sidebar color") {
+                    SettingsPopUp(title: "Sidebar color", selection: storedSidebarColor) {
                         ForEach(SidebarColor.allCases) { Text($0.title).tag($0) }
                     }
                     .accessibilityIdentifier("SidebarColor")
                 }
-                SettingsRow("Back and Forward", line: "Over the sidebar.") {
-                    SettingsToggle(title: "Back and Forward", isOn: $showsHistory).accessibilityIdentifier("SidebarHistoryToggle")
+                SettingsRow("Back and forward over the sidebar") {
+                    SettingsToggle(title: "Back and forward over the sidebar", isOn: $showsHistory).accessibilityIdentifier("SidebarHistoryToggle")
                 }
-                SettingsRow("Title When Scrolling", line: "On an item’s page.") {
-                    SettingsToggle(title: "Title When Scrolling", isOn: $showsTitle).accessibilityIdentifier("ToolbarScrolledTitle")
+                SettingsRow("Show item title when scrolling") {
+                    SettingsToggle(title: "Show item title when scrolling", isOn: $showsTitle).accessibilityIdentifier("ToolbarScrolledTitle")
                 }
-                SettingsRow("Toolbar Background When Scrolling") {
-                    SettingsToggle(title: "Toolbar Background When Scrolling", isOn: $showsBackground)
+                SettingsRow("Toolbar background when scrolling") {
+                    SettingsToggle(title: "Toolbar background when scrolling", isOn: $showsBackground)
                         .accessibilityIdentifier("ToolbarPageBackground")
                 }
-                SettingsRow("Symbols on Subtypes", line: "In the sidebar.") {
-                    SettingsToggle(title: "Symbols on Subtypes", isOn: $showsSubtypeIcons).accessibilityIdentifier("SubtypeSymbols")
+                SettingsRow("Symbols on subtypes in the sidebar") {
+                    SettingsToggle(title: "Symbols on subtypes in the sidebar", isOn: $showsSubtypeIcons).accessibilityIdentifier("SubtypeSymbols")
                 }
             }
             layout
         }
         .accessibilityIdentifier("AppearancePage")
-        .task {
-            guard !hasListedFonts else { return }
-            families = FontChoice.installedFamilies()
-            monospacedFamilies = FontChoice.installedMonospacedFamilies()
-            hasListedFonts = true
-        }
     }
 
     // MARK: Color
 
     private var color: some View {
         SettingsSection("Color") {
-            SettingsRow("Accent", line: "Switches, sliders and the text cursor.") {
+            SettingsRow("Accent") {
                 SettingsSwatches(
                     swatches: [.init(value: .system, color: SettingsTokens.systemAccent, title: Text("System"))]
                         + AccentChoice.Offered.swatched.map { offered in
@@ -121,8 +107,11 @@ struct AppearancePage: View {
                 )
                 .accessibilityIdentifier("Accent")
             }
-            SettingsRow("Highlights", line: "Behind highlighted text.") {
-                SettingsPopUp(title: "Highlights", selection: $highlight) {
+            SettingsRow("App icon", line: "In the Dock.") {
+                AppIconChoices(selection: Binding { appIcon } set: { $0.store() })
+            }
+            SettingsRow("Highlight color") {
+                SettingsPopUp(title: "Highlight color", selection: $highlight) {
                     Text("Yellow").tag(HighlightChoice.yellow)
                     Text("Orange").tag(HighlightChoice.orange)
                     Text("Green").tag(HighlightChoice.green)
@@ -134,8 +123,8 @@ struct AppearancePage: View {
                 }
                 .accessibilityIdentifier("Highlights")
             }
-            SettingsRow("Type Chips", line: "The type you give an item.") {
-                SettingsPopUp(title: "Type Chips", selection: $typeChipTint) {
+            SettingsRow("Type chip color") {
+                SettingsPopUp(title: "Type chip color", selection: $typeChipTint) {
                     Text("Tinted").tag(TypeChipTint.tinted)
                     Text("Gray").tag(TypeChipTint.gray)
                 }
@@ -157,43 +146,12 @@ struct AppearancePage: View {
         }
     }
 
-    // MARK: Fonts
-
-    private var fonts: some View {
-        SettingsSection("Fonts", line: "The rest of the app uses the system font.") {
-            SettingsRow("Text Font", line: "An item’s text.") {
-                fontPopUp("Text Font", selection: $textFont, defaultName: String(localized: "System"), installed: families)
-                    .accessibilityIdentifier("TextFont")
-            }
-            SettingsRow("Code Font", line: "Code and Markdown marks.") {
-                fontPopUp("Code Font", selection: $codeFont, defaultName: "SF Mono", installed: monospacedFamilies)
-                    .accessibilityIdentifier("CodeFont")
-            }
-        }
-    }
-
-    /// A pop-up of the installed families after the default. A family chosen once and not installed now is listed and said
-    /// to be missing, while the page and the editor use the default.
-    private func fontPopUp(_ title: LocalizedStringKey, selection: Binding<String>, defaultName: String, installed: [String]) -> some View {
-        SettingsPopUp(title: title, selection: selection) {
-            Text(verbatim: defaultName).tag("")
-            Divider()
-            ForEach(installed, id: \.self) { Text(verbatim: $0).tag($0) }
-            if !selection.wrappedValue.isEmpty, !installed.contains(selection.wrappedValue) {
-                Divider()
-                // Until the installed fonts are listed, the chosen one cannot be said to be missing.
-                Text(verbatim: hasListedFonts ? MissingChoice.label(selection.wrappedValue) : selection.wrappedValue)
-                    .tag(selection.wrappedValue)
-            }
-        }
-    }
-
     // MARK: Window layout
 
     private var layout: some View {
         SettingsSection("Window Layout", footer: "New windows open at these widths.") {
             ForEach(ColumnWidth.allCases) { ColumnWidthRow(column: $0) }
-            SettingsRow("From This Window", line: "The widths this window has now.") {
+            SettingsRow("From the front window") {
                 SettingsButton("Use Current Widths") {
                     guard let front = registry.front else { return }
                     for column in ColumnWidth.allCases {
@@ -201,10 +159,10 @@ struct AppearancePage: View {
                     }
                 }
                 .disabled(registry.front == nil)
-                .help(registry.front == nil ? "Open a window to use its column widths." : "Make the widths set in this window the defaults for new windows.")
+                .help(registry.front == nil ? "Open a window to use its column widths." : "Make the front window’s widths the defaults for new windows.")
                 .accessibilityIdentifier("ColumnWidthsUseCurrent")
             }
-            SettingsRow("Reset Widths", line: "Back to \(ColumnWidth.allCases.map { Int($0.defaultWidth).formatted() }.formatted(.list(type: .and))).") {
+            SettingsRow("Default widths", line: "\(Int(ColumnWidth.sidebar.defaultWidth)) and \(Int(ColumnWidth.list.defaultWidth)) pt.") {
                 SettingsButton("Reset") {
                     for column in ColumnWidth.allCases { UserDefaults.standard.removeObject(forKey: column.key) }
                 }
@@ -214,12 +172,49 @@ struct AppearancePage: View {
     }
 }
 
+/// The small icon choices in the Color section's trailing column.
+private struct AppIconChoices: View {
+    @Binding var selection: AppIconChoice
+
+    var body: some View {
+        let tile = SettingsTokens.Metric.tile
+        let outline = RoundedRectangle(cornerRadius: SettingsTokens.Metric.controlRadius)
+        HStack(spacing: SettingsTokens.Metric.swatchSpacing) {
+            ForEach(AppIconChoice.allCases) { choice in
+                Button { selection = choice } label: {
+                    Image(choice.previewAsset)
+                        .resizable()
+                        .scaledToFit()
+                        // The Dock assets have a transparent margin around the tile.
+                        .scaleEffect(1.25)
+                        .frame(width: tile, height: tile)
+                        .overlay {
+                            if choice == selection {
+                                outline.strokeBorder(SettingsTokens.secondaryText, lineWidth: SettingsTokens.Metric.tileEdgeWidth)
+                                    .padding(-SettingsTokens.Metric.swatchDot / 2)
+                            }
+                        }
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .help(Text(choice.title))
+                .accessibilityLabel(Text(choice.title))
+                .accessibilityAddTraits(choice == selection ? .isSelected : [])
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("App icon")
+        .accessibilityIdentifier("AppIcon")
+    }
+}
+
 /// One column's default width, clamped to the range it allows.
 private struct ColumnWidthRow: View {
     let column: ColumnWidth
     @AppStorage private var stored: Double
     @State private var text = ""
     @FocusState private var focused: Bool
+    @Environment(\.settingsTextScale) private var scale
 
     init(column: ColumnWidth) {
         self.column = column
@@ -228,8 +223,8 @@ private struct ColumnWidthRow: View {
 
     private var title: LocalizedStringKey {
         switch column {
-        case .sidebar: "Sidebar"
-        case .list: "List"
+        case .sidebar: "Sidebar width"
+        case .list: "List width"
         }
     }
 
@@ -238,6 +233,8 @@ private struct ColumnWidthRow: View {
     var body: some View {
         SettingsRow(title) {
             SettingsNumberField(title: title, text: $text, unit: "pt", onSubmit: commit)
+                // The native rounded field clips larger type in dark mode.
+                .font(SettingsTokens.font(.title, scale: min(scale, SettingsTokens.Metric.controlScaleForLarge)))
                 .focused($focused)
                 .onAppear { text = String(Int(width)) }
                 .onChange(of: stored) { if !focused { text = String(Int(width)) } }

@@ -56,6 +56,33 @@ struct AppearanceSettingsTests {
         #expect(AppTheme.dark.appearance?.name == .darkAqua)
     }
 
+    @Test func dockIconChoicesLoadTheirAssetsOrUseTheBundleIcon() {
+        #expect(AppIconChoice.allCases.map(\.dockAsset) == [
+            nil, "DockIcon-signal", "DockIcon-sea", "DockIcon-leaf", "DockIcon-marigold", "DockIcon-adobe",
+        ])
+        #expect(AppIconChoice.sky.dockImage() == nil)
+        for choice in AppIconChoice.allCases.dropFirst() {
+            #expect(choice.dockImage()?.isValid == true)
+        }
+    }
+
+    @Test func theDockIconChoiceIsReadFromDefaultsAndSkyClearsIt() {
+        let defaults = ThrowawayDefaults.make("AppearanceSettingsTests")
+        #expect(AppIconChoice.stored(in: defaults) == .sky)
+        AppIconChoice.sea.store(in: defaults)
+        #expect(AppIconChoice.stored(in: defaults) == .sea)
+        AppIconChoice.sky.store(in: defaults)
+        #expect(defaults.object(forKey: AppIconChoice.key) == nil)
+    }
+
+    @Test func theGrayPDFBackgroundClearsTheStoredChoice() {
+        let defaults = ThrowawayDefaults.make("AppearanceSettingsTests")
+        PDFBackground.white.store(in: defaults)
+        #expect(defaults.string(forKey: PDFBackground.key) == "white")
+        PDFBackground.gray.store(in: defaults)
+        #expect(defaults.object(forKey: PDFBackground.key) == nil)
+    }
+
     // MARK: Fonts
 
     @Test func aFamilyNameCannotBreakOutOfTheFontList() {

@@ -819,6 +819,16 @@
     "%lld active" : {
 
     },
+    "%lld and %lld pt." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld and %2$lld pt."
+          }
+        }
+      }
+    },
     "%lld archived" : {
 
     },
@@ -2005,7 +2015,7 @@
     "A connector’s sign-in needs the app signed in as an app. Sign in again in Connection." : {
 
     },
-    "A control turned off is in the page’s More menu, and the View menu keeps every command." : {
+    "A control turned off is in the page’s More menu." : {
 
     },
     "A copy of each file" : {
@@ -2083,7 +2093,7 @@
     "A newer version. Nothing is removed." : {
 
     },
-    "A page can switch on its own." : {
+    "A page or an article can switch on its own from the View menu." : {
 
     },
     "A paused connector does nothing until you resume it." : {
@@ -2161,9 +2171,6 @@
 
     },
     "A to Z" : {
-
-    },
-    "A triangle beside each heading hides what follows." : {
 
     },
     "A type can keep its own." : {
@@ -2476,6 +2483,9 @@
     "Adds %@. Nothing is removed." : {
 
     },
+    "Adobe" : {
+
+    },
     "Adopted the backup folder" : {
 
     },
@@ -2629,12 +2639,6 @@
     "An item with more than %lld versions will have its oldest versions permanently deleted the next time the server tidies up." : {
       "extractionState" : "manual"
     },
-    "An item’s own text." : {
-
-    },
-    "An item’s text." : {
-
-    },
     "And %lld more changes whose text can’t be shown." : {
       "localizations" : {
         "en" : {
@@ -2707,6 +2711,9 @@
     },
     "App" : {
       "extractionState" : "manual"
+    },
+    "App icon" : {
+
     },
     "Appearance" : {
 
@@ -2810,6 +2817,9 @@
 
     },
     "Articles Open In" : {
+
+    },
+    "Articles open in" : {
 
     },
     "As" : {
@@ -2957,10 +2967,7 @@
     "Back Up Now takes the first." : {
 
     },
-    "Back and Forward" : {
-
-    },
-    "Back to %@." : {
+    "Back and forward over the sidebar" : {
 
     },
     "Back to Board" : {
@@ -3042,9 +3049,6 @@
 
     },
     "Behind a date, a status or a tag you change." : {
-
-    },
-    "Behind highlighted text." : {
 
     },
     "Beneath: %@" : {
@@ -3562,6 +3566,9 @@
     "Check for Updates…" : {
 
     },
+    "Check spelling" : {
+
+    },
     "Check the Address" : {
       "extractionState" : "manual"
     },
@@ -3773,7 +3780,7 @@
     "Code Language" : {
 
     },
-    "Code and Markdown marks." : {
+    "Code font" : {
 
     },
     "Collapse" : {
@@ -3943,6 +3950,9 @@
       "extractionState" : "manual"
     },
     "Continue Lists on Return" : {
+
+    },
+    "Continue lists on Return" : {
 
     },
     "Copied" : {
@@ -4329,6 +4339,9 @@
     "Default (%@)" : {
 
     },
+    "Default widths" : {
+
+    },
     "Definitions: %@" : {
 
     },
@@ -4527,9 +4540,6 @@
     "Disk" : {
 
     },
-    "Display" : {
-
-    },
     "Divider" : {
 
     },
@@ -4685,6 +4695,9 @@
 
     },
     "Edit View" : {
+
+    },
+    "Edit pages as" : {
 
     },
     "Edited" : {
@@ -5164,6 +5177,9 @@
     "Fold Section" : {
 
     },
+    "Fold headings with a triangle" : {
+
+    },
     "Folder" : {
 
     },
@@ -5173,7 +5189,7 @@
     "Folders" : {
 
     },
-    "Fonts" : {
+    "Font" : {
 
     },
     "Footnote" : {
@@ -5243,9 +5259,6 @@
     "From Plugins" : {
 
     },
-    "From This Window" : {
-
-    },
     "From a device already signed in." : {
 
     },
@@ -5259,9 +5272,6 @@
 
     },
     "From a web address, or one a chat attached." : {
-
-    },
-    "From a web page or another app." : {
 
     },
     "From one app or key." : {
@@ -5281,6 +5291,9 @@
       }
     },
     "From the Plugin" : {
+
+    },
+    "From the front window" : {
 
     },
     "From the plugins release." : {
@@ -5335,9 +5348,6 @@
 
     },
     "Gray" : {
-
-    },
-    "Gray, or white behind a hairline." : {
 
     },
     "Green" : {
@@ -5496,6 +5506,9 @@
     "Highlight" : {
 
     },
+    "Highlight color" : {
+
+    },
     "Highlights" : {
 
     },
@@ -5533,9 +5546,6 @@
 
     },
     "How long a file is left alone before it is removed." : {
-
-    },
-    "How wide a line of text grows." : {
 
     },
     "Hybrid" : {
@@ -5629,9 +5639,6 @@
     "In Markdown Source too." : {
 
     },
-    "In Markdown Source." : {
-
-    },
     "In Progress" : {
       "extractionState" : "manual"
     },
@@ -5641,10 +5648,10 @@
     "In Two Weeks" : {
 
     },
-    "In formatted text." : {
+    "In saved pages and emails." : {
 
     },
-    "In saved pages and emails." : {
+    "In the Dock." : {
 
     },
     "In the Feed" : {
@@ -5654,9 +5661,6 @@
 
     },
     "In the Text" : {
-
-    },
-    "In the sidebar." : {
 
     },
     "Inbox" : {
@@ -5678,6 +5682,9 @@
 
     },
     "Incomplete" : {
+
+    },
+    "Indent Markdown Source with" : {
 
     },
     "Indent With" : {
@@ -5724,6 +5731,9 @@
       "extractionState" : "manual"
     },
     "Instead of the date, when it’s recent." : {
+
+    },
+    "Interface text size" : {
 
     },
     "Invalid Date" : {
@@ -6364,6 +6374,9 @@
     "Layouts can be imported once the library has loaded." : {
 
     },
+    "Leaf" : {
+
+    },
     "Leave Focus" : {
 
     },
@@ -6436,6 +6449,12 @@
     "Line Spacing" : {
 
     },
+    "Line numbers in code" : {
+
+    },
+    "Line spacing" : {
+
+    },
     "Lines of Text" : {
 
     },
@@ -6475,6 +6494,9 @@
     "Links to Items" : {
 
     },
+    "Links to items" : {
+
+    },
     "Links: %@" : {
 
     },
@@ -6482,6 +6504,9 @@
 
     },
     "List" : {
+
+    },
+    "List width" : {
 
     },
     "Listing items…" : {
@@ -6537,9 +6562,6 @@
     },
     "Long" : {
       "extractionState" : "manual"
-    },
-    "Longer titles are cut short." : {
-
     },
     "Longest" : {
 
@@ -6637,7 +6659,7 @@
     "Make one to link items in a way of your own." : {
 
     },
-    "Make the widths set in this window the defaults for new windows." : {
+    "Make the front window’s widths the defaults for new windows." : {
 
     },
     "Make this version the item’s text and title" : {
@@ -6734,6 +6756,9 @@
 
     },
     "Marfa’s" : {
+
+    },
+    "Marigold" : {
 
     },
     "Mark" : {
@@ -7665,9 +7690,6 @@
     "On This Mac" : {
 
     },
-    "On an item’s page." : {
-
-    },
     "On every Mac that connects to this Marfa. Your items stay." : {
 
     },
@@ -7949,9 +7971,6 @@
     "Over the List" : {
 
     },
-    "Over the sidebar." : {
-
-    },
     "Over whatever you’re doing." : {
 
     },
@@ -7973,16 +7992,22 @@
     "PDF Background" : {
 
     },
+    "PDF background" : {
+
+    },
     "PDF, ^[%lld page](inflect: true)" : {
 
     },
     "Page" : {
 
     },
-    "Page Corner" : {
+    "Page Controls" : {
 
     },
     "Page Width" : {
+
+    },
+    "Page width" : {
 
     },
     "Pages" : {
@@ -8000,6 +8025,9 @@
     "Pair Brackets and Quotes" : {
 
     },
+    "Pair brackets and quotes" : {
+
+    },
     "Palette Actions" : {
 
     },
@@ -8010,6 +8038,9 @@
 
     },
     "Paragraph Spacing" : {
+
+    },
+    "Paragraph spacing" : {
 
     },
     "Parent" : {
@@ -8048,7 +8079,7 @@
     "Paste and Match Style" : {
 
     },
-    "Pasting" : {
+    "Paste formatted text as" : {
 
     },
     "Paths Not Copied" : {
@@ -8155,7 +8186,7 @@
     "Pinned" : {
       "extractionState" : "manual"
     },
-    "Pinned Properties" : {
+    "Pinned properties" : {
 
     },
     "Pinned under the title." : {
@@ -8728,9 +8759,6 @@
     "Reset View" : {
 
     },
-    "Reset Widths" : {
-
-    },
     "Reset…" : {
 
     },
@@ -8955,6 +8983,9 @@
     },
     "Saved. The server now has:" : {
       "extractionState" : "manual"
+    },
+    "Sea" : {
+
     },
     "Seals stored keys. Never shown." : {
 
@@ -9383,6 +9414,9 @@
     "Show in Types" : {
 
     },
+    "Show item title when scrolling" : {
+
+    },
     "Show on Page" : {
       "extractionState" : "manual"
     },
@@ -9437,6 +9471,12 @@
     "Sidebar" : {
 
     },
+    "Sidebar color" : {
+
+    },
+    "Sidebar width" : {
+
+    },
     "Sign In" : {
       "extractionState" : "manual"
     },
@@ -9483,6 +9523,9 @@
 
     },
     "Sign-ins, keys and apps" : {
+
+    },
+    "Signal" : {
 
     },
     "Signed In As" : {
@@ -9533,6 +9576,9 @@
     "Sizes run from %@ to %@." : {
 
     },
+    "Sky" : {
+
+    },
     "Small" : {
       "extractionState" : "manual"
     },
@@ -9540,6 +9586,9 @@
 
     },
     "Smart Quotes and Dashes" : {
+
+    },
+    "Smart quotes and dashes in formatted text" : {
 
     },
     "So a change to a table can be undone." : {
@@ -9692,6 +9741,9 @@
     "Standard Width" : {
 
     },
+    "Standard width" : {
+
+    },
     "Start" : {
 
     },
@@ -9827,10 +9879,10 @@
     "Switched Servers, but the Copy Was Kept" : {
       "extractionState" : "manual"
     },
-    "Switches, sliders and the text cursor." : {
+    "Symbols on Subtypes" : {
 
     },
-    "Symbols on Subtypes" : {
+    "Symbols on subtypes in the sidebar" : {
 
     },
     "Synced Folders" : {
@@ -9943,6 +9995,12 @@
 
     },
     "Text Wasn’t Added" : {
+
+    },
+    "Text size" : {
+
+    },
+    "Text size and width" : {
 
     },
     "That address isn’t a Marfa server the app can sign in to. Check the address, then try again." : {
@@ -10686,9 +10744,6 @@
     "The page shows this field as the item’s title, its text or its link to the source, so it can’t be removed." : {
 
     },
-    "The page’s text size and width." : {
-
-    },
     "The panel closed before the view was renamed." : {
       "extractionState" : "manual"
     },
@@ -10732,9 +10787,6 @@
 
     },
     "The request was made. The app couldn’t read it back to show it here." : {
-
-    },
-    "The rest of the app uses the system font." : {
 
     },
     "The saved address, %@, has more after the server’s address, such as a path. Enter just the server’s address, such as https://marfa.example. A new address starts a new copy of your library on this Mac. Changes in the old copy that hadn’t reached the server stay there and aren’t sent." : {
@@ -10860,9 +10912,6 @@
     "The shortcuts could not be written to “%@”. Choose another place and try again." : {
 
     },
-    "The sidebar, lists and controls." : {
-
-    },
     "The sign-in address a new Marfa starts with." : {
 
     },
@@ -10898,9 +10947,6 @@
     },
     "The title “%@” for “%@” couldn’t be saved. Open the item to change the title or discard your changes." : {
       "extractionState" : "manual"
-    },
-    "The type you give an item." : {
-
     },
     "The types and sources chosen and left out make more conditions than one search can hold." : {
 
@@ -10954,9 +11000,6 @@
 
     },
     "The website sent the request on too many times." : {
-
-    },
-    "The widths this window has now." : {
 
     },
     "The window changed to another library before the entry was added to the new item." : {
@@ -11548,6 +11591,9 @@
     "Title When Scrolling" : {
 
     },
+    "Title length" : {
+
+    },
     "Titles" : {
 
     },
@@ -11600,6 +11646,9 @@
 
     },
     "Toolbar Background When Scrolling" : {
+
+    },
+    "Toolbar background when scrolling" : {
 
     },
     "Top right." : {
@@ -11688,6 +11737,9 @@
 
     },
     "Type both the host and the project token." : {
+
+    },
+    "Type chip color" : {
 
     },
     "Type it again to change it" : {
@@ -11977,6 +12029,9 @@
     "Value Panels" : {
 
     },
+    "Value panels" : {
+
+    },
     "Version" : {
 
     },
@@ -12004,9 +12059,6 @@
 
     },
     "View" : {
-
-    },
-    "View > Show Original switches it." : {
 
     },
     "View Deleted" : {

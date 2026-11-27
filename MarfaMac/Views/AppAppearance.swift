@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// Where Settings > Appearance keeps what it chooses for the whole app.
+/// Settings that sync as members of Appearance.
 nonisolated enum AppearanceKey {
     static let theme = "theme"
     static let accent = "accentColor"
@@ -11,7 +11,48 @@ nonisolated enum AppearanceKey {
     static let typeChipTint = TypeChipTint.key
     static let sidebar = SidebarColor.key
     static let pdfBackground = PDFBackground.key
-    static let all = [theme, accent, highlights, textFont, codeFont, typeChipTint, sidebar, pdfBackground]
+    // MacSettings and PreferencesMap both include every key in this list.
+    static let all = [theme, accent, highlights, textFont, codeFont, typeChipTint, sidebar, pdfBackground, AppIconChoice.key]
+}
+
+/// The running app's Dock icon. Sky uses the icon macOS loads from the bundle.
+nonisolated enum AppIconChoice: String, CaseIterable, Identifiable {
+    case sky, signal, sea, leaf, marigold, adobe
+
+    static let key = "appIcon"
+
+    var id: Self { self }
+
+    var title: LocalizedStringResource {
+        switch self {
+        case .sky: "Sky"
+        case .signal: "Signal"
+        case .sea: "Sea"
+        case .leaf: "Leaf"
+        case .marigold: "Marigold"
+        case .adobe: "Adobe"
+        }
+    }
+
+    var previewAsset: String { "DockIcon-\(rawValue)" }
+    var dockAsset: String? { self == .sky ? nil : previewAsset }
+
+    static func stored(in defaults: UserDefaults = .standard) -> Self {
+        defaults.string(forKey: key).flatMap(Self.init(rawValue:)) ?? .sky
+    }
+
+    func store(in defaults: UserDefaults = .standard) {
+        if self == .sky {
+            defaults.removeObject(forKey: Self.key)
+        } else {
+            defaults.set(rawValue, forKey: Self.key)
+        }
+    }
+
+    @MainActor func dockImage() -> NSImage? {
+        guard let dockAsset, let image = NSImage(named: dockAsset), image.isValid else { return nil }
+        return image
+    }
 }
 
 /// The main window's sidebar: the system's gray, or white behind a hairline.
@@ -30,8 +71,7 @@ nonisolated enum SidebarColor: String, CaseIterable, Identifiable {
     }
 }
 
-/// What a PDF's pages sit on: the system's gray, or white with only a soft shadow to mark each page. Chosen from the View
-/// menu while a PDF is open; Settings has no row for it yet. Gray is the default, so it is stored only when white.
+/// What a PDF's pages sit on. The Editor settings and View menu share one choice, stored only when white.
 nonisolated enum PDFBackground: String, CaseIterable, Identifiable {
     case gray, white
 
@@ -43,6 +83,14 @@ nonisolated enum PDFBackground: String, CaseIterable, Identifiable {
         switch self {
         case .gray: "Gray"
         case .white: "White"
+        }
+    }
+
+    func store(in defaults: UserDefaults = .standard) {
+        if self == .gray {
+            defaults.removeObject(forKey: Self.key)
+        } else {
+            defaults.set(rawValue, forKey: Self.key)
         }
     }
 

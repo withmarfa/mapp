@@ -153,7 +153,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) lazy var itemLinks = ItemLinkOpener(libraries: libraries)
     private let separators = MenuSeparatorTidy()
     private var metrics: MetricsListener?
-    private var themeObservation: (any NSObjectProtocol)?
+    private var appearanceObservation: (any NSObjectProtocol)?
+    private var appliedIcon: AppIconChoice?
 
     override init() {
         #if DEBUG
@@ -180,10 +181,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         assert(NSApp is MarfaMacApplication, "The app runs under MarfaMacApplication")
         QuickLookFile.removeLeftovers()
         separators.start()
-        AppTheme.apply(.stored())
-        // A choice in Settings reaches every window at once, and a Reset puts the system's back.
-        themeObservation = NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { _ in
-            MainActor.assumeIsolated { AppTheme.apply(.stored()) }
+        applyAppearance()
+        appearanceObservation = NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.applyAppearance() }
         }
         #if DEBUG
         let sampled = SampleLibrary.isRequested
@@ -199,6 +199,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         libraries.anyAppShortcuts.start()
         // The saved server's copy opens and paints before the network is asked anything.
         Task { await libraries.launch() }
+    }
+
+    private func applyAppearance() {
+        AppTheme.apply(.stored())
+        let icon = AppIconChoice.stored()
+        guard icon != appliedIcon else { return }
+        NSApp.applicationIconImage = icon.dockImage()
+        appliedIcon = icon
     }
 
     /// The URLs the system hands the app, as when a `marfa://` item link is opened in another app. The sign-in's
