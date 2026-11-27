@@ -60,7 +60,7 @@ paths:
 - **Stores preserve unreadable values** under their `...SetAside` keys, which Reset keeps, and use defaults.
 - **Sync skips unreadable text and values the defaults cannot hold.**
 - **Page placements are read by type,** so an edit keeps every other entry byte for byte.
-- **A value a store sets aside, or rewrites unprompted, stays in the Marfa** (`PreferenceHolds`) until either side changes it or another build reads it. Import, Restore, Reset, Reset View, Restore Defaults and recording a shortcut replace it, but only a new value replaces one set aside as the sync wrote it.
+- **A value a store sets aside, or rewrites unprompted, stays in the Marfa** (`PreferenceHolds`) until either side changes it or another build reads it. A change here counts as made after sending what the store left. Import, Restore, Reset and the person's resets replace it; only a new value replaces one the sync wrote.
 
 ## Removing and signing out
 

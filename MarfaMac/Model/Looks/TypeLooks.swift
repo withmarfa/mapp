@@ -112,9 +112,10 @@ final class TypeLooks {
             secondary: look.secondary == baseline.secondary ? nil : look.secondary,
             facts: look.facts == baseline.facts ? nil : look.facts)
         var types = chosen[library] ?? [:]
+        let removed: Set<String> = choice.isEmpty && types[type.rawValue] != nil ? [type.rawValue] : []
         types[type.rawValue] = choice.isEmpty ? nil : choice
         chosen[library] = types.isEmpty ? nil : types
-        save(by: .person)
+        save(by: .person(dropped: .nothing, addressed: removed))
     }
 
     /// Takes back every choice for `type`, so it shows what its preset and the types above it give. Other types' choices
@@ -122,7 +123,7 @@ final class TypeLooks {
     func restore(_ type: TypeID, in library: String) {
         guard var types = chosen[library], types.removeValue(forKey: type.rawValue) != nil else { return }
         chosen[library] = types.isEmpty ? nil : types
-        save(by: .person)
+        save(by: .person(dropped: .nothing, addressed: [type.rawValue]))
     }
 
     // MARK: Export and import
@@ -167,9 +168,14 @@ final class TypeLooks {
             types[type.rawValue] = choice.isEmpty ? nil : choice
         }
         let kept: [String: TypeLookChoice]? = types.isEmpty ? nil : types
-        guard kept != chosen[library] else { return }
+        // Every type the file names is the person's choice, even one this import leaves as it was here.
+        let writer = PreferenceHolds.Writer.person(dropped: .nothing, addressed: Set(file.looks.keys))
+        guard kept != chosen[library] else {
+            PreferenceHolds.willWrite(defaults.object(forKey: Self.defaultsKey), forKey: Self.defaultsKey, in: defaults, by: writer)
+            return
+        }
         chosen[library] = kept
-        save(by: .person)
+        save(by: writer)
     }
 
     /// How many types lie above `type` along the catalogue's `parent` links, however long the chain: `ancestors(of:)` stops

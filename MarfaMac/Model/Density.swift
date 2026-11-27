@@ -53,7 +53,8 @@ nonisolated struct PlaceDensities: Equatable, Sendable {
         for (place, word) in words {
             if let density = Density(rawValue: word) { readable[place] = density } else { unreadable[place] = word }
         }
-        return (PlaceDensities(readable), unreadable.isEmpty ? nil : try? encode(unreadable), .entries(Set(unreadable.keys)))
+        guard !unreadable.isEmpty else { return (PlaceDensities(readable), nil, .nothing) }
+        return (PlaceDensities(readable), try? encode(unreadable), .entries(Set(unreadable.keys)))
     }
 
     private static func encode(_ value: some Encodable) throws -> Data {
@@ -68,7 +69,7 @@ nonisolated struct PlaceDensities: Equatable, Sendable {
     }
 
     /// Changes the stored densities. What this write would replace and cannot read is kept aside first. `addressing`
-    /// names the places the person resets on purpose.
+    /// names the places the person resets on purpose, which this Mac may not have read; each place removed is addressed too.
     @MainActor
     static func update(in defaults: UserDefaults = .standard, addressing: Set<String> = [], _ change: (inout PlaceDensities) -> Void) {
         var value = PlaceDensities()
@@ -81,8 +82,9 @@ nonisolated struct PlaceDensities: Equatable, Sendable {
                 defaults.set((defaults.array(forKey: setAsideKey) as? [Data] ?? []) + [unreadable], forKey: setAsideKey)
             }
         }
+        let had = Set(value.places.keys)
         change(&value)
-        let writer = PreferenceHolds.Writer.person(dropped: dropped, addressed: addressing)
+        let writer = PreferenceHolds.Writer.person(dropped: dropped, addressed: addressing.union(had.subtracting(value.places.keys)))
         if value.places.isEmpty {
             PreferenceHolds.willWrite(nil, forKey: key, in: defaults, by: writer)
             defaults.removeObject(forKey: key)

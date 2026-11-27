@@ -97,7 +97,8 @@ nonisolated struct ViewOrders: Equatable, Sendable {
         for (entry, value) in object {
             if let value = value as? Value { readable[entry] = value } else { unreadable[entry] = value }
         }
-        let aside = unreadable.isEmpty ? nil : try? JSONSerialization.data(withJSONObject: unreadable, options: .sortedKeys)
+        guard !unreadable.isEmpty else { return (readable, nil, .nothing) }
+        let aside = try? JSONSerialization.data(withJSONObject: unreadable, options: .sortedKeys)
         return (readable, aside, .entries(Set(unreadable.keys)))
     }
 
@@ -127,8 +128,9 @@ nonisolated struct ViewOrders: Equatable, Sendable {
             }
             return read.readable
         }
-        func save(_ entries: [String: Any], to key: String) {
-            let writer = PreferenceHolds.Writer.person(dropped: dropped[key] ?? .nothing, addressed: [])
+        /// `removed` names the entries the change took out, each addressed.
+        func save(_ entries: [String: Any], to key: String, removed: Set<String>) {
+            let writer = PreferenceHolds.Writer.person(dropped: dropped[key] ?? .nothing, addressed: removed)
             if entries.isEmpty {
                 PreferenceHolds.willWrite(nil, forKey: key, in: defaults, by: writer)
                 defaults.removeObject(forKey: key)
@@ -141,7 +143,11 @@ nonisolated struct ViewOrders: Equatable, Sendable {
             load(key, as: [String].self, setAside: setAsideKey), hidden: load(hiddenKey, as: Bool.self, setAside: hiddenSetAsideKey))
         var value = before
         change(&value)
-        if value.places != before.places || setAside.contains(key) { save(value.places, to: key) }
-        if value.hiddenViews != before.hiddenViews || setAside.contains(hiddenKey) { save(value.hiddenViews, to: hiddenKey) }
+        if value.places != before.places || setAside.contains(key) {
+            save(value.places, to: key, removed: Set(before.places.keys).subtracting(value.places.keys))
+        }
+        if value.hiddenViews != before.hiddenViews || setAside.contains(hiddenKey) {
+            save(value.hiddenViews, to: hiddenKey, removed: Set(before.hiddenViews.keys).subtracting(value.hiddenViews.keys))
+        }
     }
 }

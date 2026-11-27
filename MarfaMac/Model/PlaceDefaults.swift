@@ -293,7 +293,8 @@ nonisolated struct PlaceDefaults: Equatable, Sendable {
             }
             readable[place] = value
         }
-        let aside = unreadable.isEmpty ? nil : try? JSONSerialization.data(withJSONObject: unreadable, options: .sortedKeys)
+        guard !unreadable.isEmpty else { return (PlaceDefaults(readable), nil, .nothing) }
+        let aside = try? JSONSerialization.data(withJSONObject: unreadable, options: .sortedKeys)
         return (PlaceDefaults(readable), aside, .entries(Set(unreadable.keys)))
     }
 
@@ -309,7 +310,7 @@ nonisolated struct PlaceDefaults: Equatable, Sendable {
     }
 
     /// Changes the stored defaults. What this write would replace and cannot read is kept aside first. `addressing`
-    /// names the places the person resets on purpose.
+    /// names the places the person resets on purpose, which this Mac may not have read; each place removed is addressed too.
     @MainActor
     static func update(in defaults: UserDefaults = .standard, addressing: Set<String> = [], _ change: (inout PlaceDefaults) -> Void) {
         var value = PlaceDefaults()
@@ -322,8 +323,9 @@ nonisolated struct PlaceDefaults: Equatable, Sendable {
                 defaults.set((defaults.array(forKey: setAsideKey) as? [Data] ?? []) + [unreadable], forKey: setAsideKey)
             }
         }
+        let had = Set(value.places.keys)
         change(&value)
-        let writer = PreferenceHolds.Writer.person(dropped: dropped, addressed: addressing)
+        let writer = PreferenceHolds.Writer.person(dropped: dropped, addressed: addressing.union(had.subtracting(value.places.keys)))
         if value.places.isEmpty {
             PreferenceHolds.willWrite(nil, forKey: key, in: defaults, by: writer)
             defaults.removeObject(forKey: key)

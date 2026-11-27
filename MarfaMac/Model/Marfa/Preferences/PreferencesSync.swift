@@ -329,8 +329,8 @@ final class PreferencesSync {
         for waiter in done { waiter.resume() }
     }
 
-    /// This Mac's settings as a step read them.
-    typealias Local = (units: PreferenceUnits, frozen: [SyncedSetting])
+    /// This Mac's settings as a step read them, and the stores' reports read after them.
+    typealias Local = (units: PreferenceUnits, frozen: [SyncedSetting], holds: PreferenceHolds.List)
 
     /// The person changed a setting a step was about to write, after the step read it: the step stops and runs again.
     private struct Moved: Error {}
@@ -369,8 +369,7 @@ final class PreferencesSync {
             }
             let originals = items.filter { !$0.isConflictedCopy }
             let local = readLocal()
-            // Read after this Mac's settings: a store reports before it writes, so every value read has its entry here.
-            let holds = PreferenceHolds.read(defaults)
+            let holds = local.holds
             // A step that switches, adopts or creates takes the Marfa's settings whole, so the entries it read go.
             var kept: [PreferenceHolds.Entry] = []
             if let adopted = record.marfas[instance] {
@@ -454,15 +453,22 @@ final class PreferencesSync {
             case .unreadable: frozen.append(setting)
             }
         }
-        return (units, frozen)
+        // Read after the values: a store reports before it writes, so every value read has its entry here.
+        return (units, frozen, PreferenceHolds.read(defaults))
     }
 
-    /// Throws `Moved` where a setting that owns one of `units` is no longer what the step read: a step awaits the copy
-    /// between reading this Mac's settings and writing them, and the person's change is the later one.
+    /// Throws `Moved` where a setting that owns one of `units` is no longer what the step read, or has an entry the step
+    /// did not read: a step awaits the copy between reading this Mac's settings and writing them, and the person's change
+    /// is the later one, even one that leaves the stored value as it was.
     func unchanged(since local: Local, writing units: Set<PreferenceUnit>) throws {
         let settings = PreferencesMap.synced.filter { setting in units.contains { setting.owns($0) } }
         guard !settings.isEmpty else { return }
         let now = readLocal()
+        let read = Set(local.holds.entries.map(\.id))
+        let keys = Set(settings.map(\.key))
+        if now.holds.entries.contains(where: { entry in
+            !read.contains(entry.id) && keys.contains(entry.key) && (entry.library == nil || entry.library == library)
+        }) { throw Moved() }
         for setting in settings {
             let read = local.units.filter { setting.owns($0.key) }
             let held = now.units.filter { setting.owns($0.key) }
@@ -565,6 +571,7 @@ final class PreferencesSync {
         // A setting the store dropped on reading it stands as the Marfa holds it, until this Mac changes it or an app
         // that reads it runs here.
         var retrying = adopted.frozenBuild == build ? [] : Set(adopted.frozen.keys)
+        let reported = switched ? [:] : adopted.frozen.filter { $0.value.reported == true }
         if !switched {
             kept = judge(holds, local: local, base: base, remote: remote, adopted: &adopted, retrying: &retrying)
         }
@@ -573,6 +580,9 @@ final class PreferencesSync {
             // The person's own change to a dropped setting is theirs to send, so it is no longer held.
             if mine[unit] == frozen.left { mine[unit] = base[unit] } else { adopted.frozen[unit] = nil }
         }
+        // The reported freezes the person ended, by a release or a change, whose rows are decided below as `main` decides
+        // a row it set aside at an earlier step.
+        let acted = reported.filter { adopted.frozen[$0.key] == nil }
         // This Mac holds nothing of a row no setting here owns, which is no deletion of the person's.
         for unit in Set(remote.keys).union(base.keys) where !PreferencesMap.synced.contains(where: { $0.owns(unit) }) {
             mine[unit] = base[unit]
@@ -596,6 +606,12 @@ final class PreferencesSync {
         let frozen = adopted.frozen
         var before = PreferencesMerge.base(
             base, reclaiming: lost.filter { frozen[$0.key] == nil }, local: mine, remote: seen)
+        for (unit, held) in acted {
+            // A row the store set aside here was sent as it left it at the step after, on `main`: the person's new value
+            // goes over the Marfa's; returned to what the store left, the row takes another Mac's later change, or with
+            // none sends what the store left.
+            before[unit] = mine[unit] != held.left || seen[unit] == base[unit] ? seen[unit] : held.left
+        }
         let won = switched ? [] : PreferencesMap.synced.filter { winning[$0.key] != nil }
         if !won.isEmpty {
             before = PreferencesMerge.base(before, winning: { unit in
@@ -643,6 +659,8 @@ final class PreferencesSync {
                        adopted: inout Record.Adopted, retrying: inout Set<PreferenceUnit>) -> [PreferenceHolds.Entry]
     {
         var kept: [PreferenceHolds.Entry] = []
+        // The value of each valid release, so a whole hold written before the person's write does not freeze it again.
+        var releasedTo: [PreferenceUnit: String?] = [:]
         func freeze(_ unit: PreferenceUnit, from entry: PreferenceHolds.Entry) {
             let now = local.units[unit]
             if let frozen = adopted.frozen[unit], frozen.reported != true, frozen.left == now {
@@ -675,10 +693,12 @@ final class PreferencesSync {
                 }
             case .whole(let left, let except):
                 for unit in base.keys where setting.owns(unit) && !except.contains(unit) {
+                    if let released = releasedTo[unit], released == left[unit] { continue }
                     if local.units[unit] == left[unit], left[unit] != base[unit] { freeze(unit, from: entry) }
                 }
             case .release(let unit, let value):
                 guard local.units[unit] == value else { continue }
+                releasedTo[unit] = value
                 kept.removeAll { $0.isFor(unit, key: entry.key, library: entry.library) && !$0.isRelease }
                 if adopted.frozen[unit]?.reported == true { adopted.frozen[unit] = nil }
             }

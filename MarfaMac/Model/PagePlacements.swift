@@ -262,7 +262,8 @@ nonisolated extension PagePlacements: RawRepresentable {
         if let text { setAsideUnreadable(in: original, text: text, defaults: defaults) }
         // Entries it could read but not understand stay in place; only a document read as nothing drops anything.
         let dropped: PreferenceHolds.Dropped = original == nil && defaults.object(forKey: key) != nil ? .whole : .nothing
-        PreferenceHolds.willWrite(edited.rawValue, forKey: key, in: defaults, by: .person(dropped: dropped, addressed: []))
+        let removed = Set(previous.entries.keys).subtracting(edited.entries.keys)
+        PreferenceHolds.willWrite(edited.rawValue, forKey: key, in: defaults, by: .person(dropped: dropped, addressed: removed))
         defaults.set(edited.rawValue, forKey: key)
     }
 

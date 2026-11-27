@@ -11,6 +11,10 @@ import Foundation
 nonisolated enum PreferenceHolds {
     static let key = "preferencesHolds"
 
+    /// The settings whose stores read them again after Import, Restore or Reset wrote them (`PreferencesSync.replaced`):
+    /// what those wrote is the person's, so the reading reports only what it drops.
+    @MainActor static var reloadingReplaced: Set<String> = []
+
     #if DEBUG
     static let hooks = TestHooks()
     #endif
@@ -29,7 +33,7 @@ nonisolated enum PreferenceHolds {
         /// The store alone, reading what is stored: no change of the person's is in the write.
         case store
         /// The person, or the app's own housekeeping: sent as before, but for what the store dropped. `addressed` names
-        /// the entries the person reset or removed on purpose.
+        /// the entries the person reset, removed or chose on purpose, each released even where nothing is watched.
         case person(dropped: Dropped, addressed: Set<String>)
         /// The person's change to `library`'s sidebar layout, with the layout as the store gave it before the change, so
         /// the rows the store filled from its defaults are told from the person's.
@@ -126,8 +130,9 @@ nonisolated enum PreferenceHolds {
         hooks.readings.update { $0 += 1 }
         #endif
         let before = list
+        let dropsOnly = writer == .store && reloadingReplaced.contains(key)
         for scope in scopes(of: setting, stored: stored, value: value) {
-            report(scope, of: setting, by: writer, in: &list)
+            report(scope, of: setting, by: writer, dropsOnly: dropsOnly, in: &list)
         }
         if list != before { save(list, in: defaults) }
     }
@@ -162,21 +167,23 @@ nonisolated enum PreferenceHolds {
         }
     }
 
-    private static func report(_ scope: Scope, of setting: SyncedSetting, by writer: Writer, in list: inout List) {
+    private static func report(_ scope: Scope, of setting: SyncedSetting, by writer: Writer, dropsOnly: Bool, in list: inout List) {
         guard case .units(let r1) = scope.written else { return }
         let build = PreferencesSync.appBuild
         func entry(_ kind: Entry.Kind) -> Entry { Entry(key: setting.key, library: scope.library, build: build, kind: kind) }
         let addressed: Set<PreferenceUnit> = if case .person(_, let names) = writer { Set(names.compactMap { unit(named: $0, of: setting) }) } else { [] }
         guard case .units(let r0) = scope.stored else {
             let except: Set<PreferenceUnit> = switch writer {
-            case .store: []
+            case .store: dropsOnly ? Set(r1.keys) : []
             case .person: Set(r1.keys)
             case .sidebar(_, let before):
                 Set(sidebarRows(before).keys).union(r1.keys).filter { sidebarRows(before)[$0] != r1[$0] }
             }
             list.append(entry(.whole(left: r1, except: except)))
-            if writer != .store, list.watched.contains(setting.key) {
-                for unit in addressed { list.append(entry(.release(unit, value: r1[unit]))) }
+            guard writer != .store else { return }
+            // What was stored cannot be read, so every unit the write sets or removes may end a hold, watched or not.
+            for unit in except.union(addressed).sorted(by: { "\($0)" < "\($1)" }) {
+                list.append(entry(.release(unit, value: r1[unit])))
             }
             return
         }
@@ -184,7 +191,7 @@ nonisolated enum PreferenceHolds {
         var held: [PreferenceUnit: (before: String?, left: String?)] = [:]
         switch writer {
         case .store:
-            for unit in changed { held[unit] = (r0[unit], r1[unit]) }
+            for unit in changed where !dropsOnly || r1[unit] == nil { held[unit] = (r0[unit], r1[unit]) }
         case .person(let dropped, _):
             let units: [PreferenceUnit] = switch dropped {
             case .nothing: []
@@ -203,8 +210,11 @@ nonisolated enum PreferenceHolds {
         for (unit, values) in held.sorted(by: { "\($0.key)" < "\($1.key)" }) {
             list.append(entry(.unit(unit, before: values.before, left: values.left, seenPending: false)))
         }
-        guard writer != .store, list.watched.contains(setting.key) else { return }
-        for unit in changed.subtracting(held.keys).union(addressed).sorted(by: { "\($0)" < "\($1)" }) {
+        guard writer != .store else { return }
+        // An unwatched setting has no hold to end, but a whole hold written before the next step could freeze a unit
+        // this write removed, and every removal is addressed.
+        let released = list.watched.contains(setting.key) ? changed.subtracting(held.keys).union(addressed) : addressed
+        for unit in released.sorted(by: { "\($0)" < "\($1)" }) {
             list.append(entry(.release(unit, value: r1[unit])))
         }
     }

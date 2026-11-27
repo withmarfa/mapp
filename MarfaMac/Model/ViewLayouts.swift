@@ -179,7 +179,8 @@ nonisolated extension ViewLayouts {
         defaults.string(forKey: key).flatMap(ViewLayouts.init(rawValue:)) ?? ViewLayouts()
     }
 
-    /// Changes the stored settings. `addressing` names the views whose settings the person removes on purpose.
+    /// Changes the stored settings. `addressing` names the views whose settings the person removes on purpose, which this Mac
+    /// may not have read; each view removed is addressed too.
     @MainActor
     static func update(in defaults: UserDefaults = .standard, addressing: Set<String> = [], _ change: (inout ViewLayouts) -> Void) {
         var dropped: PreferenceHolds.Dropped = .nothing
@@ -193,8 +194,10 @@ nonisolated extension ViewLayouts {
             dropped = .whole
         }
         var value = stored(in: defaults)
+        let had = Set(value.views.keys)
         change(&value)
-        PreferenceHolds.willWrite(value.rawValue, forKey: key, in: defaults, by: .person(dropped: dropped, addressed: addressing))
+        let addressed = addressing.union(had.subtracting(value.views.keys))
+        PreferenceHolds.willWrite(value.rawValue, forKey: key, in: defaults, by: .person(dropped: dropped, addressed: addressed))
         defaults.set(value.rawValue, forKey: key)
     }
 }

@@ -450,7 +450,9 @@ import Testing
     @Test func pagePlacementsHoldTheWholeOfADocumentThatIsNoObject() {
         defaults.set("[]", forKey: PagePlacements.key)
         PagePlacements.update(in: defaults) { $0.setPins(["starts_at"], of: TypeID(note)) }
-        #expect(entries.count == 1)
+        #expect(entries.count == 2)
+        // What the person wrote over the unreadable value ends any hold on it.
+        #expect(Set(releases.keys) == [placement(note)])
         guard case .whole(_, let except)? = entries.first?.kind else {
             Issue.record("Expected a whole hold")
             return
@@ -478,13 +480,15 @@ import Testing
         looks.change(TypeID(note), in: library, catalogue: LookFixture.catalogue()) { $0.date = .occurred }
         looks.change(TypeID(task), in: library, catalogue: LookFixture.catalogue()) { $0.date = .edited }
         looks.restore(TypeID(task), in: library)
-        #expect(entries.isEmpty)
+        // Restore ends any hold on Tasks, so it releases it.
+        #expect(entries.allSatisfy { $0.isRelease })
     }
 
     @Test func aPersonsChangeToASyncedShortcutWritesNoHold() {
         bindings.set(Shortcut(key: "n", modifiers: [.command, .control]), for: .newItem)
         bindings.restoreDefaults()
-        #expect(entries.isEmpty)
+        // Restore Defaults ends any hold on every command, so it releases them.
+        #expect(entries.allSatisfy { $0.isRelease })
     }
 
     @Test func aPersonsChangeToSyncedSearchExclusionsWritesNoHold() {

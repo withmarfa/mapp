@@ -225,6 +225,7 @@ import Testing
                 _ = try await sync?.importSettings(SettingsFile(units: [unit: value], build: "", date: .now), sections: [SettingsFile.Section(unit)])
                 looks.reload()
             case .reset:
+                sync?.replacing(PreferencesMap.synced)
                 MacSettings.reset(in: defaults)
                 sync?.replaced(PreferencesMap.synced)
                 looks.reload()

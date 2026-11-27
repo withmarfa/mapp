@@ -678,6 +678,7 @@ import Testing
 
     @Test func resetDeletesARowAStoreSetAside() async throws {
         let (copy, item, sync) = await lookSetAside()
+        sync.replacing(PreferencesMap.synced)
         MacSettings.reset(in: defaults)
         sync.replaced(PreferencesMap.synced)
         await flush(sync)
@@ -728,6 +729,7 @@ import Testing
         let sync = await sync(copy)
         let item = try #require(await copy.activeIDs.first)
         await copy.change(item, [placement(note): "{not json"])
+        sync.replacing(PreferencesMap.synced)
         MacSettings.reset(in: defaults)
         sync.replaced(PreferencesMap.synced)
         await flush(sync)
@@ -833,6 +835,7 @@ import Testing
         alsoOnReload = { [defaults] in DateFormat.setAsideUnreadable(in: defaults) }
         let next = await self.sync(copy, build: "2")
         await flush(next)
+        next.replacing(PreferencesMap.synced)
         MacSettings.reset(in: defaults)
         next.replaced(PreferencesMap.synced)
         await flush(next)
@@ -987,6 +990,7 @@ import Testing
         sync.detach()
         // Reset's steps, as `Libraries.resetMacSettings` takes them, up to the point a crash stops it before `replaced`.
         try sync.saveRestorePoint(.reset)
+        sync.replacing(PreferencesMap.synced)
         bindings.restoreDefaults()
         MacSettings.reset(in: defaults)
         sync.attach(copy, library: library, name: { nil })
@@ -997,6 +1001,8 @@ import Testing
     /// A looks file with Tasks at the look it shows with no choice, and with `notes`' look when given.
     private func looksFile(notes: LookDate?) throws -> LooksFile {
         let catalogue = LookFixture.catalogue()
+        // The store reads what `lookSetAside` left, as the app's one store would have at its set-aside.
+        looks.reload()
         let resolved = looks.looks(in: catalogue, library: library)
         var file = [TypeID(task): try #require(resolved[TypeID(task)])]
         if let notes {
