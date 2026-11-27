@@ -493,8 +493,7 @@ final class PreferencesSync {
         return Record.Adopted(item: id, base: start, frozenBuild: build)
     }
 
-    /// Takes up the item made first: what it holds wins, and what it lacks is filled from the other items, then from this
-    /// Mac, once. The other items are left as they are.
+    /// Adopts the oldest original item. Only groups that were already syncing fill its gaps from other originals or this Mac.
     private func adopt(_ chosen: PreferencesItem, remote: Remote, local: Local, resuming: Set<PreferenceGroup>,
                        in copy: any PreferencesCopy) async throws -> Record.Adopted
     {
