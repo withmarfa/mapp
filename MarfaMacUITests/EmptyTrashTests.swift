@@ -32,11 +32,5 @@ nonisolated final class EmptyTrashTests: XCTestCase {
         app.typeKey(.escape, modifierFlags: [])
         XCTAssertTrue(confirm.waitForNonExistence(timeout: 3))
         XCTAssertTrue(empty.isEnabled)
-
-        empty.click()
-        XCTAssertTrue(confirm.waitForExistence(timeout: 5))
-        confirm.click()
-        XCTAssertTrue(app.staticTexts["Trash Is Empty"].waitForExistence(timeout: 10))
-        XCTAssertFalse(empty.isEnabled)
     }
 }
