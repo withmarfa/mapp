@@ -8,17 +8,23 @@ struct SettingsTableColumn<Row> {
     /// How many lines a cell may take; a cell that needs more is cut, and `truncation` says where.
     var lines = 1
     var truncation: Text.TruncationMode = .tail
+    /// Whether this column is the one the rows are ordered by, and which way. Nil when another column is, or none is.
+    var sortedAscending: Bool?
+    /// Sorts by this column. Nil on a column that does not sort.
+    var onSort: (() -> Void)?
     let cell: (Row) -> AnyView
 
     init(
         _ title: LocalizedStringKey, width: CGFloat? = nil, numeric: Bool = false, lines: Int = 1, truncation: Text.TruncationMode = .tail,
-        @ViewBuilder cell: @escaping (Row) -> some View
+        sortedAscending: Bool? = nil, onSort: (() -> Void)? = nil, @ViewBuilder cell: @escaping (Row) -> some View
     ) {
         self.title = title
         self.width = width
         self.alignment = numeric ? .trailing : .leading
         self.lines = lines
         self.truncation = truncation
+        self.sortedAscending = sortedAscending
+        self.onSort = onSort
         self.cell = { AnyView(cell($0)) }
     }
 }
@@ -101,28 +107,50 @@ private struct TableHeader<Row>: View {
     var inset = SettingsTokens.Metric.sectionTableInset
     var height = SettingsTokens.Metric.tableHeader
     var hasCheck = false
+    /// Reserves the chevron a row that opens a page draws, so the headings sit over the cells.
+    var hasChevron = false
+
+    private var sorts: Bool { columns.contains { $0.onSort != nil } }
 
     var body: some View {
         HStack(spacing: SettingsTokens.Metric.sectionTableColumnGap) {
             if hasCheck { Color.clear.frame(width: CheckWidth.value) }
             ForEach(columns.indices, id: \.self) { index in
-                let column = columns[index]
-                Text(column.title)
-                    .settingsFont(.tableHeader)
-                    .foregroundStyle(SettingsTokens.secondaryText)
-                    .frame(width: column.width, alignment: column.alignment)
-                    .frame(maxWidth: column.width == nil ? .infinity : nil, alignment: column.alignment)
+                heading(columns[index])
             }
+            if hasChevron { Color.clear.frame(width: ChevronWidth.value).accessibilityHidden(true) }
             if hasAction { Color.clear.frame(width: ActionWidth.value) }
         }
         .padding(.horizontal, inset)
         .frame(minHeight: height)
-        .accessibilityHidden(true)
+        .accessibilityHidden(!sorts)
+    }
+
+    @ViewBuilder private func heading(_ column: SettingsTableColumn<Row>) -> some View {
+        let label = HStack(spacing: 4) {
+            Text(column.title)
+            if column.onSort != nil, let ascending = column.sortedAscending {
+                Image(systemName: ascending ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 9, weight: .semibold))
+            }
+        }
+        .settingsFont(.tableHeader)
+        .foregroundStyle(SettingsTokens.secondaryText)
+        .frame(width: column.width, alignment: column.alignment)
+        .frame(maxWidth: column.width == nil ? .infinity : nil, alignment: column.alignment)
+        if let onSort = column.onSort {
+            Button(action: onSort) { label }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(column.sortedAscending == nil ? [] : .isSelected)
+        } else {
+            label.accessibilityHidden(sorts)
+        }
     }
 }
 
 private enum ActionWidth { static let value: CGFloat = SettingsTokens.Metric.Column.action }
 private enum CheckWidth { static let value: CGFloat = SettingsTokens.Metric.Column.check }
+private enum ChevronWidth { static let value: CGFloat = 14 }
 
 private struct TableRow<Row>: View {
     let row: Row
@@ -133,9 +161,21 @@ private struct TableRow<Row>: View {
     var height = SettingsTokens.Metric.tableRow
     /// Where the table is a page with a checkbox column: whether this row is ticked.
     var check: Binding<Bool>?
+    /// The chevron of a row that opens a page, and the action that opens it. The row is the button.
+    var showsChevron = false
+    var onOpen: (() -> Void)?
     @State private var isHovered = false
 
     var body: some View {
+        if let onOpen {
+            Button(action: onOpen) { contents }
+                .buttonStyle(.plain)
+        } else {
+            contents
+        }
+    }
+
+    private var contents: some View {
         HStack(spacing: SettingsTokens.Metric.sectionTableColumnGap) {
             if let check {
                 Toggle(isOn: check) { EmptyView() }
@@ -145,6 +185,9 @@ private struct TableRow<Row>: View {
             }
             ForEach(columns.indices, id: \.self) { index in
                 cell(columns[index])
+            }
+            if showsChevron {
+                SettingsChevron().frame(width: ChevronWidth.value, alignment: .trailing)
             }
             if let action {
                 SettingsButton(action.title, small: true) { action.perform(row) }
@@ -157,6 +200,7 @@ private struct TableRow<Row>: View {
         .background(isSelected ? SettingsTokens.selection : (isHovered ? SettingsTokens.hover : Color.clear))
         .contentShape(.rect)
         .onHover { isHovered = $0 }
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private func cell(_ column: SettingsTableColumn<Row>) -> some View {
@@ -178,6 +222,10 @@ struct SettingsSectionTable<Row: Identifiable>: View {
     let columns: [SettingsTableColumn<Row>]
     var action: SettingsRowAction<Row>?
     var showAll: (() -> Void)?
+    /// Whether a row is the one the page has open. A table that only lists passes false.
+    var isSelected: (Row) -> Bool = { _ in false }
+    /// Opens the row's page. The row is then a button with a chevron, and the heading reserves the chevron's width.
+    var onOpen: ((Row) -> Void)?
     @State private var expanded = false
 
     private var preview: SettingsTablePreview { SettingsTablePreview(total: rows.count, expanded: expanded) }
@@ -185,10 +233,12 @@ struct SettingsSectionTable<Row: Identifiable>: View {
     var body: some View {
         SettingsCard {
             VStack(spacing: 0) {
-                TableHeader(columns: columns, hasAction: action != nil, height: SettingsTokens.Metric.tableRow)
+                TableHeader(columns: columns, hasAction: action != nil, height: SettingsTokens.Metric.tableRow, hasChevron: onOpen != nil)
                 Rectangle().fill(SettingsTokens.rule).frame(height: SettingsTokens.Metric.ruleThickness)
                 ForEach(rows.prefix(preview.visibleCount)) { row in
-                    TableRow(row: row, columns: columns, action: action, isSelected: false)
+                    TableRow(
+                        row: row, columns: columns, action: action, isSelected: isSelected(row), showsChevron: onOpen != nil,
+                        onOpen: onOpen.map { open in { open(row) } })
                 }
                 if let count = preview.countLabel {
                     Rectangle().fill(SettingsTokens.rule).frame(height: SettingsTokens.Metric.ruleThickness)
