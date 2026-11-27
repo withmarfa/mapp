@@ -32,7 +32,7 @@ paths:
 - **Search and New, Library and Feed, then Pinned, Types and custom sections** (`SidebarLayout`). Missing items keep their rows.
 - **Pinned holds views, collections and items.** Saved views stay until unpinned.
 - **Five types show, then "N More".** Counts include kinds.
-- **Hover highlights rows,** swaps type, kind or collection counts for Add, and shows Add and More on headings. Sections stay open.
+- **Hover highlights rows,** swaps counts for Add and shows Add and More on headings. The chosen row stays soft gray, focused or not.
 - **Customize Sidebar** uses a menu on each faded place.
 - **Go lists sidebar places, views and types, plus Archive** (`GoMenu`).
 
@@ -46,7 +46,7 @@ paths:
 
 ## Foot
 
-- **The foot is one button that opens the Marfa's panel** (`SidebarFoot`, `MarfaPanel`). Refresh, Settings and a warning line are separate buttons; the line opens Settings › Connection.
+- **The foot is one button that opens the Marfa's panel** (`SidebarFoot`, `MarfaPanel`), with no hover fill. Refresh, Settings and a warning line are buttons; the line opens Settings › Connection.
 
 ## Toolbar
 

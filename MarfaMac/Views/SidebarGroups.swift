@@ -62,6 +62,9 @@ struct SidebarGroupHeader: View, Equatable {
                 more.opacity(isHovering ? 1 : 0)
             }
         }
+        // The heading starts where the rows' icons do: a row's mark is inset 10 points from the column, and its
+        // content a further 10 from the mark; a heading has the list's own inset only.
+        .padding(.leading, 6)
         .padding(.trailing, 12)
         .contentShape(.rect)
         .onHover { isHovering = $0 }
@@ -81,7 +84,7 @@ struct SidebarGroupHeader: View, Equatable {
         return Menu {
             SidebarOfferMenu(group: group.id, kind: group.kind, tab: tab, offers: offers, actions: actions, name: group.name)
         } label: {
-            Image(systemName: "plus")
+            HeadingGlyph(symbol: "plus")
         }
         .headingButton()
         .accessibilityLabel(Text("Add to \(group.name)"))
@@ -118,7 +121,7 @@ struct SidebarGroupHeader: View, Equatable {
                 SidebarCustomizeButton(browser: browser)
             }
         } label: {
-            Image(systemName: "ellipsis")
+            HeadingGlyph(symbol: "ellipsis")
         }
         .headingButton()
         .accessibilityLabel(Text("Section Options"))
@@ -127,11 +130,28 @@ struct SidebarGroupHeader: View, Equatable {
 }
 
 private extension View {
-    /// A heading's Add or More: a borderless menu as small as its symbol.
+    /// A heading's Add or More: a plain menu, so its mark takes the quiet gray of the heading.
     func headingButton() -> some View {
-        menuStyle(.borderlessButton)
+        menuStyle(.button)
+            .buttonStyle(.plain)
             .menuIndicator(.hidden)
             .fixedSize()
+    }
+}
+
+/// The mark of a heading's Add or More, in the gray of the sidebar's other trailing marks, with a ground under the pointer.
+private struct HeadingGlyph: View {
+    @State private var isHovering = false
+    let symbol: String
+
+    var body: some View {
+        Image(systemName: symbol)
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(.secondary)
+            .frame(width: 18, height: 18)
+            .background(Color(nsColor: .labelColor).opacity(isHovering ? 0.08 : 0), in: .rect(cornerRadius: 5))
+            .contentShape(.rect)
+            .onHover { isHovering = $0 }
     }
 }
 
@@ -366,19 +386,19 @@ struct SidebarPlaceRow: View, Equatable {
             if customizing {
                 SidebarHandle()
             } else if data.adds || data.count != nil {
-                ZStack(alignment: .trailing) {
-                    if let count = data.count {
-                        Text(count, format: .number).monospacedDigit().sidebarTrailing()
-                            .opacity(isHovering && data.adds ? 0 : 1)
-                    }
-                    if data.adds, isHovering {
-                        SidebarPlus(name: addName) {
-                            // The new item's panel takes the pointer, which then never leaves the row.
-                            isHovering = false
-                            add()
+                Text(data.count ?? 0, format: .number).monospacedDigit().sidebarTrailing()
+                    .opacity(data.count == nil || isHovering && data.adds ? 0 : 1)
+                    .accessibilityHidden(data.count == nil)
+                    // An overlay, so that the plus takes the count's place without changing the row's layout.
+                    .overlay(alignment: .trailing) {
+                        if data.adds, isHovering {
+                            SidebarPlus(name: addName) {
+                                // The new item's panel takes the pointer, which then never leaves the row.
+                                isHovering = false
+                                add()
+                            }
                         }
                     }
-                }
             }
         }
     }

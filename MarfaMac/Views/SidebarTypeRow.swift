@@ -39,16 +39,16 @@ struct SidebarLabel: View {
 /// and, where the row folds kinds under it, a chevron. Under the pointer a plus takes the count's place, which makes an
 /// item of the type; the chevron and everything else stay where they are.
 ///
-/// A kind sits one step in under its type: with its mark, the mark lies under its type's name; without, which the
-/// person can choose in Settings, its name starts level with its type's.
+/// A kind sits one `indent` in under its type, whether or not it has a mark; the person can choose in Settings to draw
+/// kinds without one.
 struct SidebarTypeRow: View {
     let row: SidebarPlan.TypeRow
     let count: Int
     /// The largest count on a row that folds. The count column of every folding row is as wide as it, so their
     /// chevrons share one place whatever each count is.
     let widestFoldingCount: Int
-    /// The indent columns before the row's own content, outermost first.
-    let steps: [Step]
+    /// How many kinds deep the row is.
+    let depth: Int
     let showsIcon: Bool
     /// Makes an item of the type, where the person can; nil leaves the count under the pointer.
     var add: (() -> Void)?
@@ -66,7 +66,7 @@ struct SidebarTypeRow: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            ForEach(steps.indices, id: \.self) { SidebarIndent(step: steps[$0]) }
+            Color.clear.frame(width: CGFloat(depth) * Self.indent, height: 0).accessibilityHidden(true)
             content.padding(.vertical, Self.verticalInset).padding(.trailing, Self.countInset)
         }
         .frame(maxHeight: .infinity)
@@ -97,18 +97,19 @@ struct SidebarTypeRow: View {
             label
             Spacer(minLength: 8)
             if row.isExpandable { disclosure.hidden().accessibilityHidden(true) }
-            ZStack(alignment: .trailing) {
-                SidebarCount(count: count, widest: row.isExpandable ? widestFoldingCount : 0)
-                    .opacity(isHovering && add != nil ? 0 : 1)
-                if isHovering, let add {
-                    SidebarPlus(name: addName) {
-                        // The new item's panel takes the pointer, which then never leaves the row.
-                        isHovering = false
-                        add()
+            SidebarCount(count: count, widest: row.isExpandable ? widestFoldingCount : 0)
+                .opacity(isHovering && add != nil ? 0 : 1)
+                // An overlay, so that the plus takes the count's place without changing the row's layout.
+                .overlay(alignment: .trailing) {
+                    if isHovering, let add {
+                        SidebarPlus(name: addName) {
+                            // The new item's panel takes the pointer, which then never leaves the row.
+                            isHovering = false
+                            add()
+                        }
+                        .padding(.trailing, -4)
                     }
-                    .padding(.trailing, -4)
                 }
-            }
         }
         .accessibilityElement(children: .combine)
         .accessibilityActions {
@@ -116,34 +117,14 @@ struct SidebarTypeRow: View {
         }
     }
 
-    /// One column of a kind's indent before its content.
-    struct Step: Equatable {
-        /// Whether the column is as wide as the mark and the space after it that its parent's row has, plus `extra`.
-        var spansParentMark: Bool
-        var extra: CGFloat
-    }
-
     static let subtypeIconsKey = "sidebarSubtypeIcons"
 
-    /// How far a name sits in from its parent's name when the parent has no mark to step by.
+    /// How far a kind sits in from its type.
     static let indent: CGFloat = 12
 
     /// Whether a row has a mark. Kinds lose theirs unless `subtypeIcons`; top-level types and groups keep theirs.
     static func showsIcon(_ row: SidebarPlan.TypeRow, subtypeIcons: Bool) -> Bool {
         subtypeIcons || row.depth == 0 || !row.node.opens
-    }
-
-    /// The columns before each row's content. A row under a parent with a mark starts where the parent's name does,
-    /// with its mark or, with none, its name; a row under a parent with no mark steps in from the parent's name by
-    /// `indent`.
-    static func steps(for rows: [SidebarPlan.TypeRow], subtypeIcons: Bool) -> [[Step]] {
-        var marks: [Bool] = []
-        return rows.map { row in
-            marks = Array(marks.prefix(row.depth)) + [showsIcon(row, subtypeIcons: subtypeIcons)]
-            return (0..<row.depth).map { level in
-                Step(spansParentMark: marks[level], extra: marks[level] ? 0 : indent)
-            }
-        }
     }
 }
 
@@ -164,31 +145,6 @@ private struct SidebarCount: View {
     }
 }
 
-/// One column of a kind's indent: as wide as its parent's mark and the space after it, where the parent has one, and
-/// `extra`.
-private struct SidebarIndent: View {
-    let step: SidebarTypeRow.Step
-
-    var body: some View {
-        HStack(spacing: 0) {
-            if step.spansParentMark {
-                // The system's own label gives the width of a mark and the space after it, so nesting follows its metrics.
-                Label {
-                    Text(verbatim: "")
-                } icon: {
-                    TonedGlyph(id: nil)
-                }
-                .interfaceFont(.body)
-                .labelStyle(.titleAndIcon)
-                .fixedSize()
-                .hidden()
-            }
-            Color.clear.frame(width: step.extra)
-        }
-        .accessibilityHidden(true)
-    }
-}
-
 #if DEBUG
 /// Rows as the sidebar draws them, with a system row above to show where its count sits.
 private struct TypeRowsPreview: View {
@@ -198,7 +154,6 @@ private struct TypeRowsPreview: View {
 
     var body: some View {
         let rows = Self.rows(nodes, depth: 0, collapsed: collapsed)
-        let steps = SidebarTypeRow.steps(for: rows, subtypeIcons: subtypeIcons)
         let widest = rows.filter(\.isExpandable).map(\.node.count).max() ?? 0
         List {
             Section {
@@ -206,9 +161,9 @@ private struct TypeRowsPreview: View {
                     .badge(Text(412, format: .number).monospacedDigit())
             }
             Section("Types") {
-                ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                ForEach(rows, id: \.id) { row in
                     SidebarTypeRow(
-                        row: row, count: row.node.count, widestFoldingCount: widest, steps: steps[index],
+                        row: row, count: row.node.count, widestFoldingCount: widest, depth: row.depth,
                         showsIcon: SidebarTypeRow.showsIcon(row, subtypeIcons: subtypeIcons)
                     ) {}
                     .listRowInsets(.vertical, 0)
