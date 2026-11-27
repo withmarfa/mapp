@@ -22,6 +22,9 @@ nonisolated struct PlacementEntry: Sendable, Equatable {
         self.value = value
     }
 
+    // String equality is canonical, so two spellings of "café" would compare equal and one would be lost.
+    static func == (left: Self, right: Self) -> Bool { left.text.utf8.elementsEqual(right.text.utf8) }
+
     private struct Object: Decodable {
         init(from decoder: any Decoder) throws {
             _ = try decoder.container(keyedBy: DynamicKey.self)

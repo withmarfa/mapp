@@ -391,4 +391,17 @@ struct PagePlacementsTests {
         #expect(defaults.stringArray(forKey: PagePlacements.setAsideKey) == [unreadable])
         #expect(PagePlacements.stored(in: defaults).choices["aic.ticket"]?.shows == ["repo": .whenSet])
     }
+
+    @Test func anUnreadableEntrySpelledAnotherWayIsSetAsideAgain() throws {
+        let defaults = ThrowawayDefaults.make("PagePlacementsTests.spellings")
+        let composed = "{\"future.type\":{\"rows\":{\"caf\u{E9}\":1}}}"
+        let decomposed = "{\"future.type\":{\"rows\":{\"cafe\u{301}\":1}}}"
+        defaults.set(composed, forKey: PagePlacements.key)
+        PagePlacements.update(in: defaults) { $0.setPins(["repo"], of: Self.ticket) }
+        defaults.set(decomposed, forKey: PagePlacements.key)
+        PagePlacements.update(in: defaults) { $0.setPins(["repo"], of: Self.ticket) }
+
+        let copies = try #require(defaults.stringArray(forKey: PagePlacements.setAsideKey))
+        #expect(copies.map { Array($0.utf8) } == [Array(composed.utf8), Array(decomposed.utf8)])
+    }
 }
