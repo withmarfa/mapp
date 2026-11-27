@@ -71,6 +71,10 @@ nonisolated struct ConnectionSettings: Equatable, Sendable {
         String(localized: "Removing them also sends the changes above, so it can’t be combined with discarding them.")
     }
 
+    static var removalRisk: String {
+        String(localized: "Removing this app’s settings can also move linked items to Trash.")
+    }
+
     /// Where one of the changes that wait is the removal itself, which has no text to show.
     var removalWaiting: String {
         String(localized: "One of them removes this app’s settings from \(name). Discard the copy and the settings stay there.")

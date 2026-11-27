@@ -11,6 +11,14 @@ struct SignOutPresentation: ViewModifier {
         ConnectionSettings(standing: libraries.preferences.standing, name: LibraryDescription.name(libraries))
     }
 
+    private var message: String {
+        if model.offersSettingsRemoval {
+            let signOut = String(localized: "Marfa for Mac removes its copy from this Mac and deletes the webhooks it made.")
+            return "\(signOut) \(ConnectionSettings.removalRisk)"
+        }
+        return String(localized: "Marfa for Mac removes its copy from this Mac and deletes the webhooks it made. Your items stay.")
+    }
+
     func body(content: Content) -> some View {
         content
             .onChange(of: model.isConfirmingDisconnect, initial: true) { _, requested in
@@ -18,7 +26,7 @@ struct SignOutPresentation: ViewModifier {
                 model.isConfirmingDisconnect = false
                 SettingsAlert.confirm(
                     title: String(localized: "Sign Out?"),
-                    message: String(localized: "Marfa for Mac removes its copy from this Mac and deletes the webhooks it made. Your items stay."),
+                    message: message,
                     confirm: String(localized: "Sign Out"),
                     checkbox: model.offersSettingsRemoval ? words.signOutChoice : nil,
                     window: NSApp.keyWindow

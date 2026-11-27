@@ -6732,6 +6732,9 @@
     "Marfa for Mac couldn’t check this link in time. Try opening it again." : {
 
     },
+    "Marfa for Mac removes its copy from this Mac and deletes the webhooks it made." : {
+
+    },
     "Marfa for Mac removes its copy from this Mac and deletes the webhooks it made. Your items stay." : {
 
     },
@@ -8633,6 +8636,9 @@
 
     },
     "Removing them also sends the changes you chose to discard. Keep the copy to send them, or sign out anyway and the settings stay in %@." : {
+
+    },
+    "Removing this app’s settings can also move linked items to Trash." : {
 
     },
     "Rename" : {

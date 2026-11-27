@@ -72,7 +72,7 @@ struct DepartureSheet: View {
                 }
                 if isDisconnecting, model.offersSettingsRemoval {
                     SettingsCheckRow(
-                        verbatim: words.signOutChoice, line: words.sendsWaitingChanges,
+                        verbatim: words.signOutChoice, line: "\(words.sendsWaitingChanges) \(ConnectionSettings.removalRisk)",
                         isOn: Bindable(model).alsoRemovesSettings
                     )
                     .accessibilityIdentifier("DepartureRemoveSettings")

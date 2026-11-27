@@ -112,6 +112,25 @@ import Testing
         #expect(model.settingsRemovalFailure == nil)
     }
 
+    @Test func anOldQueueCountDoesNotLoseTheCheckedSettingsChoice() async throws {
+        let log = Log()
+        let (model, bench) = try await connected(removal: { sendsOtherChanges in
+            log.steps.append(sendsOtherChanges ? "send everything" : "remove settings")
+        })
+        let source = try #require(bench.servers.last)
+        source.report.set(SyncReport(waiting: 1, queueRead: true))
+        source.unsentCount.withLock { $0 = 0 }
+        try #require(await eventually { model.host.waitingChanges == 1 })
+
+        model.requestDisconnect()
+        try #require(await eventually { model.isConfirmingDisconnect })
+        model.alsoRemovesSettings = true
+        await model.disconnect()
+
+        #expect(log.steps == ["remove settings"])
+        #expect(!model.isConnected)
+    }
+
     @Test func aRemovalThatFailsSignsNothingOutAndAsks() async throws {
         struct Refused: Error {}
         let (model, bench) = try await connected(removal: { _ in throw Refused() })
@@ -243,6 +262,28 @@ import Testing
         await model.answer(.keepCopy)
         #expect(await copy.sentLibraryWrites == ["library-write"])
         #expect(sync.standing == .off(.removed))
+        #expect(!model.isConnected)
+    }
+
+    @Test func aChangeArrivingWhileSignOutIsConfirmedWaitsForKeepCopy() async throws {
+        let copy = FakePreferencesCopy()
+        let (model, sync, bench) = try await overSync(copy)
+        model.requestDisconnect()
+        #expect(model.isConfirmingDisconnect)
+        model.alsoRemovesSettings = true
+        await copy.queueLibraryWrite()
+        try #require(bench.servers.last).unsentCount.withLock { $0 = 1 }
+
+        await model.disconnect()
+
+        #expect(model.isConnected && model.alsoRemovesSettings)
+        #expect(model.settingsRemovalFailure == nil)
+        #expect(model.departure?.unsent?.count == 1)
+        #expect(await copy.sentLibraryWrites.isEmpty)
+        #expect(await copy.removed.isEmpty && sync.syncs)
+
+        await model.answer(.keepCopy)
+        #expect(await copy.sentLibraryWrites == ["library-write"])
         #expect(!model.isConnected)
     }
 

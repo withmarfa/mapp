@@ -103,6 +103,7 @@ struct MarfaMarkSet: Identifiable, Hashable {
     func showConnection()
     /// Starts the app’s usual sign-out flow, including any changes waiting to be sent.
     func requestSignOut()
+    var isSignInBusy: Bool { get }
     /// The package's client over the current server, which a page's own calls go through.
     func client() throws -> Client
     /// What opens something in the app, such as Show in the app; nil where the app has no such place.
@@ -178,6 +179,7 @@ struct MarfaMarkSet: Identifiable, Hashable {
 }
 
 extension MarfaSettingsHost {
+    var isSignInBusy: Bool { false }
     func show(_ page: MarfaSettingsPage) { show(page, subpage: nil) }
 }
 
