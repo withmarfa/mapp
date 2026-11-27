@@ -5,13 +5,24 @@ import SwiftUI
 struct OpenLinksRow: View {
     let model: OpenLinksModel
 
+    private var selected: LinkApp? { model.apps.first { $0.url == model.current } }
+
     var body: some View {
         SettingsRow(
             title: Text("Open Marfa links in"), line: model.apps.isEmpty ? Text("No app on this Mac opens Marfa links yet.") : nil,
             error: error, look: model.apps.isEmpty ? .off : .normal, lines: nil
         ) {
-            OpenLinksPopUp(apps: model.apps, selection: selection, isError: model.refusal != nil)
-                .disabled(model.isChanging)
+            SettingsPopUp(
+                title: "Open Marfa links in", selection: selection, isError: model.refusal != nil,
+                currentValueLabel: selected.map { Text(verbatim: $0.name) } ?? Text("None")
+            ) {
+                if model.apps.isEmpty { Text("None").tag(URL?.none) }
+                ForEach(model.apps) { app in
+                    Label { Text(verbatim: app.title) } icon: { Image(nsImage: app.icon) }.tag(URL?.some(app.url))
+                }
+            }
+            .help(Text(verbatim: selected?.title ?? ""))
+            .disabled(model.isChanging)
         }
         .onAppear { model.refresh() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in model.refresh() }
@@ -31,37 +42,5 @@ struct OpenLinksRow: View {
             guard let chosen else { return }
             Task { await model.choose(chosen) }
         }
-    }
-}
-
-/// Shows the app’s short name in the control and the full names, including disambiguating paths, in its menu.
-private struct OpenLinksPopUp: View {
-    let apps: [LinkApp]
-    @Binding var selection: URL?
-    let isError: Bool
-    @Environment(\.settingsTextScale) private var scale
-
-    private var selected: LinkApp? { apps.first { $0.url == selection } }
-
-    var body: some View {
-        Picker("Open Marfa links in", selection: $selection) {
-            if apps.isEmpty { Text("None").tag(URL?.none) }
-            ForEach(apps) { app in
-                Label { Text(verbatim: app.title) } icon: { Image(nsImage: app.icon) }.tag(URL?.some(app.url))
-            }
-        } currentValueLabel: {
-            if let selected {
-                Text(verbatim: selected.name).lineLimit(1).truncationMode(.middle)
-            } else {
-                Text("None")
-            }
-        }
-        .labelsHidden()
-        .pickerStyle(.menu)
-        .settingsControlSize()
-        .buttonSizing(.flexible)
-        .frame(width: SettingsTokens.Metric.popUpMinimumWidth * max(1, scale))
-        .settingsErrorRing(isError)
-        .help(Text(verbatim: selected?.title ?? ""))
     }
 }

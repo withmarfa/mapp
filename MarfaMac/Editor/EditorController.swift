@@ -90,7 +90,7 @@ final class EditorController: NSObject {
     @ObservationIgnored var onEscape: () -> Void = {}
     /// A window that shows an item beside the list reveals it as choosing it in the list does.
     @ObservationIgnored var onOpenItem: (ItemID) -> Void = { _ in }
-    /// A link in the item's text names this item. A window that opens items as Settings > General > Open Items says
+    /// A link in the item's text names this item. A window that opens items as General’s Open items in setting says
     /// sets this; without it the link opens as any other (`onOpenItem`).
     @ObservationIgnored var onFollowItemLink: ((ItemID) -> Void)?
     /// Shows a link's menu in place of the native one, given what it offers and the way to carry out a choice. Nothing is

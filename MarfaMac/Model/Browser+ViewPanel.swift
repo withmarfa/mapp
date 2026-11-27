@@ -307,7 +307,7 @@ extension Browser {
         itemOpening(settings: ItemOpening.stored(in: defaults))
     }
 
-    /// The same, for a view that watches Settings' Open Items itself (`@AppStorage`) and passes it as `settings`.
+    /// The same, for a view that passes General’s Open items in setting from `@AppStorage`.
     func itemOpening(settings: ItemOpening) -> ItemOpening {
         chosenOpening ?? settings.asDefault
     }

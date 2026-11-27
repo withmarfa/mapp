@@ -2,11 +2,11 @@ import MarfaIcons
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// The text form of a new item, which every New opens where Settings > General > New Opens says Text Form, and which
+/// The text form of a new item, which every New opens where General’s New item opens as setting says Text Form, and which
 /// the line hands its draft to (Add Text, a file, or a value the line cannot take): a panel near the top of the window
 /// for making one item. What it holds comes first (a title and text, a file, or a title alone); above the footer, tokens show the
 /// details the person added, its tags, properties and parent, and the files to attach to it. In says where it goes. The footer chooses the
-/// kind of item and, from the plus menu, adds a file or a detail. ⌘Return adds it and opens it the way Settings > General > Open Items says. Escape, Cancel or a click outside puts it away, keeping what was typed and given on this Mac (`NewItemDrafts`); an empty panel also goes when the window stops being in front.
+/// kind of item and, from the plus menu, adds a file or a detail. ⌘Return adds it and opens it the way General’s Open items in setting says. Escape, Cancel or a click outside puts it away, keeping what was typed and given on this Mac (`NewItemDrafts`); an empty panel also goes when the window stops being in front.
 struct QuickAddPanel: View {
     @CurrentLibrary private var library
     @Environment(Libraries.self) private var libraries

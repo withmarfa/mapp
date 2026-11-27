@@ -2,7 +2,7 @@ import MarfaIcons
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// ⌘N and every New, unless Settings > General > New Opens says Text Form: one line that makes an item. The kind is
+/// ⌘N and every New, unless General’s New item opens as setting says Text Form: one line that makes an item. The kind is
 /// the capsule at its start, which Tab moves on; `#` adds a tag, `@` a parent and `/` a property of the kind, each
 /// from a list of matches in its row under the line; a day typed is the item's due or start date; a pasted web address
 /// makes a bookmark. What the line reads shows as a chip after the words, which stay as typed until Add takes them out;

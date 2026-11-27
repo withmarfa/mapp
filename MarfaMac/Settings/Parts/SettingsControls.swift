@@ -107,14 +107,18 @@ struct SettingsMoreMenu<Content: View>: View {
 /// A system pop-up at the row's trailing edge, with room for its choices. `isError` puts the red ring round it.
 struct SettingsPopUp<Value: Hashable, Content: View>: View {
     private let title: Text
+    private let currentValueLabel: Text?
     @Binding var selection: Value
     var isError = false
     @ViewBuilder let content: Content
     @Environment(\.settingsCompactControls) private var compact
     @Environment(\.settingsTextScale) private var scale
 
-    init(title: LocalizedStringKey, selection: Binding<Value>, isError: Bool = false, @ViewBuilder content: () -> Content) {
-        self.init(label: Text(title), selection: selection, isError: isError, content: content)
+    init(
+        title: LocalizedStringKey, selection: Binding<Value>, isError: Bool = false,
+        currentValueLabel: Text? = nil, @ViewBuilder content: () -> Content
+    ) {
+        self.init(label: Text(title), selection: selection, isError: isError, currentValueLabel: currentValueLabel, content: content)
     }
 
     /// For a title the server or a plugin wrote, which is never looked up as a key.
@@ -122,22 +126,35 @@ struct SettingsPopUp<Value: Hashable, Content: View>: View {
         self.init(label: Text(verbatim: title), selection: selection, isError: isError, content: content)
     }
 
-    private init(label: Text, selection: Binding<Value>, isError: Bool, @ViewBuilder content: () -> Content) {
+    private init(
+        label: Text, selection: Binding<Value>, isError: Bool, currentValueLabel: Text? = nil,
+        @ViewBuilder content: () -> Content
+    ) {
         title = label
         _selection = selection
         self.isError = isError
+        self.currentValueLabel = currentValueLabel
         self.content = content()
     }
 
     var body: some View {
-        Picker(selection: $selection) { content } label: { title }
-            .labelsHidden()
-            .pickerStyle(.menu)
-            .settingsControlSize()
-            .buttonSizing(.flexible)
-            .frame(minWidth: compact ? SettingsTokens.Metric.popUpMinimumWidth * max(1, scale) : SettingsTokens.Metric.controlWidth)
-            .fixedSize(horizontal: true, vertical: false)
-            .settingsErrorRing(isError)
+        let width = compact ? SettingsTokens.Metric.popUpMinimumWidth * max(1, scale) : SettingsTokens.Metric.controlWidth
+        Group {
+            if let currentValueLabel {
+                Picker(selection: $selection) { content } label: { title } currentValueLabel: {
+                    currentValueLabel.lineLimit(1).truncationMode(.middle)
+                }
+            } else {
+                Picker(selection: $selection) { content } label: { title }
+            }
+        }
+        .labelsHidden()
+        .pickerStyle(.menu)
+        .settingsControlSize()
+        .buttonSizing(.flexible)
+        .frame(minWidth: width, maxWidth: currentValueLabel == nil ? nil : width)
+        .fixedSize(horizontal: currentValueLabel == nil, vertical: false)
+        .settingsErrorRing(isError)
     }
 }
 

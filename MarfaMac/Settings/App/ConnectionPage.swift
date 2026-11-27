@@ -213,7 +213,7 @@ struct ConnectionPage: View {
         }
     }
 
-    // Disconnect moves to Account’s header in session 266c.
+    // Connection keeps Disconnect until Account has its Sign Out action.
     private var disconnect: some View {
         SettingsSection("Disconnect") {
             SettingsRow(
@@ -233,7 +233,6 @@ struct ConnectionPage: View {
     private var appSettingsWords: ConnectionSettings {
         ConnectionSettings(standing: libraries.preferences.standing, name: LibraryDescription.name(libraries))
     }
-
 
     /// The question before Disconnect, with the choice to take this app's settings out of the Marfa too where they are kept there.
     private func askToDisconnect() {

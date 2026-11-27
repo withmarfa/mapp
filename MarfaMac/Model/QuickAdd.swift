@@ -742,7 +742,7 @@ final class QuickAdd {
 }
 
 extension Browser {
-    /// Opens a new item: the one line or the text form, as Settings > General > New Opens says unless `form` is given,
+    /// Opens a new item: the one line or the text form, as General’s New item opens as setting says unless `form` is given,
     /// with `kind` chosen where one is given and `title` typed where the draft is new. This is every New's one way in,
     /// the search's "New Item" among them. A draft put away, or kept from a closed window or an earlier run, comes
     /// back as it was left, its title untouched, since the person's own draft wins. Otherwise the kind is the place's

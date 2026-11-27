@@ -23,8 +23,7 @@ nonisolated struct PreferencesReadiness: Equatable, Sendable {
     var instance: String?
 }
 
-/// What the preferences sync asks of the working copy, apart from the copy so it can be tested without one. Every
-/// write is queued and shown at once, so it works offline.
+/// The working copy operations used by settings sync. Ordinary sync writes are queued locally so they work offline.
 nonisolated protocol PreferencesCopy: Sendable {
     /// Names this opened copy, so a write queued under another, whose answer no sync here can take, is told apart.
     var run: String { get }
@@ -50,7 +49,7 @@ nonisolated protocol PreferencesCopy: Sendable {
     func write(_ operations: [RowOperation], to table: PreferencesTable, of item: String) async throws
     /// Moves an item to the bin, and answers the id of the queued write that does it.
     func remove(_ item: String) async throws -> String
-    /// Moves only these settings items to the bin on the server, all together.
+    /// Asks the server to trash the named settings items together.
     func removeFromMarfa(_ items: [String]) async throws
     /// The queued writes that move a settings item to the bin and have no answer yet.
     func pendingRemovals() async throws -> Set<String>

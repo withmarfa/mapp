@@ -168,7 +168,7 @@ final class PreferencesSync {
         case otherChangesWait
         /// The server did not take the removal; it stays queued and is sent when the copy next reaches the server.
         case notTaken
-        /// The server's trash preview includes more than this app's settings.
+        /// The preview shows a cascade or a different item count.
         case takesOtherItems
         case alreadyRemoving
     }

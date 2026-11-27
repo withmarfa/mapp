@@ -1,7 +1,5 @@
 import SwiftUI
 
-/// The General page: how the app opens, what a new item is, how dates and times read, what the app does with the web, and
-/// this app's settings: saving them to a file, bringing them back and starting them over.
 struct GeneralPage: View {
     let libraries: Libraries
     @State private var files: SettingsFilesModel

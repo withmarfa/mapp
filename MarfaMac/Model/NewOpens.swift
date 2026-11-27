@@ -1,6 +1,6 @@
 import Foundation
 
-/// What New Item opens, as Settings > General > New Opens says: the one line, or the text form, which takes text and
+/// What New Item opens, as General’s New item opens as setting says: the one line, or the text form, which takes text and
 /// files as well. One word in the defaults (`key`), which syncs through the Marfa (`PreferencesMap`); a word this
 /// version does not know reads as the line.
 nonisolated enum NewOpens: String, CaseIterable {

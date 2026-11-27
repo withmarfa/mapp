@@ -13,7 +13,7 @@ struct ItemRowMenu<LayoutActions: View>: View {
     let undoManager: UndoManager?
     @ViewBuilder let layoutActions: LayoutActions
 
-    /// Where Open opens the items: the place's Open Items, else Settings.
+    /// The place’s Open Items choice takes precedence over General’s Open items in setting.
     private var way: ItemOpening { browser.itemOpening(settings: opening) }
 
     var body: some View {

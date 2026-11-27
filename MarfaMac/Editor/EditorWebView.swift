@@ -176,7 +176,7 @@ final class EditorWebView: WKWebView {
         controller?.openEmbed(embed.reference, in: embed.item)
     }
 
-    /// Open Item, on a picture or file the item embeds: its own item, as Settings > General > Open Items says.
+    /// Open Item, on a picture or file the item embeds: its own item, as General’s Open items in setting says.
     @objc private func openEmbedItem(_ sender: NSMenuItem) {
         guard let file = (sender.representedObject as? MenuEmbed)?.file else { return }
         controller?.follow(file)
