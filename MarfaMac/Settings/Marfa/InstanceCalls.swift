@@ -133,6 +133,10 @@ nonisolated enum StoredSettingChange: Hashable, Sendable {
 /// What the pages ask of the server. Every call needs the server and is never queued.
 nonisolated protocol InstanceCalls: Sendable {
     func activity(_ query: ActivityQuery) async throws(OwnerFailure) -> ActivityBatch
+    /// Item counts from `GET /items/stats`. A missing key means zero. The call needs no owner permission of its own.
+    func itemStats(_ query: UsageStatsQuery) async throws(OwnerFailure) -> [String: Int]
+    /// Versions, files and the database from `GET /metrics`. Needs `instance.read`.
+    func usageMetrics() async throws(OwnerFailure) -> UsageMetrics
     func storedSettings() async throws(OwnerFailure) -> InstanceSettingsSnapshot
     func startUpSettings() async throws(OwnerFailure) -> [StartUpSetting]
     /// Sends exactly `changes` to the instance that was read. If another instance answers, nothing is written and the call
@@ -140,9 +144,11 @@ nonisolated protocol InstanceCalls: Sendable {
     func change(_ changes: [String: StoredSettingChange], instanceID: String?) async throws(OwnerFailure)
 }
 
-/// `InstanceCalls` over the package's generated client.
+/// `InstanceCalls` over the package's generated client. Item counts go through `Server.itemStats`, which renews a
+/// refused token itself.
 nonisolated struct ClientInstanceCalls: InstanceCalls {
     let client: @Sendable () throws -> Client
+    let server: @Sendable () throws -> Server
 
     private func run<Result>(
         plainConflict: (String) -> OwnerFailure = { .refused($0) }, _ call: (Client) async throws -> Result
@@ -163,6 +169,11 @@ nonisolated struct ClientInstanceCalls: InstanceCalls {
             ?? (try? Date(text, strategy: .iso8601))
     }
 
+    private static func count(_ value: Double) -> Int? {
+        guard value.isFinite else { return nil }
+        return Int(exactly: value.rounded())
+    }
+
     func activity(_ query: ActivityQuery) async throws(OwnerFailure) -> ActivityBatch {
         try await run { client in
             let search = query.search.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -178,6 +189,42 @@ nonisolated struct ClientInstanceCalls: InstanceCalls {
                         resourceType: entry.resourceType, resourceID: entry.resourceId, address: entry.clientIp)
                 },
                 next: page.nextCursor)
+        }
+    }
+
+    func itemStats(_ query: UsageStatsQuery) async throws(OwnerFailure) -> [String: Int] {
+        let asked = Self.itemStatsRequest(query)
+        let server: Server
+        do { server = try self.server() } catch { throw ClientOwnerCalls.failure(error) }
+        do {
+            let groups = try await server.itemStats(by: asked.grouping, filters: asked.filters)
+            var counts: [String: Int] = [:]
+            for group in groups {
+                counts[group.key] = Int(exactly: group.count) ?? Int.max
+            }
+            return counts
+        } catch {
+            throw ClientOwnerCalls.failure(error)
+        }
+    }
+
+    /// The grouping and the changed-time bounds `GET /items/stats` is asked with. An open count sends neither bound.
+    static func itemStatsRequest(_ query: UsageStatsQuery) -> (grouping: ItemStatsGrouping, filters: ItemStatsFilters) {
+        (
+            grouping: query.grouping == .type ? .type : .source,
+            filters: ItemStatsFilters(
+                updatedAfter: query.updatedAfter.map(ItemDate.instant),
+                updatedBefore: query.updatedBefore.map(ItemDate.instant))
+        )
+    }
+
+    func usageMetrics() async throws(OwnerFailure) -> UsageMetrics {
+        try await run { client in
+            let metrics = try await client.getInstanceMetrics().ok.body.json
+            return UsageMetrics(
+                versionCount: metrics.storage.rows.versions.flatMap(Self.count),
+                fileBytes: Self.count(metrics.blobs.totalBytes) ?? 0,
+                databaseBytes: metrics.storage.databaseBytes.flatMap(Self.count))
         }
     }
 

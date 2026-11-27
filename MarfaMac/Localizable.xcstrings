@@ -2690,6 +2690,12 @@
     "An item can’t be linked to itself." : {
       "extractionState" : "manual"
     },
+    "An item counts once, on the day it last changed." : {
+
+    },
+    "An item with more than %lld versions will have its oldest versions permanently deleted the next time the server tidies up." : {
+      "extractionState" : "manual"
+    },
     "And %lld more changes whose text can’t be shown." : {
       "localizations" : {
         "en" : {
@@ -3587,6 +3593,9 @@
     "Changed the settings" : {
 
     },
+    "Changes and sign-ins are recorded here." : {
+
+    },
     "Changes Are Waiting" : {
 
     },
@@ -4323,6 +4332,9 @@
 
     },
     "Couldn’t read the total file size" : {
+
+    },
+    "Couldn’t read the version count or storage sizes." : {
 
     },
     "Couldn’t read where files are" : {
@@ -5486,6 +5498,9 @@
     "Group: None" : {
 
     },
+    "Grouping" : {
+
+    },
     "Grouping by %@" : {
       "extractionState" : "manual"
     },
@@ -6068,7 +6083,16 @@
     "Items About This" : {
       "extractionState" : "manual"
     },
+    "Items Changed" : {
+
+    },
     "Items With No Location" : {
+
+    },
+    "Items by Source" : {
+
+    },
+    "Items by Type" : {
 
     },
     "Items deleted more than %@ ago will be permanently deleted, with their history, the next time the server tidies up. They can’t be recovered." : {
@@ -6426,6 +6450,12 @@
 
     },
     "Largest request" : {
+
+    },
+    "Last 30 Days" : {
+
+    },
+    "Last 7 Days" : {
 
     },
     "Last Backup" : {
@@ -7326,6 +7356,12 @@
     "No Items" : {
       "extractionState" : "manual"
     },
+    "No items yet" : {
+
+    },
+    "No Jobs Yet" : {
+
+    },
     "No Jobs" : {
 
     },
@@ -7805,6 +7841,9 @@
     "Oldest Marfa" : {
 
     },
+    "Oldest first" : {
+
+    },
     "On" : {
 
     },
@@ -8231,6 +8270,9 @@
     },
     "Pending" : {
       "extractionState" : "manual"
+    },
+    "Period" : {
+
     },
     "Permanently Delete" : {
 
@@ -9979,6 +10021,9 @@
     "Storage Usage" : {
 
     },
+    "Stored" : {
+
+    },
     "Strict" : {
 
     },
@@ -10449,6 +10494,12 @@
 
     },
     "The app isn’t allowed to read deleted items." : {
+
+    },
+    "The app isn’t allowed to read how many items this Marfa holds." : {
+
+    },
+    "The app isn’t allowed to read how much this Marfa stores." : {
 
     },
     "The app isn’t allowed to read or change which sources apps and keys read." : {
@@ -12117,6 +12168,9 @@
     "Uploads will stop below %@ free. This may leave the server less room to work in." : {
 
     },
+    "Usage" : {
+
+    },
     "Use %lld characters or fewer." : {
       "extractionState" : "manual"
     },
@@ -12471,9 +12525,6 @@
 
     },
     "What apps catch up on after being away." : {
-
-    },
-    "What happens in %@ is recorded here." : {
 
     },
     "What it may read and change. It can only be narrowed." : {

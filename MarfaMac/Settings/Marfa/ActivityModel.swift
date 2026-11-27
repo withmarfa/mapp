@@ -114,6 +114,22 @@ nonisolated enum ActivityWording {
     ]
 }
 
+/// A column of the log. The order is the page that is loaded: the server has no sort of its own.
+enum ActivityColumn: Int, CaseIterable, Hashable, Sendable {
+    case when, who, what, address
+}
+
+/// Which way the loaded page is listed. When starts newest first; any other column starts at A.
+struct ActivityOrder: Equatable, Sendable {
+    var column: ActivityColumn = .when
+    var ascending = false
+
+    /// Whether `column` is the one in force, and which way. Nil on the others, so only one heading shows a direction.
+    func ascending(for column: ActivityColumn) -> Bool? {
+        self.column == column ? ascending : nil
+    }
+}
+
 /// The Activity page: the server's audit log, newest first, a page at a time. The server gives no count and no way back, so
 /// the model keeps where each page it has shown began, and Newer returns to those.
 @Observable @MainActor final class ActivityModel {
@@ -124,6 +140,7 @@ nonisolated enum ActivityWording {
 
     var kind: ActivityKind?
     var search = ""
+    var order = ActivityOrder()
 
     private(set) var entries: [ActivityEntry] = []
     private(set) var hasNext = false
@@ -146,6 +163,39 @@ nonisolated enum ActivityWording {
     var filterKey: String { (kind?.rawValue ?? "") + "\u{0}" + search.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     var isFiltered: Bool { kind != nil || !search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
+    /// The loaded page in `order`. The server's own order stays in `entries`.
+    var listed: [ActivityEntry] {
+        let order = order
+        return entries.sorted { lhs, rhs in
+            let compared = Self.compare(lhs, rhs, by: order.column)
+            if compared == .orderedSame {
+                // When keeps the server's order. A stable sort needs false both ways; an id tie-break would reorder equals.
+                return order.column == .when ? false : lhs.id < rhs.id
+            }
+            let ascending = compared == .orderedAscending
+            return order.ascending ? ascending : !ascending
+        }
+    }
+
+    /// "Newest first" for the order the log opens in, and a short line for any other.
+    var orderLabel: String {
+        switch (order.column, order.ascending) {
+        case (.when, false): String(localized: "Newest first")
+        case (.when, true): String(localized: "Oldest first")
+        case (_, true): String(localized: "A to Z")
+        case (_, false): String(localized: "Z to A")
+        }
+    }
+
+    /// The heading that was clicked: the same column changes direction, and a new one starts at A, or newest first for When.
+    func toggleSort(_ column: ActivityColumn) {
+        if order.column == column {
+            order.ascending.toggle()
+        } else {
+            order = ActivityOrder(column: column, ascending: column != .when)
+        }
+    }
 
     /// "1 to 20" for the page shown.
     var range: String? {
@@ -193,15 +243,37 @@ nonisolated enum ActivityWording {
             failure = nil
         } catch {
             guard mine == generation else { return }
+            let refused = if case .notPermitted = error { true } else { false }
             starts = Array(starts.prefix(pageIndex + 1))
-            if clearingOnFailure {
+            if clearingOnFailure || refused {
                 entries = []
                 next = nil
                 hasNext = false
             }
             failure = error
+            hasLoaded = true
             await context.learn(from: error)
+            return
         }
         hasLoaded = true
     }
+
+    /// A missing date is the oldest. Who uses the name the page shows, so a missing actor is Unknown. What is those words, not the server's key.
+    private static func compare(_ lhs: ActivityEntry, _ rhs: ActivityEntry, by column: ActivityColumn) -> ComparisonResult {
+        switch column {
+        case .when:
+            let left = lhs.date ?? .distantPast
+            let right = rhs.date ?? .distantPast
+            if left == right { return .orderedSame }
+            return left < right ? .orderedAscending : .orderedDescending
+        case .who:
+            return who(lhs.who).localizedStandardCompare(who(rhs.who))
+        case .what:
+            return ActivityWording.what(lhs.action).localizedStandardCompare(ActivityWording.what(rhs.action))
+        case .address:
+            return (lhs.address ?? "").localizedStandardCompare(rhs.address ?? "")
+        }
+    }
+
+    private static func who(_ name: String?) -> String { name ?? String(localized: "Unknown") }
 }

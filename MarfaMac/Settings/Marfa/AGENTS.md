@@ -19,7 +19,7 @@ These pages stand alone, so another app can take them. They import nothing of th
 
 ## Permissions and states
 
-- **Each page names its permission and the one line that says what the app may not do** (`MarfaSettingsPage.permission`, `permissionLine`). No two pages share a line.
+- **Each page names its permission and the one line that says what the app may not do** (`MarfaSettingsPage.permission`, `permissionLine`). No two pages share a line. Activity names none, because Usage needs `instance.read` and Log needs `audit.read`, and each tab says so itself.
 - **`MarfaPageGate` shows the page or a centered state.** A page never falls back to a library of its own.
 - **A setting that needs no Marfa stands above the state** (`MarfaPageGate(above:)`, `SettingsStandingState`).
 - **Every permission request goes through `allowMore(_:)`,** whose argument names the permissions that the caller needs.

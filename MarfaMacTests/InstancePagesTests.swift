@@ -4,6 +4,62 @@ import Synchronization
 import Testing
 @testable import MarfaMac
 
+/// Holds `itemStats` so a test can change the period while a read is in flight.
+private nonisolated final class StatsPause: @unchecked Sendable {
+    private let lock = NSLock()
+    private var holding = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    private var waitingCount = 0
+
+    var isHolding: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return holding
+    }
+
+    var waiting: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return waitingCount
+    }
+
+    func hold() {
+        lock.lock()
+        holding = true
+        lock.unlock()
+    }
+
+    /// Later calls are not held. Calls already waiting stay waiting.
+    func admit() {
+        lock.lock()
+        holding = false
+        lock.unlock()
+    }
+
+    func park() async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            lock.lock()
+            if holding {
+                waitingCount += 1
+                waiters.append(continuation)
+                lock.unlock()
+            } else {
+                lock.unlock()
+                continuation.resume()
+            }
+        }
+    }
+
+    func release() {
+        lock.lock()
+        holding = false
+        let pending = waiters
+        waiters = []
+        lock.unlock()
+        pending.forEach { $0.resume() }
+    }
+}
+
 /// What Activity, Monitoring, Limits and Start-Up ask of the server, held in memory: it answers as the server does, keeps what it
 /// was sent and fails a named call on request.
 nonisolated final class FakeInstanceCalls: InstanceCalls {
@@ -21,6 +77,16 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
         var sent: [[String: StoredSettingChange]] = []
         var instanceIDsSent: [String?] = []
         var queries: [ActivityQuery] = []
+        var metrics = UsageMetrics(versionCount: 0, fileBytes: 0, databaseBytes: 0)
+        var allTimeType: [String: Int] = [:]
+        var allTimeSource: [String: Int] = [:]
+        var periodType: [String: Int] = [:]
+        var periodSource: [String: Int] = [:]
+        var dayType: [String: Int] = [:]
+        var daySource: [String: Int] = [:]
+        var statQueries: [UsageStatsQuery] = []
+        /// A day-sized stats read fails, and the wider reads still answer.
+        var failDayStats = false
         /// A refusal the server gives a write, in its words, instead of taking it.
         var refusal: String?
         /// How long a write takes, so a second write can arrive while it runs.
@@ -60,6 +126,14 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
     }()
 
     let state = Mutex(State())
+    private let statsPause = StatsPause()
+
+    /// Holds later `itemStats` calls until `releaseStats`.
+    func holdStats() { statsPause.hold() }
+    var waitingStats: Int { statsPause.waiting }
+
+    /// New stats calls go through, and calls already waiting stay waiting.
+    func admitNewStats() { statsPause.admit() }
 
     var calls: [String] { state.withLock { $0.calls } }
     var sent: [[String: StoredSettingChange]] { state.withLock { $0.sent } }
@@ -91,6 +165,41 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
             let end = min(start + query.limit, matching.count)
             return ActivityBatch(entries: Array(matching[start..<end]), next: end < matching.count ? String(end) : nil)
         }
+    }
+
+    func itemStats(_ query: UsageStatsQuery) async throws(OwnerFailure) -> [String: Int] {
+        try enter("itemStats")
+        state.withLock { $0.statQueries.append(query) }
+        if statsPause.isHolding { await statsPause.park() }
+        let answer = state.withLock { state -> Result<[String: Int], OwnerFailure> in
+            let span = query.updatedAfter.flatMap { start in query.updatedBefore.map { $0.timeIntervalSince(start) } }
+            if state.failDayStats, let span, span < 36 * 60 * 60 { return .failure(.unreachable) }
+            return .success(Self.stats(state, query))
+        }
+        switch answer {
+        case .success(let counts): return counts
+        case .failure(let error): throw error
+        }
+    }
+
+    /// Lets every paused stats read finish.
+    func releaseStats() { statsPause.release() }
+
+    private static func stats(_ state: State, _ query: UsageStatsQuery) -> [String: Int] {
+        let span = query.updatedAfter.flatMap { start in query.updatedBefore.map { $0.timeIntervalSince(start) } }
+        switch (query.grouping, span) {
+        case (.type, nil): return state.allTimeType
+        case (.source, nil): return state.allTimeSource
+        case (.type, let span?) where span < 36 * 60 * 60: return state.dayType
+        case (.source, let span?) where span < 36 * 60 * 60: return state.daySource
+        case (.type, _): return state.periodType
+        case (.source, _): return state.periodSource
+        }
+    }
+
+    func usageMetrics() async throws(OwnerFailure) -> UsageMetrics {
+        try enter("usageMetrics")
+        return state.withLock { $0.metrics }
     }
 
     static func kind(of action: String) -> ActivityKind {
@@ -821,6 +930,390 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
             #expect(!ActivityWording.what(action).contains("."))
         }
     }
+
+    @Test func theLoadedPageSortsByEachColumnAndAMissingValueSortsAsNothing() async {
+        let calls = FakeInstanceCalls()
+        let sent = [
+            ActivityEntry(id: "b", date: Date(timeIntervalSince1970: 200), who: "Mira", action: "item.update", resourceType: "item", resourceID: nil, address: "10.0.0.2"),
+            ActivityEntry(id: "a", date: nil, who: nil, action: "auth.sign_in.success", resourceType: "item", resourceID: nil, address: nil),
+            ActivityEntry(id: "c", date: Date(timeIntervalSince1970: 100), who: "Ada", action: "config.update", resourceType: "item", resourceID: nil, address: "10.0.0.1"),
+        ]
+        calls.state.withLock { $0.entries = sent }
+        let model = model(calls)
+        await model.reload()
+        #expect(model.orderLabel == "Newest first")
+        #expect(model.listed.map(\.id) == ["b", "c", "a"], "a missing time is the oldest, so newest first puts it last")
+        model.toggleSort(.when)
+        #expect(model.orderLabel == "Oldest first")
+        #expect(model.listed.map(\.id) == ["a", "c", "b"])
+        model.toggleSort(.when)
+        #expect(model.listed.map(\.id) == ["b", "c", "a"])
+
+        model.toggleSort(.who)
+        #expect(model.order.ascending)
+        #expect(model.orderLabel == "A to Z")
+        #expect(model.listed.map(\.id) == ["c", "b", "a"], "a missing name is Unknown, after Ada and Mira")
+        model.toggleSort(.who)
+        #expect(model.orderLabel == "Z to A")
+        #expect(model.listed.map(\.id) == ["a", "b", "c"])
+
+        model.toggleSort(.what)
+        #expect(model.listed.map(\.id) == ["b", "c", "a"], "Changed an item, Changed the settings, Signed in")
+        model.toggleSort(.what)
+        #expect(model.listed.map(\.id) == ["a", "c", "b"])
+
+        model.toggleSort(.address)
+        #expect(model.listed.map(\.id) == ["a", "c", "b"])
+        model.toggleSort(.address)
+        #expect(model.listed.map(\.id) == ["b", "c", "a"])
+        #expect(model.entries.map(\.id) == ["b", "a", "c"], "sorting the page shown does not reorder what the server sent")
+    }
+
+    @Test func equalTimesKeepTheServersOrder() async {
+        let calls = FakeInstanceCalls()
+        let date = Date(timeIntervalSince1970: 200)
+        calls.state.withLock {
+            $0.entries = [
+                ActivityEntry(id: "b", date: date, who: "Mira", action: "item.update", resourceType: "item", resourceID: nil, address: nil),
+                ActivityEntry(id: "a", date: date, who: "Ada", action: "item.create", resourceType: "item", resourceID: nil, address: nil),
+            ]
+        }
+        let model = model(calls)
+        await model.reload()
+        #expect(model.listed.map(\.id) == ["b", "a"])
+        model.toggleSort(.when)
+        #expect(model.listed.map(\.id) == ["b", "a"], "the same instant stays in the order the server sent")
+    }
+
+    @Test func anOlderPageRefusedForWantOfAPermissionClearsTheRows() async {
+        let calls = FakeInstanceCalls()
+        calls.state.withLock { $0.entries = entries(45) }
+        let refreshed = RefreshCount()
+        let model = ActivityModel(
+            context: OwnerContext(calls: FakeOwnerCalls(), grants: { [.auditRead] }, refreshGrants: { refreshed.count += 1 }), calls: calls)
+        await model.reload()
+        calls.fail("activity", with: .notPermitted("audit.read"))
+        await model.older()
+        #expect(model.entries.isEmpty)
+        #expect(model.failure == .notPermitted("audit.read"))
+        #expect(model.range == nil)
+        #expect(refreshed.count == 1)
+    }
+
+    @Test func aLateRefusalDoesNotClearANewerPage() async {
+        let calls = FakeInstanceCalls()
+        calls.state.withLock { $0.entries = entries(45) }
+        let pause = StatsPause()
+        pause.hold()
+        let model = ActivityModel(
+            context: OwnerContext(calls: FakeOwnerCalls(), grants: { [.auditRead] }, refreshGrants: { await pause.park() }), calls: calls)
+        await model.reload()
+        calls.fail("activity", with: .notPermitted("audit.read"))
+        let older = Task { await model.older() }
+        #expect(await eventually { pause.waiting >= 1 })
+        calls.fail("activity", with: nil)
+        await model.reload()
+        #expect(model.entries.first?.id == "e0")
+        #expect(model.failure == nil)
+        pause.release()
+        await older.value
+        #expect(model.entries.first?.id == "e0")
+        #expect(model.failure == nil)
+    }
+
+    @Test func choosingWhenStartsNewestFirstAndAnyOtherColumnStartsAtA() {
+        let model = model(FakeInstanceCalls())
+        model.toggleSort(.who)
+        model.toggleSort(.when)
+        #expect(model.order == ActivityOrder(column: .when, ascending: false))
+        model.toggleSort(.address)
+        #expect(model.order == ActivityOrder(column: .address, ascending: true))
+    }
+
+    @Test func eachTabNamesThePermissionItNeeds() {
+        #expect(MarfaSettingsPage.activity.permission == nil)
+        #expect(ActivityTab.usage.permission == nil, "item counts follow type access, and storage asks for instance.read itself")
+        #expect(ActivityTab.log.permission == .auditRead)
+        #expect(ActivityTab.log.permissionLine == "The app isn’t allowed to read the server’s audit log.")
+        #expect(ActivityTab.usage.permissionLine == "The app isn’t allowed to read how many items this Marfa holds.")
+        #expect(ActivityTab.usage.permissionLine != ActivityTab.log.permissionLine)
+        #expect(ActivityTab.usage.permissionLine != MarfaSettingsPage.fileStorage.permissionLine)
+    }
+}
+
+@Suite(.hangLimit) @MainActor struct ActivityUsageTests {
+    private func calendar() -> Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return calendar
+    }
+
+    private func model(_ calls: FakeInstanceCalls, now: Date = Date(timeIntervalSince1970: 1_700_000_000)) -> ActivityUsageModel {
+        ActivityUsageModel(
+            context: OwnerContext(calls: FakeOwnerCalls(), grants: { [.instanceRead] }), calls: calls, now: { now }, calendar: calendar())
+    }
+
+    @Test func itemStatsAsksForTheGroupingAndTheDayBounds() {
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        let end = start.addingTimeInterval(3_600)
+        let day = ClientInstanceCalls.itemStatsRequest(
+            UsageStatsQuery(grouping: .source, updatedAfter: start, updatedBefore: end))
+        #expect(day.grouping == .source)
+        #expect(day.filters.updatedAfter == ItemDate.instant(start))
+        #expect(day.filters.updatedBefore == ItemDate.instant(end))
+        let open = ClientInstanceCalls.itemStatsRequest(UsageStatsQuery(grouping: .type))
+        #expect(open.grouping == .type)
+        #expect(open.filters.updatedAfter == nil)
+        #expect(open.filters.updatedBefore == nil)
+    }
+
+    @Test func anEmptyMarfaIsZerosNotAFailure() async {
+        let model = model(FakeInstanceCalls())
+        await model.reload()
+        #expect(model.hasStats)
+        #expect(model.hasMetrics)
+        #expect(model.statsFailure == nil)
+        #expect(model.storedItems == 0)
+        #expect(model.versionCount == 0)
+        #expect(model.days.count == 7)
+        #expect(model.typeRows.isEmpty)
+        #expect(model.sourceRows.isEmpty)
+        #expect(model.chart.series.isEmpty)
+        #expect(model.chart.other == nil)
+    }
+
+    @Test func aTypeOrSourceWithNoItemsStaysInTheTableAndDoesNotBreakTheChart() async {
+        let calls = FakeInstanceCalls()
+        calls.state.withLock {
+            $0.allTimeType = ["core.note": 4, "core.empty": 0]
+            $0.allTimeSource = ["app.marfa-mac": 4, "app.none": 0]
+            $0.dayType = ["core.note": 1, "core.empty": 0]
+            $0.periodSource = ["app.marfa-mac": 2, "app.none": 0]
+        }
+        let model = model(calls)
+        await model.reload()
+        #expect(model.typeRows.first { $0.key == "core.empty" } == UsageRow(key: "core.empty", items: 0, changed: 0))
+        #expect(model.sourceRows.first { $0.key == "app.none" } == UsageRow(key: "app.none", items: 0, changed: 0))
+        #expect(model.chart.series.map(\.key) == ["core.note"])
+        #expect(model.chart.series.first?.values == Array(repeating: 1, count: 7))
+        #expect(model.storedItems == 4)
+    }
+
+    @Test func aVeryLongTypeOrSourceNameIsKeptWhole() {
+        let key = "x" + String(repeating: "y", count: 399)
+        #expect(key.count == 400)
+        let rows = UsageMath.rows(items: [key: 1], changed: [key: 0])
+        #expect(rows == [UsageRow(key: key, items: 1, changed: 0)])
+        let named = UsageNaming.typeName(key, plural: nil)
+        #expect(named.count == 400)
+        #expect(named.hasPrefix("X"))
+        #expect(UsageNaming.sourceName(key, named: nil).count == 400)
+        #expect(UsageNaming.typeName("core.rss_entry", plural: "RSS Entries") == "RSS Entries")
+        #expect(UsageNaming.typeName("core.rss_entry", plural: nil) == "Rss Entry")
+    }
+
+    @Test func theChartKeepsFourAndFoldsTheRestAndADayIsHalfOpen() async {
+        let daily = [
+            ["a": 1, "b": 9, "c": 3, "d": 4, "e": 2],
+            ["a": 1, "b": 1, "c": 1, "d": 1, "e": 1],
+        ]
+        let chart = UsageMath.chart(daily: daily)
+        #expect(chart.series.map(\.key) == ["b", "d", "c", "e"], "the busiest is first, which the chart draws at the bottom")
+        #expect(chart.other == [1, 1])
+        #expect(UsageMath.chart(daily: [["only": 0]]).series.isEmpty)
+
+        let calls = FakeInstanceCalls()
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let model = model(calls, now: now)
+        await model.reload()
+        let queries = calls.state.withLock { $0.statQueries }
+        let days = queries.filter { query in
+            guard let start = query.updatedAfter, let end = query.updatedBefore else { return false }
+            return end.timeIntervalSince(start) < 36 * 60 * 60
+        }
+        let period = queries.filter { query in
+            guard let start = query.updatedAfter, let end = query.updatedBefore else { return false }
+            return end.timeIntervalSince(start) >= 36 * 60 * 60
+        }
+        let open = queries.filter { $0.updatedAfter == nil && $0.updatedBefore == nil }
+        #expect(days.count == 7)
+        #expect(days.allSatisfy { $0.grouping == .type })
+        #expect(Set(days.map(\.updatedAfter)) .count == 7)
+        let today = calendar().startOfDay(for: now)
+        #expect(days.map(\.updatedBefore).contains(calendar().date(byAdding: .day, value: 1, to: today)))
+        #expect(period.count == 1)
+        #expect(period.first?.grouping == .source)
+        #expect(open.map(\.grouping).sorted { $0.rawValue < $1.rawValue } == [.source, .type])
+    }
+
+    @Test func aLateAnswerDoesNotReplaceThePeriodAskedForSince() async {
+        let calls = FakeInstanceCalls()
+        calls.holdStats()
+        calls.state.withLock {
+            $0.dayType = ["core.note": 1]
+            $0.allTimeType = ["core.note": 4]
+        }
+        let model = model(calls)
+        let first = Task { await model.reload() }
+        #expect(await eventually { calls.waitingStats >= 1 })
+        model.period = .last30Days
+        calls.admitNewStats()
+        await model.reload()
+        calls.releaseStats()
+        await first.value
+        #expect(model.days.count == 30)
+        #expect(model.typeRows.first { $0.key == "core.note" }?.changed == 30)
+    }
+
+    @Test func metricsFailingStillShowsTheItemCounts() async {
+        let calls = FakeInstanceCalls()
+        calls.fail("usageMetrics", with: .unreachable)
+        calls.state.withLock {
+            $0.allTimeType = ["core.note": 3]
+            $0.dayType = ["core.note": 1]
+        }
+        let model = model(calls)
+        await model.reload()
+        #expect(model.hasStats)
+        #expect(!model.hasMetrics)
+        #expect(model.metricsFailure == .unreachable)
+        #expect(model.storedItems == 3)
+        #expect(model.versionCount == nil)
+        #expect(model.fileBytes == nil)
+        #expect(model.databaseBytes == nil)
+        #expect(model.typeRows.first?.changed == 7)
+    }
+
+    @Test func aServerThatDoesNotAnswerShowsNoCounts() async {
+        let calls = FakeInstanceCalls()
+        calls.fail("itemStats", with: .unreachable)
+        calls.fail("usageMetrics", with: .unreachable)
+        let refreshed = RefreshCount()
+        let model = ActivityUsageModel(
+            context: OwnerContext(calls: FakeOwnerCalls(), grants: { [.instanceRead] }, refreshGrants: { refreshed.count += 1 }),
+            calls: calls, now: { Date(timeIntervalSince1970: 1_700_000_000) }, calendar: calendar())
+        await model.reload()
+        #expect(!model.hasStats)
+        #expect(!model.hasMetrics)
+        #expect(model.storedItems == nil)
+        #expect(model.statsFailure == .unreachable)
+        #expect(model.typeRows.isEmpty)
+        #expect(model.days.count == 7)
+        #expect(refreshed.count == 0, "a server that does not answer is not a missing permission")
+    }
+
+    @Test func rowsAreMostItemsFirstAndATieIsTheKey() {
+        let rows = UsageMath.rows(items: ["b": 2, "a": 2, "c": 9], changed: ["b": 5, "d": 1])
+        #expect(rows.map(\.key) == ["c", "a", "b", "d"])
+        #expect(rows.first { $0.key == "d" }?.items == 0)
+        #expect(rows.first { $0.key == "b" }?.changed == 5)
+    }
+
+    @Test func anOlderReadThatWaitsOnGrantsDoesNotOverwriteANewerPeriod() async {
+        let calls = FakeInstanceCalls()
+        calls.fail("usageMetrics", with: .notPermitted("instance.read"))
+        calls.state.withLock {
+            $0.allTimeType = ["core.note": 9]
+            $0.dayType = ["core.note": 1]
+        }
+        let pause = StatsPause()
+        pause.hold()
+        let model = ActivityUsageModel(
+            context: OwnerContext(calls: FakeOwnerCalls(), grants: { [.instanceRead] }, refreshGrants: { await pause.park() }),
+            calls: calls, now: { Date(timeIntervalSince1970: 1_700_000_000) }, calendar: calendar())
+        model.period = .last30Days
+        let first = Task { await model.reload() }
+        #expect(await eventually { pause.waiting >= 1 })
+        calls.fail("usageMetrics", with: nil)
+        model.period = .last7Days
+        await model.reload()
+        #expect(model.shownPeriod == .last7Days)
+        #expect(model.days.count == 7)
+        #expect(model.typeRows.first { $0.key == "core.note" }?.changed == 7)
+        pause.release()
+        await first.value
+        #expect(model.shownPeriod == .last7Days)
+        #expect(model.days.count == 7)
+        #expect(model.typeRows.first { $0.key == "core.note" }?.changed == 7)
+    }
+
+    @Test func theWindowIsReadAgainSoItMovesPastMidnight() async {
+        let clock = Mutex(Date(timeIntervalSince1970: 1_700_000_000))
+        let calls = FakeInstanceCalls()
+        let model = ActivityUsageModel(
+            context: OwnerContext(calls: FakeOwnerCalls(), grants: { [.instanceRead] }), calls: calls,
+            now: { clock.withLock { $0 } }, calendar: calendar())
+        await model.reload()
+        let first = model.days.first
+        clock.withLock { $0 = $0.addingTimeInterval(2 * 86_400) }
+        await model.reload()
+        #expect(model.days.first != first)
+        #expect(model.days.count == 7)
+    }
+
+    @Test func changingTheGroupingDoesNotReinterpretTheDays() async {
+        let calls = FakeInstanceCalls()
+        calls.state.withLock {
+            $0.dayType = ["core.note": 1]
+            $0.allTimeType = ["core.note": 4]
+            $0.periodSource = ["studio": 3]
+            $0.allTimeSource = ["studio": 10]
+        }
+        let model = model(calls)
+        await model.reload()
+        #expect(model.shownGrouping == .type)
+        #expect(model.sourceRows.first { $0.key == "studio" }?.changed == 3)
+        #expect(model.chart.series.map(\.key) == ["core.note"])
+        model.grouping = .source
+        #expect(model.shownGrouping == .type)
+        #expect(model.sourceRows.first { $0.key == "studio" }?.changed == 3, "the shown source changes stay the period that was read")
+        #expect(model.chart.series.map(\.key) == ["core.note"])
+    }
+
+    @Test func aFailedDayKeepsTheAllTimeTotals() async {
+        let calls = FakeInstanceCalls()
+        calls.state.withLock {
+            $0.failDayStats = true
+            $0.allTimeType = ["core.note": 4]
+            $0.allTimeSource = ["studio": 4]
+            $0.periodSource = ["studio": 2]
+        }
+        let model = model(calls)
+        await model.reload()
+        #expect(model.storedItems == 4)
+        #expect(model.typeRows.first?.items == 4)
+        #expect(model.typeRows.first?.changed == nil)
+        #expect(model.sourceRows.first { $0.key == "studio" }?.changed == 2)
+        #expect(!model.hasDaily)
+        #expect(model.hasMetrics)
+        #expect(model.statsFailure == .unreachable)
+    }
+
+    @Test func storageIsNotReadWithoutInstanceRead() async {
+        let calls = FakeInstanceCalls()
+        let model = model(calls)
+        await model.reload(items: true, storage: false)
+        #expect(!calls.calls.contains("usageMetrics"))
+        #expect(calls.calls.contains("itemStats"))
+        await model.reload()
+        #expect(!calls.calls.contains("usageMetrics"), "Try Again repeats the parts that were asked for")
+    }
+
+    @Test func itemCountsFollowTypeAccessAndStorageFollowsInstanceRead() async {
+        #expect(ActivityAccess.readsItems(["*:read"]))
+        #expect(ActivityAccess.readsItems(["core.note:read"]))
+        #expect(ActivityAccess.readsItems(["instance.read", "core.note:read"]))
+        #expect(!ActivityAccess.readsItems(["*:write"]))
+        #expect(!ActivityAccess.readsItems(["instance.read", "audit.read"]))
+        #expect(!ActivityAccess.readsItems(["profile:read", "profile.name:read"]))
+        #expect(!ActivityAccess.readsItems(["edge.parent-of:read"]))
+        #expect(!ActivityAccess.readsItems(["metadata.edge_types:read"]))
+        let calls = FakeInstanceCalls()
+        let model = model(calls)
+        await model.reload(items: false, storage: true)
+        #expect(!calls.calls.contains("itemStats"))
+        #expect(calls.calls.contains("usageMetrics"))
+    }
 }
 
 @Suite(.hangLimit) @MainActor struct StartUpTests {
@@ -836,11 +1329,12 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
     }
 
     @Test func eachNewPageNamesThePermissionItNeeds() {
-        #expect(MarfaSettingsPage.activity.permission == .auditRead)
+        #expect(MarfaSettingsPage.activity.permission == nil, "Usage and Log each name their own permission")
+        #expect(ActivityTab.log.permission == .auditRead)
         #expect(MarfaSettingsPage.monitoring.permission == .configManage)
         #expect(MarfaSettingsPage.limits.missingPermission(in: [.instanceRead]) == nil)
         #expect(MarfaSettingsPage.limits.missingPermission(in: [.configManage]) == nil)
-        #expect(MarfaSettingsPage.activity.permissionLine == "The app isn’t allowed to read the server’s audit log.")
+        #expect(ActivityTab.log.permissionLine == "The app isn’t allowed to read the server’s audit log.")
         #expect(MarfaSettingsPage.monitoring.permissionLine == "The app isn’t allowed to see or change how the server is monitored.")
         #expect(MarfaSettingsPage.limits.permissionLine == "The app isn’t allowed to see or change the server’s limits.")
     }

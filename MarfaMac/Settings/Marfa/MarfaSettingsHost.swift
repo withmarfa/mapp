@@ -85,6 +85,8 @@ struct MarfaMarkSet: Identifiable, Hashable {
     var lacksAsked: Bool { get }
     /// Whether the sign-in holds `scope`, one the app asks for beyond the owner's permissions.
     func holds(_ scope: String) -> Bool
+    /// Whether the sign-in can read at least one item type. Item counts need that, not `instance.read`.
+    var readsItems: Bool { get }
 
     /// Signs in again with the full request. The new sign-in holds what the owner approves.
     /// Returns `.allowed` when the new sign-in holds every permission in `permissions`.
@@ -283,6 +285,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
     /// The permission the page needs to open, which the owner may not have approved. Account needs none to open, since the
     /// profile needs none: its sign-ins need `sign_ins.manage`, which Change Password asks for where the sign-in lacks it.
     /// Folders needs none: a folder is read as an item, under the access the app holds to every type.
+    /// Activity needs none to open. Item counts follow a type the sign-in can read. Storage needs `instance.read`. Log needs `audit.read`.
     var permission: InstancePermission? {
         switch self {
         case .housekeeping: .instanceRead
@@ -298,7 +301,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .connectors: .connectorsManage
         case .webhooks: .webhooksManage
         case .folders: nil
-        case .activity: .auditRead
+        case .activity: nil
         }
     }
 
@@ -327,7 +330,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .folders: ""
         case .backups: String(localized: "The app isn’t allowed to see, take or restore backups.")
         case .housekeeping: String(localized: "The app isn’t allowed to read the jobs the server runs by itself.")
-        case .activity: String(localized: "The app isn’t allowed to read the server’s audit log.")
+        case .activity: ""
         case .monitoring: String(localized: "The app isn’t allowed to see or change how the server is monitored.")
         case .limits: String(localized: "The app isn’t allowed to see or change the server’s limits.")
         case .links: String(localized: "The app isn’t allowed to change link types.")
@@ -406,7 +409,11 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .housekeeping:
             [String(localized: "Jobs"), String(localized: "Clean-up"), String(localized: "Confirm Date"), String(localized: "Clock"), String(localized: "Keep Records For")] + InstanceSetting.logSettings.map(\.title)
         case .activity:
-            [String(localized: "Audit Log"), String(localized: "Who Did What")]
+            [
+                String(localized: "Usage"), String(localized: "Log"), String(localized: "Stored"), String(localized: "Items Changed"),
+                String(localized: "Items by Type"), String(localized: "Items by Source"), String(localized: "Audit Log"),
+                String(localized: "Who Did What"),
+            ]
         case .monitoring:
             [
                 String(localized: "Heartbeat"), String(localized: "Error Reports"), String(localized: "Telemetry"), String(localized: "Error reports address"),

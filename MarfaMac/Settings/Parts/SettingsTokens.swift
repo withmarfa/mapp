@@ -141,7 +141,7 @@ enum SettingsTokens {
 
     /// The interface fonts of Settings. A page asks for these by role.
     enum Role: Hashable, Sendable {
-        case title, line, sectionName, sectionLine, footer, small, mono, stateTitle, headTitle, pageHeader, sidebar, sidebarHeading, sidebarBadge, largeGlyph, tableHeader, linkGlyph, pathGlyph, chartAxis, chartTick
+        case title, line, sectionName, sectionLine, footer, small, mono, stateTitle, headTitle, pageHeader, usageFigure, sidebar, sidebarHeading, sidebarBadge, largeGlyph, tableHeader, linkGlyph, pathGlyph, chartAxis, chartTick
     }
 
     static func font(_ role: Role, scale: CGFloat = 1) -> Font {
@@ -151,6 +151,7 @@ enum SettingsTokens {
         case .sidebarBadge: .system(size: 11 * scale, weight: .semibold)
         case .sidebarHeading: .system(size: 12 * scale, weight: .semibold)
         case .pageHeader: .system(size: 17 * scale, weight: .semibold)
+        case .usageFigure: .system(size: 20 * scale, weight: .semibold)
         case .linkGlyph: .system(size: 9 * scale, weight: .medium)
         case .pathGlyph: .system(size: 12 * scale)
         case .chartAxis: .system(size: 11 * scale)
@@ -362,6 +363,8 @@ enum SettingsTokens {
         enum Column {
             static let state: CGFloat = 70
             static let day: CGFloat = 90
+            /// A count in a usage table. Other tables keep `day`.
+            static let number: CGFloat = 80
             static let label: CGFloat = 110
             static let address: CGFloat = 130
             static let time: CGFloat = 150

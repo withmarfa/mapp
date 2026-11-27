@@ -18,6 +18,9 @@ import Testing
     var lacksScope = false
     var lacksAsked: Bool { !Set(InstancePermission.allCases).isSubset(of: grants) || lacksScope }
     func holds(_ scope: String) -> Bool { !lacksScope }
+    /// Scopes the stub's sign-in holds beyond the owner permissions. Item counts follow these.
+    var itemScopes: Set<String> = ["*:read"]
+    var readsItems: Bool { ActivityAccess.readsItems(itemScopes) }
     var isAllowingMore = false
     var instanceSettings: InstanceSettingsModel
     let ownerDrafts = OwnerDrafts()
