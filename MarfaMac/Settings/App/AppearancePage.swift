@@ -108,7 +108,14 @@ struct AppearancePage: View {
                 .accessibilityIdentifier("Accent")
             }
             SettingsRow("App icon", line: "In the Dock.") {
-                AppIconChoices(selection: Binding { appIcon } set: { $0.store() })
+                SettingsIconChoices(
+                    choices: AppIconChoice.allCases.map {
+                        .init(value: $0, asset: $0.previewAsset, title: Text($0.title))
+                    },
+                    selection: Binding { appIcon } set: { $0.store() },
+                    title: "App icon"
+                )
+                .accessibilityIdentifier("AppIcon")
             }
             SettingsRow("Highlight color") {
                 SettingsPopUp(title: "Highlight color", selection: $highlight) {
@@ -169,42 +176,6 @@ struct AppearancePage: View {
                 .accessibilityIdentifier("ColumnWidthsReset")
             }
         }
-    }
-}
-
-/// The small icon choices in the Color section's trailing column.
-private struct AppIconChoices: View {
-    @Binding var selection: AppIconChoice
-
-    var body: some View {
-        let tile = SettingsTokens.Metric.tile
-        let outline = RoundedRectangle(cornerRadius: SettingsTokens.Metric.controlRadius)
-        HStack(spacing: SettingsTokens.Metric.swatchSpacing) {
-            ForEach(AppIconChoice.allCases) { choice in
-                Button { selection = choice } label: {
-                    Image(choice.previewAsset)
-                        .resizable()
-                        .scaledToFit()
-                        // The Dock assets have a transparent margin around the tile.
-                        .scaleEffect(1.25)
-                        .frame(width: tile, height: tile)
-                        .overlay {
-                            if choice == selection {
-                                outline.strokeBorder(SettingsTokens.secondaryText, lineWidth: SettingsTokens.Metric.tileEdgeWidth)
-                                    .padding(-SettingsTokens.Metric.swatchDot / 2)
-                            }
-                        }
-                        .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
-                .help(Text(choice.title))
-                .accessibilityLabel(Text(choice.title))
-                .accessibilityAddTraits(choice == selection ? .isSelected : [])
-            }
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("App icon")
-        .accessibilityIdentifier("AppIcon")
     }
 }
 

@@ -48,3 +48,46 @@ struct ChoiceTiles<Value: Hashable>: View {
         .padding(SettingsTokens.Metric.inset)
     }
 }
+
+struct SettingsIconChoices<Value: Hashable>: View {
+    struct Choice: Identifiable {
+        let value: Value
+        let asset: String
+        let title: Text
+        var id: Value { value }
+    }
+
+    let choices: [Choice]
+    @Binding var selection: Value
+    let title: LocalizedStringKey
+
+    private typealias Metric = SettingsTokens.Metric
+
+    var body: some View {
+        let outline = RoundedRectangle(cornerRadius: Metric.controlRadius)
+        HStack(spacing: Metric.swatchSpacing) {
+            ForEach(choices) { choice in
+                Button { selection = choice.value } label: {
+                    Image(choice.asset)
+                        .resizable()
+                        .scaledToFit()
+                        .scaleEffect(Metric.iconChoiceScale)
+                        .frame(width: Metric.tile, height: Metric.tile)
+                        .overlay {
+                            if choice.value == selection {
+                                outline.strokeBorder(SettingsTokens.secondaryText, lineWidth: Metric.tileEdgeWidth)
+                                    .padding(-Metric.iconChoiceRingOutset)
+                            }
+                        }
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .help(choice.title)
+                .accessibilityLabel(choice.title)
+                .accessibilityAddTraits(choice.value == selection ? .isSelected : [])
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(Text(title))
+    }
+}

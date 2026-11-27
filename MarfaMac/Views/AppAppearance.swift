@@ -11,17 +11,14 @@ nonisolated enum AppearanceKey {
     static let typeChipTint = TypeChipTint.key
     static let sidebar = SidebarColor.key
     static let pdfBackground = PDFBackground.key
-    // MacSettings and PreferencesMap both include every key in this list.
     static let all = [theme, accent, highlights, textFont, codeFont, typeChipTint, sidebar, pdfBackground, AppIconChoice.key]
 }
 
 /// The running app's Dock icon. Sky uses the icon macOS loads from the bundle.
-nonisolated enum AppIconChoice: String, CaseIterable, Identifiable {
+nonisolated enum AppIconChoice: String, CaseIterable {
     case sky, signal, sea, leaf, marigold, adobe
 
     static let key = "appIcon"
-
-    var id: Self { self }
 
     var title: LocalizedStringResource {
         switch self {
