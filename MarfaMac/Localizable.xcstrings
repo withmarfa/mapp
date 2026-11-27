@@ -162,9 +162,6 @@
     "%@ answers on it too." : {
 
     },
-    "%@ answers there." : {
-
-    },
     "%@ are attached to “%@”, but they couldn’t be put in its text." : {
       "extractionState" : "manual"
     },
@@ -2361,7 +2358,7 @@
     "Add a Word" : {
 
     },
-    "Add a passkey at the new address." : {
+    "Add a new one at the new address." : {
 
     },
     "Add a passkey to sign in with it." : {
@@ -2744,6 +2741,9 @@
     "Apps and keys using this rule will see items from every source for the types you limited, including subtypes." : {
 
     },
+    "Apps sign out" : {
+
+    },
     "Archive" : {
 
     },
@@ -3108,6 +3108,12 @@
     "Browsers" : {
 
     },
+    "Browsers and apps sign out" : {
+
+    },
+    "Browsers sign out" : {
+
+    },
     "Built In" : {
 
     },
@@ -3376,9 +3382,6 @@
 
     },
     "Change Address" : {
-
-    },
-    "Change Address…" : {
 
     },
     "Change Calendar" : {
@@ -4844,16 +4847,7 @@
     "Every Week" : {
 
     },
-    "Every app signs out" : {
-
-    },
-    "Every browser and app signs out" : {
-
-    },
     "Every browser sign-in has ended. Apps and keys keep working." : {
-
-    },
-    "Every browser signs out" : {
 
     },
     "Every browser signs out. Apps and keys keep working." : {
@@ -6972,9 +6966,6 @@
     "New %@" : {
       "extractionState" : "manual"
     },
-    "New Address" : {
-
-    },
     "New Child Type" : {
 
     },
@@ -7053,6 +7044,9 @@
 
     },
     "New Word" : {
+
+    },
+    "New address" : {
 
     },
     "New entry: %@" : {
@@ -8001,7 +7995,7 @@
     "Passkeys" : {
 
     },
-    "Passkeys stop working" : {
+    "Passkeys for other domains stop working" : {
 
     },
     "Password" : {
@@ -9438,6 +9432,9 @@
     "Sign in again" : {
 
     },
+    "Sign in again to check the new address." : {
+
+    },
     "Sign in and switch" : {
 
     },
@@ -10577,6 +10574,9 @@
       "extractionState" : "manual"
     },
     "The new address is never shown again." : {
+
+    },
+    "The new address works." : {
 
     },
     "The new entry wasn’t finished, so it wasn’t added." : {
