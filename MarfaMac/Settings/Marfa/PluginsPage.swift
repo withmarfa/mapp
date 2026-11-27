@@ -208,6 +208,18 @@ private struct PluginCommandSection: View {
     }
 }
 
+/// Update and Remove of a connector plugin, locked until the sign-in holds `connectors.manage`.
+private struct ConnectorPermissionButton: View {
+    let host: any MarfaSettingsHost
+
+    var body: some View {
+        SettingsButton(host.isAllowingMore ? "Waiting…" : "Allow More…") {
+            host.askForMore(naming: InstancePermission.connectorsManage.rawValue)
+        }
+        .disabled(host.isAllowingMore)
+    }
+}
+
 /// An update that carries guidance offers the command to run instead.
 private struct PluginUpdateRow: View {
     let model: PluginsModel
@@ -233,6 +245,8 @@ private struct PluginUpdateRow: View {
                 SettingsButton(model.copied == command ? "Copied" : "Copy Command") { model.copyCommand(command) }
             } else if case .failed? = model.bundles[update.id] {
                 SettingsButton("Try Again") { Task { await model.readAgain(update.id) } }
+            } else if !model.mayChange(update.installed) {
+                ConnectorPermissionButton(host: host)
             } else {
                 SettingsButton("Update", role: .update) { Task { await model.install(update.entry, asUpdate: true) } }
             }
@@ -267,8 +281,12 @@ private struct PluginDetail: View {
                 if model.isWorking(plugin.name) {
                     ProgressView().controlSize(.small)
                 } else if let update, model.heldCommand(plugin.name) == nil {
-                    SettingsButton(verbatim: String(localized: "Update to \(update.entry.version.description)"), role: .update) {
-                        Task { await model.install(update.entry, asUpdate: true) }
+                    if model.mayChange(plugin) {
+                        SettingsButton(verbatim: String(localized: "Update to \(update.entry.version.description)"), role: .update) {
+                            Task { await model.install(update.entry, asUpdate: true) }
+                        }
+                    } else {
+                        ConnectorPermissionButton(host: host)
                     }
                 }
             }
@@ -287,8 +305,12 @@ private struct PluginDetail: View {
                     line: plugin.connector == nil
                         ? String(localized: "Its types and items stay.") : String(localized: "Its connector stops. Its types and items stay.")
                 ) {
-                    SettingsButton("Remove…", role: .destructive) { model.askToRemove(plugin) }
-                        .disabled(model.isWorking(plugin.name))
+                    if model.mayChange(plugin) {
+                        SettingsButton("Remove…", role: .destructive) { model.askToRemove(plugin) }
+                            .disabled(model.isWorking(plugin.name))
+                    } else {
+                        ConnectorPermissionButton(host: host)
+                    }
                 }
             }
         }
