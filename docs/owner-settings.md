@@ -26,16 +26,16 @@ The page gate checks the connection and the sign-in’s permissions. A configure
 | Types | `schema.write` | Types, fields, status words, and rules |
 | Links | `schema.write` | Link types. Opens from Types |
 | Sources | `keys.manage` | Names and marks of sources. Both source rules need `config.manage` |
-| Trash | `items.purge` | Restore items or empty Trash. Choose Select Items or Show All to permanently delete selected items. Changing how long items wait needs `config.manage` |
-| Storage | `config.manage` | Where files are kept, copies, reading text, removing unused files, and item version retention |
+| Trash | `items.purge` | Restore items or empty Trash. Choose Select Items or Show All to permanently delete selected items. Storage controls how long items stay in Trash |
+| Storage | `instance.read` or `config.manage` | File locations, sizes, and unused files need `instance.read`. Each configuration control needs `config.manage` |
 | Connectors | `connectors.manage` | Each connector's health, machine, sign-in, settings and mapping |
 | Webhooks | `webhooks.manage` | Webhooks by maker, their events and deliveries |
 | Folders | type access to `system.folder` | Synced folders: patterns, limits, copies, Stop Syncing |
 | Backups | `backups.manage` | Destination, backups, restore. Destination and interval need `config.manage` |
 | Housekeeping | `instance.read` or `config.manage` | Jobs need `instance.read`. Confirming the clock needs `instance.maintain`. Log retention needs `config.manage` |
 | Activity | `audit.read` | The audit log |
-| Monitoring | `config.manage` | Heartbeat, error reports and telemetry |
-| Limits | `config.manage` or `instance.read` | Changing limits needs `config.manage`. Either permission can read start-up setting names and whether each is set |
+| Monitoring | `config.manage` | Pausing telemetry pauses error reports. The owner can still change or remove the reporting destination |
+| Limits | `config.manage` or `instance.read` | Request, rate, inbound delivery, and live update limits need `config.manage`. Either permission can read start-up setting names and whether each is set |
 
 ## Permissions
 
@@ -51,7 +51,8 @@ The page gate checks the connection and the sign-in’s permissions. A configure
 - **Ask before anything that cannot be got back**, naming what goes and what stays: narrowing, revoking, disconnecting, emptying, shorter retention, less free disk, a raised folder limit, removing a type, plugin or data.
 - **A question holds its version.** What is confirmed is sent on the version it named, whatever is read while the alert is open.
 - **A typed safety number asks when the field is left**, because a person passes through other numbers while typing.
-- **A shorter or unknown retention always asks.** With no value the app can read, any choice may be shorter. Keep Versions asks on every change.
+- **Version history** asks before a change to any snapshot window or a possible reduction of the version cap. The server applies the cap after all three windows. Keep Versions asks on every change.
+- **Trash and log retention** ask before a shorter period. Use the server’s reported default for an unset period. If the default is unknown, ask when the change could shorten retention.
 - **Removing an app's data counts first and never half-tells.** It repeats until nothing is left, says how many went where it stops, and never says nothing changed once an item has gone.
 - **The app's own data is never removed here.** Connection's Remove… stops `PreferencesSync` first; a purge from here would delete the item under it.
 - **A disconnected app's keys still work** (`keys-and-oauth/grant-revoke-keeps-keys`); its webhooks go.
@@ -67,7 +68,7 @@ The page gate checks the connection and the sign-in’s permissions. A configure
 
 ## What a person typed
 
-- **A refusal keeps what was typed**, marks the field and says why under it. Clearing it loses work the person cannot see again.
+- **A refusal preserves what the person typed.** A refused limit or free disk reserve returns to its last reported value. When the app shows the recovery notice, it copies the original input to the clipboard. Other fields keep the input and show the reason for the refusal.
 - **A draft is handed back** at the end of the window or the app (`OwnerDrafts`, `Notices.notKept`). Where a call is in flight, its failure hands it back.
 - **A pop-up or switch sends at once; a field sends on Return or when left.** Emptied, it removes the stored value.
 - **A number out of range is never sent.** A separator the Mac's region does not use is refused, not guessed at.

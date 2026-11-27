@@ -96,46 +96,43 @@ nonisolated struct LimitSetting: Identifiable, Hashable, Sendable {
 
     private static let tebibyte = 1_099_511_627_776
 
-    static let largestRequest = bytes("max_request_bytes", String(localized: "Largest Request"), tebibyte)
+    static let largestRequest = bytes("max_request_bytes", String(localized: "Largest request"), tebibyte)
     static let largestBulkRequest = bytes(
-        "max_bulk_request_bytes", String(localized: "Largest Bulk Request"), 33_554_432, line: String(localized: "At most 32 MB."))
+        "max_bulk_request_bytes", String(localized: "Largest bulk request"), 33_554_432)
     static let requestsPerWindow = LimitSetting(
-        key: "rate_limit_requests", title: String(localized: "Requests per Window"), unit: .requests, range: 1...1_000_000,
-        line: String(localized: "From one app or key."), requires: rateLimitSwitch)
+        key: "rate_limit_requests", title: String(localized: "Requests from each app or key"), unit: .requests, range: 1...1_000_000, requires: rateLimitSwitch)
     static let keyRequestsPerWindow = LimitSetting(
-        key: "rate_limit_keys_requests", title: String(localized: "Key Requests per Window"), unit: .requests, range: 1...1_000_000,
-        line: String(localized: "From a key alone."), requires: rateLimitSwitch)
+        key: "rate_limit_keys_requests", title: String(localized: "Requests that manage keys"), unit: .requests, range: 1...1_000_000, requires: rateLimitSwitch)
     static let window = LimitSetting(
         key: "rate_limit_window_seconds", title: String(localized: "Window"), unit: .seconds, range: 1...86_400, requires: rateLimitSwitch)
-    static let largestFileRead = bytes("enrichment_max_blob_bytes", String(localized: "Largest File Read"), tebibyte)
+    static let largestFileRead = bytes("enrichment_max_blob_bytes", String(localized: "Largest file read"), tebibyte)
     static let mostTextKept = LimitSetting(
-        key: "enrichment_max_text_chars", title: String(localized: "Most Text Kept"), unit: .characters, range: 1...100_000_000)
+        key: "enrichment_max_text_chars", title: String(localized: "Most text kept"), unit: .characters, range: 1...100_000_000)
     static let tries = LimitSetting(key: "enrichment_max_attempts", title: String(localized: "Tries"), unit: .times, range: 1...100)
-    static let largestDelivery = bytes("inbound_max_bytes", String(localized: "Largest Delivery"), tebibyte)
+    static let largestDelivery = bytes("inbound_max_bytes", String(localized: "Largest delivery"), tebibyte)
     static let deliveriesPerWindow = LimitSetting(
-        key: "rate_limit_inbound_requests", title: String(localized: "Requests per Window"), unit: .requests, range: 1...1_000_000,
+        key: "rate_limit_inbound_requests", title: String(localized: "Requests per window"), unit: .requests, range: 1...1_000_000,
         requires: rateLimitSwitch)
     static let waiting = LimitSetting(
-        key: "inbound_backlog_deliveries", title: String(localized: "Waiting, at Most"), unit: .deliveries, range: 1...1_000_000)
+        key: "inbound_backlog_deliveries", title: String(localized: "Waiting, at most"), unit: .deliveries, range: 1...1_000_000)
     static let mostViewers = LimitSetting(
-        key: "event_stream_max_viewers", title: String(localized: "Most Viewers"), unit: .viewers, range: 0...1_000_000,
-        line: String(localized: "0 sets no limit."))
-    static let largestFetch = bytes("mcp_fetch_max_bytes", String(localized: "Largest File"), tebibyte, requires: fetchSwitch)
+        key: "event_stream_max_viewers", title: String(localized: "Most viewers at once"), unit: .viewers, range: 0...1_000_000)
+    static let largestFetch = bytes("mcp_fetch_max_bytes", String(localized: "Largest file"), tebibyte, requires: fetchSwitch)
     static let fetchTime = LimitSetting(
-        key: "mcp_fetch_timeout_seconds", title: String(localized: "Time Allowed"), unit: .seconds, range: 1...3_600, requires: fetchSwitch)
+        key: "mcp_fetch_timeout_seconds", title: String(localized: "Time allowed"), unit: .seconds, range: 1...3_600, requires: fetchSwitch)
 
     static let rateLimitSwitch = "rate_limit_enabled"
     static let fetchSwitch = "mcp_fetch_enabled"
 
-    static let all: [LimitSetting] = [
-        largestRequest, largestBulkRequest, requestsPerWindow, keyRequestsPerWindow, window, largestFileRead, mostTextKept,
-        tries, largestDelivery, deliveriesPerWindow, waiting, mostViewers, largestFetch, fetchTime,
-    ]
+    static let limitFields = [largestRequest, largestBulkRequest, window, requestsPerWindow, keyRequestsPerWindow, largestDelivery, deliveriesPerWindow, waiting, mostViewers]
+    static let storageFields = [largestFileRead, mostTextKept, tries, largestFetch, fetchTime]
+    static let all = limitFields + storageFields
 }
 
-/// Sends changed limits on Return or when the field loses focus. A refused value stays in its field with an explanation.
+/// Sends changed limits on Return or when the field loses focus. A failed write restores the last value the server reported.
 @Observable @MainActor final class LimitsModel: OwnerDraftHolding {
     private let store: StoredSettings
+    private let returnDraft: (OwnerDraft) -> Void
 
     /// What each field being edited holds; a field with no entry shows what the server holds.
     var drafts: [String: String] = [:]
@@ -145,16 +142,15 @@ nonisolated struct LimitSetting: Identifiable, Hashable, Sendable {
     private(set) var notice: String?
     private(set) var saving: Set<String> = []
 
-    init(store: StoredSettings) {
-        self.store = store
-    }
-
-    convenience init(context: OwnerContext, calls: any InstanceCalls) {
-        self.init(store: StoredSettings(context: context, calls: calls))
+    init(context: OwnerContext, calls: any InstanceCalls) {
+        store = StoredSettings(context: context, calls: calls)
+        returnDraft = context.lateDraft
     }
 
     var failure: OwnerFailure? { store.failure }
-    var isLoaded: Bool { store.snapshot != nil }
+    var isLoaded: Bool { store.snapshot != nil && store.failure == nil }
+
+    func setting(_ key: String) -> StoredSetting? { store.setting(key) }
 
     func load() async {
         await store.load()
@@ -188,7 +184,7 @@ nonisolated struct LimitSetting: Identifiable, Hashable, Sendable {
 
     /// Sends a typed value that differs from what the server holds. An invalid one is kept where it was typed.
     func commit(_ limit: LimitSetting) async {
-        guard let typed = drafts[limit.key], !saving.contains(limit.key) else { return }
+        guard held(limit) != nil, let typed = drafts[limit.key], !saving.contains(limit.key) else { return }
         let change: StoredSettingChange
         switch limit.entry(from: typed) {
         case .invalid: return
@@ -206,7 +202,11 @@ nonisolated struct LimitSetting: Identifiable, Hashable, Sendable {
             }
             change = .set(.int(value))
         }
-        await send([limit.key: change], keys: [limit.key])
+        drafts[limit.key] = nil
+        let result = await send(change, for: limit.key)
+        if result != .saved, !typed.isEmpty {
+            returnDraft(.typed(title: limit.title, text: typed))
+        }
     }
 
     /// Takes what is typed in a field; the notice about an earlier change closes.
@@ -218,29 +218,29 @@ nonisolated struct LimitSetting: Identifiable, Hashable, Sendable {
     func dismissNotice() { notice = nil }
 
     func setSwitch(_ key: String, _ on: Bool) async {
-        guard !saving.contains(key), isOn(key) != on else { return }
-        await send([key: .set(.bool(on))], keys: [key])
+        guard store.setting(key)?.value?.bool != nil, !saving.contains(key), isOn(key) != on else { return }
+        _ = await send(.set(.bool(on)), for: key)
     }
 
-    private func send(_ changes: [String: StoredSettingChange], keys: [String]) async {
-        saving.formUnion(keys)
-        defer { saving.subtract(keys) }
+    private func send(_ change: StoredSettingChange, for key: String) async -> StoredSettingsWrite {
+        saving.insert(key)
+        defer { saving.remove(key) }
         notice = nil
-        for key in keys { lines[key] = nil }
-        switch await store.write(changes) {
-        case .saved:
-            for key in keys { drafts[key] = nil }
+        lines[key] = nil
+        let result = await store.write([key: change])
+        switch result {
+        case .saved: break
         case .elsewhere(let moved):
-            for key in keys { drafts[key] = nil }
             notice = StoredSettingWording.elsewhere(moved.map(Self.name))
         case .failed(let failure):
-            for key in keys { lines[key] = StoredSettingWording.line(failure) }
+            lines[key] = StoredSettingWording.line(failure)
         }
+        return result
     }
 
     private static func name(_ key: String) -> String {
-        if key == LimitSetting.rateLimitSwitch { return String(localized: "Limit Requests") }
-        if key == LimitSetting.fetchSwitch { return String(localized: "Let Tools Fetch Files") }
+        if key == LimitSetting.rateLimitSwitch { return String(localized: "Limit requests") }
+        if key == LimitSetting.fetchSwitch { return InstanceSetting.mcpFetchEnabled.title }
         return LimitSetting.all.first { $0.key == key }?.title ?? key
     }
 
@@ -251,7 +251,7 @@ nonisolated struct LimitSetting: Identifiable, Hashable, Sendable {
         let held = drafts
         drafts = [:]
         return LimitSetting.all.compactMap { limit in
-            guard let text = held[limit.key]?.trimmingCharacters(in: .whitespaces), !text.isEmpty, limit.entry(from: text) != .value(self.held(limit) ?? -1)
+            guard let text = held[limit.key], !text.isEmpty, limit.entry(from: text) != .value(self.held(limit) ?? -1)
             else { return nil }
             return .typed(title: limit.title, text: text)
         }

@@ -9,6 +9,36 @@ import Testing
 struct SettingsControlTests {
     enum Finish: CaseIterable { case escape, submit, blur }
 
+    @Test func pausedTelemetryLetsTheOwnerOpenTheirReportDestination() async throws {
+        let settings = StubMarfaHost(settings: InstanceSettingsModel { nil })
+        let calls = FakeInstanceCalls()
+        calls.changeElsewhere("telemetry_enabled", to: .bool(false))
+        settings.instanceCalls = calls
+        let model = MonitoringModel(context: OwnerContext(host: settings), calls: calls)
+        let window = host(MonitoringPage(host: settings, model: model))
+        defer { window.contentView = nil; window.close() }
+        try await press(in: window, matching: "Monitoring-postHogHost", attribute: "accessibilityIdentifier")
+        #expect(await eventually(within: .seconds(3)) { model.sheet?.secret == .postHogHost })
+    }
+
+    @Test func storageWithReadAccessLoadsFileDetailsWithoutRequestingConfiguration() async throws {
+        let settings = StubMarfaHost(settings: InstanceSettingsModel { nil })
+        settings.grants = [.instanceRead]
+        let calls = FakeOwnerCalls()
+        let configuration = FakeInstanceCalls()
+        calls.state.withLock { $0.metrics = InstanceMetricsReading(version: "1", databaseBytes: 256, fileBytes: 512) }
+        settings.ownerCalls = calls
+        settings.instanceCalls = configuration
+        let window = host(MarfaSettingsPageView(page: .fileStorage, host: settings))
+        defer { window.contentView = nil; window.close() }
+        #expect(await eventually(within: .seconds(3)) { calls.calls.contains("fileStores") && calls.calls.contains("instanceMetrics") })
+        #expect(configuration.calls.isEmpty)
+        #expect(await eventually(within: .seconds(3)) {
+            window.contentView?.layoutSubtreeIfNeeded()
+            return !elements(window.contentView, matching: "Database", attribute: "accessibilityValue").isEmpty
+        })
+    }
+
     @Test(arguments: [
         (OwnerFailure.signedOut, "Signed Out"), (.instanceChanged, "Another Marfa Answers"),
         (.notPermitted("profile:read"), "Needs a Permission"), (.unsupported, "No Server Settings"),

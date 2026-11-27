@@ -550,7 +550,7 @@ struct RenderedWindow<Detail: View>: View {
             windowed(.fileStorage, host: StubMarfaHost(settings: settings)), size: Self.size, named: "Storage, versions")
     }
 
-    @Test func fileStorage() async throws {
+    @Test(arguments: [ColorScheme.light, .dark]) func serverPages(appearance: ColorScheme) async throws {
         let source = FakeInstanceConfig([
             .blobMinCopies: .number(1), .diskReserveMegabytes: .number(128), .enrichmentEnabled: .flag(true), .enrichmentOcrEnabled: .flag(true),
             .mcpFetchEnabled: .flag(true), .mcpFetchMaxMegabytes: .number(50), .blobCleanupEnabled: .flag(true), .blobCleanupGraceSeconds: .number(86_400),
@@ -564,9 +564,24 @@ struct RenderedWindow<Detail: View>: View {
                     FileStoreRow(id: "a", kind: .disk, locator: "/var/lib/marfa/files", error: nil),
                     FileStoreRow(id: "b", kind: .folder, locator: "/Volumes/Studio Backup", error: nil),
                 ], orphanCount: 3, orphanBytes: 12_000_000, firstFound: .now, orphansComplete: true)
-            $0.metrics.fileBytes = 3_400_000_000
+            $0.metrics = InstanceMetricsReading(version: "1", databaseBytes: 214_000_000, fileBytes: 3_400_000_000)
+            $0.jobs = [
+                HousekeepingJob(name: "backup", intervalSeconds: 3600, lastFinished: .now, outcome: .succeeded),
+                HousekeepingJob(name: "blob-integrity", intervalSeconds: 3600, lastFinished: .now, outcome: .failed),
+                HousekeepingJob(name: "heartbeat", intervalSeconds: 60, lastFinished: nil, outcome: nil),
+            ]
         }
-        try await SettingsRender.png(windowed(.fileStorage, host: host), size: Self.size, named: "Storage")
+        let calls = try #require(host.instanceCalls as? FakeInstanceCalls)
+        calls.changeElsewhere("telemetry_enabled", to: .bool(false))
+        calls.state.withLock { $0.settings["heartbeat_url"]?.isSet = true }
+        host.bindOverview()
+        for (page, height) in [(MarfaSettingsPage.fileStorage, 1460), (.monitoring, 900), (.limits, 1030), (.housekeeping, 900)] {
+            try await SettingsRender.png(windowed(page, host: host), size: CGSize(width: Self.size.width, height: CGFloat(height)),
+                named: "\(page.title), \(appearance)", appearance: appearance, settle: .milliseconds(900))
+        }
+        host.grants = [.instanceRead]
+        try await SettingsRender.png(windowed(.fileStorage, host: host), size: CGSize(width: Self.size.width, height: 1460),
+            named: "Storage, read only, \(appearance)", appearance: appearance, settle: .milliseconds(900))
     }
 
     @Test func trash() async throws {

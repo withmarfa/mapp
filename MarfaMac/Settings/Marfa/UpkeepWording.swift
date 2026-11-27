@@ -183,18 +183,25 @@ nonisolated enum UpkeepWording {
 
     // MARK: Housekeeping
 
-    /// The jobs the page lists, in order, by the name the contract gives each and the title the owner reads. The jobs that
-    /// only tidy the server's inside (event logs, credentials, bulk jobs, table rows, inbound deliveries, feed expiry, integrity
-    /// checks, the attention check and the heartbeat) are not listed.
-    static let jobs: [(name: String, title: String)] = [
-        ("backup", String(localized: "Back Up")),
-        ("trash-purge", String(localized: "Empty Recently Deleted")),
-        ("version-thinning", String(localized: "Thin Old Versions")),
-        ("audit-cleanup", String(localized: "Remove Old Activity")),
-        ("blob-orphans", String(localized: "Remove Unused Files")),
-        ("blob-replicate", String(localized: "Copy Files to Storage")),
-        ("enrichment-sweep", String(localized: "Read New Files")),
-        ("release-check", String(localized: "Check for Updates")),
+    /// Display names for known jobs. The server decides which jobs appear.
+    private static let jobs: [(name: String, title: String)] = [
+        ("backup", String(localized: "Back up")),
+        ("trash-purge", String(localized: "Delete items past their time in Trash")),
+        ("version-thinning", String(localized: "Thin old versions")),
+        ("audit-cleanup", String(localized: "Remove old activity")),
+        ("blob-orphans", String(localized: "Remove unused files")),
+        ("blob-replicate", String(localized: "Copy files to storage")),
+        ("enrichment-sweep", String(localized: "Read new files")),
+        ("release-check", String(localized: "Check for updates")),
+        ("heartbeat", String(localized: "Send a heartbeat")),
+        ("feed-expiry", String(localized: "Move expired Feed items to Trash")),
+        ("event-log-cleanup", String(localized: "Remove old events")),
+        ("inbound-delivery-cleanup", String(localized: "Remove expired connector deliveries")),
+        ("bulk-action-gc", String(localized: "Remove finished bulk changes")),
+        ("table-row-cleanup", String(localized: "Remove old table changes")),
+        ("credential-cleanup", String(localized: "Remove expired sign-ins, keys and app access")),
+        ("blob-integrity", String(localized: "Check files are intact")),
+        ("attention-check", String(localized: "Look for problems")),
     ]
 
     static func jobTitle(_ name: String) -> String {
@@ -205,9 +212,9 @@ nonisolated enum UpkeepWording {
     static func every(_ seconds: Int) -> String {
         switch seconds {
         case ..<60: String(localized: "\(seconds) seconds")
-        case 60: String(localized: "Minute")
-        case 3600: String(localized: "Hour")
-        case 86_400: String(localized: "Day")
+        case 60: String(localized: "1 minute")
+        case 3600: String(localized: "1 hour")
+        case 86_400: String(localized: "1 day")
         default:
             if seconds % 86_400 == 0 { String(localized: "\(seconds / 86_400) days") }
             else if seconds % 3600 == 0 { String(localized: "\(seconds / 3600) hours") }
