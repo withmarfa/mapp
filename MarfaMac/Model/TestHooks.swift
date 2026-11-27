@@ -91,13 +91,6 @@ extension MarfaSync {
     }
 }
 
-extension PreferenceHolds {
-    nonisolated struct TestHooks: Sendable {
-        /// How many writes were read in full rather than passed by the fast path.
-        let readings = TestTally(0)
-    }
-}
-
 extension PictureCache {
     nonisolated struct TestHooks: Sendable {
         /// Runs as a trim begins, given whether the lock `removeAll` and `store` share is free then.

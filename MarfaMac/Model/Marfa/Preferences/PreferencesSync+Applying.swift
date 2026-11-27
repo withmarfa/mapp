@@ -27,10 +27,7 @@ extension PreferencesSync {
             for setting in settings {
                 for unit in Set(outcome.merged.keys).union(held.keys) where setting.owns(unit) && kept[unit] == nil {
                     if let value = written[unit], held[unit] != value {
-                        // Another build trying a reported unit again writes the base it had, and a store that still
-                        // cannot read it leaves the freeze as the report made it.
-                        let retried = adopted.frozen[unit]?.reported == true && value == adopted.base[unit]
-                        adopted.frozen[unit] = Record.Frozen(left: held[unit], reported: retried ? true : nil)
+                        adopted.frozen[unit] = Record.Frozen(left: held[unit])
                     } else {
                         adopted.frozen[unit] = nil
                     }

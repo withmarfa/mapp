@@ -46,15 +46,14 @@ nonisolated struct PlaceDensities: Equatable, Sendable {
 
     /// The stored densities, and the stored data that could not be read: the whole of it where it is not an object of words,
     /// otherwise an object of the entries whose word is not a density.
-    private static func read(_ data: Data) -> (readable: PlaceDensities, unreadable: Data?, dropped: PreferenceHolds.Dropped) {
-        guard let words = try? JSONDecoder().decode([String: String].self, from: data) else { return (PlaceDensities(), data, .whole) }
+    private static func read(_ data: Data) -> (readable: PlaceDensities, unreadable: Data?) {
+        guard let words = try? JSONDecoder().decode([String: String].self, from: data) else { return (PlaceDensities(), data) }
         var readable: [String: Density] = [:]
         var unreadable: [String: String] = [:]
         for (place, word) in words {
             if let density = Density(rawValue: word) { readable[place] = density } else { unreadable[place] = word }
         }
-        guard !unreadable.isEmpty else { return (PlaceDensities(readable), nil, .nothing) }
-        return (PlaceDensities(readable), try? encode(unreadable), .entries(Set(unreadable.keys)))
+        return (PlaceDensities(readable), unreadable.isEmpty ? nil : try? encode(unreadable))
     }
 
     private static func encode(_ value: some Encodable) throws -> Data {
@@ -68,28 +67,18 @@ nonisolated struct PlaceDensities: Equatable, Sendable {
         defaults.data(forKey: key).map { read($0).readable } ?? PlaceDensities()
     }
 
-    /// Changes the stored densities. What this write would replace and cannot read is kept aside first. `addressing`
-    /// names the places the person resets on purpose, which this Mac may not have read; each place removed is addressed too.
-    @MainActor
-    static func update(in defaults: UserDefaults = .standard, addressing: Set<String> = [], _ change: (inout PlaceDensities) -> Void) {
+    /// Changes the stored densities. What this write would replace and cannot read is kept aside first.
+    static func update(in defaults: UserDefaults = .standard, _ change: (inout PlaceDensities) -> Void) {
         var value = PlaceDensities()
-        var dropped: PreferenceHolds.Dropped = defaults.object(forKey: key) == nil ? .nothing : .whole
         if let saved = defaults.data(forKey: key) {
-            let read = read(saved)
-            value = read.readable
-            dropped = read.dropped
-            if let unreadable = read.unreadable {
-                defaults.set((defaults.array(forKey: setAsideKey) as? [Data] ?? []) + [unreadable], forKey: setAsideKey)
-            }
+            let (readable, unreadable) = read(saved)
+            value = readable
+            if let unreadable { defaults.set((defaults.array(forKey: setAsideKey) as? [Data] ?? []) + [unreadable], forKey: setAsideKey) }
         }
-        let had = Set(value.places.keys)
         change(&value)
-        let writer = PreferenceHolds.Writer.person(dropped: dropped, addressed: addressing.union(had.subtracting(value.places.keys)))
         if value.places.isEmpty {
-            PreferenceHolds.willWrite(nil, forKey: key, in: defaults, by: writer)
             defaults.removeObject(forKey: key)
         } else if let data = try? encode(value.places.mapValues(\.rawValue)) {
-            PreferenceHolds.willWrite(data, forKey: key, in: defaults, by: writer)
             defaults.set(data, forKey: key)
         }
     }

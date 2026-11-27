@@ -54,7 +54,6 @@ final class ShortcutBindings {
         } else {
             chosen = [:]
             defaults.set((defaults.array(forKey: Self.setAsideKey) as? [Data] ?? []) + [saved], forKey: Self.setAsideKey)
-            PreferenceHolds.willWrite(nil, forKey: Self.defaultsKey, in: defaults, by: .store)
             defaults.removeObject(forKey: Self.defaultsKey)
         }
     }
@@ -96,24 +95,20 @@ final class ShortcutBindings {
     /// another command holds is `replace`d or not set.
     func set(_ shortcut: Shortcut?, for command: ShortcutCommand) {
         setWithoutSaving(shortcut, for: command)
-        save(addressing: [command.id])
+        save()
     }
 
     /// Gives `command` the shortcut and takes it from the command that held it, which is left with none.
     func replace(_ shortcut: Shortcut, for command: ShortcutCommand) {
-        var addressed: Set<String> = [command.id]
-        if case .command(let holder)? = holder(of: shortcut, besides: command) {
-            setWithoutSaving(nil, for: holder)
-            addressed.insert(holder.id)
-        }
+        if case .command(let holder)? = holder(of: shortcut, besides: command) { setWithoutSaving(nil, for: holder) }
         setWithoutSaving(shortcut, for: command)
-        save(addressing: addressed)
+        save()
     }
 
     /// Puts every command back to its default. A stored command the app no longer has stays as it was.
     func restoreDefaults() {
         for command in commands { chosen.removeValue(forKey: command.id) }
-        save(addressing: Set(commands.map(\.id)))
+        save()
     }
 
     private func setWithoutSaving(_ shortcut: Shortcut?, for command: ShortcutCommand) {
@@ -124,14 +119,10 @@ final class ShortcutBindings {
         }
     }
 
-    /// Keeps the person's change, which set or reset the shortcuts of the commands `addressed` names.
-    private func save(addressing addressed: Set<String>) {
-        let writer = PreferenceHolds.Writer.person(dropped: .nothing, addressed: addressed)
+    private func save() {
         if chosen.isEmpty {
-            PreferenceHolds.willWrite(nil, forKey: Self.defaultsKey, in: defaults, by: writer)
             defaults.removeObject(forKey: Self.defaultsKey)
         } else if let data = try? Self.encoder.encode(Stored(shortcuts: chosen)) {
-            PreferenceHolds.willWrite(data, forKey: Self.defaultsKey, in: defaults, by: writer)
             defaults.set(data, forKey: Self.defaultsKey)
         }
     }
@@ -192,7 +183,7 @@ final class ShortcutBindings {
             if let entry = accepted[command.id] { setWithoutSaving(entry, for: command) }
         }
         result.applied = accepted.count
-        save(addressing: Set(accepted.keys))
+        save()
         return result
     }
 }

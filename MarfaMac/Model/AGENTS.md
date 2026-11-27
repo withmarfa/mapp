@@ -14,14 +14,13 @@ Keep SwiftUI out. `ItemLibrary` is the app's whole view of the working copy; `Ma
 
 ## One rule decides, the view draws
 
-- **What a list row or card says is `RowContent`,** which is pure, from the item, its type's look and the list (`RowList`). `RowContents` keeps it per item value, so no row body resolves a look or reads the catalogue.
+- **What a list row or card says is `RowContent`,** which is pure, from the item, its type's look and the list (`RowList`). `RowContents` keeps it for each item value, so no row body resolves a look or reads the catalogue.
 - **What a page's head shows is `PageHead`,** and what a person chose for a type is `PagePlacements`.
 
 ## Settings the app keeps
 
-- **`PreferencesMap` places each new setting** or keeps it on the Mac, and a store holding one rereads it in `reload()`.
-- **An unreadable stored setting is set aside** under its store's `setAsideKey`, never removed: a later version may read it.
-- **A store calls `PreferenceHolds.willWrite` before writing a synced setting,** naming what it dropped and what the person reset.
+- **`PreferencesMap` places each new setting** or keeps it on the Mac. A store that holds one reads it again in `reload()`.
+- **An unreadable stored setting is set aside** under its store's `setAsideKey`, never removed, because a later version may read it.
 
 ## Commands and writes
 
@@ -53,7 +52,7 @@ Keep SwiftUI out. `ItemLibrary` is the app's whole view of the working copy; `Ma
 ## Changing libraries and quitting
 
 - **With no copy open, a window shows the connect, waiting or failure page** (`Libraries.mode`), never another library.
-- **`Libraries.flushEditors` runs before the host changes library or the app quits.** It ends the open value panel, takes every page's last edit and saves every title. A flush that fails or times out cancels the step and says why. It never waits on the server.
+- **`Libraries.flushEditors` runs before the host changes library and before the app quits.** It ends the open value panel, takes every page's last edit and saves every title. A flush that fails or runs out of time cancels the step and says why. It never waits on the server.
 - **A change of library resets each window** (`Browser.adopt`), because its selections name items the other may lack.
 
 ## Logs, reports and notices
@@ -61,7 +60,7 @@ Keep SwiftUI out. `ItemLibrary` is the app's whole view of the working copy; `Ma
 - **`Model/Telemetry/` is the one place for logs and signposts** (`Telemetry.logger(_:)`). Never make a `Logger`, because its privacy rules would be its own.
 - **Never log a person's text, titles, property values or keys.** Log kinds, durations and counts, with `privacy: .public` for those alone. A message that may quote text keeps the default privacy.
 - **Reports leave only through `Telemetry+Reports.swift`,** a closed list over `Reporting`. A report holds fixed words, numbers and flags: no text, id, title, server address, path or error message. `Reporting.Gate` keeps tests and previews from reporting.
-- **Every alert to the person goes through `Notices`** (`tell`, `notKept`). A change not kept goes to the clipboard when first shown, never written over before the person answers.
+- **Every alert to the person goes through `Notices`** (`tell`, `notKept`). A change not kept goes to the clipboard the first time it is shown, and is never written over before the person answers.
 
 ## Code Review Rules
 

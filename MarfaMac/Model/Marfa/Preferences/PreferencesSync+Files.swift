@@ -55,7 +55,6 @@ extension PreferencesSync {
         guard let values = try restorePoints.snapshot(of: point).checked() else { throw .unreadable }
         return try await betweenSteps { () throws(RestorePoints.Failure) -> Applied in
             let domain = try saveRestorePoint(.restoring)
-            replacing(PreferencesMap.synced)
             SettingsSnapshot.write(values, to: defaults, domain: domain)
             replaced(PreferencesMap.synced)
             return Applied(applied: values.count, skipped: refusedShortcuts().count)
@@ -71,30 +70,11 @@ extension PreferencesSync {
         return domain
     }
 
-    /// Forgets what the stores reported of `settings`, but for the units `except` names, before Import, Restore or Reset
-    /// writes the first of them, after its restore point is saved: what the person is about to write is theirs, so no
-    /// report left by an earlier write may hold it back, even where the replace stops before `replaced`.
-    func replacing(_ settings: [SyncedSetting], except: Set<PreferenceUnit> = []) {
-        guard !settings.isEmpty else { return }
-        PreferenceHolds.drop(Set(settings.map(\.key)), except: except, in: defaults)
-        var record = Record.read(defaults)
-        guard let last = record.last, var adopted = record.marfas[last] else { return }
-        let before = adopted
-        for (unit, frozen) in adopted.frozen where frozen.reported == true && !except.contains(unit) {
-            if settings.contains(where: { $0.owns(unit) }) { adopted.frozen[unit] = nil }
-        }
-        guard adopted != before else { return }
-        record.marfas[last] = adopted
-        record.save(defaults)
-    }
-
     /// Has the stores read the defaults again after `settings` were replaced on this Mac on purpose, and marks them to
     /// win at the next step that follows the Marfa (`Record.winning`), even over another Mac's change not yet taken, but
-    /// for the units `except` names by setting key, where this Mac kept what it held. `replacing` runs first.
+    /// for the units `except` names by setting key, where this Mac kept what it held.
     func replaced(_ settings: [SyncedSetting], except: [String: Set<PreferenceUnit>] = [:]) {
-        PreferenceHolds.reloadingReplaced = Set(settings.map(\.key))
         storesReadAgain()
-        PreferenceHolds.reloadingReplaced = []
         guard enabled, !settings.isEmpty else { return }
         var record = Record.read(defaults)
         var marked = record.winning ?? [:]
@@ -130,16 +110,14 @@ extension PreferencesSync {
             result.skipped += mine.count - accepted
             writes.append((setting, mine, setAside))
         }
-        let written = writes.filter { write in PreferencesMap.synced.contains { $0.key == write.setting.key } }
-        let except = Dictionary(written.map { write in
-            (write.setting.key, Set(write.units.filter { !write.setting.accepts($0.value) }.keys))
-        }) { first, second in first.union(second) }
-        replacing(written.map(\.setting), except: Set(except.values.joined()))
         for write in writes {
             write.setAside?()
             write.setting.write(write.units, to: defaults, library: library)
         }
-        replaced(written.map(\.setting), except: except)
+        let written = writes.filter { write in PreferencesMap.synced.contains { $0.key == write.setting.key } }
+        replaced(written.map(\.setting), except: Dictionary(written.map { write in
+            (write.setting.key, Set(write.units.filter { !write.setting.accepts($0.value) }.keys))
+        }) { first, second in first.union(second) })
         let refused = refusedShortcuts()
         let unregistered = units.count { unit, text in
             guard sections.contains(PreferencesMap.anyAppShortcuts.section), PreferencesMap.anyAppShortcuts.owns(unit),

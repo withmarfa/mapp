@@ -185,8 +185,8 @@ extension Browser {
         guard hasDefaultView, viewPanel?.isNew != true else { return }
         let place = shown
         let before = viewSnapshot()
-        PlaceDefaults.update(in: defaults, addressing: [place.storageKey]) { $0.set(nil, for: place) }
-        PlaceDensities.update(in: defaults, addressing: [place.storageKey]) { $0.set(nil, for: place) }
+        PlaceDefaults.update(in: defaults) { $0.set(nil, for: place) }
+        PlaceDensities.update(in: defaults) { $0.set(nil, for: place) }
         densityRevision += 1
         defaults.set(ItemTableColumnLayouts.removing(place, in: defaults.data(forKey: ItemTableColumnLayouts.key) ?? Data()),
                      forKey: ItemTableColumnLayouts.key)

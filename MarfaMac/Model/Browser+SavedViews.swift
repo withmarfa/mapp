@@ -605,7 +605,7 @@ extension Browser {
     /// settings: a view missing from a list proves nothing, since a read that failed publishes an empty one.
     func forgetView(_ id: ItemID) {
         viewSeeds[id] = nil
-        ViewLayouts.update(in: defaults, addressing: [id.rawValue]) { $0.forget(id) }
+        ViewLayouts.update(in: defaults) { $0.forget(id) }
     }
 
     /// Delete View…, from the View menu, the palette or a pill: asks first, since a view has no bin. The View panel closes

@@ -179,25 +179,13 @@ nonisolated extension ViewLayouts {
         defaults.string(forKey: key).flatMap(ViewLayouts.init(rawValue:)) ?? ViewLayouts()
     }
 
-    /// Changes the stored settings. `addressing` names the views whose settings the person removes on purpose, which this Mac
-    /// may not have read; each view removed is addressed too.
-    @MainActor
-    static func update(in defaults: UserDefaults = .standard, addressing: Set<String> = [], _ change: (inout ViewLayouts) -> Void) {
-        var dropped: PreferenceHolds.Dropped = .nothing
+    static func update(in defaults: UserDefaults = .standard, _ change: (inout ViewLayouts) -> Void) {
         // This write replaces every view's settings, so text it could not read is kept rather than lost.
-        if let text = defaults.string(forKey: key) {
-            if !text.isEmpty, ViewLayouts(rawValue: text) == nil {
-                defaults.set((defaults.stringArray(forKey: setAsideKey) ?? []) + [text], forKey: setAsideKey)
-                dropped = .whole
-            }
-        } else if defaults.object(forKey: key) != nil {
-            dropped = .whole
+        if let text = defaults.string(forKey: key), !text.isEmpty, ViewLayouts(rawValue: text) == nil {
+            defaults.set((defaults.stringArray(forKey: setAsideKey) ?? []) + [text], forKey: setAsideKey)
         }
         var value = stored(in: defaults)
-        let had = Set(value.views.keys)
         change(&value)
-        let addressed = addressing.union(had.subtracting(value.views.keys))
-        PreferenceHolds.willWrite(value.rawValue, forKey: key, in: defaults, by: .person(dropped: dropped, addressed: addressed))
         defaults.set(value.rawValue, forKey: key)
     }
 }

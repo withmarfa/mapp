@@ -85,7 +85,6 @@ nonisolated struct DateFormat: Hashable, Sendable, RawRepresentable {
 
     /// The stored format, or the standard where none is stored or it does not read. A value that does not read is first
     /// set aside (`setAsideUnreadable`), never translated.
-    @MainActor
     static func stored(in defaults: UserDefaults = .standard) -> DateFormat {
         setAsideUnreadable(in: defaults)
         return defaults.string(forKey: key).flatMap(Self.init(rawValue:)) ?? standard
@@ -93,13 +92,11 @@ nonisolated struct DateFormat: Hashable, Sendable, RawRepresentable {
 
     /// Keeps a stored value that does not read, such as an older version's word, under `setAsideKey` and removes it, so
     /// the page starts from the standard and a change writes over nothing. Run at launch, before any view writes.
-    @MainActor
     static func setAsideUnreadable(in defaults: UserDefaults = .standard) {
         guard let value = defaults.object(forKey: key) else { return }
         let text = value as? String ?? String(describing: value)
         guard Self(rawValue: text) == nil else { return }
         defaults.set((defaults.stringArray(forKey: setAsideKey) ?? []) + [text], forKey: setAsideKey)
-        PreferenceHolds.willWrite(nil, forKey: key, in: defaults, by: .store)
         defaults.removeObject(forKey: key)
     }
 

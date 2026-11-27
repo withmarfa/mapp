@@ -38,7 +38,7 @@ final class TypeLooks {
         chosen = readable
         guard let unreadable else { return }
         defaults.set((defaults.array(forKey: Self.setAsideKey) as? [Data] ?? []) + [unreadable], forKey: Self.setAsideKey)
-        save(by: .store)
+        save()
         Telemetry.typeLooksUnreadable(reporting: reporting)
     }
 
@@ -112,10 +112,9 @@ final class TypeLooks {
             secondary: look.secondary == baseline.secondary ? nil : look.secondary,
             facts: look.facts == baseline.facts ? nil : look.facts)
         var types = chosen[library] ?? [:]
-        let removed: Set<String> = choice.isEmpty && types[type.rawValue] != nil ? [type.rawValue] : []
         types[type.rawValue] = choice.isEmpty ? nil : choice
         chosen[library] = types.isEmpty ? nil : types
-        save(by: .person(dropped: .nothing, addressed: removed))
+        save()
     }
 
     /// Takes back every choice for `type`, so it shows what its preset and the types above it give. Other types' choices
@@ -123,7 +122,7 @@ final class TypeLooks {
     func restore(_ type: TypeID, in library: String) {
         guard var types = chosen[library], types.removeValue(forKey: type.rawValue) != nil else { return }
         chosen[library] = types.isEmpty ? nil : types
-        save(by: .person(dropped: .nothing, addressed: [type.rawValue]))
+        save()
     }
 
     // MARK: Export and import
@@ -168,14 +167,9 @@ final class TypeLooks {
             types[type.rawValue] = choice.isEmpty ? nil : choice
         }
         let kept: [String: TypeLookChoice]? = types.isEmpty ? nil : types
-        // Every type the file names is the person's choice, even one this import leaves as it was here.
-        let writer = PreferenceHolds.Writer.person(dropped: .nothing, addressed: Set(file.looks.keys))
-        guard kept != chosen[library] else {
-            PreferenceHolds.willWrite(defaults.object(forKey: Self.defaultsKey), forKey: Self.defaultsKey, in: defaults, by: writer)
-            return
-        }
+        guard kept != chosen[library] else { return }
         chosen[library] = kept
-        save(by: writer)
+        save()
     }
 
     /// How many types lie above `type` along the catalogue's `parent` links, however long the chain: `ancestors(of:)` stops
@@ -188,12 +182,10 @@ final class TypeLooks {
         return seen.count - 1
     }
 
-    /// `writer` is who made the change: the store's own reading, or the person.
-    private func save(by writer: PreferenceHolds.Writer) {
+    private func save() {
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
         guard let data = try? encoder.encode(chosen) else { return }
-        PreferenceHolds.willWrite(data, forKey: Self.defaultsKey, in: defaults, by: writer)
         defaults.set(data, forKey: Self.defaultsKey)
     }
 }

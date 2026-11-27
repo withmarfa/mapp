@@ -251,7 +251,6 @@ nonisolated extension PagePlacements: RawRepresentable {
         defaults.string(forKey: key).flatMap(Self.init(rawValue:)) ?? PagePlacements()
     }
 
-    @MainActor
     static func update(in defaults: UserDefaults = .standard, _ change: (inout PagePlacements) -> Void) {
         let text = defaults.string(forKey: key)
         let original = text.flatMap(Self.init(rawValue:))
@@ -260,10 +259,6 @@ nonisolated extension PagePlacements: RawRepresentable {
         change(&edited)
         guard edited.entries != previous.entries else { return }
         if let text { setAsideUnreadable(in: original, text: text, defaults: defaults) }
-        // Entries it could read but not understand stay in place; only a document read as nothing drops anything.
-        let dropped: PreferenceHolds.Dropped = original == nil && defaults.object(forKey: key) != nil ? .whole : .nothing
-        let removed = Set(previous.entries.keys).subtracting(edited.entries.keys)
-        PreferenceHolds.willWrite(edited.rawValue, forKey: key, in: defaults, by: .person(dropped: dropped, addressed: removed))
         defaults.set(edited.rawValue, forKey: key)
     }
 

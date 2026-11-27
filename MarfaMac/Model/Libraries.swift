@@ -155,7 +155,6 @@ import MarfaTesting
     func resetMacSettings(then done: @escaping @MainActor () -> Void = {}) {
         preferences.resetBetweenSteps { [preferences, shortcuts, anyAppShortcuts, defaults, automaticExport] () throws(RestorePoints.Failure) in
             try preferences.saveRestorePoint(.reset)
-            preferences.replacing(PreferencesMap.synced)
             shortcuts.restoreDefaults()
             anyAppShortcuts.clearAll()
             MacSettings.reset(in: defaults)

@@ -617,7 +617,7 @@ final class SidebarLayouts {
         entries = kept
         guard let unreadable else { return }
         defaults.set((defaults.array(forKey: Self.setAsideKey) as? [Data] ?? []) + [unreadable], forKey: Self.setAsideKey)
-        save(by: .store)
+        save()
         Telemetry.sidebarLayoutsUnreadable(reporting: reporting)
     }
 
@@ -693,11 +693,9 @@ final class SidebarLayouts {
 
     func update(_ library: String, _ change: (inout SidebarLayout) -> Void) {
         var layout = layout(for: library)
+        change(&layout)
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
-        // Taken before the change, so the rows the store filled from its defaults are told from the person's.
-        let before = try? encoder.encode(layout)
-        change(&layout)
         guard layout != self.layout(for: library), let value = try? encoder.encode(layout),
               let key = try? JSONEncoder().encode(library) else { return }
         layouts[library] = layout
@@ -706,13 +704,10 @@ final class SidebarLayouts {
         } else {
             entries.append(StoredEntry(library: library, key: key, value: value))
         }
-        save(by: .sidebar(library: library, before: before))
+        save()
     }
 
-    /// `writer` is who made the change: the store's own reading, or the person.
-    private func save(by writer: PreferenceHolds.Writer) {
-        let value = Self.object(entries)
-        PreferenceHolds.willWrite(value, forKey: Self.defaultsKey, in: defaults, by: writer)
-        defaults.set(value, forKey: Self.defaultsKey)
+    private func save() {
+        defaults.set(Self.object(entries), forKey: Self.defaultsKey)
     }
 }

@@ -279,8 +279,8 @@ nonisolated struct PlaceDefaults: Equatable, Sendable {
 
     /// The stored defaults, and the stored data that could not be read: the whole of it where it is not an object of
     /// places, otherwise an object of the entries that could not be read, so one bad entry leaves the other places' alone.
-    private static func read(_ data: Data) -> (readable: PlaceDefaults, unreadable: Data?, dropped: PreferenceHolds.Dropped) {
-        guard let entries = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return (PlaceDefaults(), data, .whole) }
+    private static func read(_ data: Data) -> (readable: PlaceDefaults, unreadable: Data?) {
+        guard let entries = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return (PlaceDefaults(), data) }
         var readable: [String: PlaceDefault] = [:]
         var unreadable: [String: Any] = [:]
         for (place, entry) in entries {
@@ -293,9 +293,8 @@ nonisolated struct PlaceDefaults: Equatable, Sendable {
             }
             readable[place] = value
         }
-        guard !unreadable.isEmpty else { return (PlaceDefaults(readable), nil, .nothing) }
-        let aside = try? JSONSerialization.data(withJSONObject: unreadable, options: .sortedKeys)
-        return (PlaceDefaults(readable), aside, .entries(Set(unreadable.keys)))
+        let aside = unreadable.isEmpty ? nil : try? JSONSerialization.data(withJSONObject: unreadable, options: .sortedKeys)
+        return (PlaceDefaults(readable), aside)
     }
 
     /// The stored defaults; data that cannot be read is no defaults, never a failure.
@@ -309,28 +308,18 @@ nonisolated struct PlaceDefaults: Equatable, Sendable {
         data.flatMap { read($0).readable.default(for: .favorites)?.scope } ?? .library
     }
 
-    /// Changes the stored defaults. What this write would replace and cannot read is kept aside first. `addressing`
-    /// names the places the person resets on purpose, which this Mac may not have read; each place removed is addressed too.
-    @MainActor
-    static func update(in defaults: UserDefaults = .standard, addressing: Set<String> = [], _ change: (inout PlaceDefaults) -> Void) {
+    /// Changes the stored defaults. What this write would replace and cannot read is kept aside first.
+    static func update(in defaults: UserDefaults = .standard, _ change: (inout PlaceDefaults) -> Void) {
         var value = PlaceDefaults()
-        var dropped: PreferenceHolds.Dropped = defaults.object(forKey: key) == nil ? .nothing : .whole
         if let saved = defaults.data(forKey: key) {
-            let read = read(saved)
-            value = read.readable
-            dropped = read.dropped
-            if let unreadable = read.unreadable {
-                defaults.set((defaults.array(forKey: setAsideKey) as? [Data] ?? []) + [unreadable], forKey: setAsideKey)
-            }
+            let (readable, unreadable) = read(saved)
+            value = readable
+            if let unreadable { defaults.set((defaults.array(forKey: setAsideKey) as? [Data] ?? []) + [unreadable], forKey: setAsideKey) }
         }
-        let had = Set(value.places.keys)
         change(&value)
-        let writer = PreferenceHolds.Writer.person(dropped: dropped, addressed: addressing.union(had.subtracting(value.places.keys)))
         if value.places.isEmpty {
-            PreferenceHolds.willWrite(nil, forKey: key, in: defaults, by: writer)
             defaults.removeObject(forKey: key)
         } else if let data = try? encode(value.places) {
-            PreferenceHolds.willWrite(data, forKey: key, in: defaults, by: writer)
             defaults.set(data, forKey: key)
         }
     }
