@@ -107,6 +107,8 @@ The page gate checks connection and permissions. A configured Marfa keeps its Ac
 - **An update to a plugin only adds.** Removing one keeps its types and their items and deletes its connector's mapping.
 - **Guidance has no rule of the app's own.** The server's answer decides: a sign-in again, a refusal that gives the command-line command, or a missing permission.
 - **A new type or link type is under `user.`**, with an id made from its name and checked against a fresh list. A field keeps its name when its label changes, because items hold values under it.
+- **A registered type changes when the sign-in holds `schema.write` and may write that type**, including one an app registered. One Marfa ships, or one a plugin brought, does not. Yours lists `user.*` only.
+- **Update and Remove of a plugin with a connector need `connectors.manage`.** Without it they stay on the page and offer Allow More.
 - **A type in use is moved before it is deleted.** The move is previewed again just before it starts, and the type is deleted unforced only when no item is left.
 - **A mapping saves as it is made**, sending every other kind as stored, so one refused kind holds no other back. An older reading is never applied over a newer one.
 - **Existing items change only when the owner applies a mapping**, after a dry run of the saved mapping counted them.
@@ -114,6 +116,7 @@ The page gate checks connection and permissions. A configured Marfa keeps its Ac
 
 ## Folders and backups
 
+- **Folders is one list.** A copy's sign-in does not say which Mac it is on.
 - **A folder's record is pinned by the working copy** (`CopyFolderCalls`), because the copy's slice leaves out `system.folder`. A pin goes only with Stop Syncing.
 - **Stop Syncing cannot be undone**, and leaves items in Marfa and files on disk.
 - **A restore adds what a backup holds and changes nothing that is there**, and says what it leaves out.
