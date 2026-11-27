@@ -293,7 +293,7 @@ nonisolated protocol OwnerCalls: Sendable {
     /// Changes only what `change` names and answers the webhook as the server holds it.
     func change(webhook id: String, _ change: WebhookChange) async throws(OwnerFailure) -> OwnerWebhook
     func delete(webhook id: String) async throws(OwnerFailure)
-    func deliveries(of webhook: String) async throws(OwnerFailure) -> [WebhookDeliveryInfo]
+    func deliveries(of webhook: String, limit: Int) async throws(OwnerFailure) -> [WebhookDeliveryInfo]
     func redeliver(_ delivery: String, of webhook: String) async throws(OwnerFailure) -> WebhookDeliveryInfo
 
     /// The server's health: the open fields for any sign-in, the rest for `instance.read`.

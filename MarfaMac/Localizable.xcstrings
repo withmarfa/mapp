@@ -2206,7 +2206,7 @@
     "A web page at %@." : {
 
     },
-    "A webhook sends events to an address you choose, as they happen." : {
+    "A webhook tells another app when your items change." : {
 
     },
     "A word goes to the word in its group, unless you choose another." : {
@@ -4311,6 +4311,9 @@
 
     },
     "Custom Color" : {
+
+    },
+    "Custom name." : {
 
     },
     "Customize Access" : {
@@ -6420,6 +6423,9 @@
     "Limit Sources" : {
 
     },
+    "Limit sources" : {
+
+    },
     "Limit Sources Not Saved" : {
 
     },
@@ -6937,16 +6943,7 @@
     "Name: %@" : {
 
     },
-    "Named by its key." : {
-
-    },
-    "Named by the app." : {
-
-    },
     "Named by the sign-in that keeps each one." : {
-
-    },
-    "Named by you." : {
 
     },
     "Narrow" : {
@@ -7306,6 +7303,9 @@
     "No Webhooks" : {
 
     },
+    "No Webhooks for This Sign-In" : {
+
+    },
     "No Window to Sign In From" : {
 
     },
@@ -7494,9 +7494,6 @@
     },
     "Not looked up yet" : {
       "extractionState" : "manual"
-    },
-    "Not named yet." : {
-
     },
     "Not ready yet" : {
 
@@ -7760,9 +7757,6 @@
     "Only for %@." : {
 
     },
-    "Only items from the sources you name are read." : {
-
-    },
     "Only one of the two coordinates is set, so there is no point to show." : {
       "extractionState" : "manual"
     },
@@ -7770,9 +7764,6 @@
 
     },
     "Only the checked sources can add items of the checked types. Subtypes have their own rules. A key can use its own rule." : {
-
-    },
-    "Only the sources you name may write these types." : {
 
     },
     "Only when something changed." : {
@@ -9586,9 +9577,6 @@
     "Signing Secret" : {
 
     },
-    "Signing Secret Not Copied" : {
-
-    },
     "Signs sign-ins. Never shown." : {
 
     },
@@ -10994,6 +10982,9 @@
     "The view won’t keep:" : {
       "extractionState" : "manual"
     },
+    "The webhook may have been deleted, or this sign-in may have lost access." : {
+
+    },
     "The webhook “%@” was made, and its signing secret can’t be shown again. If you didn’t copy it, delete the webhook on the Webhooks page and make it again." : {
 
     },
@@ -11236,9 +11227,6 @@
     },
     "This Version" : {
       "extractionState" : "manual"
-    },
-    "This Webhook Is Gone" : {
-
     },
     "This Week" : {
 
@@ -11707,9 +11695,6 @@
 
     },
     "Turn Off %@?" : {
-
-    },
-    "Turn Off…" : {
 
     },
     "Turn off “%@”?" : {
@@ -12215,7 +12200,16 @@
     "Webhook Address Not Changed" : {
 
     },
+    "Webhook Created" : {
+
+    },
+    "Webhook limit reached" : {
+
+    },
     "Webhook Not Made" : {
+
+    },
+    "Webhook Unavailable" : {
 
     },
     "Webhooks" : {
@@ -12388,6 +12382,9 @@
 
     },
     "Who May Write" : {
+
+    },
+    "Who may write" : {
 
     },
     "Who May Write Not Saved" : {

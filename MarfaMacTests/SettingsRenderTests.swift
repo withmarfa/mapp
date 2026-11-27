@@ -80,7 +80,10 @@ import Testing
     }
 
     func marks(matching query: String, in set: MarfaMarkSet) -> [String] { ["lucide:inbox", "lucide:rss", "lucide:book-open"] }
-    func markGlyph(_ id: String) -> AnyView { AnyView(Image(systemName: "tray")) }
+    func markGlyph(_ id: String) -> AnyView {
+        if id.isEmpty { return AnyView(Image(systemName: "tray")) }
+        return AnyView(RowIconImage(icon: .type(id)).foregroundStyle(SettingsTokens.secondaryText))
+    }
     func markTitle(_ id: String) -> String { id }
     func typeMark(for pattern: String) -> AnyView { AnyView(TypeTile(icon: typeIcons[pattern], size: .side)) }
     var typeCalls: any TypeCalls = FakeTypeCalls()
@@ -515,14 +518,18 @@ struct RenderedWindow<Detail: View>: View {
     }
 
     private static let sourceRows = [
-        MarfaSourceRow(code: "marfa-mac", name: "Marfa for Mac", mark: nil, count: 4_212, nameOrigin: .app),
-        MarfaSourceRow(code: "github", name: "GitHub", mark: nil, count: 318, nameOrigin: .set),
-        MarfaSourceRow(code: "readwise", name: "Readwise", mark: nil, count: 127, nameOrigin: .key),
-        MarfaSourceRow(code: "rss", name: "RSS", mark: nil, count: 156, nameOrigin: .key),
+        MarfaSourceRow(code: "marfa-mac", name: "Marfa for Mac", mark: "lucide:app-window", count: 429, nameOrigin: .app),
+        MarfaSourceRow(code: "studio", name: "Studio Notes", mark: "lucide:folder", count: 337, nameOrigin: .key),
+        MarfaSourceRow(code: "readwise", name: "Readwise", mark: "lucide:book", count: 154, nameOrigin: .key),
+        MarfaSourceRow(code: "rss", name: "RSS", mark: "lucide:rss", count: 151, nameOrigin: .key),
+        MarfaSourceRow(code: "raycast", name: "Raycast", mark: "lucide:command", count: 111, nameOrigin: .app),
+        MarfaSourceRow(code: "github", name: "GitHub", mark: "lucide:code-xml", count: 47, nameOrigin: .set),
+        MarfaSourceRow(code: "claude", name: "Claude", mark: "lucide:sparkle", count: 45, nameOrigin: .app),
     ]
 
     @Test func sources() async throws {
         let host = await stub { $0.sources = Self.sourceRows }
+        fake(host).state.withLock { $0.sourceLimit.allowlist = (["core.note"], ["studio"]) }
         try await SettingsRender.png(windowed(.sources, host: host), size: Self.size, named: "Sources")
     }
 
@@ -963,7 +970,22 @@ struct RenderedWindow<Detail: View>: View {
     // MARK: Webhooks and Folders
 
     @Test func webhooks() async throws {
-        try await page(.webhooks, owner(), named: "Webhooks")
+        let host = owner()
+        fake(host).state.withLock {
+            $0.names["studio.job"] = "Jobs"
+            $0.webhooks[0].maker?.name = "Marfa for Mac"
+            $0.webhooks[1].maker?.name = "Marfa for Mac"
+            $0.webhooks[0].typeFilter = "studio.job"
+            $0.webhooks[1].typeFilter = "studio.job"
+            $0.webhooks[3].maker = .init(kind: .app, id: "studio-sync", name: "Studio Folder Sync")
+            $0.webhooks[3].typeFilter = "core.note"
+            $0.deliveries["w4"] = []
+        }
+        try await page(.webhooks, host, named: "Webhooks")
+    }
+
+    @Test func webhooksWithAFailedDelivery() async throws {
+        try await page(.webhooks, owner(), named: "Webhooks, failed delivery")
     }
 
     @Test func webhooksWithoutManageKeys() async throws {
@@ -988,10 +1010,29 @@ struct RenderedWindow<Detail: View>: View {
         try await page(.webhooks, host, named: "Webhooks, a revoked key's among them")
     }
 
-    @Test func noWebhooks() async throws {
+    @Test func webhooksEmpty() async throws {
         let host = owner()
-        (host.ownerCalls as? FakeOwnerCalls)?.state.withLock { $0.webhooks = [] }
-        try await page(.webhooks, host, named: "Webhooks, none yet")
+        fake(host).state.withLock { $0.webhooks = [] }
+        try await page(.webhooks, host, named: "SettingsProposal-Edge-WebhooksEmpty")
+        #expect(!fake(host).calls.contains("deliveries"))
+    }
+
+    @Test func sourcesWithLockedRules() async throws {
+        let host = await stub {
+            $0.sources = Self.sourceRows
+            $0.grants.remove(.configManage)
+        }
+        try await page(.sources, host, named: "Sources, rules locked")
+        #expect(!fake(host).calls.contains("sourceLimit"))
+    }
+
+    @Test func sourcesAndWebhooksWhenTheServerDoesNotAnswer() async throws {
+        let host = owner()
+        host.connection = .notAnswering(lastAnswered: nil)
+        for page in [MarfaSettingsPage.sources, .webhooks] {
+            try await self.page(page, host, named: "\(page.title), not answering")
+        }
+        #expect(!fake(host).calls.contains("webhooks") && !fake(host).calls.contains("sourceLimit"))
     }
 
     @Test func aWebhook() async throws {
@@ -1032,8 +1073,9 @@ struct RenderedWindow<Detail: View>: View {
 
     @Test func webhooksWithoutWebhooksManage() async throws {
         let host = owner()
-        host.grants = []
+        host.grants = [.keysManage]
         try await page(.webhooks, host, named: "Webhooks, without webhooks.manage")
+        #expect(!fake(host).calls.contains("webhooks"))
     }
 
     @Test func folders() async throws {
