@@ -104,4 +104,12 @@ extension MarfaLibrary {
         let savingRefusedFile = TestHook<@Sendable () throws -> URL>()
     }
 }
+
+extension MarfaSource {
+    nonisolated struct TestHooks: Sendable {
+        /// Replaces the server lookup of which items hold these files' bytes. The URLs are the ones an add would
+        /// upload, symbolic links resolved. A throw is no answer for the whole batch.
+        let holdingBytes = TestHook<@Sendable ([URL]) async throws -> [Marfa.FileMatch]>()
+    }
+}
 #endif

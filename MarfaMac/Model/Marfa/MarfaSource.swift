@@ -74,13 +74,19 @@ nonisolated final class MarfaSource: ItemSource {
     /// The answers to the app's writes to its settings item, which the engine takes with the rest.
     let preferenceAnswers = PreferenceAnswers()
     private let counting: MarfaCounts
+    /// Server calls for this connection. Nil for a sample or a test source, which never asks the server.
+    private let calls: MarfaServerCalls?
+    #if DEBUG
+    let hooks = TestHooks()
+    #endif
 
     /// `parentLinks` is where the engine keeps its new items' parent links across a relaunch, or nil for memory.
     init(copy: WorkingCopy, connection: MarfaConnection,
          reading: (any MarfaReading)? = nil, refreshing: (any MarfaRefreshing)? = nil, parentLinks: URL? = nil,
-         keptFolder: URL = MarfaSource.keptFiles(for: "Sample")) {
+         keptFolder: URL = MarfaSource.keptFiles(for: "Sample"), calls: MarfaServerCalls? = nil) {
         self.copy = copy
         self.keptFolder = keptFolder
+        self.calls = calls
         counting = MarfaCounts(copy: copy)
         let downloads = MarfaDownloads(copy: copy, keptFolder: keptFolder)
         downloadedFiles = downloads
@@ -130,7 +136,8 @@ nonisolated final class MarfaSource: ItemSource {
         let source = MarfaSource(
             copy: copy, connection: connection, refreshing: refreshing,
             parentLinks: location.directory(for: connection).appending(path: "New Item Parent Links.json"),
-            keptFolder: keptFiles(for: location.directory(for: connection).lastPathComponent))
+            keptFolder: keptFiles(for: location.directory(for: connection).lastPathComponent),
+            calls: MarfaServerCalls(connection: connection, signIns: signIns))
         source.events.yield(.paint)
         return source
     }
@@ -180,11 +187,29 @@ nonisolated final class MarfaSource: ItemSource {
         }
     }
 
-    /// Not wired yet: marfa-swift's call that hashes local files off the main actor and asks `POST /items/blobs`
-    /// fills this, mapping a failure or a hash left unanswered to `noAnswer`. Until then every add goes ahead
-    /// unasked, as it always has.
+    /// The items that hold each file's bytes. The package hashes the file an add would upload, symbolic links
+    /// resolved, while the caller still holds any security-scoped access. A lookup that throws, or that the app's
+    /// check gives up on, is no answer for the whole batch. A file the package cannot read is no answer for that
+    /// file alone. Nothing is asked while the server is out of reach or there is no sign-in, so that answer is immediate.
     func itemsWithSameBytes(as files: [URL]) async -> FileMatches {
-        .noAnswer
+        guard !files.isEmpty else { return .noAnswer }
+        let uploading = files.map { $0.resolvingSymlinksInPath() }
+        #if DEBUG
+        if let lookup = hooks.holdingBytes.current {
+            return await ByteMatches.answers(for: files) { try await lookup(uploading) }
+        }
+        #endif
+        guard hub.connection == .online, let calls else { return .noAnswer }
+        let server: Server
+        do {
+            server = try calls.server()
+        } catch {
+            return .noAnswer
+        }
+        let timeout = await AlreadyInMarfa.limit
+        return await ByteMatches.answers(for: files) {
+            try await server.itemsHoldingBytes(of: uploading, timeout: timeout)
+        }
     }
 
     func pinForOpening(_ id: ItemID) async throws {

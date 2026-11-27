@@ -131,7 +131,7 @@ extension EditorTests {
         try #require(await eventually { editor.alreadyInMarfa.question != nil })
         editor.alreadyInMarfa.answer(.open)
         try #require(await eventually { opened == [beach.id, trip.id] })
-        try #require(await eventually { library.attachedBatches == [["gone.png"]] })
+        try #require(await eventually { library.attachedBatches.map(\.names) == [["gone.png"]] })
         #expect(library.notices.waiting.contains { $0.title == "Couldn’t Open Item" && $0.message.contains("gone.png") })
     }
 
