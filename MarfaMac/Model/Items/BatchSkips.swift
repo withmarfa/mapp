@@ -9,6 +9,7 @@ nonisolated struct BatchSkips: Equatable, Sendable {
         case inBin
         /// With a problem the library found in it, such as values or text it could not read.
         case cantChange
+        case typeWriteDenied
         /// Held read only: a person's connector keeps it and would put back a change made here.
         case readOnly
         /// A file, which keeps its type.
@@ -57,6 +58,7 @@ nonisolated struct BatchSkips: Equatable, Sendable {
         case .gone: String(localized: "\(count) items are no longer in the library.")
         case .inBin: String(localized: "\(count) items are in Recently Deleted.")
         case .cantChange: String(localized: "\(count) items can’t be changed right now.")
+        case .typeWriteDenied: AttributedString(localized: "The app doesn’t have write access to ^[\(count) item](inflect: true).").text
         case .readOnly: String(localized: "\(count) items are managed by a connector, so changes made here would be overwritten.")
         case .file: String(localized: "\(count) items are files, which keep their type.")
         case .cantBecomeType: String(localized: "\(count) items can’t become this type.")
