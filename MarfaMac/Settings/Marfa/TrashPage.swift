@@ -17,7 +17,7 @@ struct TrashPage: View {
         }
     }
 
-    var items: [MarfaDeletedItem] {
+    private var items: [MarfaDeletedItem] {
         let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
         return host.deletedItems.filter { item in
             (kind == nil || item.kind == kind) && (query.isEmpty || item.title.localizedStandardContains(query))

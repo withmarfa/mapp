@@ -639,13 +639,13 @@ struct RenderedWindow<Detail: View>: View {
             $0.deletedCount = $0.deletedItems.count
         }
         let page = TrashPage(host: host, showsAll: false)
-        #expect(Set(page.items.map(\.kind)) == ["Bookmarks", "Notes"])
+        #expect(Set(host.deletedItems.map(\.kind)) == ["Bookmarks", "Notes"])
         #expect(page.purgePermission == nil)
         let size = CGSize(width: Self.size.width, height: 1400)
         try await SettingsRender.png(windowed(.trash, host: host, badge: 1), size: size, named: "Trash, \(appearance)", appearance: appearance)
         host.grants.remove(.itemsPurge)
         #expect(page.purgePermission == .itemsPurge)
-        #expect(page.items.count == 124)
+        #expect(host.deletedItems.count == 124)
         try await SettingsRender.png(windowed(.trash, host: host), size: size, named: "Trash, read only, \(appearance)", appearance: appearance)
     }
 
