@@ -386,6 +386,9 @@ struct SoftSelection: NSViewRepresentable {
 
 extension NSView {
     /// The table a background view sits behind: the first, going outwards, whose scroll view covers the view's centre.
+    /// The search stops at the hosting view that holds the view, since a list's background and the list are in the
+    /// same one, and a column that has not made its table yet would otherwise lend its neighbour's, whose scroll view
+    /// can reach under it.
     func nearestTable() -> NSTableView? {
         let centre = convert(NSPoint(x: bounds.midX, y: bounds.midY), to: nil)
         func firstTable(in view: NSView) -> NSTableView? {
@@ -402,6 +405,7 @@ extension NSView {
         var ancestor = superview
         while let view = ancestor {
             if let table = firstTable(in: view) { return table }
+            if NSStringFromClass(type(of: view)).contains("NSHostingView") { return nil }
             ancestor = view.superview
         }
         return nil
