@@ -75,6 +75,21 @@ struct SettingsWindowView: View {
                 DepartureSheet(model: libraries.marfaSettings, departure: departure)
             }
         }
+        .onChange(of: model.isConfirmingDisconnect) { _, isAsking in
+            guard isAsking else { return }
+            model.isConfirmingDisconnect = false
+            askToDisconnect()
+        }
+        .alert(
+            "Couldn’t Remove This App’s Settings",
+            isPresented: Binding { model.settingsRemovalFailure != nil } set: { if !$0 { model.stayConnected() } }
+        ) {
+            Button("Stay Connected", role: .cancel) {}
+            Button("Disconnect Anyway", role: .destructive) { Task { await model.disconnectAnyway() } }
+        } message: {
+            Text(verbatim: model.settingsRemovalFailure?.reason == .discardedChangesWait
+                ? appSettingsWords.discardedChangesWait : appSettingsWords.removalNotTaken)
+        }
         .environment(\.settingsSheets, sheets)
         .settingsSheet(isPresented: sheets.isPresented, dismiss: { sheets.dismiss() }) {
             if let content = sheets.content { content }
@@ -85,6 +100,28 @@ struct SettingsWindowView: View {
             if badgeAddress != nil { await host.overview.load() }
         }
         .accessibilityIdentifier("SettingsWindow")
+    }
+
+    private var model: MarfaSettingsModel { libraries.marfaSettings }
+
+    private var appSettingsWords: ConnectionSettings {
+        ConnectionSettings(standing: libraries.preferences.standing, name: LibraryDescription.name(libraries))
+    }
+
+    /// The question before Disconnect, with the choice to take this app's settings out of the Marfa too where they are kept there.
+    private func askToDisconnect() {
+        let name = LibraryDescription.name(libraries)
+        SettingsAlert.confirm(
+            title: String(localized: "Disconnect from \(name)?"),
+            message: String(localized: "The app removes its copy from this Mac and signs out. Webhooks it made are deleted. Your items stay."),
+            confirm: String(localized: "Disconnect"),
+            checkbox: model.offersSettingsRemoval ? appSettingsWords.disconnectChoice : nil,
+            window: NSApp.keyWindow
+        ) { confirmed, checked in
+            guard confirmed else { return }
+            model.alsoRemovesSettings = checked
+            Task { await model.disconnect() }
+        }
     }
 
     /// Closing Settings hands over what was typed and not saved, stops following an update (the server carries on), and drops

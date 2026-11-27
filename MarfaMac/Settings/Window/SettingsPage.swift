@@ -5,11 +5,12 @@ nonisolated enum SettingsPage: CaseIterable, Hashable, Sendable {
     case general, appearance, keyboard, lists, editor, layouts, search, connection
     case marfa(MarfaSettingsPage)
 
-    static let overview = SettingsPage.marfa(.overview)
+    static let passkeys = SettingsPage.marfa(.passkeys)
+    static let browsers = SettingsPage.marfa(.browsers)
     static let account = SettingsPage.marfa(.account)
     static let apps = SettingsPage.marfa(.apps)
     static let keys = SettingsPage.marfa(.keys)
-    static let addresses = SettingsPage.marfa(.addresses)
+    static let network = SettingsPage.marfa(.network)
     static let plugins = SettingsPage.marfa(.plugins)
     static let types = SettingsPage.marfa(.types)
     static let sources = SettingsPage.marfa(.sources)
@@ -21,7 +22,6 @@ nonisolated enum SettingsPage: CaseIterable, Hashable, Sendable {
     static let webhooks = SettingsPage.marfa(.webhooks)
     static let folders = SettingsPage.marfa(.folders)
     static let backups = SettingsPage.marfa(.backups)
-    static let updates = SettingsPage.marfa(.updates)
     static let housekeeping = SettingsPage.marfa(.housekeeping)
     static let activity = SettingsPage.marfa(.activity)
     static let monitoring = SettingsPage.marfa(.monitoring)
