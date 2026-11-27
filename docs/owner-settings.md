@@ -34,14 +34,14 @@ A page opens with the permission here (`MarfaSettingsPage.permission`). A part t
 | Backups | `backups.manage` | Destination, backups, restore. Destination and interval need `config.manage` |
 | Updates | `instance.read` | The release and an update's progress. Starting one needs `instance.maintain` |
 | Housekeeping | `instance.read` | The jobs the server runs. Confirming its clock needs `instance.maintain` |
-| Activity | `audit.read` | The audit log |
+| Activity | none to open. Usage needs `instance.read`. Log needs `audit.read` | How many items this Marfa holds, and the audit log |
 | Monitoring | `config.manage` | Heartbeat, error reports and telemetry |
 | Limits | `config.manage` | The server's adjustable limits |
 | Start-Up | `instance.read` | What the server started with, never a value |
 
 ## Permissions
 
-- **A page never shows content behind a missing permission.** It shows Needs a Permission in its own words, with Allow More, because a row that cannot load looks like a fault. `MarfaPageGate` decides.
+- **A page never shows content behind a missing permission.** It shows Needs a Permission in its own words, with Allow More, because a row that cannot load looks like a fault. `MarfaPageGate` decides. Activity opens without one permission: a tab the sign-in lacks shows that state, and the other tab stays open.
 - **A sign-in asks for every permission an app can hold**, and the owner grants what they choose. A page rereads the grants after approval and still says what is missing.
 - **A `forbidden` answer rereads the grants** and offers Allow More… in the problem row (`OwnerProblemRow`).
 - **Owner permissions are counted, never all or nothing**, and can only be turned off on a key's or an app's page (`OwnerPermissionsRow`).

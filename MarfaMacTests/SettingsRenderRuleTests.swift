@@ -49,7 +49,46 @@ extension SettingsRenderTests {
     @Test func backups() async throws { try await page(.backups, owner(), named: "Backups") }
     @Test func updates() async throws { try await page(.updates, owner(), named: "Updates") }
     @Test func housekeeping() async throws { try await page(.housekeeping, owner(), named: "Housekeeping") }
-    @Test func activity() async throws { try await page(.activity, owner(), named: "Activity") }
+    @Test func activityUsage() async throws {
+        let host = owner()
+        let calls = FakeInstanceCalls()
+        calls.state.withLock {
+            $0.metrics = UsageMetrics(versionCount: 9_806, fileBytes: 3_400_000_000, databaseBytes: 214_000_000)
+            $0.allTimeType = ["core.note": 69, "core.rss_entry": 50, "core.image": 24, "core.task": 22, "core.bookmark": 12]
+            $0.dayType = ["core.note": 2, "core.rss_entry": 1, "core.image": 1, "core.task": 1]
+            $0.allTimeSource = ["app.marfa-mac": 120, "studio": 40, "readwise": 17]
+            $0.periodSource = ["app.marfa-mac": 8, "studio": 3, "readwise": 1]
+        }
+        host.instanceCalls = calls
+        host.typePlurals = [
+            "core.note": "Notes", "core.rss_entry": "RSS Entries", "core.image": "Images", "core.task": "Tasks", "core.bookmark": "Bookmarks",
+        ]
+        host.sources = [
+            MarfaSourceRow(code: "app.marfa-mac", name: "Marfa for Mac", mark: "lucide:laptop", count: 120, nameOrigin: .set),
+            MarfaSourceRow(code: "studio", name: "Studio Notes", mark: "lucide:notebook", count: 40, nameOrigin: .set),
+            MarfaSourceRow(code: "readwise", name: "Readwise", mark: "simple-icons:readwise", count: 17, nameOrigin: .app),
+        ]
+        try await page(.activity, host, size: CGSize(width: SettingsTokens.Metric.windowWidth, height: 1700), named: "Activity, Usage")
+    }
+
+    @Test func activityLog() async throws {
+        let host = owner()
+        let calls = FakeInstanceCalls()
+        let now = Date.now
+        calls.state.withLock {
+            $0.entries = (0..<12).map { index in
+                ActivityEntry(
+                    id: "e\(index)", date: now.addingTimeInterval(-Double(index) * 3_600),
+                    who: ["Marfa for Mac", "Raycast", "Mira Castell", "Marfa"][index % 4],
+                    action: ["type.replace", "item.create", "auth.scopes.narrowed", "item.versions_thinned"][index % 4],
+                    resourceType: "item", resourceID: nil, address: index.isMultiple(of: 3) ? nil : "81.2.69.160")
+            }
+        }
+        host.instanceCalls = calls
+        try await SettingsRender.png(
+            RenderedWindow(selection: .marfa(.activity), detail: ActivityPage(host: host, tab: .log)),
+            size: CGSize(width: SettingsTokens.Metric.windowWidth, height: 1000), named: "Activity, Log", settle: .milliseconds(900))
+    }
     @Test func monitoring() async throws { try await page(.monitoring, owner(), named: "Monitoring") }
     @Test func limits() async throws { try await page(.limits, owner(), named: "Limits") }
     @Test func startUp() async throws { try await page(.startUp, owner(), named: "Start-Up") }

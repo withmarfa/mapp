@@ -219,8 +219,14 @@ enum LibraryDescription {
     /// confirm it is them, and sends the call again once they have.
     var ownerCalls: any OwnerCalls { ClientOwnerCalls(server: plainServer, client: confirmingClient) }
 
-    /// What Activity, Monitoring, Limits and Start-Up ask of the server, through the same client.
-    var instanceCalls: any InstanceCalls { ClientInstanceCalls(client: confirmingClient) }
+    /// What Activity, Monitoring, Limits and Start-Up ask of the server, through the same client. Item counts also use
+    /// the server, because the generated client does not hold `GET /items/stats`.
+    var instanceCalls: any InstanceCalls {
+        let server: @Sendable () throws -> Server = confirmingServer ?? {
+            throw MarfaError.signedOut(origin: "", message: "no server is set")
+        }
+        return ClientInstanceCalls(client: confirmingClient, server: server)
+    }
 
     @ObservationIgnored private var heldFolderCalls: CopyFolderCalls?
 

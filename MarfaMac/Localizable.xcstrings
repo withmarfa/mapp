@@ -2643,6 +2643,9 @@
     "An item can’t be linked to itself." : {
       "extractionState" : "manual"
     },
+    "An item counts once, on the day it last changed." : {
+
+    },
     "An item with more than %lld versions will have its oldest versions permanently deleted the next time the server tidies up." : {
       "extractionState" : "manual"
     },
@@ -4233,6 +4236,9 @@
     "Couldn’t read downloaded files. The app will try again." : {
       "extractionState" : "manual"
     },
+    "Couldn’t read versions, files and the database." : {
+
+    },
     "Couldn’t remove downloaded files. %@" : {
       "extractionState" : "manual"
     },
@@ -5382,6 +5388,9 @@
     "Group: None" : {
 
     },
+    "Grouping" : {
+
+    },
     "Grouping by %@" : {
       "extractionState" : "manual"
     },
@@ -5961,7 +5970,16 @@
     "Items About This" : {
       "extractionState" : "manual"
     },
+    "Items Changed" : {
+
+    },
     "Items With No Location" : {
+
+    },
+    "Items by Source" : {
+
+    },
+    "Items by Type" : {
 
     },
     "Items deleted more than %@ ago will be permanently deleted, with their history, the next time the server tidies up. They can’t be recovered." : {
@@ -6313,6 +6331,12 @@
 
     },
     "Last %@" : {
+
+    },
+    "Last 30 Days" : {
+
+    },
+    "Last 7 Days" : {
 
     },
     "Last Backup" : {
@@ -7201,6 +7225,9 @@
     "No Items" : {
       "extractionState" : "manual"
     },
+    "No Items Yet" : {
+
+    },
     "No Jobs Yet" : {
 
     },
@@ -7662,6 +7689,9 @@
     "Oldest Marfa" : {
 
     },
+    "Oldest first" : {
+
+    },
     "On" : {
 
     },
@@ -8106,6 +8136,9 @@
     },
     "Pending" : {
       "extractionState" : "manual"
+    },
+    "Period" : {
+
     },
     "Permanently Delete" : {
 
@@ -9818,6 +9851,9 @@
     "Storage Usage" : {
 
     },
+    "Stored" : {
+
+    },
     "Strict" : {
 
     },
@@ -10291,6 +10327,9 @@
 
     },
     "The app isn’t allowed to make keys." : {
+
+    },
+    "The app isn’t allowed to read how many items this Marfa holds." : {
 
     },
     "The app isn’t allowed to read or change which sources apps and keys read." : {
@@ -11897,6 +11936,9 @@
 
     },
     "Uploads will stop below %@ free instead of below %@, which leaves the server less room to work in." : {
+
+    },
+    "Usage" : {
 
     },
     "Use %lld characters or fewer." : {

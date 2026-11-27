@@ -281,6 +281,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
     /// The permission the page needs to open, which the owner may not have approved. Account needs none to open, since the
     /// profile needs none: its sign-ins need `sign_ins.manage`, which Change Password asks for where the sign-in lacks it.
     /// Folders needs none: a folder is read as an item, under the access the app holds to every type.
+    /// Activity needs none to open: Usage needs `instance.read` and Log needs `audit.read`, and each tab says so itself.
     var permission: InstancePermission? {
         switch self {
         case .overview, .updates, .housekeeping: .instanceRead
@@ -295,7 +296,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .connectors: .connectorsManage
         case .webhooks: .webhooksManage
         case .folders: nil
-        case .activity: .auditRead
+        case .activity: nil
         case .startUp: .instanceRead
         }
     }
@@ -321,7 +322,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .backups: String(localized: "The app isn’t allowed to see, take or restore backups.")
         case .updates: String(localized: "The app isn’t allowed to read whether a newer Marfa is ready.")
         case .housekeeping: String(localized: "The app isn’t allowed to read the jobs the server runs by itself.")
-        case .activity: String(localized: "The app isn’t allowed to read the server’s audit log.")
+        case .activity: ""
         case .monitoring: String(localized: "The app isn’t allowed to see or change how the server is monitored.")
         case .limits: String(localized: "The app isn’t allowed to see or change the server’s limits.")
         case .startUp: String(localized: "The app isn’t allowed to read the settings the server started with.")
@@ -401,7 +402,11 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .housekeeping:
             [String(localized: "Jobs"), String(localized: "Clean-up"), String(localized: "Confirm Date"), String(localized: "Clock")]
         case .activity:
-            [String(localized: "Audit Log"), String(localized: "Who Did What")]
+            [
+                String(localized: "Usage"), String(localized: "Log"), String(localized: "Stored"), String(localized: "Items Changed"),
+                String(localized: "Items by Type"), String(localized: "Items by Source"), String(localized: "Audit Log"),
+                String(localized: "Who Did What"),
+            ]
         case .monitoring:
             [
                 String(localized: "Heartbeat"), String(localized: "Error Reports"), String(localized: "Telemetry"), String(localized: "PostHog Host"),

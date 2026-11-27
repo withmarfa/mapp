@@ -14,7 +14,7 @@ extension LiveMarfaTests {
         private func calls() throws -> ClientInstanceCalls {
             let connection = try MarfaConnection(address: try LiveMarfa.address())
             let calls = MarfaServerCalls(connection: connection, signIns: ScriptedSignIns([connection.address: try LiveMarfa.key()]))
-            return ClientInstanceCalls { try calls.client() }
+            return ClientInstanceCalls(client: { try calls.client() }, server: { try calls.server() })
         }
 
         @Test(.timeLimit(.minutes(2))) func theAuditLogIsReadAPageAtATime() async throws {
