@@ -565,6 +565,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
 
     func backUpNow() async throws(OwnerFailure) -> BackupTaken {
         try enter("backUpNow")
+        await held("backUpNow")
         return state.withLock { state in
             state.backupsTaken += 1
             let taken = Date.now

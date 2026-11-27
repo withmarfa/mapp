@@ -53,7 +53,12 @@ extension ClientOwnerCalls {
             } catch {
                 // A server with nowhere to keep backups refuses the list (`no_backup_destination`): there are none, which the
                 // page says as it says an empty list, with the way to choose a place.
-                if case .server(_, "no_backup_destination", _, _, _)? = Self.marfaError(error) { return [] }
+                if case .server(_, let code, _, _, _)? = Self.marfaError(error) {
+                    if code == "no_backup_destination" { return [] }
+                    if code == "blob_store_unavailable" {
+                        throw OwnerFailure.refused(String(localized: "The backup destination isn’t available."))
+                    }
+                }
                 throw error
             }
         }
