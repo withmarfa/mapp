@@ -36,7 +36,7 @@ struct AccountPage: View {
             }
             if host.grants.contains(.configManage) {
                 let snapshot = try? await host.instanceCalls.storedSettings()
-                monitoringCount = snapshot?.enabledMonitoringCount
+                monitoringCount = snapshot?.activeMonitoringCount
             } else {
                 monitoringCount = nil
             }

@@ -32,6 +32,7 @@ import Observation
         let id = UUID()
         let patch: InstanceConfigPatch
         let shortenings: [Shortening]
+        var revertsOnFailure = false
     }
 
     typealias Provider = @MainActor () -> Target?
@@ -182,13 +183,13 @@ import Observation
     func save() async { await save(Set(InstanceSetting.allCases)) }
 
     /// Sends the changes to `settings` alone. While a question is open, or a change is on its way, it does nothing.
-    func save(_ settings: Set<InstanceSetting>) async {
+    func save(_ settings: Set<InstanceSetting>, revertsOnFailure: Bool = false) async {
         guard canSave(settings), let patch = patch(for: settings) else { return }
         let shortenings = shortenings(of: patch)
         if shortenings.isEmpty {
-            await send(patch)
+            await send(patch, revertsOnFailure: revertsOnFailure)
         } else {
-            pending = Pending(patch: patch, shortenings: shortenings)
+            pending = Pending(patch: patch, shortenings: shortenings, revertsOnFailure: revertsOnFailure)
         }
     }
 
@@ -201,7 +202,7 @@ import Observation
     @discardableResult func agree(_ agreed: Pending) -> Task<Void, Never> {
         pending = nil
         sending.formUnion(agreed.patch.settings)
-        return Task { await send(agreed.patch) }
+        return Task { await send(agreed.patch, revertsOnFailure: agreed.revertsOnFailure) }
     }
 
     /// The person kept things as they were: what was chosen is put back, so the field shows what the server holds.
@@ -252,7 +253,7 @@ import Observation
         return to < held ? Shortening(setting: setting, change: .shorter(from: held, to: to)) : nil
     }
 
-    private func send(_ patch: InstanceConfigPatch) async {
+    private func send(_ patch: InstanceConfigPatch, revertsOnFailure: Bool) async {
         sending.formUnion(patch.settings)
         defer { sending.subtract(patch.settings) }
         // A patch made for the server the page was reading is never sent to another one that has replaced it.
@@ -290,6 +291,9 @@ import Observation
             onSaved(answer, patch.settings, target.id)
         } catch {
             guard generation == self.generation else { return }
+            if revertsOnFailure, let loaded {
+                for setting in patch.settings { draft[setting] = loaded.text(setting) }
+            }
             if error == .instanceChanged { await instanceChanged() } else { fail(error) }
         }
     }

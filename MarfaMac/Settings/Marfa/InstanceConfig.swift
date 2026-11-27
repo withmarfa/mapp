@@ -48,7 +48,7 @@ nonisolated enum InstanceSetting: String, CaseIterable, Hashable, Sendable {
         case .trashRetentionDays, .versionRecentDays, .versionDailyDays, .versionWeeklyDays, .auditRetentionDays, .eventLogRetentionDays,
             .rowLogRetentionDays, .inboundHandledRetentionDays, .inboundPendingRetentionDays:
             0...36500
-        case .versionMaxVersions: 1...9_007_199_254_740_991
+        case .versionMaxVersions: 1...1_000_000
         case .blobMinCopies: 1...1_000_000
         case .diskReserveMegabytes: 0...(1_099_511_627_776 / Self.bytesPerMegabyte)
         case .mcpFetchMaxMegabytes: 1...(1_099_511_627_776 / Self.bytesPerMegabyte)
@@ -95,14 +95,38 @@ nonisolated enum InstanceSetting: String, CaseIterable, Hashable, Sendable {
     /// The settings whose windows must not decrease, in order: recent, then daily, then weekly.
     static let versionWindows: [InstanceSetting] = [.versionRecentDays, .versionDailyDays, .versionWeeklyDays]
 
+    var serverKey: String {
+        switch self {
+        case .name: "name"
+        case .trashRetentionDays: "trash_retention_days"
+        case .versionRecentDays: "version_recent_days"
+        case .versionDailyDays: "version_daily_snapshot_days"
+        case .versionWeeklyDays: "version_weekly_snapshot_days"
+        case .versionMaxVersions: "version_max_versions"
+        case .auditRetentionDays: "audit_retention_days"
+        case .eventLogRetentionDays: "event_log_retention_days"
+        case .rowLogRetentionDays: "row_log_retention_days"
+        case .inboundHandledRetentionDays: "inbound_handled_retention_days"
+        case .inboundPendingRetentionDays: "inbound_pending_retention_days"
+        case .blobMinCopies: "blob_min_copies"
+        case .diskReserveMegabytes: "disk_reserve_bytes"
+        case .enrichmentEnabled: "enrichment_enabled"
+        case .enrichmentOcrEnabled: "enrichment_ocr_enabled"
+        case .mcpFetchEnabled: "mcp_fetch_enabled"
+        case .mcpFetchMaxMegabytes: "mcp_fetch_max_bytes"
+        case .blobCleanupEnabled: "blob_cleanup_enabled"
+        case .blobCleanupGraceSeconds: "blob_cleanup_grace_seconds"
+        }
+    }
+
     var title: String {
         switch self {
         case .name: String(localized: "Name")
-        case .trashRetentionDays: String(localized: "Permanently Delete After")
+        case .trashRetentionDays: String(localized: "Delete from Trash After")
         case .versionRecentDays: String(localized: "Keep Every Version For")
         case .versionDailyDays: String(localized: "Then One a Day Up To")
         case .versionWeeklyDays: String(localized: "Then One a Week Up To")
-        case .versionMaxVersions: String(localized: "At Most")
+        case .versionMaxVersions: String(localized: "Most Versions per Item")
         case .auditRetentionDays: String(localized: "Activity")
         case .eventLogRetentionDays: String(localized: "Events")
         case .rowLogRetentionDays: String(localized: "Table Changes")
@@ -112,10 +136,10 @@ nonisolated enum InstanceSetting: String, CaseIterable, Hashable, Sendable {
         case .diskReserveMegabytes: String(localized: "Keep Free on Disk")
         case .enrichmentEnabled: String(localized: "Read Text in Files")
         case .enrichmentOcrEnabled: String(localized: "Read Text in Pictures")
-        case .mcpFetchEnabled: String(localized: "Let Chats Save Files")
+        case .mcpFetchEnabled: String(localized: "Let Agents Fetch Files")
         case .mcpFetchMaxMegabytes: String(localized: "Largest File")
         case .blobCleanupEnabled: String(localized: "Remove Unused Files")
-        case .blobCleanupGraceSeconds: String(localized: "After")
+        case .blobCleanupGraceSeconds: String(localized: "Remove After")
         }
     }
 

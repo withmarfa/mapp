@@ -368,11 +368,12 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .trash:
             [
                 String(localized: "Deleted Items"), String(localized: "Restore"), String(localized: "Permanently Delete"),
-                String(localized: "Empty Trash"), String(localized: "Recently Deleted"), InstanceSetting.trashRetentionDays.title,
+                String(localized: "Empty Trash"), String(localized: "Recently Deleted"),
             ]
         case .fileStorage:
-            [String(localized: "Where Files Are"), String(localized: "Reading Files"), String(localized: "Files From the Web"), String(localized: "Unused Files")]
-                + (InstanceSetting.fileSettings + InstanceSetting.versionSettings).map(\.title) + [String(localized: "Versions")]
+            [String(localized: "Files"), String(localized: "Reading Files"), String(localized: "Files from the Web"), String(localized: "Trash")]
+                + (InstanceSetting.fileSettings + InstanceSetting.versionSettings + [.trashRetentionDays]).map(\.title)
+                + LimitSetting.storageFields.map(\.title) + [String(localized: "Versions")]
         case .connectors:
             [
                 String(localized: "Pause"), String(localized: "Run Now"), String(localized: "Runs On"), String(localized: "Settings"),
@@ -395,16 +396,16 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
                 String(localized: "Restore"), String(localized: "Folder"),
             ]
         case .housekeeping:
-            [String(localized: "Jobs"), String(localized: "Clean-up"), String(localized: "Confirm Date"), String(localized: "Clock"), String(localized: "Logs")] + InstanceSetting.logSettings.map(\.title)
+            [String(localized: "Jobs"), String(localized: "Clean-up"), String(localized: "Confirm Date"), String(localized: "Clock"), String(localized: "Keep Records For")] + InstanceSetting.logSettings.map(\.title)
         case .activity:
             [String(localized: "Audit Log"), String(localized: "Who Did What")]
         case .monitoring:
             [
-                String(localized: "Heartbeat"), String(localized: "Error Reports"), String(localized: "Telemetry"), String(localized: "PostHog Host"),
+                String(localized: "Heartbeat"), String(localized: "Error Reports"), String(localized: "Telemetry"), String(localized: "Error Reports Address"),
                 String(localized: "Project Token"), String(localized: "Report Errors"),
             ]
         case .limits:
-            LimitSetting.all.map(\.title) + [String(localized: "Rate Limits"), String(localized: "Limit Requests"), String(localized: "Requests"), String(localized: "Start-Up"), String(localized: "Environment")]
+            LimitSetting.limitFields.map(\.title) + [String(localized: "Rate Limits"), String(localized: "Limit Requests"), String(localized: "Requests"), String(localized: "Start-Up"), String(localized: "Set Where It Runs")]
         case .links:
             [String(localized: "Links Between Items"), String(localized: "New Link Type")]
         }

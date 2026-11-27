@@ -42,24 +42,25 @@ struct MonitoringPage: View {
                 SettingsSection("Heartbeat") {
                     switchRow(
                         "Send a Heartbeat", key: "heartbeat_enabled", hasReceiver: model.heartbeatHasReceiver,
-                        line: "\(host.serverName) asks this address on a schedule, so a monitor notices if it stops.",
+                        line: "Asks the address below on a schedule, so a monitor notices if it stops.",
                         idle: "Nothing is sent until an address is set.")
                     secretRow(.heartbeatAddress)
                 }
-                SettingsSection("Error Reports") {
+                SettingsSection("Telemetry") {
                     switchRow(
-                        "Report Errors", key: "error_reporting_enabled", hasReceiver: model.errorReportsHaveReceiver,
-                        line: "To PostHog’s error tracking.", idle: "Nothing is sent until the host and token are set.")
-                    secretRow(.postHogHost)
-                    secretRow(.postHogToken)
-                }
-                SettingsSection("Telemetry", footer: "Faults also appear in Account. Secrets are never shown.") {
-                    switchRow(
-                        "Send Telemetry", key: "telemetry_enabled", hasReceiver: model.telemetryHasReceiver,
-                        line: "Traces, logs and metrics. Off keeps the settings.", idle: "Nothing is sent until an address is set.")
+                        "Send Telemetry", key: "telemetry_enabled", hasReceiver: model.telemetryHasReceiver || model.errorReportsHaveReceiver,
+                        line: "Traces, logs, metrics and error reports. Off sends none of them.", idle: "Nothing is sent until a destination is set.")
                     secretRow(.telemetryAddress)
                     secretRow(.telemetryHeaders)
                 }
+                SettingsSection("Error Reports", footer: "Sent only while telemetry is on. Secrets are never shown.") {
+                    switchRow(
+                        "Report Errors", key: "error_reporting_enabled", hasReceiver: model.errorReportsHaveReceiver,
+                        line: nil, idle: "Nothing is sent until the address and token are set.")
+                    secretRow(.postHogHost)
+                    secretRow(.postHogToken)
+                }
+                .disabled(!model.isOn("telemetry_enabled"))
             }
         } else {
             OwnerLoading()
@@ -67,22 +68,28 @@ struct MonitoringPage: View {
     }
 
     /// A switch row. A switch that is on with nothing to send to says so in its line.
-    private func switchRow(_ title: LocalizedStringKey, key: String, hasReceiver: Bool, line: LocalizedStringKey, idle: LocalizedStringKey) -> some View {
-        SettingsRow(title: Text(title), line: Text(model.isOn(key) && !hasReceiver ? idle : line), error: model.line(key)) {
-            SettingsToggle(title: title, isOn: Binding { model.isOn(key) } set: { on in Task { await model.setSwitch(key, on) } })
-                .disabled(model.isWriting)
-                .accessibilityIdentifier("Monitoring-" + key)
+    @ViewBuilder private func switchRow(_ title: LocalizedStringKey, key: String, hasReceiver: Bool, line: LocalizedStringKey?, idle: LocalizedStringKey) -> some View {
+        if model.reports(key) {
+            SettingsRow(title: Text(title), line: (model.isOn(key) && !hasReceiver ? idle : line).map { Text($0) }, error: model.line(key),
+                look: key == "error_reporting_enabled" && !model.isOn("telemetry_enabled") ? .off : .normal) {
+                SettingsToggle(title: title, isOn: Binding { model.isOn(key) } set: { on in Task { await model.setSwitch(key, on) } })
+                    .disabled(model.isWriting)
+                    .accessibilityIdentifier("Monitoring-" + key)
+            }
         }
     }
 
-    private func secretRow(_ secret: MonitoringSecret) -> some View {
+    @ViewBuilder private func secretRow(_ secret: MonitoringSecret) -> some View {
         let isSet = model.isSet(secret)
-        return SettingsRow(
-            title: Text(verbatim: secret.title), line: Text(isSet ? "Set." : "Not set."), error: model.line(secret.key)
-        ) {
-            SettingsButton(isSet ? "Change…" : "Set…") { model.begin(secret) }
-                .disabled(model.isWriting)
-                .accessibilityIdentifier("Monitoring-" + secret.rawValue)
+        if model.reports(secret.key) {
+            SettingsRow(
+                title: Text(verbatim: secret.title), error: model.line(secret.key),
+                look: secret.partner != nil && !model.isOn("telemetry_enabled") ? .off : .normal
+            ) {
+                SettingsButton(isSet ? "Change…" : "Set…") { model.begin(secret) }
+                    .disabled(model.isWriting)
+                    .accessibilityIdentifier("Monitoring-" + secret.rawValue)
+            }
         }
     }
 }

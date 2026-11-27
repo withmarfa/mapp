@@ -21,7 +21,7 @@ nonisolated enum MonitoringSecret: String, CaseIterable, Hashable, Sendable, Ide
     var title: String {
         switch self {
         case .heartbeatAddress, .telemetryAddress: String(localized: "Address")
-        case .postHogHost: String(localized: "PostHog Host")
+        case .postHogHost: String(localized: "Error Reports Address")
         case .postHogToken: String(localized: "Project Token")
         case .telemetryHeaders: String(localized: "Headers")
         }
@@ -116,13 +116,18 @@ struct MonitoringSecretSheet: Identifiable, Equatable {
     }
 
     var failure: OwnerFailure? { store.failure }
-    var isLoaded: Bool { store.snapshot != nil }
+    var isLoaded: Bool { store.snapshot != nil && store.failure == nil }
 
     func load() async { await store.load() }
 
     // MARK: Reading
 
-    func isOn(_ key: String) -> Bool { store.setting(key)?.value?.bool ?? false }
+    func reports(_ key: String) -> Bool { store.setting(key) != nil }
+
+    func isOn(_ key: String) -> Bool {
+        if key == "error_reporting_enabled", !isOn("telemetry_enabled") { return false }
+        return store.setting(key)?.value?.bool == true
+    }
     func isSet(_ secret: MonitoringSecret) -> Bool { store.setting(secret.key)?.isSet ?? false }
 
     /// Whether the server has what it sends reports with, so a switch that is on does something.
@@ -143,7 +148,7 @@ struct MonitoringSecretSheet: Identifiable, Equatable {
     /// Turns a switch on or off. The server turns the heartbeat and the error reports on only where something receives them,
     /// so that is said here, in one line, before anything is sent.
     func setSwitch(_ key: String, _ on: Bool) async {
-        guard !isWriting, isOn(key) != on else { return }
+        guard reports(key), key != "error_reporting_enabled" || isOn("telemetry_enabled"), !isWriting, isOn(key) != on else { return }
         lines[key] = nil
         notice = nil
         if on {
@@ -258,5 +263,13 @@ struct MonitoringSecretSheet: Identifiable, Equatable {
         case "telemetry_enabled": return String(localized: "Send Telemetry")
         default: return key
         }
+    }
+}
+
+extension InstanceSettingsSnapshot {
+    var activeMonitoringCount: Int? {
+        guard let enabledMonitoringCount else { return nil }
+        let reportsArePaused = setting("telemetry_enabled")?.value?.bool == false && setting("error_reporting_enabled")?.value?.bool == true
+        return reportsArePaused ? enabledMonitoringCount - 1 : enabledMonitoringCount
     }
 }

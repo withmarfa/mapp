@@ -90,28 +90,22 @@ import Testing
     }
 
     @Test func theChoicesKeepAValueTheServerHoldsAndAlwaysOfferDefault() {
-        let held = InstanceChoices.options(for: .versionRecentDays, holding: 45)
+        let held = InstanceChoices.options(for: .versionRecentDays, holding: 45, defaultValue: 30)
         #expect(held.first == InstanceChoices.Option(value: nil, title: "Default (30 Days)"))
-        #expect(InstanceChoices.options(for: .name, holding: nil).first?.title == "Default")
+        #expect(InstanceChoices.options(for: .name, holding: nil, defaultValue: nil).first?.title == "Default")
         #expect(held.contains { $0.value == 45 && $0.title == "45 Days" })
         let values = held.dropFirst().compactMap(\.value)
         #expect(values == values.sorted())
-        // Zero days means no limit where it keeps things, and is never offered for a version window.
-        #expect(InstanceChoices.options(for: .auditRetentionDays, holding: nil).contains { $0.value == 0 && $0.title == "No Limit" })
-        #expect(!InstanceChoices.options(for: .versionRecentDays, holding: nil).contains { $0.value == 0 })
+        #expect(InstanceChoices.options(for: .auditRetentionDays, holding: nil, defaultValue: nil).contains { $0.value == 0 && $0.title == "No Limit" })
+        #expect(InstanceChoices.options(for: .versionRecentDays, holding: nil, defaultValue: nil).contains { $0.value == 0 && $0.title == "0 Days" })
         #expect(InstanceChoices.title(.versionRecentDays, 365) == "1 Year")
         #expect(InstanceChoices.title(.versionMaxVersions, 500) == "500 Versions")
         #expect(InstanceChoices.title(.blobCleanupGraceSeconds, 86_400) == "1 Day")
         #expect(InstanceChoices.title(.blobCleanupGraceSeconds, 3_600) == "1 Hour")
     }
 
-    @Test func aPopUpShowsTheDefaultsValueWhereTheServerHoldsNone() {
-        #expect(InstanceChoices.shown(for: .trashRetentionDays, holding: nil) == 60)
-        #expect(InstanceChoices.title(.trashRetentionDays, 60) == "60 Days")
-        #expect(InstanceChoices.shown(for: .trashRetentionDays, holding: 14) == 14)
-        #expect(InstanceChoices.shown(for: .name, holding: nil) == nil)
-        // The menu still offers the server's default by its own item, which says what it is.
-        #expect(InstanceChoices.options(for: .trashRetentionDays, holding: 60).first?.title == "Default (60 Days)")
+    @Test func aMenuUsesTheDefaultTheServerReports() {
+        #expect(InstanceChoices.options(for: .trashRetentionDays, holding: 60, defaultValue: 14).first?.title == "Default (14 Days)")
     }
 
     @Test func eachPageNamesThePermissionItNeeds() {

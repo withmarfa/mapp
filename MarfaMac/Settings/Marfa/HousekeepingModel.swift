@@ -33,9 +33,9 @@ import Observation
         })
     }
 
-    /// The jobs the page lists, in its order, with the rest left out.
+    /// Every job the server reports, ordered by its displayed name.
     var listed: [HousekeepingJob] {
-        UpkeepWording.jobs.compactMap { listed in jobs.first { $0.name == listed.name } }
+        jobs.sorted { UpkeepWording.jobTitle($0.name).localizedStandardCompare(UpkeepWording.jobTitle($1.name)) == .orderedAscending }
     }
 
     // MARK: The clock

@@ -111,7 +111,7 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
         if let pending = model.pending { await model.confirm(pending) }
         #expect(source.sent == [InstanceConfigPatch(clear: [.versionMaxVersions])])
         #expect(model.loaded?.values[.versionMaxVersions] == nil)
-        #expect(model.saved == ["At Most: default, 500 versions"])
+        #expect(model.saved == ["Most Versions per Item: default, 500 versions"])
     }
 
     @Test func whatTheContractRefusesIsRefusedBeforeAnythingIsSent() async {
@@ -206,7 +206,7 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
 
         #expect(source.sent == [InstanceConfigPatch(values: [.trashRetentionDays: .number(7)])])
         #expect(model.draft[.trashRetentionDays] == "7")
-        #expect(model.saved == ["Permanently Delete After: 7 days"])
+        #expect(model.saved == ["Delete from Trash After: 7 days"])
         #expect(!model.hasUnsentEdits)
     }
 
@@ -219,6 +219,19 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
         #expect(model.failure == .refused("No."))
         #expect(model.draft[.trashRetentionDays] == "7")
         #expect(model.hasUnsentEdits)
+    }
+
+    @Test func aConfirmedTrashChangeThatFailsRestoresTheServerValueAndExplainsWhy() async throws {
+        let (model, source) = await loaded([.trashRetentionDays: .number(0)])
+        model.draft[.trashRetentionDays] = "36500"
+        await model.save([.trashRetentionDays], revertsOnFailure: true)
+        let confirmation = try #require(model.pending)
+        #expect(confirmation.shortenings == [.init(setting: .trashRetentionDays, change: .shorter(from: 0, to: 36_500))])
+        source.updateFailure.withLock { $0 = .refused("The server is busy.") }
+        await model.confirm(confirmation)
+        #expect(model.failure == .refused("The server is busy."))
+        #expect(model.draft[.trashRetentionDays] == "0")
+        #expect(!model.hasUnsentEdits)
     }
 
     @Test func keepingLessFreeOnDiskAsksFirstAndNamesTheOldAndNewValues() async {
@@ -273,7 +286,7 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
         #expect(await asked([:], [.trashRetentionDays: "0"]).isEmpty)
         #expect(await asked([:], [.trashRetentionDays: "36500"]).isEmpty)
         #expect(await asked([:], [.versionRecentDays: "36500", .versionDailyDays: "36500", .versionWeeklyDays: "36500"]).isEmpty)
-        #expect(await asked([:], [.versionMaxVersions: "9007199254740991"]).isEmpty)
+        #expect(await asked([:], [.versionMaxVersions: "1000000"]).isEmpty)
         #expect(await asked([:], [.name: "Home"]).isEmpty)
     }
 

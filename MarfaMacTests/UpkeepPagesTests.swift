@@ -372,6 +372,19 @@ nonisolated private func record(_ name: String, hoursAgo: Int = 0) -> BackupReco
         return bench
     }
 
+    @Test func theJobsComeFromTheServerIncludingNewJobsAndFailedRuns() async {
+        let bench = bench()
+        let model = HousekeepingModel(context: bench.context)
+        bench.calls.state.withLock { $0.jobs = [] }
+        await model.load()
+        #expect(model.hasLoaded && model.listed.isEmpty)
+        let failed = job("new-job", every: 73, .failed)
+        bench.calls.state.withLock { $0.jobs = [failed] }
+        await model.load()
+        #expect(model.listed == [failed])
+        #expect(UpkeepWording.result(model.listed.first?.outcome) == "Failed")
+    }
+
     @Test func confirmingAsksFirstAndSendsNothingUntilTheOwnerAgrees() async {
         let bench = bench()
         let model = HousekeepingModel(context: bench.context)

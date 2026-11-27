@@ -18,7 +18,7 @@ struct StartUpSettings: View {
     }
 
     var body: some View {
-        SettingsSection("Start-Up", footer: "The server reads these settings when it starts. Change them where it runs.") {
+        SettingsSection("Set Where It Runs", footer: "Read when the server starts. Change them where it runs.") {
             if rows.isEmpty {
                 SettingsEmptyCard(symbol: "power", title: Text("No Start-Up Settings"), line: Text("The server lists no start-up settings."))
             } else {

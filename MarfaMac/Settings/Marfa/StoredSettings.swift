@@ -50,6 +50,10 @@ nonisolated enum StoredSettingsWrite: Equatable, Sendable {
     func write(_ changes: [String: StoredSettingChange]) async -> StoredSettingsWrite {
         while isWriting { await withCheckedContinuation { waiting.append($0) } }
         guard let shown = snapshot else { return .failed(.failed(String(localized: "The server’s answer couldn’t be read."))) }
+        guard changes.keys.allSatisfy({ shown.setting($0) != nil }) else {
+            return .failed(.failed(String(localized: "The server doesn’t list this setting.")))
+        }
+        if case .notPermitted = failure { return .failed(.notPermitted("config.manage")) }
         isWriting = true
         defer {
             isWriting = false
@@ -72,6 +76,7 @@ nonisolated enum StoredSettingsWrite: Equatable, Sendable {
             failure = nil
             return .saved
         } catch {
+            if case .notPermitted = error { failure = error }
             await context.learn(from: error)
             if error == .conflict {
                 if let fresh = try? await calls.storedSettings(), fresh.instanceID == shown.instanceID { snapshot = fresh }

@@ -39,10 +39,10 @@ struct HousekeepingPage: View {
         SettingsPageColumn {
             jobsContent
             if host.grants.contains(.configManage) {
-                InstanceSettingsGate(page: .housekeeping, host: host) {
-                    SettingsSection("Logs") {
+                InstanceSettingsGate(page: .housekeeping, host: host) { catalog in
+                    SettingsSection("Keep Records For") {
                         ForEach(InstanceSetting.logSettings, id: \.self) { setting in
-                            InstanceChoiceRow(model: host.instanceSettings, setting: setting, among: InstanceSetting.logSettings, line: Self.logLine(setting))
+                            InstanceChoiceRow(model: host.instanceSettings, setting: setting, among: InstanceSetting.logSettings, catalog: catalog, line: Self.logLine(setting))
                         }
                         InstanceStatusLine(model: host.instanceSettings, settings: InstanceSetting.logSettings)
                     }
@@ -121,7 +121,13 @@ struct HousekeepingPage: View {
 
     private var columns: [SettingsTableColumn<HousekeepingJob>] {
         [
-            SettingsTableColumn("Job") { Text(verbatim: UpkeepWording.jobTitle($0.name)) },
+            SettingsTableColumn("Job", lines: 2) { job in
+                if let since = job.runningSince {
+                    Text("\(UpkeepWording.jobTitle(job.name)) (running)").help(Text("Running since \(UpkeepWording.moment(since))."))
+                } else {
+                    Text(verbatim: UpkeepWording.jobTitle(job.name))
+                }
+            },
             SettingsTableColumn("Every", width: SettingsTokens.Metric.Column.day) {
                 Text(verbatim: UpkeepWording.every($0.intervalSeconds)).foregroundStyle(SettingsTokens.secondaryText)
             },
@@ -135,10 +141,10 @@ struct HousekeepingPage: View {
 
     private var jobs: some View {
         SettingsSection(
-            name: Text("Jobs"), line: Text("\(host.serverName) runs these by itself. Jobs that delete pause while its clock looks wrong.")
+            "Jobs", footer: "These run by themselves. Jobs that delete pause while the clock looks wrong."
         ) {
             if model.listed.isEmpty {
-                SettingsEmptyCard(symbol: "sparkles", title: Text("No Jobs Yet"), line: Text("\(host.serverName) lists its jobs once it has started them."))
+                SettingsEmptyCard(symbol: "sparkles", title: Text("No Jobs"), line: Text("The server reports no scheduled jobs."))
             } else {
                 SettingsSectionTable(rows: model.listed, columns: columns)
             }

@@ -27,15 +27,15 @@ The page gate checks the connection and the sign-in’s permissions. A configure
 | Links | `schema.write` | Link types. Opens from Types |
 | Sources | `keys.manage` | Names and marks of sources. Both source rules need `config.manage` |
 | Trash | `items.purge` | Restore items or empty Trash. Choose Select Items or Show All to permanently delete selected items. Changing how long items wait needs `config.manage` |
-| Storage | `config.manage` | Where files are kept, copies, reading text, removing unused files, and item version retention |
+| Storage | `config.manage` | File locations and sizes need `instance.read`. Configuration controls copies, text extraction, web fetching, unused files, versions, and Trash retention |
 | Connectors | `connectors.manage` | Each connector's health, machine, sign-in, settings and mapping |
 | Webhooks | `webhooks.manage` | Webhooks by maker, their events and deliveries |
 | Folders | type access to `system.folder` | Synced folders: patterns, limits, copies, Stop Syncing |
 | Backups | `backups.manage` | Destination, backups, restore. Destination and interval need `config.manage` |
 | Housekeeping | `instance.read` or `config.manage` | Jobs need `instance.read`. Confirming the clock needs `instance.maintain`. Log retention needs `config.manage` |
 | Activity | `audit.read` | The audit log |
-| Monitoring | `config.manage` | Heartbeat, error reports and telemetry |
-| Limits | `config.manage` or `instance.read` | Changing limits needs `config.manage`. Either permission can read start-up setting names and whether each is set |
+| Monitoring | `config.manage` | Heartbeat and telemetry. Turning off telemetry also pauses error reports |
+| Limits | `config.manage` or `instance.read` | Request, rate, inbound delivery, and live update limits need `config.manage`. Either permission can read start-up setting names and whether each is set |
 
 ## Permissions
 
