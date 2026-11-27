@@ -233,6 +233,7 @@ enum SettingsTokens {
         static let tableFooterHeight: CGFloat = 40
         static let sectionTableInset: CGFloat = 12
         static let sectionTableColumnGap: CGFloat = 10
+        static let typeTableIndent: CGFloat = 16
         static let pageTableRow: CGFloat = 30
         /// The space above and below a table row's cells, which a cell that wraps keeps by growing the row.
         static let tableCellPadding: CGFloat = 7

@@ -201,7 +201,6 @@ struct NewLinkTypeSheet: View {
     }
 }
 
-/// The row on Types that opens Links. The page stays, because this row still goes there.
 struct LinksSection: View {
     @State private var model: LinksModel
     let host: any MarfaSettingsHost

@@ -159,7 +159,7 @@ struct TypesPage: View {
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }
-                .padding(.leading, CGFloat(row.depth) * 16)
+                .padding(.leading, CGFloat(row.depth) * SettingsTokens.Metric.typeTableIndent)
             },
             SettingsTableColumn(
                 "From", width: SettingsTokens.Metric.Column.who, sortedAscending: sort.ascending(for: .source),

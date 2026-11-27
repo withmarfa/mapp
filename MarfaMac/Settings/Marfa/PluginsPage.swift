@@ -115,19 +115,19 @@ struct PluginsPage: View {
         } content: {
             switch model.release {
             case .reading:
-                SettingsRow("Reading the Plugins Release…") { ProgressView().controlSize(.small) }
+                SettingsRow("Reading the plugins release…") { ProgressView().controlSize(.small) }
             case .notRead:
-                SettingsRow("The Plugins Release Wasn’t Read") {
+                SettingsRow("The plugins release wasn’t read") {
                     SettingsButton("Try Again") { Task { await model.readRelease() } }
                 }
             case .unreadable(let failure):
                 SettingsProblemRow(
-                    title: Text("The Plugins Release Couldn’t Be Read"), line: Text(verbatim: PluginWording.line(failure)),
+                    title: Text("The plugins release couldn’t be read"), line: Text(verbatim: PluginWording.line(failure)),
                     symbol: "exclamationmark.triangle", tone: .orange,
                     actions: [SettingsProblemAction("Try Again") { Task { await model.readRelease() } }])
             case .read:
                 if model.available.isEmpty {
-                    SettingsRow("Nothing More Is Available", look: .off)
+                    SettingsRow("Nothing more is available", look: .off)
                 }
                 ForEach(model.available) { entry in
                     SettingsLinkRow(
@@ -208,7 +208,7 @@ private struct PluginCommandSection: View {
     }
 }
 
-/// One row of Plugin Updates: what the newer version adds, and Update, or the command where it carries guidance.
+/// An update that carries guidance offers the command to run instead.
 private struct PluginUpdateRow: View {
     let model: PluginsModel
     let update: PluginsModel.Update

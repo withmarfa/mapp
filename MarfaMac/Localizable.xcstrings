@@ -7545,9 +7545,6 @@
     "Nothing Matches" : {
 
     },
-    "Nothing More Is Available" : {
-
-    },
     "Nothing Pinned" : {
       "extractionState" : "manual"
     },
@@ -7597,6 +7594,9 @@
 
     },
     "Nothing is sent until an address is set." : {
+
+    },
+    "Nothing more is available" : {
 
     },
     "Nothing is sent until the host and token are set." : {
@@ -8450,7 +8450,7 @@
     "Reading earlier versions…" : {
 
     },
-    "Reading the Plugins Release…" : {
+    "Reading the plugins release…" : {
 
     },
     "Reading the server’s settings…" : {
@@ -10724,6 +10724,12 @@
 
     },
     "The plugin brought no types." : {
+
+    },
+    "The plugins release couldn’t be read" : {
+
+    },
+    "The plugins release wasn’t read" : {
 
     },
     "The port it listens on." : {
