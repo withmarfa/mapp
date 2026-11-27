@@ -89,6 +89,13 @@ nonisolated struct StartUpSetting: Identifiable, Hashable, Sendable {
 
 /// Every stored setting and start-up setting the server listed, with the instance that answered.
 nonisolated struct InstanceSettingsSnapshot: Hashable, Sendable {
+    /// An unknown switch has no count until the server reports it.
+    var enabledMonitoringCount: Int? {
+        let switches = ["heartbeat_enabled", "error_reporting_enabled", "telemetry_enabled"]
+        let values = switches.compactMap { settings[$0]?.value?.bool }
+        return values.count == switches.count ? values.filter { $0 }.count : nil
+    }
+
     var instanceID: String?
     var settings: [String: StoredSetting]
     var startUp: [StartUpSetting]
@@ -127,6 +134,7 @@ nonisolated enum StoredSettingChange: Hashable, Sendable {
 nonisolated protocol InstanceCalls: Sendable {
     func activity(_ query: ActivityQuery) async throws(OwnerFailure) -> ActivityBatch
     func storedSettings() async throws(OwnerFailure) -> InstanceSettingsSnapshot
+    func startUpSettings() async throws(OwnerFailure) -> [StartUpSetting]
     /// Sends exactly `changes` to the instance that was read. If another instance answers, nothing is written and the call
     /// throws `conflict`.
     func change(_ changes: [String: StoredSettingChange], instanceID: String?) async throws(OwnerFailure)
@@ -170,6 +178,12 @@ nonisolated struct ClientInstanceCalls: InstanceCalls {
                         resourceType: entry.resourceType, resourceID: entry.resourceId, address: entry.clientIp)
                 },
                 next: page.nextCursor)
+        }
+    }
+
+    func startUpSettings() async throws(OwnerFailure) -> [StartUpSetting] {
+        try await run { client in
+            try await client.listSettings().ok.body.json.startOnly.map { StartUpSetting(name: $0.name, isSecret: $0.secret, isSet: $0.set) }
         }
     }
 

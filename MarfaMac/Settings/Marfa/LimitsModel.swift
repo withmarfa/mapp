@@ -162,6 +162,8 @@ nonisolated struct LimitSetting: Identifiable, Hashable, Sendable {
 
     // MARK: Reading
 
+    var startUp: [StartUpSetting] { store.snapshot?.startUp ?? [] }
+
     func held(_ limit: LimitSetting) -> Int? { store.setting(limit.key)?.value?.int }
 
     /// What the field shows: what was typed, else what the server holds.

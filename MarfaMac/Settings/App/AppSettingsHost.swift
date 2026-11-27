@@ -42,15 +42,13 @@ enum LibraryDescription {
 
     private var host: MarfaHost { libraries.host }
 
-    // MARK: Overview
+    // MARK: Shared server readings
 
-    private typealias Shared = (address: String?, overview: OverviewModel, health: ServerHealthModel, updates: UpdatesModel)
+    private typealias Shared = (address: String?, overview: AccountOverview, health: ServerHealthModel, updates: UpdatesModel)
     @ObservationIgnored private var overviewModels: Shared?
 
-    /// What the Overview and the sidebar's badge read, the one reader of health that Overview, Backups and Housekeeping
-    /// share, and the one updates model that Overview and Updates share. All are made again for another server, since their
-    /// calls are bound to one.
-    var overview: OverviewModel { models.overview }
+    /// The shared readings belong to one server, because each call is bound to its sign-in.
+    var overview: AccountOverview { models.overview }
     var health: ServerHealthModel { models.health }
     var updates: UpdatesModel { models.updates }
 
@@ -59,7 +57,7 @@ enum LibraryDescription {
         overviewModels?.updates.stop()
         let health = ServerHealthModel(context: OwnerContext(host: self))
         let made = (
-            serverAddress, OverviewModel(context: OwnerContext(host: self), health: health), health,
+            serverAddress, AccountOverview(context: OwnerContext(host: self)), health,
             UpdatesModel(context: OwnerContext(host: self))
         )
         overviewModels = made
@@ -205,6 +203,12 @@ enum LibraryDescription {
     }
 
     func tryAgain() { host.refresh() }
+
+    func requestSignOut() {
+        guard !libraries.marfaSettings.isWorking, host.configuredConnection != nil else { return }
+        showConnection()
+        libraries.marfaSettings.requestDisconnect()
+    }
 
     func showConnection() { launcher.show(.connection) }
 

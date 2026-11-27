@@ -115,8 +115,6 @@ import Testing
     }
 
     @Test func eachPageNamesThePermissionItNeeds() {
-        #expect(MarfaSettingsPage.overview.permission == .instanceRead)
-        #expect(MarfaSettingsPage.history.permission == .configManage)
         #expect(MarfaSettingsPage.fileStorage.permission == .configManage)
         #expect(MarfaSettingsPage.sources.permission == .keysManage)
         #expect(MarfaSettingsPage.trash.permission == .itemsPurge)
@@ -124,7 +122,7 @@ import Testing
 }
 
 @MainActor
-@Suite(.hangLimit) struct OverviewModelTests {
+@Suite(.hangLimit) struct AccountOverviewTests {
     private func bench(grants: Set<InstancePermission> = [.instanceRead]) -> OwnerBench { OwnerBench(grants: grants) }
 
     @Test func theCountOfWhatNeedsAttentionIsTheSidebarsBadge() async {
@@ -135,7 +133,7 @@ import Testing
                 AttentionConcern(kind: .connector, reference: "rss", title: "RSS reports a problem"),
             ]
         }
-        let model = OverviewModel(context: bench.context)
+        let model = AccountOverview(context: bench.context)
         await model.load()
         #expect(model.attentionBadge == 2)
         #expect(model.hasLoaded)
@@ -143,12 +141,10 @@ import Testing
 
     @Test func noConcernsLeavesTheSectionToGoAndTheBadgeEmpty() async {
         let bench = bench()
-        let model = OverviewModel(context: bench.context)
+        let model = AccountOverview(context: bench.context)
         await model.load()
         #expect(model.concerns.isEmpty)
         #expect(model.attentionBadge == nil)
-        #expect(model.health(of: .database).condition == .ok)
-        #expect(model.backups.state == .ok)
     }
 
     @Test func anAvailableUpdateAloneDoesNotBadgeAccount() async {
@@ -158,50 +154,10 @@ import Testing
             $0.update.available = true
             $0.update.latest = UpdateRelease(version: "0.0.90")
         }
-        let model = OverviewModel(context: bench.context)
+        let model = AccountOverview(context: bench.context)
         await model.load()
         #expect(model.updateReady == "0.0.90")
         #expect(model.attentionBadge == nil)
-    }
-
-    private func overview(health: ServerHealth?, concerns: [AttentionConcern] = []) async -> OverviewModel {
-        let bench = bench()
-        bench.calls.state.withLock {
-            $0.health = health
-            $0.concerns = concerns
-        }
-        let model = OverviewModel(context: bench.context)
-        await model.load()
-        return model
-    }
-
-    private func standing(
-        database: Condition = .ok, disk: Condition = .ok, files: Condition = .ok, backups: BackupsHealth = BackupsHealth(state: .ok, lastBackup: nil)
-    ) -> ServerHealth {
-        ServerHealth(database: database, disk: disk, files: files, backups: backups, housekeeping: nil)
-    }
-
-    @Test func eachPartTakesItsStatusFromTheServersHealthAndNeverFromAConcernsTitle() async {
-        let model = await overview(
-            health: standing(database: .down, disk: .degraded, files: .ok),
-            concerns: [
-                AttentionConcern(kind: .health, reference: "disk", title: "Disk is down"),
-                AttentionConcern(kind: .health, reference: "blob_storage", title: "Blob storage is down"),
-            ])
-        #expect(model.health(of: .database).condition == .down)
-        #expect(model.health(of: .disk).condition == .degraded)
-        #expect(model.health(of: .files).condition == .ok)
-        #expect(model.concerns.count == 2, "the concerns still say what needs attention")
-    }
-
-    @Test func aHealthTheServerCouldNotGiveIsNeverShownAsWorking() async {
-        let model = await overview(health: nil)
-        #expect(model.health(of: .database).condition == .unknown)
-        #expect(model.health(of: .disk).condition == .unknown)
-        #expect(model.health(of: .files).condition == .unknown)
-        #expect(model.backups.state == .unknown)
-        #expect(OverviewPage.backupsWord(model.backups) == "Couldn’t Check")
-        #expect(OverviewPage.word(.unknown) == "Couldn’t Check")
     }
 
     @Test func aDatabaseThatReadsButCannotWriteIsNotWorking() {
@@ -217,31 +173,10 @@ import Testing
         #expect(health.housekeeping == nil)
     }
 
-    @Test func theBackupsRowFollowsTheServersOwnAccountOfThem() async {
-        let off = await overview(health: standing(backups: BackupsHealth(state: .off, lastBackup: nil, reason: .noDestination)))
-        #expect(off.backups.state == .off)
-        let failing = await overview(
-            health: standing(backups: BackupsHealth(state: .failing, lastBackup: nil, faults: [.runFailed(count: 2)])),
-            concerns: [AttentionConcern(kind: .backup, reference: "something_new", title: "A notice")])
-        #expect(failing.backups.state == .failing)
-        let quiet = await overview(
-            health: standing(), concerns: [AttentionConcern(kind: .backup, reference: "store", title: "The backup folder is not there")])
-        #expect(quiet.backups.state == .ok, "a concern's reference no longer decides the row")
-    }
-
-    @Test func overviewReadsTheSameHealthAsTheOtherPages() async {
-        let bench = bench()
-        let health = ServerHealthModel(context: bench.context)
-        let model = OverviewModel(context: bench.context, health: health)
-        await model.load()
-        #expect(health.hasLoaded)
-        #expect(bench.calls.calls.filter { $0 == "health" }.count == 1)
-    }
-
     @Test func aRefusalForWantOfAPermissionShowsTheStateAndReadsTheGrantsAgain() async {
         let bench = bench()
         bench.calls.fail("attention", with: .notPermitted("instance.read"))
-        let model = OverviewModel(context: bench.context)
+        let model = AccountOverview(context: bench.context)
         await model.load()
         #expect(model.failure == .notPermitted("instance.read"))
         #expect(bench.refreshed == 1)
@@ -250,7 +185,7 @@ import Testing
 
     @Test func theServerNotAnsweringShowsItAndKeepsNothingOld() async {
         let bench = bench()
-        let model = OverviewModel(context: bench.context)
+        let model = AccountOverview(context: bench.context)
         await model.load()
         bench.calls.fail("attention", with: .unreachable)
         await model.load()
@@ -265,21 +200,10 @@ import Testing
             $0.update.available = true
             $0.update.latest = UpdateRelease(version: "0.0.90")
         }
-        let model = OverviewModel(context: bench.context)
+        let model = AccountOverview(context: bench.context)
         await model.load()
         #expect(model.updateReady == "0.0.90")
         #expect(model.owner == "mira")
-    }
-
-    @Test func aDevelopmentBuildHasNoVersionToShow() async {
-        let bench = bench()
-        bench.calls.state.withLock { $0.update.running = "0.0.0" }
-        let model = OverviewModel(context: bench.context)
-        await model.load()
-        #expect(model.releaseVersion == nil)
-        bench.calls.state.withLock { $0.update.running = "0.0.89" }
-        await model.load()
-        #expect(model.releaseVersion == "0.0.89")
     }
 
     @Test(arguments: ["0.0.90", "0.0.100"])
@@ -290,7 +214,7 @@ import Testing
             $0.update.available = true
             $0.update.latest = UpdateRelease(version: "0.0.90")
         }
-        let model = OverviewModel(context: bench.context)
+        let model = AccountOverview(context: bench.context)
         await model.load()
         #expect(model.updateReady == "0.0.90")
 
@@ -310,7 +234,6 @@ import Testing
         await loading.value
 
         #expect(model.releaseFailure == .unreachable)
-        #expect(model.releaseVersion == installed)
         #expect(model.updateReady == nil)
 
         bench.calls.fail("updateStatus", with: nil)
@@ -328,12 +251,11 @@ import Testing
             $0.update.available = true
             $0.update.latest = UpdateRelease(version: "0.0.90")
         }
-        let model = OverviewModel(context: bench.context)
+        let model = AccountOverview(context: bench.context)
         bench.calls.fail("instanceMetrics", with: .unreachable)
         bench.calls.fail("updateStatus", with: .unreachable)
         await model.load()
         #expect(model.failure == nil)
-        #expect(model.releaseVersion == nil)
         #expect(model.releaseFailure == .unreachable)
         #expect(model.metricsFailure == .unreachable)
 
@@ -342,7 +264,6 @@ import Testing
         await model.load()
         #expect(model.releaseFailure == nil)
         #expect(model.metricsFailure == nil)
-        #expect(model.releaseVersion == "0.0.89")
         #expect(model.updateReady == "0.0.90")
 
         bench.calls.fail("instanceMetrics", with: .unreachable)
@@ -350,7 +271,6 @@ import Testing
         await model.load()
         #expect(model.releaseFailure == .unreachable)
         #expect(model.metricsFailure == .unreachable)
-        #expect(model.releaseVersion == "0.0.89")
         #expect(model.updateReady == nil)
         #expect(model.metrics == metrics)
     }
@@ -360,10 +280,10 @@ import Testing
         #expect(backup.shownTitle == "No backups are kept")
         #expect(backup.shownLine == "There is nowhere to keep backups.")
         let secret = AttentionConcern(kind: .setting, reference: "object_store_secret_key", title: "Set object_store_secret_key again")
-        #expect(secret.shownTitle == "Set a Secret Again", "a setting the app has no name for is never told by its key")
+        #expect(secret.shownTitle == "Set a secret again", "a setting the app has no name for is never told by its key")
         #expect(secret.shownLine?.contains("_") == false)
         let token = AttentionConcern(kind: .setting, reference: "posthog_project_token", title: "Set posthog_project_token again")
-        #expect(token.shownTitle == "Set PostHog Project Token Again")
+        #expect(token.shownTitle == "Set the PostHog project token again")
         let connector = AttentionConcern(kind: .connector, reference: "rss", title: "RSS reports problems")
         #expect(connector.shownLine == "It reports problems.")
         // No wording for the kind and reference: the title alone.
@@ -397,13 +317,6 @@ import Testing
         #expect(SettingsPageTable<MarfaDeletedItem, EmptyView, EmptyView>.selectedText(0, of: 1_204) == "None selected")
     }
 
-    @Test func theBackupsWordsAreWhatTheServerHolds() {
-        let noon = Calendar.current.date(bySettingHour: 14, minute: 0, second: 0, of: .now) ?? .now
-        #expect(OverviewPage.backupsWord(BackupsHealth(state: .off)) == "Off")
-        #expect(OverviewPage.backupsWord(BackupsHealth(state: .failing)) == "Failing")
-        #expect(OverviewPage.backupsWord(BackupsHealth(state: .ok, lastBackup: nil)) == "Working")
-        #expect(OverviewPage.backupsWord(BackupsHealth(state: .ok, lastBackup: noon), now: noon).hasPrefix("Last at"))
-    }
 }
 
 @MainActor

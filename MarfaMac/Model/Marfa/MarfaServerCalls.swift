@@ -158,6 +158,7 @@ nonisolated struct MarfaServerCalls: ItemHistorySource, InstanceConfigSource, Ty
     static func config(_ answer: Components.Schemas.InstanceConfig) -> InstanceConfig {
         var config = InstanceConfig()
         config.instanceID = answer.instanceId
+        config.signInAddress = answer.signInAddress ?? answer.addresses?.first
         func number(_ setting: InstanceSetting, _ value: Int?) { config.values[setting] = value.map { .number($0) } }
         func megabytes(_ setting: InstanceSetting, _ bytes: Int?) {
             config.values[setting] = bytes.map { .number(Int((Double($0) / Double(InstanceSetting.bytesPerMegabyte)).rounded())) }

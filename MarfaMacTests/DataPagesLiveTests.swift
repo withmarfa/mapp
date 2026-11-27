@@ -5,7 +5,7 @@ import Testing
 @testable import MarfaMac
 
 extension LiveMarfaTests {
-    /// The Overview, History, File Storage and Sources pages' calls over a real test instance. The key must hold the owner's
+    /// The Account, Housekeeping, Storage and Sources pages' calls over a real test instance. The key must hold the owner's
     /// permissions. Every setting changed is put back as it was, or removed if it was unset, whether the test passes or not.
     @MainActor
     @Suite(.serialized)
@@ -15,7 +15,7 @@ extension LiveMarfaTests {
             return (connection, MarfaServerCalls(connection: connection, signIns: ScriptedSignIns([connection.address: try LiveMarfa.key()])))
         }
 
-        @Test(.timeLimit(.minutes(2))) func theOverviewFileStorageAndSourceLimitAreRead() async throws {
+        @Test(.timeLimit(.minutes(2))) func theAccountStorageAndSourceLimitAreRead() async throws {
             let (_, server) = try connection()
             let calls = ClientOwnerCalls { try server.client() }
             _ = try await calls.attention()
@@ -32,7 +32,7 @@ extension LiveMarfaTests {
             #expect(limit.instanceID?.isEmpty == false)
         }
 
-        @Test(.timeLimit(.minutes(3))) func theHistoryAndFileStorageSettingsAreChangedOneAtATimeAndPutBack() async throws {
+        @Test(.timeLimit(.minutes(3))) func logRetentionAndFileSettingsAreChangedOneAtATimeAndPutBack() async throws {
             let (connection, source) = try connection()
             let model = InstanceSettingsModel { .init(id: connection.address.absoluteString, source: source) }
             await model.load()

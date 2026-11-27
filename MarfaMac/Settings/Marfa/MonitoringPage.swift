@@ -53,7 +53,7 @@ struct MonitoringPage: View {
                     secretRow(.postHogHost)
                     secretRow(.postHogToken)
                 }
-                SettingsSection("Telemetry", footer: "Faults show on Overview too. Secrets are never shown.") {
+                SettingsSection("Telemetry", footer: "Faults also appear in Account. Secrets are never shown.") {
                     switchRow(
                         "Send Telemetry", key: "telemetry_enabled", hasReceiver: model.telemetryHasReceiver,
                         line: "Traces, logs and metrics. Off keeps the settings.", idle: "Nothing is sent until an address is set.")

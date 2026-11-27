@@ -27,17 +27,6 @@ nonisolated enum MonitoringSecret: String, CaseIterable, Hashable, Sendable, Ide
         }
     }
 
-    /// What the secret is called as a title, where a concern asks for it to be set again.
-    var settingTitle: String {
-        switch self {
-        case .heartbeatAddress: String(localized: "Heartbeat Address")
-        case .postHogHost: String(localized: "PostHog Host")
-        case .postHogToken: String(localized: "PostHog Project Token")
-        case .telemetryAddress: String(localized: "Telemetry Address")
-        case .telemetryHeaders: String(localized: "Telemetry Headers")
-        }
-    }
-
     /// The secret a setting key names, if Monitoring holds it.
     static func named(key: String) -> MonitoringSecret? { allCases.first { $0.key == key } }
 

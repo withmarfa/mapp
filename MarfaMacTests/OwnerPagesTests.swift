@@ -20,7 +20,6 @@ nonisolated final class OwnerCallGate: Sendable {
 nonisolated final class FakeOwnerCalls: OwnerCalls {
     struct State {
         var profile = OwnerProfile(username: "mira", emailIsReadable: true, email: nil)
-        var changeableProfile = Set(ProfileField.allCases)
         var picture: Data?
         var namesSent: [String] = []
         /// Names the server refuses once their send has been let go, as a refusal that comes after a wait.
@@ -196,8 +195,6 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         return state.withLock { $0.profile }
     }
 
-    func changeableProfile() -> Set<ProfileField> { state.withLock { $0.changeableProfile } }
-
     func setProfileName(_ name: String) async throws(OwnerFailure) -> OwnerProfile {
         try enter("setProfileName")
         await held("setProfileName")
@@ -205,6 +202,18 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         return state.withLock { state in
             state.namesSent.append(name)
             state.profile.name = name.trimmingCharacters(in: .whitespaces)
+            return state.profile
+        }
+    }
+
+    func setProfileContact(_ field: ProfileContactField, to value: String) async throws(OwnerFailure) -> OwnerProfile {
+        await held("setProfileContact")
+        try enter("setProfileContact")
+        return state.withLock { state in
+            switch field {
+            case .username: state.profile.username = value.lowercased()
+            case .email: state.profile.email = value.isEmpty ? nil : value.lowercased()
+            }
             return state.profile
         }
     }
@@ -1005,6 +1014,17 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         #expect(bench.calls.calls.contains("passkeys"), "the lists are read once it is held")
     }
 
+    @Test func thePasswordSheetStaysClosedWhenTheReloadAfterApprovalIsSignedOut() async {
+        let bench = OwnerBench(grants: [])
+        let account = model(bench)
+        await account.load()
+        bench.calls.fail("profile", with: .signedOut)
+        await account.beginChangePassword()
+        #expect(bench.asked == [[.signInsManage]])
+        #expect(account.gateFailure == .signedOut)
+        #expect(account.sheet == nil)
+    }
+
     @Test func allowMoreCancelledOpensNothingAndChangesNothing() async {
         let bench = OwnerBench(grants: [])
         bench.allowing = .cancelled
@@ -1116,7 +1136,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         await account.load()
         account.askToEnd(account.browsers[0])
         let question = try #require(account.question)
-        #expect(question.title == "Sign out “Safari on macOS”?")
+        #expect(question.title == "Sign Out “Safari on macOS”?")
         #expect(!bench.calls.calls.contains("endSignIn"), "nothing is sent before the owner agrees")
         account.cancelQuestion()
         #expect(account.question == nil)
@@ -1147,10 +1167,10 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     @Test func theLinesUnderAPasskeySayWhenItWasAddedAndUsed() {
         let calendar = Calendar(identifier: .gregorian)
         let now = Date(timeIntervalSince1970: 1_800_000_000)
-        let line = AccountPage.line(added: now.addingTimeInterval(-86_400 * 40), used: now, now: now, calendar: calendar)
+        let line = AccountSignInsPage.line(added: now.addingTimeInterval(-86_400 * 40), used: now, now: now, calendar: calendar)
         #expect(line.hasPrefix("Added "))
         #expect(line.hasSuffix("Used today."))
-        #expect(AccountPage.line(added: nil, used: nil, now: now, calendar: calendar) == "Never used.")
+        #expect(AccountSignInsPage.line(added: nil, used: nil, now: now, calendar: calendar) == "Never used.")
     }
 }
 

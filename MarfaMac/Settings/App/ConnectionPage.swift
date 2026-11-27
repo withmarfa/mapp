@@ -39,7 +39,7 @@ struct ConnectionPage: View {
             ConnectToMarfaSheet(model: model, dismiss: dismissConnect)
         }
         .onDisappear { model.closeConnectSheet() }
-        .onChange(of: model.isConfirmingDisconnect) { _, isAsking in
+        .onChange(of: model.isConfirmingDisconnect, initial: true) { _, isAsking in
             guard isAsking else { return }
             model.isConfirmingDisconnect = false
             askToDisconnect()
@@ -247,7 +247,6 @@ struct ConnectionPage: View {
         }
     }
 
-    // Connection keeps Disconnect until Account has its Sign Out action.
     private var disconnect: some View {
         SettingsSection("Disconnect") {
             SettingsRow(

@@ -1,7 +1,7 @@
 import Marfa
 import SwiftUI
 
-/// The File Storage page: where the server keeps files, how it reads, fetches and cleans them up. Switches and choices are sent
+/// The Storage page: where the server keeps files, how it reads, fetches and cleans them up. Switches and choices are sent
 /// at once, numbers when Return is pressed or the field is left.
 struct FileStoragePage: View {
     let host: any MarfaSettingsHost
@@ -32,6 +32,12 @@ struct FileStoragePage: View {
                     InstanceToggleRow(model: model, setting: .blobCleanupEnabled, among: all)
                     InstanceChoiceRow(model: model, setting: .blobCleanupGraceSeconds, among: all, line: "How long a file is left alone before it is removed.")
                     unused
+                }
+                SettingsSection("Versions", footer: "A type can keep its own versions.") {
+                    ForEach(InstanceSetting.versionSettings, id: \.self) { setting in
+                        InstanceChoiceRow(model: model, setting: setting, among: InstanceSetting.versionSettings, line: setting == .versionMaxVersions ? "For one item." : nil)
+                    }
+                    InstanceStatusLine(model: model, settings: InstanceSetting.versionSettings)
                 }
                 InstanceStatusLine(model: model, settings: all)
             }

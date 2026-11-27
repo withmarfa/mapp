@@ -97,6 +97,8 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
         }
     }
 
+    func startUpSettings() async throws(OwnerFailure) -> [StartUpSetting] { try await storedSettings().startUp }
+
     func storedSettings() async throws(OwnerFailure) -> InstanceSettingsSnapshot {
         try enter("storedSettings")
         return state.withLock { InstanceSettingsSnapshot(instanceID: $0.instanceID, settings: $0.settings, startUp: $0.startUp) }
@@ -752,11 +754,10 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
     @Test func eachNewPageNamesThePermissionItNeeds() {
         #expect(MarfaSettingsPage.activity.permission == .auditRead)
         #expect(MarfaSettingsPage.monitoring.permission == .configManage)
-        #expect(MarfaSettingsPage.limits.permission == .configManage)
-        #expect(MarfaSettingsPage.startUp.permission == .instanceRead)
+        #expect(MarfaSettingsPage.limits.missingPermission(in: [.instanceRead]) == nil)
+        #expect(MarfaSettingsPage.limits.missingPermission(in: [.configManage]) == nil)
         #expect(MarfaSettingsPage.activity.permissionLine == "The app isn’t allowed to read the server’s audit log.")
         #expect(MarfaSettingsPage.monitoring.permissionLine == "The app isn’t allowed to see or change how the server is monitored.")
         #expect(MarfaSettingsPage.limits.permissionLine == "The app isn’t allowed to see or change the server’s limits.")
-        #expect(MarfaSettingsPage.startUp.permissionLine == "The app isn’t allowed to read the settings the server started with.")
     }
 }

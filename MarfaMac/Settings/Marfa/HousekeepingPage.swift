@@ -17,7 +17,8 @@ struct HousekeepingPage: View {
 
     var body: some View {
         content
-            .task(id: host.serverAddress) {
+            .task(id: host.grants) {
+                guard host.grants.contains(.instanceRead) else { return }
                 await model.load()
                 await host.health.load()
             }
@@ -35,15 +36,42 @@ struct HousekeepingPage: View {
     }
 
     @ViewBuilder private var content: some View {
-        if let failure = model.failure {
+        SettingsPageColumn {
+            jobsContent
+            if host.grants.contains(.configManage) {
+                InstanceSettingsGate(page: .housekeeping, host: host) {
+                    SettingsSection("Logs") {
+                        ForEach(InstanceSetting.logSettings, id: \.self) { setting in
+                            InstanceChoiceRow(model: host.instanceSettings, setting: setting, among: InstanceSetting.logSettings, line: Self.logLine(setting))
+                        }
+                        InstanceStatusLine(model: host.instanceSettings, settings: InstanceSetting.logSettings)
+                    }
+                }
+            } else {
+                OwnerProblem(title: "Log Retention", failure: .notPermitted(InstancePermission.configManage.rawValue), page: .housekeeping, host: host)
+            }
+        }
+    }
+
+    private static func logLine(_ setting: InstanceSetting) -> LocalizedStringKey? {
+        switch setting {
+        case .auditRetentionDays: "And webhook deliveries."
+        case .eventLogRetentionDays: "What apps catch up on after being away."
+        case .rowLogRetentionDays: "So a change to a table can be undone."
+        default: nil
+        }
+    }
+
+    @ViewBuilder private var jobsContent: some View {
+        if !host.grants.contains(.instanceRead) {
+            OwnerProblem(title: "Jobs", failure: .notPermitted(InstancePermission.instanceRead.rawValue), page: .housekeeping, host: host)
+        } else if let failure = model.failure {
             OwnerFailureState(page: .housekeeping, failure: failure, host: host) { Task { await model.load() } }
         } else if !model.hasLoaded {
             OwnerLoading()
         } else {
-            SettingsPageColumn {
-                attention
-                jobs
-            }
+            attention
+            jobs
         }
     }
 
