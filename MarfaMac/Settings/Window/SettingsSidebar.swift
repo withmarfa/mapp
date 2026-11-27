@@ -80,6 +80,7 @@ struct SettingsSidebar: View {
                     .settingsFont(.sidebar)
                     .fontWeight(.regular)
                     .foregroundStyle(isSelected ? SettingsTokens.sidebarSelectedText : Color.primary)
+                    .lineLimit(nil)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
                 if let badge = badges(page), badge > 0 { problemBadge(badge) }
