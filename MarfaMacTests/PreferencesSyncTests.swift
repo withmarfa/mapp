@@ -364,6 +364,23 @@ import Testing
         #expect(await copy.writesToBinned == 0)
     }
 
+    @Test func settingsCanBeKeptAgainAfterMarfaRefusesRemoval() async throws {
+        let copy = FakePreferencesCopy()
+        let sync = await sync(copy)
+        let item = try #require(await copy.activeIDs.first)
+        try await sync.remove()
+        await copy.refuseRemoval(of: item)
+        defaults.set("dark", forKey: AppearanceKey.theme)
+        await sync.flush()
+        #expect(sync.standing == .off(.removed))
+        #expect(await copy.unitsHeld(item)[theme] == nil)
+
+        try await sync.startAgain()
+        #expect(sync.standing == .syncing)
+        #expect(await copy.activeIDs == [item])
+        #expect(await copy.unitsHeld(item)[theme] == #""dark""#)
+    }
+
     // MARK: Review findings
 
     /// A value a later version of the app wrote, which a store here sets aside, stays in the Marfa for the Macs that read it: the

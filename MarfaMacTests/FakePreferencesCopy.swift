@@ -35,6 +35,11 @@ actor FakePreferencesCopy: PreferencesCopy {
 
     func showBinnedItems(_ ids: Set<String>) { visibleBinnedItems = ids }
 
+    func refuseRemoval(of item: String) {
+        queuedRemovals = queuedRemovals.filter { $0.value != item }
+        held[item]?.trashed = false
+    }
+
     private var pausedItems: CheckedContinuation<Void, Never>?
     private var pausesNextItems = false
     private var isPaused = false
@@ -236,6 +241,11 @@ actor FakePreferencesCopy: PreferencesCopy {
     }
 
     func pendingRemovals() async throws -> Set<String> { Set(queuedRemovals.keys) }
+
+    func itemsAfterRemovalsSettle() async throws -> [PreferencesItem]? {
+        guard queuedRemovals.isEmpty, visibleBinnedItems.isEmpty else { return nil }
+        return try await items()
+    }
 
     func holdsOtherChanges(besides items: Set<String>) async throws -> Bool { !libraryWrites.isEmpty }
 

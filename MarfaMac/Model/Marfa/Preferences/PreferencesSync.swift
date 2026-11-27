@@ -317,15 +317,18 @@ final class PreferencesSync {
             guard ready.filled else { return standing = .off(.notFilled) }
             guard ready.holdsType else { return standing = .off(.needsPermission) }
             guard ready.tablesWhole, let instance = ready.instance else { return standing = .off(.notFilled) }
-            let items = try await copy.items()
+            var items = try await copy.items()
             answered.merge(await copy.answers()) { _, later in later }
             guard generation == self.generation else { return }
             var record = Record.read(defaults)
             if let adopted = record.marfas[instance], adopted.removed == true {
+                item = nil
+                standing = .off(.removed)
+                guard record.restarting.contains(instance) else { return }
                 let removedItems = adopted.removedItems ?? [adopted.item]
-                guard record.restarting.contains(instance), !items.contains(where: { removedItems.contains($0.id) }) else {
-                    item = nil
-                    return standing = .off(.removed)
+                if items.contains(where: { removedItems.contains($0.id) }) {
+                    guard let current = try await copy.itemsAfterRemovalsSettle(), generation == self.generation else { return }
+                    items = current
                 }
                 record.marfas[instance] = nil
             }
