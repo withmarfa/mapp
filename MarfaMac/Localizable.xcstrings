@@ -2557,9 +2557,6 @@
     "All Backups" : {
 
     },
-    "All Data" : {
-
-    },
     "All Day" : {
 
     },
@@ -2572,9 +2569,6 @@
     "All Items" : {
       "extractionState" : "manual"
     },
-    "All Links" : {
-
-    },
     "All Pages Are Shown" : {
 
     },
@@ -2584,10 +2578,16 @@
     "All Types Are Shown" : {
 
     },
+    "All data" : {
+
+    },
     "All day" : {
       "extractionState" : "manual"
     },
     "All items" : {
+
+    },
+    "All links" : {
 
     },
     "All versions kept for" : {
@@ -4102,12 +4102,6 @@
     "Couldn’t Check" : {
 
     },
-    "Couldn’t Check Webhook Deliveries" : {
-
-    },
-    "Couldn’t Check Webhook Keys" : {
-
-    },
     "Couldn’t Check the Webhook’s Key" : {
 
     },
@@ -4159,22 +4153,13 @@
     "Couldn’t Read %@" : {
 
     },
-    "Couldn’t Read Apps" : {
-
-    },
     "Couldn’t Read Available Types" : {
-
-    },
-    "Couldn’t Read Connector Machines" : {
 
     },
     "Couldn’t Read Every Source" : {
 
     },
     "Couldn’t Read Its Data" : {
-
-    },
-    "Couldn’t Read Keys" : {
 
     },
     "Couldn’t Read This Folder" : {
@@ -4192,9 +4177,6 @@
     "Couldn’t Read the Keys This App Made" : {
 
     },
-    "Couldn’t Read the Rules" : {
-
-    },
     "Couldn’t Remove This App’s Settings" : {
 
     },
@@ -4202,9 +4184,6 @@
 
     },
     "Couldn’t Restore Settings" : {
-
-    },
-    "Couldn’t Revoke Key" : {
 
     },
     "Couldn’t Save Item" : {
@@ -4249,6 +4228,12 @@
     "Couldn’t check for problems" : {
 
     },
+    "Couldn’t check webhook deliveries" : {
+
+    },
+    "Couldn’t check webhook keys" : {
+
+    },
     "Couldn’t confirm the date" : {
 
     },
@@ -4291,6 +4276,9 @@
     "Couldn’t read" : {
 
     },
+    "Couldn’t read apps" : {
+
+    },
     "Couldn’t read automatic update settings" : {
 
     },
@@ -4300,11 +4288,20 @@
     "Couldn’t read backups" : {
 
     },
+    "Couldn’t read connector machines" : {
+
+    },
     "Couldn’t read downloaded files" : {
 
     },
     "Couldn’t read downloaded files. The app will try again." : {
       "extractionState" : "manual"
+    },
+    "Couldn’t read items changed" : {
+
+    },
+    "Couldn’t read keys" : {
+
     },
     "Couldn’t read private addresses" : {
 
@@ -4324,6 +4321,9 @@
     "Couldn’t read the release" : {
 
     },
+    "Couldn’t read the rules" : {
+
+    },
     "Couldn’t read the total file size" : {
 
     },
@@ -4335,6 +4335,9 @@
     },
     "Couldn’t remove downloaded files. %@" : {
       "extractionState" : "manual"
+    },
+    "Couldn’t revoke key" : {
+
     },
     "Couldn’t sync" : {
 
@@ -4394,6 +4397,9 @@
 
     },
     "Custom name." : {
+
+    },
+    "Custom name. %@" : {
 
     },
     "Customize Access" : {
@@ -6590,13 +6596,13 @@
     "Link Actions" : {
 
     },
-    "Link Definitions" : {
-
-    },
     "Link Not Saved" : {
 
     },
     "Link Type Not Made" : {
+
+    },
+    "Link definitions" : {
 
     },
     "Link to Item" : {
@@ -6794,9 +6800,6 @@
     "Make this version the item’s text and title" : {
 
     },
-    "Manage All Keys" : {
-
-    },
     "Manage Apps" : {
 
     },
@@ -6816,6 +6819,12 @@
 
     },
     "Manage Webhooks" : {
+
+    },
+    "Manage all keys" : {
+
+    },
+    "Manage apps" : {
 
     },
     "Manages webhooks." : {
@@ -7040,16 +7049,16 @@
     "Move “%@” to the Feed?" : {
 
     },
-    "Moved an item to Recently Deleted" : {
+    "Moved an item to Trash" : {
 
     },
     "Moved an item to another status" : {
 
     },
-    "Moved expired feed items to Recently Deleted" : {
+    "Moved expired Feed items to Trash" : {
 
     },
-    "Moved items to Recently Deleted" : {
+    "Moved items to Trash" : {
 
     },
     "Moved to Recently Deleted" : {
@@ -7310,7 +7319,7 @@
     "No Browsers" : {
 
     },
-    "No Built In Types" : {
+    "No Built-In Types" : {
 
     },
     "No Collections" : {
@@ -7563,9 +7572,6 @@
     "Not Added to the Item" : {
 
     },
-    "Not Allowed" : {
-
-    },
     "Not Applicable" : {
       "extractionState" : "manual"
     },
@@ -7591,9 +7597,6 @@
 
     },
     "Not Now" : {
-
-    },
-    "Not Removed" : {
 
     },
     "Not Restored" : {
@@ -7622,9 +7625,6 @@
     },
     "Not Started" : {
       "extractionState" : "manual"
-    },
-    "Not Updated" : {
-
     },
     "Not allowed" : {
 
@@ -7659,10 +7659,16 @@
     "Not ready yet" : {
 
     },
+    "Not removed" : {
+
+    },
     "Not set" : {
 
     },
     "Not set." : {
+
+    },
+    "Not updated" : {
 
     },
     "Not yet" : {
@@ -8112,10 +8118,10 @@
     "Other Marfas" : {
 
     },
-    "Other Webhooks Aren’t Listed" : {
+    "Other files" : {
 
     },
-    "Other files" : {
+    "Other webhooks aren’t listed" : {
 
     },
     "Outline" : {
@@ -11952,9 +11958,6 @@
       "extractionState" : "manual",
       "generatesSymbol" : false
     },
-    "Type Definitions" : {
-
-    },
     "Type Description Not Kept" : {
 
     },
@@ -11980,6 +11983,9 @@
 
     },
     "Type chip color" : {
+
+    },
+    "Type definitions" : {
 
     },
     "Type it again to change it" : {
@@ -12979,6 +12985,9 @@
       "comment" : "Typed in the list's search: a date field is after a day"
     },
     "after today" : {
+
+    },
+    "all data and links" : {
 
     },
     "an app that’s no longer connected" : {

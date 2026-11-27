@@ -41,7 +41,7 @@ The page gate checks connection and permissions. A configured Marfa keeps its Ac
 
 - **A missing page permission shows Needs a Permission with Allow More.** `MarfaPageGate` decides. Apps and Keys checks access to each section independently and shows a locked row for an unavailable action. Activity's counts, storage and Log follow their own access.
 - **A sign-in asks for every permission an app can hold**, and the owner grants what they choose. A page rereads the grants after approval and still says what is missing.
-- **A `forbidden` answer rereads the grants** and offers Allow More… in the problem row (`OwnerProblemRow`).
+- **A `forbidden` answer rereads the grants** and offers Allow More in the problem row (`OwnerProblemRow`).
 - **Owner permissions are counted, never all or nothing**, and can only be turned off on a key's or an app's page (`OwnerPermissionsRow`).
 - **Access is only ever narrowed.** It is sent with what was read, or with `narrow_only` for a key. A grant that holds only a write is sent a read in its place, never nothing.
 - **Account asks at sign-in to read and change the profile**, and shows a value as read only where it may not change it.

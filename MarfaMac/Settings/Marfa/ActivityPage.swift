@@ -99,7 +99,6 @@ struct ActivityPage: View {
                     logFilter
                 }
             }
-            .padding(.horizontal, SettingsTokens.Metric.inset)
             .frame(maxWidth: SettingsTokens.Metric.column, alignment: .leading)
         }
         .padding(.horizontal, SettingsTokens.Metric.pageSide)
@@ -145,8 +144,10 @@ struct ActivityPage: View {
             logEmpty
         } else {
             SettingsPageColumn {
-                SettingsSectionTable(rows: model.listed, columns: columns)
-                logPager
+                VStack(alignment: .trailing, spacing: SettingsTokens.Metric.barGap) {
+                    SettingsSectionTable(rows: model.listed, columns: columns)
+                    logPager
+                }
             }
         }
     }
@@ -220,7 +221,7 @@ struct ActivityPage: View {
                         series: chartSeries.map { SettingsUsageChart.Series(name: $0.name, tone: $0.tone, values: $0.values) })
                 }
             } else if let failure = usage.statsFailure {
-                OwnerProblemRow(title: "Items Changed", failure: failure, page: .activity, host: host) {
+                OwnerProblemRow(title: "Couldn’t read items changed", failure: failure, page: .activity, host: host) {
                     Task { await usage.reload() }
                 }
             }
@@ -315,16 +316,23 @@ struct ActivityPage: View {
         }
     }
 
+    /// This table's own widths. The shared column tokens are other tables' widths.
+    private enum LogColumn {
+        static let when: CGFloat = 100
+        static let who: CGFloat = 170
+        static let address: CGFloat = 120
+    }
+
     private var columns: [SettingsTableColumn<ActivityEntry>] {
         [
             SettingsTableColumn(
-                "When", width: SettingsTokens.Metric.Column.day,
+                "When", width: LogColumn.when,
                 sortedAscending: model.order.ascending(for: .when), onSort: { model.toggleSort(.when) }
             ) { entry in
-                Text(verbatim: ActivityWording.when(entry.date)).foregroundStyle(SettingsTokens.secondaryText)
+                Text(verbatim: ActivityWording.when(entry.date))
             },
             SettingsTableColumn(
-                "Who", width: SettingsTokens.Metric.Column.who,
+                "Who", width: LogColumn.who,
                 sortedAscending: model.order.ascending(for: .who), onSort: { model.toggleSort(.who) }
             ) { entry in
                 Text(verbatim: entry.who ?? String(localized: "Unknown")).foregroundStyle(SettingsTokens.secondaryText)
@@ -335,7 +343,7 @@ struct ActivityPage: View {
                 Text(verbatim: ActivityWording.what(entry.action)).foregroundStyle(SettingsTokens.secondaryText)
             },
             SettingsTableColumn(
-                "Address", width: SettingsTokens.Metric.Column.address,
+                "Address", width: LogColumn.address,
                 sortedAscending: model.order.ascending(for: .address), onSort: { model.toggleSort(.address) }
             ) { entry in
                 Text(verbatim: entry.address ?? "").foregroundStyle(SettingsTokens.secondaryText)

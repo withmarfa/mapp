@@ -58,6 +58,9 @@ struct SettingsUsageChart: View {
 
         return Chart(segments.indices, id: \.self) { index in
             let bar = segments[index]
+            let roundsTop = bar.end > bar.start && segments.allSatisfy { other in
+                other.day != bar.day || other.end <= bar.end
+            }
             BarMark(
                 x: .value("Day", String(bar.day)),
                 yStart: .value("Start", bar.start),
@@ -65,6 +68,7 @@ struct SettingsUsageChart: View {
                 width: .fixed(barWidth)
             )
             .foregroundStyle(bar.series.tone.color)
+            .cornerRadius(roundsTop ? Metric.barCornerRadius : 0, style: .circular)
             .accessibilityLabel(Text(verbatim: Self.dayLabel(days[bar.day], now: now, calendar: calendar)))
             .accessibilityValue(Text("\(bar.series.name), \(bar.end - bar.start, format: .number.precision(.fractionLength(0)))"))
         }
@@ -89,7 +93,7 @@ struct SettingsUsageChart: View {
             AxisMarks(position: .trailing) { value in
                 AxisGridLine(stroke: StrokeStyle(lineWidth: SettingsTokens.Metric.tileEdgeWidth))
                     .foregroundStyle(SettingsTokens.hairline)
-                AxisValueLabel {
+                AxisValueLabel(horizontalSpacing: Metric.axisLabelGap) {
                     if let count = value.as(Double.self) {
                         Text(count, format: .number)
                             .settingsFont(.chartTick)
@@ -98,6 +102,9 @@ struct SettingsUsageChart: View {
                     }
                 }
             }
+        }
+        .chartYAxisStyle { axis in
+            axis.frame(width: Metric.axisGutter, alignment: .leading)
         }
     }
 
@@ -127,7 +134,7 @@ struct SettingsStorageBar: View {
     private var shares: [(bytes: Double, color: Color)] {
         let used = parts.filter { $0.bytes > 0 }.map { (Double($0.bytes), $0.tone.color) }
         guard let freeBytes, freeBytes > 0 else { return used }
-        return used + [(Double(freeBytes), SettingsTokens.selection)]
+        return used + [(Double(freeBytes), SettingsTokens.storageFree)]
     }
 
     private var legend: [UsageLegend.Entry] {
@@ -163,7 +170,7 @@ struct SettingsStorageBar: View {
             }
         }
         .frame(height: Metric.storageHeight)
-        .background(SettingsTokens.selection)
+        .background(SettingsTokens.storageFree)
         .clipShape(.capsule)
         .accessibilityHidden(true)
     }
@@ -200,10 +207,10 @@ private struct UsageLegend: View {
 
     private func swatch(_ tone: SettingsTokens.Tone?) -> some View {
         let shape = RoundedRectangle(cornerRadius: Metric.swatchRadius)
-        return shape.fill(tone?.color ?? SettingsTokens.selection)
+        return shape.fill(tone?.color ?? SettingsTokens.storageFree)
             .overlay {
                 if tone == nil {
-                    shape.strokeBorder(SettingsTokens.hairline, lineWidth: SettingsTokens.Metric.tileEdgeWidth)
+                    shape.strokeBorder(SettingsTokens.storageFreeEdge, lineWidth: SettingsTokens.Metric.tileEdgeWidth)
                 }
             }
             .frame(width: Metric.swatchSize, height: Metric.swatchSize)

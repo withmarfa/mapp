@@ -16,6 +16,8 @@ struct SettingsSection<Content: View, Accessory: View>: View {
     private let name: Text?
     private let line: Text?
     private let footer: Text?
+    /// An add button still sits in the title band when the section has no name.
+    private let pinsAccessory: Bool
     private let accessory: Accessory
     private let content: Content
     @Environment(\.settingsSectionInset) private var inset
@@ -25,9 +27,17 @@ struct SettingsSection<Content: View, Accessory: View>: View {
         name: Text?, line: Text? = nil, footer: Text? = nil,
         @ViewBuilder accessory: () -> Accessory, @ViewBuilder content: () -> Content
     ) {
+        self.init(name: name, line: line, footer: footer, pinsAccessory: true, accessory: accessory, content: content)
+    }
+
+    private init(
+        name: Text?, line: Text?, footer: Text?, pinsAccessory: Bool,
+        @ViewBuilder accessory: () -> Accessory, @ViewBuilder content: () -> Content
+    ) {
         self.name = name
         self.line = line
         self.footer = footer
+        self.pinsAccessory = pinsAccessory
         self.accessory = accessory()
         self.content = content()
     }
@@ -41,7 +51,7 @@ struct SettingsSection<Content: View, Accessory: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: SettingsTokens.Metric.sectionGap) {
-            if name != nil || line != nil {
+            if name != nil || line != nil || pinsAccessory {
                 VStack(alignment: .leading, spacing: SettingsTokens.Metric.rowTextPadding) {
                     HStack(spacing: SettingsTokens.Metric.tableColumnGap) {
                         if let name {
@@ -72,11 +82,13 @@ struct SettingsSection<Content: View, Accessory: View>: View {
 
 extension SettingsSection where Accessory == EmptyView {
     init(_ name: LocalizedStringKey, line: LocalizedStringKey? = nil, footer: LocalizedStringKey? = nil, @ViewBuilder content: () -> Content) {
-        self.init(name: Text(name), line: line.map { Text($0) }, footer: footer.map { Text($0) }, accessory: { EmptyView() }, content: content)
+        self.init(
+            name: Text(name), line: line.map { Text($0) }, footer: footer.map { Text($0) }, pinsAccessory: false,
+            accessory: { EmptyView() }, content: content)
     }
 
     init(name: Text?, line: Text? = nil, footer: Text? = nil, @ViewBuilder content: () -> Content) {
-        self.init(name: name, line: line, footer: footer, accessory: { EmptyView() }, content: content)
+        self.init(name: name, line: line, footer: footer, pinsAccessory: false, accessory: { EmptyView() }, content: content)
     }
 }
 

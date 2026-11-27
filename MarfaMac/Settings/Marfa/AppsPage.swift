@@ -85,6 +85,30 @@ struct AppsPage: View {
         case .commandLine: "terminal"
         }
     }
+
+    /// Raycast and Claude have plain marks. Anything else keeps the glyph for its kind.
+    static func brandIcon(clientID: String, name: String?) -> String? {
+        for key in [clientID, name ?? ""].map({ $0.lowercased() }) where !key.isEmpty {
+            switch key {
+            case "raycast", "oauth:raycast": return "simple-icons:raycast"
+            case "claude", "oauth:claude": return "simple-icons:claude"
+            default: continue
+            }
+        }
+        return nil
+    }
+
+    static func lead(for app: AppAccess) -> SettingsLead {
+        if let icon = brandIcon(clientID: app.clientID, name: app.name) {
+            return .custom(AnyView(
+                RowIconImage(icon: .type(icon))
+                    .font(.system(size: 14))
+                    .foregroundStyle(SettingsTokens.secondaryText)
+                    .accessibilityHidden(true)
+            ))
+        }
+        return .symbol(symbol(app.kind))
+    }
 }
 
 struct SignedInAppsSection: View {
@@ -94,9 +118,9 @@ struct SignedInAppsSection: View {
     var body: some View {
         SettingsSection("Apps") {
             if !model.canReadApps {
-                OwnerProblemRow(title: "Manage Apps", failure: .notPermitted(InstancePermission.grantsManage.rawValue), page: .apps, host: host)
+                OwnerProblemRow(title: "Manage apps", failure: .notPermitted(InstancePermission.grantsManage.rawValue), page: .apps, host: host)
             } else if let failure = model.failure {
-                OwnerProblemRow(title: "Couldn’t Read Apps", failure: failure, page: .apps, host: host) {
+                OwnerProblemRow(title: "Couldn’t read apps", failure: failure, page: .apps, host: host) {
                     Task { await model.load(includeKeys: false) }
                 }
             } else if !model.hasLoaded {
@@ -108,7 +132,7 @@ struct SignedInAppsSection: View {
                     SettingsLinkRow(
                         verbatim: AppsModel.name(of: app),
                         line: line(for: app),
-                        lead: .symbol(AppsPage.symbol(app.kind)), value: OwnerWording.used(app.lastUsed)
+                        lead: AppsPage.lead(for: app), value: OwnerWording.used(app.lastUsed)
                     ) { host.show(.apps, subpage: AppsPage.subpage(for: app)) }
                         .help(Text(verbatim: AppsModel.name(of: app)))
                         .accessibilityIdentifier("SettingsApp-\(app.id)")

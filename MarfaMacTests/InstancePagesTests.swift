@@ -913,6 +913,9 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
     }
 
     @Test func wordsAreTheAppsAndNeverTheServersKeys() {
+        #expect(ActivityWording.what("item.delete") == "Moved an item to Trash")
+        #expect(ActivityWording.what("items.trash") == "Moved items to Trash")
+        #expect(ActivityWording.what("items.feed_expired") == "Moved expired Feed items to Trash")
         #expect(ActivityWording.what("auth.sign_in.success") == "Signed in")
         #expect(ActivityWording.what("config.update") == "Changed the settings")
         #expect(ActivityWording.what("thing.did_something") == "Thing did something", "an unknown action is still put into words")

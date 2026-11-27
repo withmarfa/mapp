@@ -8,18 +8,18 @@ enum SettingsTokens {
     enum Tone: CaseIterable, Hashable, Sendable {
         case gray, blue, indigo, amber, orange, purple, teal, green, pink, red
 
-        /// The tile colors of the agreed sidebar (S9), which are not the system's: a deeper amber, indigo, green and teal.
+        /// Row and navigation tiles, shared by the App and Marfa boards. The sidebar uses `sidebarColor`.
         var color: Color {
             switch self {
-            case .gray: Color(red: 142 / 255, green: 142 / 255, blue: 147 / 255)
-            case .blue: Color(red: 0, green: 122 / 255, blue: 255 / 255)
-            case .indigo: Color(red: 104 / 255, green: 102 / 255, blue: 216 / 255)
-            case .amber: Color(red: 225 / 255, green: 170 / 255, blue: 5 / 255)
-            case .orange: Color(red: 240 / 255, green: 138 / 255, blue: 0)
-            case .purple: Color(red: 166 / 255, green: 80 / 255, blue: 216 / 255)
-            case .teal: Color(red: 24 / 255, green: 163 / 255, blue: 185 / 255)
-            case .green: Color(red: 46 / 255, green: 170 / 255, blue: 75 / 255)
-            case .pink: Color(red: 232 / 255, green: 67 / 255, blue: 122 / 255)
+            case .gray: rgb(0x8a8a90)
+            case .blue: rgb(0x007aff)
+            case .indigo: rgb(0x5856d6)
+            case .amber: rgb(0xe0a800)
+            case .orange: rgb(0xf08a00)
+            case .purple: rgb(0xa650d8)
+            case .teal: rgb(0x17a2b8)
+            case .green: rgb(0x28a745)
+            case .pink: rgb(0xe8437a)
             case .red: Color(nsColor: .systemRed)
             }
         }
@@ -51,6 +51,9 @@ enum SettingsTokens {
     static let buttonFill = adaptive(light: NSColor(white: 0, alpha: 0.06), dark: NSColor(white: 1, alpha: 0.12))
     /// A chosen row, card or table row: a soft gray, never blue.
     static let selection = adaptive(light: NSColor(white: 0, alpha: 0.07), dark: NSColor(white: 1, alpha: 0.1))
+    /// Free space on a storage bar: the label ink at 7%, with the legend swatch edged at 22%.
+    static let storageFree = adaptive(light: NSColor(white: 0, alpha: 0.059), dark: NSColor(white: 1, alpha: 0.059))
+    static let storageFreeEdge = adaptive(light: NSColor(white: 0, alpha: 0.186), dark: NSColor(white: 1, alpha: 0.186))
     /// Where a row is under the pointer.
     static let hover = adaptive(light: NSColor(white: 0, alpha: 0.04), dark: NSColor(white: 1, alpha: 0.06))
     /// The fill of a field with accessories or of a read-only value.
@@ -80,7 +83,10 @@ enum SettingsTokens {
     /// The accent the Mac is set to, which the first swatch of a color choice shows.
     static let systemAccent = Color(nsColor: .controlAccentColor)
     static let warning = Color(nsColor: .systemOrange)
-    static let ok = Color(nsColor: .systemGreen)
+    /// A healthy or sending status. The boards name this green in both appearances; the system green resolves lighter offscreen.
+    static let ok = adaptive(
+        light: NSColor(red: 52 / 255, green: 199 / 255, blue: 89 / 255, alpha: 1),
+        dark: NSColor(red: 48 / 255, green: 209 / 255, blue: 88 / 255, alpha: 1))
     static let choiceEdge = Color.black.opacity(0.2)
     static let choiceSelectionRing = adaptive(light: NSColor(white: 0, alpha: 0.339), dark: NSColor(white: 1, alpha: 0.339))
     /// A focused control's ring is gray.
@@ -234,7 +240,7 @@ enum SettingsTokens {
         static let tableFooterHeight: CGFloat = 40
         static let sectionTableInset: CGFloat = 12
         static let sectionTableColumnGap: CGFloat = 10
-        static let typeTableIndent: CGFloat = 16
+        static let typeTableIndent: CGFloat = 20
         static let pageTableRow: CGFloat = 30
         /// The space above and below a table row's cells, which a cell that wraps keeps by growing the row.
         static let tableCellPadding: CGFloat = 7
@@ -346,6 +352,10 @@ enum SettingsTokens {
             static let storageHeight: CGFloat = 12
             static let storageGap: CGFloat = 2
             static let storageLegendGap: CGFloat = 12
+            /// The top of the uppermost segment, and the room the trailing counts take beside the plot.
+            static let barCornerRadius: CGFloat = 3
+            static let axisGutter: CGFloat = 34
+            static let axisLabelGap: CGFloat = 8
         }
         /// The mark before a status group.
         static let statusMark: CGFloat = 14

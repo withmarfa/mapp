@@ -110,20 +110,23 @@ struct TypesPage: View {
     private var list: some View {
         SettingsPageColumn {
             LinksSection(host: host)
-            SettingsListHeader {
-                SettingsTabs(tabs: tabs, selection: $tab)
-            } trailing: {
-                SettingsButton("New Type…") { model.beginChild(of: nil) }
-            }
-            if rows.isEmpty {
-                SettingsEmptyCard(symbol: "shippingbox", title: emptyTitle, line: emptyLine)
-            } else {
-                SettingsSectionTable(
-                    rows: rows, columns: columns, isSelected: { $0.id == selected },
-                    onOpen: { row in
-                        selected = row.id
-                        navigation?.push(subpage(for: row.type))
-                    })
+            VStack(spacing: Self.headerGap) {
+                SettingsListHeader {
+                    SettingsTabs(tabs: tabs, selection: $tab)
+                } trailing: {
+                    SettingsButton("New Type…", small: true) { model.beginChild(of: nil) }
+                        .padding(.trailing, SettingsTokens.Metric.sectionTableInset)
+                }
+                if rows.isEmpty {
+                    SettingsEmptyCard(symbol: "shippingbox", title: emptyTitle, line: emptyLine)
+                } else {
+                    SettingsSectionTable(
+                        rows: rows, columns: columns, isSelected: { $0.id == selected },
+                        onOpen: { row in
+                            selected = row.id
+                            navigation?.push(subpage(for: row.type))
+                        })
+                }
             }
         }
         .onChange(of: tab) { selected = model.keptSelection(selected, in: rows) }
@@ -148,10 +151,14 @@ struct TypesPage: View {
         return tabs
     }
 
+    /// The gap under the tabs, and this table's Type column. Shared column tokens belong to other tables.
+    private static let headerGap: CGFloat = 12
+    private static let typeColumn: CGFloat = 376
+
     private var columns: [SettingsTableColumn<TypesModel.TypeListRow>] {
         [
             SettingsTableColumn(
-                "Type", sortedAscending: sort.ascending(for: .type), onSort: { sort = sort.toggled(.type) }
+                "Type", width: Self.typeColumn, sortedAscending: sort.ascending(for: .type), onSort: { sort = sort.toggled(.type) }
             ) { row in
                 HStack(spacing: SettingsTokens.Metric.buttonGap) {
                     host.typeMark(for: row.type.id)
@@ -162,7 +169,7 @@ struct TypesPage: View {
                 .padding(.leading, CGFloat(row.depth) * SettingsTokens.Metric.typeTableIndent)
             },
             SettingsTableColumn(
-                "From", width: SettingsTokens.Metric.Column.who, sortedAscending: sort.ascending(for: .source),
+                "From", sortedAscending: sort.ascending(for: .source),
                 onSort: { sort = sort.toggled(.source) }
             ) { row in
                 Text(verbatim: model.sourceTitle(of: row.type)).foregroundStyle(SettingsTokens.secondaryText)
@@ -180,7 +187,7 @@ struct TypesPage: View {
         switch tab {
         case .all: Text("No Types")
         case .yours: Text("No Types of Your Own")
-        case .builtIn: Text("No Built In Types")
+        case .builtIn: Text("No Built-In Types")
         case .fromPlugins: Text("No Types from Plugins")
         case .fromApps: Text("No Types from Apps")
         }

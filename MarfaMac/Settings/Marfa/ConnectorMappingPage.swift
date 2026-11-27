@@ -56,7 +56,7 @@ struct ConnectorMappingPage: View {
     private func content(_ entry: ConnectorMappingModel.Kind) -> some View {
         SettingsPageColumn {
             SettingsHead(
-                lead: SettingsWell(size: SettingsTokens.Metric.headTile) { host.markGlyph(summary.mark) },
+                lead: host.markGlyph(summary.mark).font(.system(size: SettingsTokens.Metric.headTile * SettingsTokens.Metric.wellGlyph)),
                 title: Text("\(title) From \(summary.title)"), line: Text("How each one lands in \(host.serverName)."))
             if model.isStale { stale }
             if let failure = model.saveFailure {

@@ -198,12 +198,12 @@ nonisolated enum AccessScopes {
     /// What a pattern reaches, as a row's title. `names` is each type's label.
     static func title(of pattern: String, names: [String: String]) -> String {
         switch pattern {
-        case "*": return String(localized: "All Data")
+        case "*": return String(localized: "All data")
         case "content": return String(localized: "Your Content")
-        case "edge.*": return String(localized: "All Links")
+        case "edge.*": return String(localized: "All links")
         case "metadata": return String(localized: "Types and Links")
-        case "metadata.types": return String(localized: "Type Definitions")
-        case "metadata.edge_types": return String(localized: "Link Definitions")
+        case "metadata.types": return String(localized: "Type definitions")
+        case "metadata.edge_types": return String(localized: "Link definitions")
         case "profile": return String(localized: "Your Profile")
         default: break
         }
@@ -222,12 +222,41 @@ nonisolated enum AccessScopes {
     static func summary(_ parsed: Parsed, names: [String: String]) -> String {
         let reached = parsed.entries.filter { $0.level != .none }
         guard !reached.isEmpty else { return String(localized: "Reaches no items.") }
-        let writes = reached.filter { $0.level == .write }.map { title(of: $0.pattern, names: names) }
-        let reads = reached.filter { $0.level == .read }.map { title(of: $0.pattern, names: names) }
+        let writes = reached.filter { $0.level == .write }
+        let reads = reached.filter { $0.level == .read }
         var parts: [String] = []
-        if !writes.isEmpty { parts.append(String(localized: "Reads and edits \(writes.formatted(.list(type: .and))).")) }
-        if !reads.isEmpty { parts.append(String(localized: "Reads \(reads.formatted(.list(type: .and))).")) }
+        if !writes.isEmpty { parts.append(String(localized: "Reads and edits \(listed(writes, names: names)).")) }
+        if !reads.isEmpty { parts.append(String(localized: "Reads \(listed(reads, names: names)).")) }
         return parts.joined(separator: " ")
+    }
+
+    /// The grants as they read in a sentence. Data and links together are one phrase. A type's own name stays as given.
+    private static func listed(_ entries: [Entry], names: [String: String]) -> String {
+        let combines = Set(entries.map(\.pattern)).isSuperset(of: ["*", "edge.*"])
+        var phrases: [String] = []
+        var combined = false
+        for entry in entries {
+            if combines, entry.pattern == "*" || entry.pattern == "edge.*" {
+                if !combined {
+                    phrases.append(String(localized: "all data and links"))
+                    combined = true
+                }
+                continue
+            }
+            phrases.append(inSentence(title(of: entry.pattern, names: names)))
+        }
+        return phrases.formatted(.list(type: .and))
+    }
+
+    /// A row's title, lowered where it is one of the fixed grants so it can sit mid-sentence.
+    private static func inSentence(_ title: String) -> String {
+        switch title {
+        case String(localized: "All data"), String(localized: "All links"),
+             String(localized: "Type definitions"), String(localized: "Link definitions"):
+            return title.prefix(1).lowercased() + title.dropFirst()
+        default:
+            return title
+        }
     }
 }
 
