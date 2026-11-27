@@ -27,6 +27,8 @@ import Testing
     var canDeletePermanently = true
     var openInApp: ((String) -> Void)?
     var ownAppVendor: String? { "app.marfa-mac" }
+    /// The sign-in whose folder copies count as On This Mac. Nil leaves Folders as one list.
+    var folderSignInID: String?
 
     var webSignInReturn: String { "com.withmarfa.marfa.test:/signed-in" }
     /// What the web sign-in sheet answers, and the addresses it was shown.
@@ -51,6 +53,10 @@ import Testing
     var markSets = [MarfaMarkSet(id: "lucide", title: "Lucide")]
     /// The icon of each type a render names, by type id.
     var typeIcons: [String: String] = ["core.bookmark": "lucide:bookmark", "core.note": "lucide:file-text"]
+    /// How many items a type holds of its own, before its kinds are added.
+    var typeCounts: [String: Int] = [:]
+    /// A type's plural where the server's list does not give one.
+    var typePlurals: [String: String] = [:]
 
     init(settings: InstanceSettingsModel) {
         instanceSettings = settings
@@ -85,8 +91,8 @@ import Testing
     func typeMark(for pattern: String) -> AnyView { AnyView(TypeTile(icon: typeIcons[pattern], size: .side)) }
     var typeCalls: any TypeCalls = FakeTypeCalls()
     func largeTypeMark(for id: String) -> AnyView { AnyView(TypeTile(icon: typeIcons[id], size: .large)) }
-    func itemCount(ofType id: String) -> Int { 0 }
-    func typePlural(of id: String) -> String? { nil }
+    func itemCount(ofType id: String) -> Int { typeCounts[id] ?? 0 }
+    func typePlural(of id: String) -> String? { typePlurals[id] }
     func typeIcon(of id: String) -> String? { typeIcons[id] }
     func changeTypeIcon(_ icon: String?, ofType id: String) async -> OwnerFailure? {
         typeIcons[id] = icon
@@ -131,6 +137,8 @@ struct RenderedWindow<Detail: View>: View {
     var sheet: AnyView?
     /// The number of problems on Account.
     var badge: Int?
+    /// A control in the strip that stands for the window toolbar. An offscreen window has no toolbar of its own.
+    var toolbar: AnyView?
     let detail: Detail
 
     var body: some View {
@@ -151,6 +159,7 @@ struct RenderedWindow<Detail: View>: View {
                     Image(systemName: "chevron.right").foregroundStyle(.tertiary)
                     Text(selection.title).font(.system(size: 13, weight: .semibold))
                     Spacer()
+                    if let toolbar { toolbar }
                 }
                 .padding(.horizontal, 18)
                 .frame(height: 52)
@@ -687,13 +696,13 @@ struct RenderedWindow<Detail: View>: View {
 
     func page(
         _ page: MarfaSettingsPage, _ host: StubMarfaHost, subpage: SettingsSubpage? = nil, sheet: AnyView? = nil, size: CGSize = Self.size,
-        named: String
+        named: String, appearance: ColorScheme = SettingsRender.isDark ? .dark : .light, toolbar: AnyView? = nil
     ) async throws {
         try await SettingsRender.png(
             RenderedWindow(
-                selection: .marfa(page), sheet: sheet,
+                selection: .marfa(page), sheet: sheet, toolbar: toolbar,
                 detail: MarfaSettingsPageView(page: page, host: host).environment(\.settingsSubpage, subpage)),
-            size: size, named: named, settle: .milliseconds(900))
+            size: size, named: named, appearance: appearance, settle: .milliseconds(900))
     }
 
     func context(_ host: StubMarfaHost) -> OwnerContext { OwnerContext(host: host) }
@@ -1037,5 +1046,330 @@ struct RenderedWindow<Detail: View>: View {
         let host = owner()
         (host.ownerCalls as? FakeOwnerCalls)?.fail("folders", with: .notPermitted(nil))
         try await page(.folders, host, named: "Folders, refused")
+    }
+
+    // MARK: Types, Plugins, Connectors and Folders
+
+    @Test(arguments: [ColorScheme.light, .dark])
+    func types(appearance: ColorScheme) async throws {
+        try await page(.types, castellTypes(), named: appearanceName("Types", appearance), appearance: appearance)
+    }
+
+    @Test func typesWithNoPluginOrAppTypes() async throws {
+        try await page(.types, castellTypes(plugins: false, apps: false), named: "Types, no plugin or app types")
+    }
+
+    @Test func typesWhenTheServerIsNotAnswering() async throws {
+        try await page(.types, unanswered(castellTypes()), named: "Types, the server is not answering")
+    }
+
+    @Test func typesWithoutSchemaWrite() async throws {
+        try await page(.types, blocked(castellTypes()), named: "Types, without schema.write")
+    }
+
+    @Test(arguments: [ColorScheme.light, .dark])
+    func plugins(appearance: ColorScheme) async throws {
+        try await page(.plugins, castellPlugins(), named: appearanceName("Plugins", appearance), appearance: appearance)
+    }
+
+    @Test func pluginsWithNoneInstalled() async throws {
+        try await page(.plugins, castellPlugins(installed: false), named: "Plugins, none installed")
+    }
+
+    @Test func pluginsWhenTheReleaseCannotBeRead() async throws {
+        try await page(.plugins, castellPlugins(releaseFails: true), named: "Plugins, the release can't be read")
+    }
+
+    @Test func pluginsWhenTheServerIsNotAnswering() async throws {
+        try await page(.plugins, unanswered(castellPlugins()), named: "Plugins, the server is not answering")
+    }
+
+    @Test func pluginsWithoutSchemaWrite() async throws {
+        try await page(.plugins, blocked(castellPlugins()), named: "Plugins, without schema.write")
+    }
+
+    @Test(arguments: [ColorScheme.light, .dark])
+    func connectors(appearance: ColorScheme) async throws {
+        try await page(
+            .connectors, castellConnectors(), named: appearanceName("Connectors", appearance), appearance: appearance,
+            toolbar: AnyView(SettingsButton("Add a Connector…") {}.disabled(true)))
+    }
+
+    @Test func connectorsWithNone() async throws {
+        try await page(
+            .connectors, castellConnectors(.none), named: "Connectors, none",
+            toolbar: AnyView(SettingsButton("Add a Connector…") {}.disabled(true)))
+    }
+
+    @Test func connectorsWithAFailedRunAndAQuietOne() async throws {
+        try await page(
+            .connectors, castellConnectors(.troubled), named: "Connectors, one failed and one quiet",
+            toolbar: AnyView(SettingsButton("Add a Connector…") {}.disabled(true)))
+    }
+
+    @Test func connectorsWhenTheServerIsNotAnswering() async throws {
+        try await page(.connectors, unanswered(castellConnectors()), named: "Connectors, the server is not answering")
+    }
+
+    @Test func connectorsWithoutConnectorsManage() async throws {
+        try await page(.connectors, blocked(castellConnectors()), named: "Connectors, without connectors.manage")
+    }
+
+    @Test(arguments: [ColorScheme.light, .dark])
+    func foldersOnThisMac(appearance: ColorScheme) async throws {
+        try await page(.folders, foldersSplitBySignIn(), named: appearanceName("Folders, on this Mac", appearance), appearance: appearance)
+    }
+
+    @Test func foldersWithNone() async throws {
+        let host = owner()
+        (host.ownerCalls as? FakeOwnerCalls)?.state.withLock {
+            $0.folders = []
+            $0.reports = [:]
+        }
+        host.folderCalls = FakeFolderCalls()
+        try await page(.folders, host, named: "Folders, none")
+    }
+
+    @Test func foldersWhenTheServerIsNotAnswering() async throws {
+        try await page(.folders, unanswered(owner()), named: "Folders, the server is not answering")
+    }
+
+    private func appearanceName(_ name: String, _ appearance: ColorScheme) -> String {
+        appearance == .dark ? "\(name), dark" : name
+    }
+
+    private func unanswered(_ host: StubMarfaHost) -> StubMarfaHost {
+        host.connection = .notAnswering(lastAnswered: .now.addingTimeInterval(-600))
+        return host
+    }
+
+    private func blocked(_ host: StubMarfaHost) -> StubMarfaHost {
+        host.grants = []
+        return host
+    }
+
+    private func listedType(
+        _ id: String, _ label: String, plural: String, parent: String? = nil, origin: MarfaMac.TypeOrigin = .registered,
+        plugin: String? = nil, creator: TypeCreator? = nil
+    ) -> TypeRecord {
+        TypeRecord(
+            id: id, label: label, plural: plural, parent: parent, origin: origin,
+            plugin: plugin.map { TypeRecord.PluginOrigin(name: $0, version: "1.0") }, creator: creator, fields: [:])
+    }
+
+    private func linkType(_ id: String, _ label: String) -> OwnerLinkType {
+        OwnerLinkType(
+            id: id, label: label, reverseLabel: label, description: nil, cardinality: .manyToMany, fromTypes: ["*"], toTypes: ["*"],
+            shipped: true, plugin: nil, reverseName: nil)
+    }
+
+    /// Castell Studio's types: built in, from plugins, the owner's, and one from Raycast, plus a name too long for the column.
+    private func castellTypes(plugins: Bool = true, apps: Bool = true) -> StubMarfaHost {
+        let calls = FakeTypeCalls()
+        let long = String(repeating: "Extraordinary ", count: 8) + "Specification"
+        var types = [
+            listedType("core.bookmark", "Bookmark", plural: "Bookmarks", origin: .platform),
+            listedType("core.note", "Note", plural: "Notes", origin: .platform),
+            listedType("core.task", "Task", plural: "Tasks", origin: .platform),
+            listedType("user.project", "Project", plural: "Projects"),
+            listedType("user.job", "Job", plural: "Jobs", parent: "user.project"),
+            listedType("user.specification", long, plural: long, parent: "user.project"),
+        ]
+        if plugins {
+            types += [
+                listedType("rss.entry", "RSS Entry", plural: "RSS Entries", parent: "core.bookmark", origin: .plugin, plugin: "rss"),
+                listedType("github.issue", "GitHub Issue", plural: "GitHub Issues", parent: "core.task", origin: .plugin, plugin: "github"),
+                listedType("user.bug", "Bug", plural: "Bugs", parent: "core.task"),
+            ]
+        }
+        if apps {
+            types.append(listedType(
+                "app.raycast.snippets", "Snippet", plural: "Snippets",
+                creator: TypeCreator(kind: .app, id: "raycast", name: "Raycast")))
+        }
+        calls.state.withLock {
+            $0.types = types
+            $0.pluginTitles = ["rss": "RSS", "github": "GitHub", "tickets": "Tickets"]
+        }
+        let host = owner()
+        host.typeCalls = calls
+        host.typeCounts = [
+            "core.bookmark": 17, "rss.entry": 151, "core.note": 217, "core.task": 3, "github.issue": 35, "user.bug": 12,
+            "user.project": 9, "user.job": 18, "user.specification": 1, "app.raycast.snippets": 6,
+        ]
+        host.typeIcons["core.bookmark"] = "lucide:bookmark"
+        host.typeIcons["core.note"] = "lucide:file-text"
+        (host.ownerCalls as? FakeOwnerCalls)?.state.withLock {
+            $0.linkTypes = [linkType("parent", "Parent of"), linkType("collection", "In collection"), linkType("mentions", "Mentions")]
+        }
+        return host
+    }
+
+    private func installedPlugin(
+        _ name: String, _ title: String, version: String, types: [String], connector: Bool, description: String? = nil
+    ) -> InstalledPlugin {
+        InstalledPlugin(
+            name: name, title: title, description: description ?? "\(title) plugin", mark: "lucide:puzzlepiece", maker: "Marfa",
+            marfa: "0.0.90", version: version, types: types, edgeTypes: [],
+            connector: connector ? .init(source: name, sourceName: title) : nil, host: nil, fingerprint: "ff",
+            installedAt: nil, installedBy: nil)
+    }
+
+    private func releasePlugin(_ name: String, _ title: String, version: String, description: String) -> ReleasePlugin {
+        ReleasePlugin(
+            name: name, title: title, description: description, mark: "lucide:puzzlepiece", maker: "Marfa",
+            marfa: PluginVersion(major: 0, minor: 0, patch: 90), version: PluginVersion(version)!, sha256: String(repeating: "a", count: 64))
+    }
+
+    private func castellPlugins(installed: Bool = true, releaseFails: Bool = false) -> StubMarfaHost {
+        let calls = FakePluginCalls()
+        let github = releasePlugin("github", "GitHub", version: "2.4.0", description: "Fixes and small changes.")
+        let held = [
+            installedPlugin(
+                "github", "GitHub", version: "2.3.0", types: ["github.issue"] + (0..<9).map { "github.extra\($0)" }, connector: true),
+            installedPlugin(
+                "readwise", "Readwise", version: "1.4", types: ["readwise.highlight", "readwise.source", "readwise.file"], connector: true),
+            installedPlugin("rss", "RSS", version: "1.1", types: ["rss.entry", "rss.picture"], connector: true),
+        ]
+        let available = [
+            github,
+            releasePlugin(
+                "google-calendar", "Google Calendar", version: "1.0.0", description: "A connector, and Google Calendars and Events."),
+            releasePlugin("todoist", "Todoist", version: "1.2.0", description: "A connector, and Todoist Tasks."),
+        ]
+        let bundle = ReleaseBundle(plugin: github, bytes: Data("{}".utf8), types: [], edgeTypes: [], connector: nil)
+        calls.state.withLock { state in
+            if installed {
+                state.installed = held
+                state.typeInfo = [
+                    "github.issue": PluginTypeInfo(label: "Issue", plural: "GitHub Issues", parent: nil),
+                    "readwise.highlight": PluginTypeInfo(label: "Highlight", plural: "Readwise Highlights", parent: nil),
+                    "readwise.source": PluginTypeInfo(label: "Source", plural: "Sources", parent: nil),
+                    "readwise.file": PluginTypeInfo(label: "File", plural: "Files", parent: nil),
+                    "rss.entry": PluginTypeInfo(label: "Entry", plural: "RSS Entries", parent: nil),
+                    "rss.picture": PluginTypeInfo(label: "Picture", plural: "Pictures", parent: nil),
+                ]
+            }
+            if releaseFails {
+                state.releaseFailure = .releaseUnreadable("offline")
+            } else {
+                state.release = available
+                state.bundles["github"] = bundle
+            }
+        }
+        let host = owner()
+        host.pluginCalls = calls
+        return host
+    }
+
+    private enum ConnectorPicture { case ran, none, troubled }
+
+    private func connectorSummary(_ name: String, _ title: String, _ description: String, host: String) -> PluginConnectorSummary {
+        PluginConnectorSummary(
+            name: name, title: title, description: description, mark: "lucide:arrow.triangle.2.circlepath", source: name, version: "1.0.0",
+            hostID: host, kinds: [ConnectorKind(name: "item", type: "\(name).item", direction: .into)], signIn: nil)
+    }
+
+    private func castellConnectors(_ picture: ConnectorPicture = .ran) -> StubMarfaHost {
+        let host = owner()
+        let now = Date.now
+        let settings = ConnectorSettingsReading(settings: [], missing: [])
+        let plugins: [PluginConnectorSummary]
+        let controls: [String: ConnectorControl]
+        let registrations: [String: ConnectorRegistration]
+        let hosts: [ConnectorHostInfo]
+        switch picture {
+        case .none:
+            plugins = []
+            controls = [:]
+            registrations = [:]
+            hosts = []
+        case .ran:
+            let placed: [(name: String, title: String, description: String, host: String, ago: TimeInterval)] = [
+                ("github", "GitHub", "Brings in your GitHub issues.", "studio", 7_200),
+                ("readwise", "Readwise", "Brings in your Readwise highlights.", "mini", 7_200),
+                ("rss", "RSS", "Brings in new posts from your feeds.", "mini", 3_600),
+            ]
+            plugins = placed.map { connectorSummary($0.name, $0.title, $0.description, host: $0.host) }
+            controls = Dictionary(uniqueKeysWithValues: placed.map { plugin in
+                (plugin.name, ConnectorControl(host: plugin.host, registration: plugin.name, paused: false, runRequested: nil))
+            })
+            registrations = Dictionary(uniqueKeysWithValues: placed.map { plugin in
+                let finished = now.addingTimeInterval(-plugin.ago)
+                return (plugin.name, ConnectorRegistration(
+                    lastHeartbeat: now.addingTimeInterval(-30),
+                    lastRun: ConnectorRunInfo(succeeded: true, started: finished, finished: finished, summary: nil), problems: []))
+            })
+            hosts = [
+                ConnectorHostInfo(id: "studio", name: "Studio server", lastSeen: now.addingTimeInterval(-30), linked: true),
+                ConnectorHostInfo(id: "mini", name: "Mac mini", lastSeen: now.addingTimeInterval(-30), linked: true),
+            ]
+        case .troubled:
+            let failedAt = now.addingTimeInterval(-600)
+            let quietAt = now.addingTimeInterval(-7_200)
+            plugins = [
+                connectorSummary("github", "GitHub", "Brings in your GitHub issues.", host: "studio"),
+                connectorSummary("readwise", "Readwise", "Brings in your Readwise highlights.", host: "mini"),
+            ]
+            controls = [
+                "github": ConnectorControl(host: "studio", registration: "github", paused: false, runRequested: nil),
+                "readwise": ConnectorControl(host: "mini", registration: "readwise", paused: false, runRequested: nil),
+            ]
+            registrations = [
+                "github": ConnectorRegistration(
+                    lastHeartbeat: now.addingTimeInterval(-30),
+                    lastRun: ConnectorRunInfo(succeeded: false, started: failedAt, finished: failedAt, summary: nil), problems: []),
+                "readwise": ConnectorRegistration(
+                    lastHeartbeat: quietAt, lastRun: ConnectorRunInfo(succeeded: true, started: quietAt, finished: quietAt, summary: nil),
+                    problems: []),
+            ]
+            hosts = [
+                ConnectorHostInfo(id: "studio", name: "Studio server", lastSeen: now.addingTimeInterval(-30), linked: true),
+                ConnectorHostInfo(id: "mini", name: "Mac mini", lastSeen: quietAt, linked: true),
+            ]
+        }
+        (host.ownerCalls as? FakeOwnerCalls)?.state.withLock { state in
+            state.connectorPlugins = plugins
+            state.connectorControls = controls
+            state.connectorRegistrations = registrations
+            state.connectorHosts = hosts
+            for plugin in plugins { state.connectorSettings[plugin.name] = settings }
+        }
+        return host
+    }
+
+    private func folderCopy(_ id: String, signInID: String, removals: Int = 0, problems: [FolderProblem] = []) -> FolderCopy {
+        var copy = FolderCopy(
+            id: id, signIn: signInID == "this" ? "Marfa for Mac" : "marfa on Mac mini", pendingUploads: 0, pendingDownloads: 0,
+            pausedRemovals: removals, firstSyncWaiting: false, problems: problems, ageSeconds: 60)
+        copy.signInID = signInID
+        return copy
+    }
+
+    /// The board's two sections. This app has no folder path and does not sync folders, so the rows carry no path.
+    private func foldersSplitBySignIn() -> StubMarfaHost {
+        let host = owner()
+        host.folderSignInID = "this"
+        host.typePlurals = ["core.note": "Notes", "core.file": "Files", "core.person": "People"]
+        let folders = [
+            OwnerFolder(id: "f1", title: "Studio Notes"), OwnerFolder(id: "f2", title: "Client Drawings"),
+            OwnerFolder(id: "f3", title: "Reading"), OwnerFolder(id: "f4", title: "Contacts"),
+        ]
+        let reports = [
+            "f1": FolderReport(copies: [folderCopy("c1", signInID: "this")]),
+            "f2": FolderReport(copies: [folderCopy("c2", signInID: "this", problems: [FolderProblem(code: .paused, count: 1)])]),
+            "f3": FolderReport(copies: [folderCopy("c3", signInID: "this", removals: 12)]),
+            "f4": FolderReport(copies: [folderCopy("c4", signInID: "other")]),
+        ]
+        (host.ownerCalls as? FakeOwnerCalls)?.state.withLock { state in
+            state.folders = folders
+            state.reports = reports
+        }
+        host.folderCalls = FakeFolderCalls(
+            FakeFolderCalls.folder("f1", "Studio Notes", types: ["core.note"]),
+            FakeFolderCalls.folder("f2", "Client Drawings", types: ["core.file"]),
+            FakeFolderCalls.folder("f3", "Reading", types: ["core.note"]),
+            FakeFolderCalls.folder("f4", "Contacts", types: ["core.person"]))
+        return host
     }
 }
