@@ -57,6 +57,7 @@ The first that fits wins, so the order is the rule: Quote, Place, Person, Media,
 - **The type shows only where the list mixes types** and is not grouped by type.
 - **A row shows two facts, and a count of the rest.** A fact with no value is skipped.
 - **A row's picture comes from the item's own file, its first embed or an attached image**, never from a web address, because drawing a list must load nothing from a website. Its frame stays when no picture can be made, so a row never changes height.
+- **A row's picture stays inside its row,** beside the text, in lists and in Settings' density preview.
 - **A card without a picture shows its opening lines**, and its Secondary line then leaves them out.
 - **A board's card leaves out the field its lanes are grouped by.**
 - **Two densities:** Standard, and Compact, which is one line. The view's or place's own choice wins, then the setting. A search result is always Standard, because its excerpt says why it matched.

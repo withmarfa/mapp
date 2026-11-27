@@ -121,7 +121,7 @@ struct ItemList: View, Equatable {
                     fold: browser.listShape?.arranged == true ? { browser.toggleGroup($0, in: library) } : nil, nest: nest, order: order)
                 .selectionDisabled(line.itemID == nil)
                 .listRowSeparator(line.itemID == nil ? .hidden : .automatic, edges: .top)
-                .listRowSeparator(line.endsSection || line.drawsMore != nil ? .hidden : .automatic, edges: .bottom)
+                .listRowSeparator(line.isHeading || line.endsSection || line.drawsMore != nil ? .hidden : .automatic, edges: .bottom)
                 if let run = line.drawsMore {
                     row.onAppear { browser.drawMoreOfList(after: run) }
                 } else if (nest?.depth ?? 0) > 0 {
@@ -217,15 +217,18 @@ private struct ListLineRow: View {
 }
 
 extension View {
-    /// A list row under its parent: stood in by its depth, with the chevron of a parent before it (`SubItemDisclosure`).
-    /// How many sub-items are done is the type's look's to say, as a progress count, as on a card.
+    /// A list row under its parent: stood in by its depth, with the chevron of a parent before it (`SubItemDisclosure`),
+    /// inside the row's own space, so that it is inside the card and takes a click. How many sub-items are done is the
+    /// type's look's to say, as a progress count, as on a card.
     @ViewBuilder fileprivate func nested(_ nest: ItemNesting.Place?, toggle: @escaping () -> Void) -> some View {
         if let nest {
             HStack(spacing: SubItemDisclosure.gap) {
                 SubItemDisclosure(place: nest, toggle: toggle)
                 self
             }
-            .padding(.leading, CGFloat(nest.depth) * SubItemDisclosure.indent - SubItemDisclosure.width - SubItemDisclosure.gap)
+            .padding(.leading, CGFloat(nest.depth) * SubItemDisclosure.indent)
+            // The line under a row starts at its parents' titles, not at its own: every depth's line starts at one inset.
+            .alignmentGuide(.listRowSeparatorLeading) { _ in SubItemDisclosure.width + SubItemDisclosure.gap }
         } else {
             self
         }

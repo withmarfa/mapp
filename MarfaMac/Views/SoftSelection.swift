@@ -146,6 +146,8 @@ struct SoftSelection: NSViewRepresentable {
         private let hoverMark: CALayer?
         private var pointerIsOver = false
         private var placedHover: (frame: NSRect?, color: CGColor)?
+        /// The separators hidden beside the hovered row, which AppKit hides beside a chosen row but leaves beside any other.
+        private var hiddenSeparators: [Weak<NSView>] = []
         /// The rows the pointer gets no mark on. SwiftUI's table answers nothing to `shouldSelectRow` for a row it will
         /// not select, so the lists name their headings themselves.
         var inert: Set<Int> = [] {
@@ -222,6 +224,8 @@ struct SoftSelection: NSViewRepresentable {
         }
 
         func detach() {
+            hiddenSeparators.forEach { $0.object?.isHidden = false }
+            hiddenSeparators.removeAll()
             observers.forEach(NotificationCenter.default.removeObserver)
             observers.removeAll()
             followed.values.forEach { NotificationCenter.default.removeObserver($0.observer) }
@@ -277,6 +281,7 @@ struct SoftSelection: NSViewRepresentable {
             lastHover = (row, appearance)
             if row >= 0, table.isRowSelected(row) || table.rowView(atRow: row, makeIfNecessary: false)?.isSelected == true { row = -1 }
             if inert.contains(row) { row = -1 }
+            hideSeparators(besideRow: row)
             let frame = row >= 0 ? Self.rect(ofRow: row, in: table) : nil
             let color = SelectionLooks.layerColor(SelectionLooks.hoverOpacity, in: effectiveAppearance)
             if let placedHover, placedHover.frame == frame, placedHover.color == color { return }
@@ -289,6 +294,30 @@ struct SoftSelection: NSViewRepresentable {
                 hoverMark.backgroundColor = color
             }
             CATransaction.commit()
+        }
+
+        /// Hides the lines under the row at `row` and above it, so that no line runs along the edge of the hovered mark, as
+        /// none does along a chosen one. Every other row's line is shown again, which also covers a row view the table
+        /// has reused for another row since. A row view's separator is a subview of its own that the system makes, found
+        /// by its class's name; where there is none, the lines stay.
+        private func hideSeparators(besideRow row: Int) {
+            var hidden: [NSView] = []
+            if row >= 0, let table {
+                for index in [row - 1, row] where index >= 0 {
+                    if let separator = table.rowView(atRow: index, makeIfNecessary: false)?.subviews.first(where: Self.isSeparator) {
+                        hidden.append(separator)
+                    }
+                }
+            }
+            for entry in hiddenSeparators {
+                if let view = entry.object, !hidden.contains(where: { $0 === view }) { view.isHidden = false }
+            }
+            hidden.forEach { $0.isHidden = true }
+            hiddenSeparators = hidden.map(Weak.init)
+        }
+
+        private static func isSeparator(_ view: NSView) -> Bool {
+            NSStringFromClass(type(of: view)).hasSuffix("SeparatorDrawingView")
         }
 
         /// Whether the view at a point in the window, as a click there would find it, is the table or inside it.
