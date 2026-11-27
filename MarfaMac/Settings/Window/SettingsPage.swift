@@ -111,7 +111,7 @@ nonisolated enum SettingsPage: CaseIterable, Hashable, Sendable {
                 String(localized: "New items are"), String(localized: "New item opens as"), String(localized: "Say today and yesterday"),
                 String(localized: "Week starts on"), String(localized: "Date format"), String(localized: "Time format"),
                 String(localized: "Load pictures from websites"), String(localized: "Send error reports"),
-                String(localized: "Marfa for Mac"), String(localized: "Check for Updates"), String(localized: "Check automatically"),
+                String(localized: "Marfa"), String(localized: "Version"), String(localized: "Check for Updates"), String(localized: "Check automatically"),
                 String(localized: "Try beta versions"), String(localized: "Kept in this Marfa"), String(localized: "Export settings"),
                 String(localized: "Import settings"), String(localized: "Restore earlier settings"), String(localized: "Reset settings"),
             ]

@@ -28,6 +28,7 @@ struct GeneralPage: View {
 
     var body: some View {
         SettingsPageColumn {
+            header
             opening
             newItems
             dates
@@ -50,6 +51,21 @@ struct GeneralPage: View {
             Button("Remove", role: .destructive) { removeKeptSettings() }
         } message: {
             Text(keptSettings.removeMessage)
+        }
+    }
+
+    // MARK: Header
+
+    /// The app's name and version, with Check for Updates where the build updates itself.
+    private var header: some View {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+        return SettingsPageHeader(name: String(localized: "Marfa"), line: String(localized: "Version \(version)")) {
+            if let updater {
+                Button("Check for Updates") { updater.checkForUpdates() }
+                    .settingsHeaderAction()
+                    .disabled(!updater.canCheckForUpdates)
+                    .accessibilityIdentifier("CheckForUpdates")
+            }
         }
     }
 
@@ -202,11 +218,7 @@ struct GeneralPage: View {
     /// Shown only in a build that updates itself.
     @ViewBuilder private var updates: some View {
         if let updater {
-            SettingsSection("Marfa for Mac") {
-                SettingsRow(title: Text("Marfa for Mac \(updater.version)"), line: updater.checkSummary.map { Text(verbatim: $0) }, lines: nil) {
-                    SettingsButton("Check for Updates") { updater.checkForUpdates() }
-                        .disabled(!updater.canCheckForUpdates)
-                }
+            SettingsSection(name: Text("Updates"), footer: updater.checkSummary.map { Text(verbatim: $0) }) {
                 SettingsRow("Check automatically") {
                     SettingsToggle(
                         title: "Check automatically",

@@ -10,7 +10,7 @@ nonisolated enum UpdateSettings {
     static let publicKeyKey = "SUPublicEDKey"
     /// Sparkle's own switch for looking by itself, which it keeps in the defaults under this name.
     static let automaticChecksKey = "SUEnableAutomaticChecks"
-    /// Settings > General > Marfa for Mac > Try beta versions. Stays on this Mac.
+    /// Settings > General > Updates > Try beta versions. Stays on this Mac.
     static let betaKey = "betaVersions"
     /// The channel a release candidate's appcast item is in.
     static let betaChannel = "beta"
@@ -39,7 +39,6 @@ final class AppUpdater {
     var checksAutomatically: Bool {
         didSet { controller.updater.automaticallyChecksForUpdates = checksAutomatically }
     }
-    var version: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "" }
     private var availableVersion: String?
     private var isUpToDate = false
 

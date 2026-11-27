@@ -282,10 +282,11 @@ enum SettingsWording {
     }
 }
 
-/// A page heading with its address and actions at the trailing edge, without a card.
+/// A page heading with one line under it and the page's one key action at the trailing edge, without a card. Account leads
+/// with the Marfa's name and has Sign Out; General leads with Marfa and its version and has Check for Updates.
 struct SettingsPageHeader<Trailing: View>: View {
     let name: String
-    let address: String
+    let line: String
     @ViewBuilder let trailing: Trailing
 
     var body: some View {
@@ -295,7 +296,7 @@ struct SettingsPageHeader<Trailing: View>: View {
                     .settingsFont(.pageHeader)
                     .frame(minHeight: SettingsTokens.Metric.pageHeaderNameHeight)
                     .accessibilityAddTraits(.isHeader)
-                Text(verbatim: address).withSettingsGlyph(.link)
+                Text(verbatim: line)
                     .settingsFont(.title)
                     .frame(minHeight: SettingsTokens.Metric.pageHeaderAddressHeight)
                     .foregroundStyle(SettingsTokens.secondaryText)
@@ -306,5 +307,13 @@ struct SettingsPageHeader<Trailing: View>: View {
         }
         .padding(.horizontal, SettingsTokens.Metric.inset)
         .padding(.top, SettingsTokens.Metric.pageHeaderTop)
+    }
+}
+
+extension View {
+    /// A page header's key action: the system's bordered capsule at the large size, 28 points tall, so it reads as larger
+    /// than the buttons in a row.
+    func settingsHeaderAction() -> some View {
+        buttonStyle(.bordered).buttonBorderShape(.capsule).controlSize(.large)
     }
 }
