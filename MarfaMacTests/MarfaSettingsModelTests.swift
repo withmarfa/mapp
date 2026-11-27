@@ -281,6 +281,25 @@ import Testing
         #expect(bench.hasCopy(first))
     }
 
+    @Test func signingOutStillAsksAfterTheLastReportedWriteWasSent() async throws {
+        let bench = HostBench()
+        let (model, flushed) = model(bench)
+        await connect(model)
+        let source = try #require(bench.servers.last)
+        source.report.set(SyncReport(waiting: 1, queueRead: true))
+        source.unsentCount.withLock { $0 = 0 }
+        try #require(await eventually { model.host.waitingChanges == 1 })
+        let before = flushed.count
+
+        model.requestDisconnect()
+        try #require(await eventually { model.isConfirmingDisconnect })
+        #expect(model.departure == nil)
+        #expect(flushed.count == before)
+        #expect(model.isConnected)
+        #expect(bench.hasCopy(first))
+        #expect(try bench.signIns.key(for: first.address) == "key-1")
+    }
+
     @Test func keepingTheCopyLeavesItOnDiskForTheSameServerToResume() async throws {
         let bench = HostBench()
         let (model, _) = model(bench)
@@ -471,7 +490,7 @@ import Testing
         await model.disconnect()
         #expect(!model.isConnected)
         #expect(bench.savedAddress == nil)
-        #expect(model.notice?.title == "Disconnected, but This App May Still Be Approved")
+        #expect(model.notice?.title == "Signed Out, but This App May Still Be Approved")
     }
 
     /// A sign-out that waits on a server that does not answer holds the step for up to a minute: the person is shown
