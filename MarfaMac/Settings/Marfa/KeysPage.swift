@@ -258,6 +258,14 @@ struct KeySheet: View {
 private struct NewKeySheet: View {
     @Bindable var model: KeysModel
 
+    @State private var isEditingAccess: Bool
+    @State private var showsSourceOptions = false
+
+    init(model: KeysModel) {
+        self.model = model
+        _isEditingAccess = State(initialValue: !model.draft.exceptions.isEmpty || !model.draft.permissions.isEmpty || model.isChoosingPermissions)
+    }
+
     private static let expiries: [KeysModel.Expiry] = [.days(7), .days(30), .days(90), .days(365), .never]
 
     private func title(_ expiry: KeysModel.Expiry) -> String {
@@ -273,94 +281,176 @@ private struct NewKeySheet: View {
         model.typeNames.filter { model.draft.exceptions[$0.key] == nil }.map { (id: $0.key, name: $0.value) }.sorted { $0.name < $1.name }
     }
 
-    private var permissionCount: String {
-        model.draft.permissions.isEmpty
-            ? String(localized: "None yet.") : OwnerWording.permissionCount(model.draft.permissions.count, of: model.givablePermissions.count)
+    private var unavailablePermissions: Set<String> {
+        model.draft.permissions.subtracting(model.givablePermissions)
+    }
+
+    private var permissionSummary: String {
+        let operations = model.draft.permissions.sorted().map { permission in
+            switch InstancePermission(rawValue: permission) {
+            case .itemsPurge: String(localized: "permanently delete trashed items")
+            case .instanceMaintain: String(localized: "update and maintain the server")
+            default: OwnerWording.title(of: permission).localizedLowercase
+            }
+        }
+        guard !operations.isEmpty else { return String(localized: "None") }
+        let list = operations.formatted(.list(type: .and))
+        let sentence = String(list.prefix(1)).localizedUppercase + list.dropFirst()
+        return String(localized: "\(sentence).")
     }
 
     var body: some View {
-        if model.isChoosingPermissions {
-            permissionsPage
-        } else {
-            fieldsPage
+        Group {
+            if model.isChoosingPermissions {
+                permissionsPage
+            } else {
+                fieldsPage
+            }
+        }
+        .onChange(of: model.sourceError, initial: true) {
+            if model.sourceError != nil { showsSourceOptions = true }
         }
     }
 
     private var fieldsPage: some View {
-        SettingsSheet(
-            title: Text("New Key"), line: Text("A key can only be narrowed later, so choose what it needs now."), isWide: true
-        ) {
+        SettingsSheet(title: Text("New Key"), isWide: true) {
             VStack(alignment: .leading, spacing: SettingsTokens.Metric.sheetFormGap) {
                 SettingsSheetField(label: "Name", error: model.draftError) {
                     SettingsField(title: "Name", text: Binding { model.draft.name } set: { name in
                         if model.draft.source == KeysModel.source(from: model.draft.name) { model.draft.source = KeysModel.source(from: name) }
                         model.draft.name = name
+                        if model.draft.source.isEmpty, !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            showsSourceOptions = true
+                        }
                     }, isError: model.draftError != nil, width: nil)
                 }
-                SettingsSheetField(label: "Source, Stamped on What It Writes", error: model.sourceError) {
-                    SettingsField(title: "Source", text: $model.draft.source, isError: model.sourceError != nil, isMonospaced: true, width: nil)
-                }
-                SettingsSection("Key") {
+                if showsSourceOptions { sourceOptions }
+                accessSection
+                SettingsSection(name: nil) {
                     SettingsRow("Expires") {
                         SettingsPopUp(title: "Expires", selection: $model.draft.expires) {
                             ForEach(Self.expiries, id: \.self) { Text(verbatim: title($0)).tag($0) }
                         }
                     }
-                    SettingsRow("New Items Go To") {
-                        SettingsPopUp(title: "New Items Go To", selection: $model.draft.tier) {
-                            ForEach(KeyTier.allCases, id: \.self) { Text(verbatim: $0.title).tag($0) }
-                        }
-                    }
                 }
-                SettingsSection("Access") {
-                    SettingsRow("Every Type", lead: .symbol("tray.full")) {
-                        SettingsPopUp(title: "Every Type", selection: $model.draft.everyType) {
-                            ForEach(AccessLevel.allCases.reversed(), id: \.self) { Text(verbatim: $0.title).tag($0) }
-                        }
-                    }
-                    ForEach(exceptionPatterns, id: \.self) { pattern in
-                        SettingsRow(verbatim: AccessScopes.title(of: pattern, names: model.typeNames), lead: .symbol("tray")) {
-                            HStack(spacing: SettingsTokens.Metric.buttonGap) {
-                                SettingsPopUp(title: "Access", selection: Binding { model.draft.exceptions[pattern] ?? .read } set: { model.draft.exceptions[pattern] = $0 }) {
-                                    ForEach(AccessLevel.allCases.reversed(), id: \.self) { Text(verbatim: $0.title).tag($0) }
-                                }
-                                SettingsMoreMenu { Button("Remove", role: .destructive) { model.draft.exceptions[pattern] = nil } }
-                            }
-                        }
-                    }
-                    if !addable.isEmpty {
-                        SettingsAddMenu("Add an Exception…") {
-                            ForEach(addable, id: \.id) { type in
-                                Button(type.name) { model.draft.exceptions[type.id] = .read }
-                            }
-                        }
-                    }
-                }
-                if !model.givablePermissions.isEmpty {
-                    SettingsSection("Looking After This Marfa") {
-                        SettingsRow(title: Text("Owner’s Permissions"), line: Text(verbatim: permissionCount)) {
-                            SettingsButton("Choose…") { model.isChoosingPermissions = true }
-                        }
-                    }
-                }
-                Text("The source can’t change later.").settingsFont(.footer).foregroundStyle(SettingsTokens.secondaryText)
+                if isEditingAccess || !model.draft.permissions.isEmpty { permissionSection }
             }
+            .environment(\.settingsCompactControls, true)
+            .environment(\.settingsUsesSheetControls, false)
+        } leading: {
+            SettingsButton(showsSourceOptions ? "Hide Options" : "Source and Destination", small: true) {
+                showsSourceOptions.toggle()
+            }
+            .disabled(model.sourceError != nil)
+            .help("Set the source and where new items go.")
         } buttons: {
             SettingsButton("Cancel") { model.closeSheet() }
-            SettingsButton("Create Key", role: .confirm) { Task { await model.make() } }.disabled(!model.canMakeDraft)
+            SettingsButton("Create Key", role: .confirm) {
+                Task {
+                    guard unavailablePermissions.isEmpty else { return }
+                    await model.make()
+                }
+            }
+            .disabled(!model.canMakeDraft || !unavailablePermissions.isEmpty)
+        }
+    }
+
+    private var accessSection: some View {
+        SettingsSection("Access") {
+            SettingsButton(isEditingAccess ? "Finish Customizing" : "Customize Access", small: true) {
+                isEditingAccess.toggle()
+            }
+            .help("Choose type exceptions and owner permissions.")
+        } content: {
+            SettingsRow("Every type", lead: .symbol("tray.full")) {
+                SettingsPopUp(title: "Every type", selection: $model.draft.everyType) { accessLevels }
+            }
+            ForEach(exceptionPatterns, id: \.self) { pattern in
+                let name = AccessScopes.title(of: pattern, names: model.typeNames)
+                if let level = model.draft.exceptions[pattern] {
+                    SettingsRow(verbatim: name, lead: .symbol("tray")) {
+                        if isEditingAccess {
+                            HStack(spacing: SettingsTokens.Metric.buttonGap) {
+                                SettingsPopUp(verbatim: name, selection: Binding { model.draft.exceptions[pattern] ?? level } set: {
+                                    model.draft.exceptions[pattern] = $0
+                                }) {
+                                    accessLevels
+                                }
+                                SettingsMoreMenu { Button("Remove", role: .destructive) { model.draft.exceptions[pattern] = nil } }
+                                    .accessibilityLabel(Text("More actions for \(name)"))
+                            }
+                        } else {
+                            SettingsValue(verbatim: level.title)
+                        }
+                    }
+                }
+            }
+            if isEditingAccess, !addable.isEmpty {
+                SettingsAddMenu("Add an Exception…") {
+                    ForEach(addable, id: \.id) { type in
+                        Button(type.name) { model.draft.exceptions[type.id] = .read }
+                    }
+                }
+            }
+        }
+    }
+
+    private var accessLevels: some View {
+        ForEach(AccessLevel.allCases.reversed(), id: \.self) { level in
+            Text(verbatim: level.title).tag(level)
+        }
+    }
+
+    private var permissionSection: some View {
+        SettingsSection("Permissions") {
+            if model.givablePermissions.isEmpty && model.draft.permissions.isEmpty {
+                SettingsRow("Owner’s permissions", line: "This sign-in can’t grant owner permissions.", lead: .symbol("lock"), look: .off)
+            } else {
+                SettingsRow(title: Text("Owner’s permissions"), line: Text(verbatim: permissionSummary), lines: nil) {
+                    if isEditingAccess, !model.givablePermissions.isEmpty {
+                        SettingsButton("Choose…", small: true) { model.isChoosingPermissions = true }
+                    }
+                }
+            }
+            if !unavailablePermissions.isEmpty {
+                let names = unavailablePermissions.sorted().map { OwnerWording.title(of: $0) }.formatted(.list(type: .and))
+                SettingsRow(title: Text("Permissions no longer available"), line: Text(verbatim: names), lines: nil) {
+                    SettingsButton("Remove") { model.draft.permissions.subtract(unavailablePermissions) }
+                }
+            }
+        }
+    }
+
+    private var sourceOptions: some View {
+        VStack(alignment: .leading, spacing: SettingsTokens.Metric.sheetFormGap) {
+            SettingsSheetField(label: "Source", error: model.sourceError) {
+                SettingsField(title: "Source", text: $model.draft.source, isError: model.sourceError != nil, isMonospaced: true, width: nil)
+            }
+            SettingsSection(name: nil, footer: Text("The source is stamped on what the key writes and can’t change later.")) {
+                SettingsRow("New items go to") {
+                    SettingsPopUp(title: "New items go to", selection: $model.draft.tier) {
+                        ForEach(KeyTier.allCases, id: \.self) { Text(verbatim: $0.title).tag($0) }
+                    }
+                }
+            }
         }
     }
 
     /// The owner's permissions, a page of the sheet: one switch each, and Back to the fields with what was chosen kept.
     private var permissionsPage: some View {
         SettingsSheet(
-            title: Text("Look After This Marfa"), line: Text("The owner’s permissions. Most keys need none."), isWide: true
+            title: Text("Permissions"), line: Text("The owner’s permissions. Most keys need none."), isWide: true
         ) {
             SettingsSection(name: nil) {
                 ForEach(model.givablePermissions, id: \.self) { permission in
                     SettingsRow(verbatim: OwnerWording.title(of: permission), size: .compact) {
                         SettingsToggle(title: "Allowed", isOn: Binding { model.draft.permissions.contains(permission) } set: { on in
-                            if on { model.draft.permissions.insert(permission) } else { model.draft.permissions.remove(permission) }
+                            if on {
+                                guard model.givablePermissions.contains(permission) else { return }
+                                model.draft.permissions.insert(permission)
+                            } else {
+                                model.draft.permissions.remove(permission)
+                            }
                         })
                     }
                 }
