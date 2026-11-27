@@ -107,8 +107,8 @@ extension MarfaLibrary {
 
 extension MarfaSource {
     nonisolated struct TestHooks: Sendable {
-        /// Replaces the server lookup of which items hold these files' bytes. The URLs are the ones an add would
-        /// upload, symbolic links resolved. A throw is no answer for the whole batch.
+        /// Replaces the server lookup of which items hold these files' bytes. The URLs are the ones the caller
+        /// passed, which is the file an add would upload. A throw is no answer for the whole batch.
         let holdingBytes = TestHook<@Sendable ([URL]) async throws -> [Marfa.FileMatch]>()
     }
 }

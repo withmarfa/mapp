@@ -15,10 +15,10 @@ nonisolated enum ByteMatches {
             return .noAnswer
         }
         guard matches.count == files.count else { return .noAnswer }
-        var answers: [URL: FileMatchAnswer] = [:]
-        for (file, match) in zip(files, matches) {
+        var answers = Array(repeating: FileMatchAnswer.noAnswer, count: files.count)
+        for (index, match) in matches.enumerated() {
             guard case .held(_, let holders, let more) = match else { continue }
-            answers[file] = .answered(
+            answers[index] = .answered(
                 holders.map { FileMatch(id: ItemID($0.id), title: $0.title ?? "") }, more: more)
         }
         return FileMatches(answers)

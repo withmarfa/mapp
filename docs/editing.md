@@ -66,7 +66,7 @@ Every editor asks `Item.allows(_:)` for the `ItemChange` it writes (`ValueEditKi
 - **Files dropped on a list join the place in view** (`Browser.fileDropTarget`): a collection, the Feed, else the Library.
 - **A collection's row, card or sidebar row takes items and files** (`dropsInto`).
 - **A drop is one undo step and one toast;** Undo unlinks, then moves them to Recently Deleted.
-- **One duplicate alert covers the batch, including pasted images.** Open shows the matches Marfa returned and adds files with no reachable match. In Quick Add, those files stay in the draft. An unanswered lookup allows the add to proceed.
+- **One duplicate alert covers the batch, including pasted images.** Open shows the matches and adds each file whose match cannot be opened. In Quick Add, a file added while Open fetches stays in the draft. No answer still adds. A pasted image stays with the item that was open.
 
 ## Changing type
 

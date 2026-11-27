@@ -164,9 +164,12 @@ final class FakeItemLibrary: ItemLibrary {
     var arrivals: [ItemID: Item] = [:]
     /// Each item something asked to open, in order, held or not.
     private(set) var heldForOpening: [ItemID] = []
+    /// Runs after an item is asked for and before it is brought in, so a test can change the library mid-fetch.
+    var holding: ((ItemID) async -> Void)?
 
     func holdForOpening(_ id: ItemID) async -> Bool {
         heldForOpening.append(id)
+        await holding?(id)
         if item(id) != nil { return true }
         guard let arriving = arrivals[id] else { return false }
         items.append(arriving)

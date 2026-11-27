@@ -50,8 +50,8 @@ struct ByteMatchesTests {
         let second = disk.url("b.png")
         let answers = await opened.source.itemsWithSameBytes(as: [first, second])
         #expect(called.withLock { $0 })
-        #expect(answers[first] == .noAnswer)
-        #expect(answers[second] == .noAnswer)
+        #expect(answers[0] == .noAnswer)
+        #expect(answers[1] == .noAnswer)
         await close(opened)
     }
 
@@ -62,8 +62,8 @@ struct ByteMatchesTests {
         let match = held([("beach", "Beach Day")])
         opened.source.hooks.holdingBytes.set { _ in [.unreadable, match] }
         let answers = await opened.source.itemsWithSameBytes(as: [unreadable, found])
-        #expect(answers[unreadable] == .noAnswer)
-        #expect(answers[found] == .answered([item("beach", "Beach Day")], more: false))
+        #expect(answers[0] == .noAnswer)
+        #expect(answers[1] == .answered([item("beach", "Beach Day")], more: false))
         await close(opened)
     }
 
@@ -73,7 +73,7 @@ struct ByteMatchesTests {
         let match = held([])
         opened.source.hooks.holdingBytes.set { _ in [match] }
         let answers = await opened.source.itemsWithSameBytes(as: [file])
-        #expect(answers[file] == .answered([], more: false))
+        #expect(answers[0] == .answered([], more: false))
         await close(opened)
     }
 
@@ -84,8 +84,8 @@ struct ByteMatchesTests {
         let extra = held([("one", "One"), ("two", nil)], more: true)
         opened.source.hooks.holdingBytes.set { _ in [.notAFile, extra] }
         let answers = await opened.source.itemsWithSameBytes(as: [folder, photo])
-        #expect(answers[folder] == .noAnswer)
-        #expect(answers[photo] == .answered([item("one", "One"), item("two", "")], more: true))
+        #expect(answers[0] == .noAnswer)
+        #expect(answers[1] == .answered([item("one", "One"), item("two", "")], more: true))
         await close(opened)
     }
 
@@ -96,8 +96,19 @@ struct ByteMatchesTests {
         let match = held([("only", "Only")])
         opened.source.hooks.holdingBytes.set { _ in [match] }
         let answers = await opened.source.itemsWithSameBytes(as: [first, second])
-        #expect(answers[first] == .noAnswer)
-        #expect(answers[second] == .noAnswer)
+        #expect(answers[0] == .noAnswer)
+        #expect(answers[1] == .noAnswer)
+        await close(opened)
+    }
+
+    @Test func theSamePathTwiceKeepsEachAnswer() async {
+        let opened = opened()
+        let file = disk.url("a.png")
+        let match = held([("one", "One")])
+        opened.source.hooks.holdingBytes.set { _ in [match, .unreadable] }
+        let answers = await opened.source.itemsWithSameBytes(as: [file, file])
+        #expect(answers[0] == .answered([item("one", "One")], more: false))
+        #expect(answers[1] == .noAnswer)
         await close(opened)
     }
 
@@ -113,8 +124,9 @@ struct ByteMatchesTests {
             return [match]
         }
         let answers = await opened.source.itemsWithSameBytes(as: [link])
-        #expect(seen.withLock { $0 }.map(\.path) == [link.resolvingSymlinksInPath().path])
-        #expect(answers[link] == .answered([item("photo", "Photo")], more: false))
+        // The caller resolves a link once. This lookup is given that URL and does not resolve it again.
+        #expect(seen.withLock { $0 }.map(\.path) == [link.path])
+        #expect(answers[0] == .answered([item("photo", "Photo")], more: false))
         await close(opened)
     }
 
@@ -131,7 +143,7 @@ struct ByteMatchesTests {
         let started = ContinuousClock.now
         let answers = await opened.source.itemsWithSameBytes(as: [file])
         #expect(started.duration(to: .now) < .seconds(2))
-        #expect(answers[file] == .noAnswer)
+        #expect(answers[0] == .noAnswer)
         await close(opened)
     }
 
@@ -144,7 +156,7 @@ struct ByteMatchesTests {
         let started = ContinuousClock.now
         let answers = await opened.source.itemsWithSameBytes(as: [file])
         #expect(started.duration(to: .now) < .seconds(2))
-        #expect(answers[file] == .noAnswer)
+        #expect(answers[0] == .noAnswer)
         await close(opened)
     }
 
@@ -162,7 +174,7 @@ struct ByteMatchesTests {
         let answers = await library.itemsWithSameBytes(as: [file])
         #expect(started.duration(to: .now) < .seconds(2))
         #expect(asked.withLock { $0 } == false)
-        #expect(answers[file] == .noAnswer)
+        #expect(answers[0] == .noAnswer)
         await close(opened)
     }
 }

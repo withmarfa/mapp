@@ -34,22 +34,21 @@ extension Browser {
         QuickAdd.File.tellUnreadable(notRead, unreadable: unreadable, to: library.notices)
         let plan = await AlreadyInMarfa.check(files.map(\.url), in: library, asking: alreadyInMarfa)
         guard !plan.isCancelled else { return [] }
-        let reached = isShowing(library)
-            ? await AlreadyInMarfa.reachable(plan.open, in: library)
-            : (open: [ItemID](), missed: plan.open)
-        let adding = Set(plan.filesToAdd(missed: reached.missed))
-        let recovered = Set(plan.recoveredFiles(missed: reached.missed))
-        files.removeAll { !adding.contains($0.url) }
+        let opened = isShowing(library)
+            ? await AlreadyInMarfa.opening(plan.matched, in: library)
+            : AlreadyInMarfa.Opened(opened: [], fallback: plan.matched)
+        let fallback = Set(opened.fallback.map(\.index))
         var added: [ItemID] = []
         var unopened = 0
-        for file in files {
+        for index in plan.indicesToAdd(fallback: opened.fallback) {
+            let file = files[index]
             if let id = await library.addFile(file.url, title: nil, parentID: nil, tier: QuickAdd.startingTier(in: target.place), tags: []) {
                 added.append(id)
-                if recovered.contains(file.url) { unopened += 1 }
+                if fallback.contains(index) { unopened += 1 }
             }
         }
         guard !added.isEmpty else {
-            if isShowing(library) { showFound(reached.open, in: library, order: order) }
+            if isShowing(library) { showFound(opened.opened, in: library, order: order) }
             return []
         }
         // A drop is told, joined and given its Undo only for what the library holds: a source that has not shown an
@@ -71,13 +70,13 @@ extension Browser {
                 String(localized: "Drop Can’t Be Undone"),
                 String(localized: "\(added.count - held.count) of the \(added.count) files added have not reached the library yet, so this drop has no Undo."))
         }
-        let asked = files.count + notRead.count + unreadable
+        let asked = plan.indicesToAdd(fallback: opened.fallback).count + notRead.count + unreadable
         let leftOut = target.collection == nil ? 0 : added.count - (joined ? held.count : 0)
         say(addedMessage(
             added.count, of: asked, to: target.isOnCollection ? target.name : nil, leftOut: leftOut, from: target.name,
             unopened: unopened), symbol: "arrow.down.doc", step: step, toasts: toasts)
-        if !reached.open.isEmpty {
-            if isShowing(library) { showFound(reached.open, in: library, order: order) }
+        if !opened.opened.isEmpty {
+            if isShowing(library) { showFound(opened.opened, in: library, order: order) }
             return added
         }
         guard isShowing(library), shown.isSame(target.shown), let first = held.first else { return added }

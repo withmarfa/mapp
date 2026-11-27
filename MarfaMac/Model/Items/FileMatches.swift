@@ -16,16 +16,19 @@ nonisolated enum FileMatchAnswer: Hashable, Sendable {
     case noAnswer
 }
 
-/// The answers for a batch of files, by file. A file Marfa gave no answer for is `noAnswer`.
-nonisolated struct FileMatches: Sendable {
-    private var answers: [URL: FileMatchAnswer]
+/// The answers for a batch, one per file in the order asked. A position Marfa gave no answer for is `noAnswer`.
+/// The same path can be asked twice and get two answers, so a result is never stored by its URL.
+nonisolated struct FileMatches: Sendable, Equatable {
+    private var answers: [FileMatchAnswer]
 
-    init(_ answers: [URL: FileMatchAnswer]) {
-        self.answers = Dictionary(answers.map { ($0.key.standardizedFileURL, $0.value) }) { first, _ in first }
+    init(_ answers: [FileMatchAnswer]) {
+        self.answers = answers
     }
 
     /// No file answered, as where the library cannot ask or the check failed.
-    static let noAnswer = FileMatches([:])
+    static let noAnswer = FileMatches([])
 
-    subscript(file: URL) -> FileMatchAnswer { answers[file.standardizedFileURL] ?? .noAnswer }
+    subscript(position: Int) -> FileMatchAnswer {
+        answers.indices.contains(position) ? answers[position] : .noAnswer
+    }
 }

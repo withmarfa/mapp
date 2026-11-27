@@ -8,38 +8,53 @@ extension EditorController {
     /// Reports each image that could not be attached or placed in the text. Files and pasted bytes already in Marfa
     /// are asked about first (`AlreadyInMarfa`): Cancel attaches nothing, and Open attaches the rest and opens
     /// every item that matched. A match that cannot be opened is attached, and the person is told. A pasted
-    /// image is staged to a temporary file for the check, and that file is removed whatever the person chooses.
+    /// image is staged to a temporary file for the check. That copy is removed after Cancel, after Open skips it,
+    /// or once attaching it or saving it to Downloads has succeeded. The page moving on does not drop it: it is
+    /// still attached to the item that was open, and only the insertion into the text is skipped.
     @discardableResult
     func insertImages(_ sources: [PastedImages.Source], at point: CGPoint? = nil) -> Bool {
         guard isEditable, let pageItemID, let asked = library, !sources.isEmpty else { return false }
         let height = webView.bounds.height
+        let prepared: [(PastedImages.Source, ScopedChoice?)] = sources.map { source in
+            guard case .file(let url) = source else { return (source, nil) }
+            let held = ScopedChoice(url)
+            return (.file(held.resolved), held)
+        }
         Task {
-            let staged = Self.stageForChecking(sources)
-            defer { staged.remove() }
-            let plan = await AlreadyInMarfa.check(staged.urls, in: asked, asking: alreadyInMarfa)
-            guard !plan.isCancelled else { return }
-            let reached = await AlreadyInMarfa.reachable(plan.open, in: asked)
-            let adding = Set(plan.filesToAdd(missed: reached.missed))
-            let recovered = Set(plan.recoveredFiles(missed: reached.missed))
+            let held = prepared.compactMap(\.1)
+            defer { held.forEach { $0.close() } }
+            let staged = Self.stageForChecking(prepared.map(\.0))
+            #if DEBUG
+            let limit = AlreadyInMarfa.limitOverride.current ?? AlreadyInMarfa.limit
+            #else
+            let limit = AlreadyInMarfa.limit
+            #endif
+            let plan = await AlreadyInMarfa.check(staged.urls, in: asked, asking: alreadyInMarfa, within: limit)
+            guard !plan.isCancelled else {
+                await plan.lookup.ended()
+                staged.remove()
+                return
+            }
+            let reached = await AlreadyInMarfa.opening(plan.matched, in: asked)
+            let adding = Set(plan.indicesToAdd(fallback: reached.fallback))
+            let fallback = Set(reached.fallback.map(\.index))
             let chosen = staged.entries.filter { entry in
-                guard let url = entry.url else { return true }
-                return adding.contains(url)
+                guard let index = entry.checkIndex else { return true }
+                return adding.contains(index)
             }
             let recoveredNames = staged.entries.compactMap { entry -> String? in
-                guard let url = entry.url, recovered.contains(url) else { return nil }
+                guard let index = entry.checkIndex, fallback.contains(index) else { return nil }
                 return entry.name
             }
             // Opened only once the rest are placed, since opening an item takes the page from this one.
-            defer { openFound(reached.open) }
-            guard !chosen.isEmpty else { return }
-            guard self.pageItemID == pageItemID, isEditable else {
-                asked.notices.tell(
-                    String(localized: "Images Weren’t Attached"),
-                    String(localized: "The item was no longer open for editing, so nothing was attached. Add the images again."))
+            defer { openFound(reached.opened) }
+            guard !chosen.isEmpty else {
+                await plan.lookup.ended()
+                staged.remove()
                 return
             }
             let (files, skipped) = await PastedImages.read(chosen.map(\.source))
-            // The page may have moved on while the files were read. They still belong to the item that was open.
+            // The page may have moved on. The files still belong to the item that was open, and a refusal saves them.
             let report = files.isEmpty ? AttachReport() : await asked.attach(files, to: pageItemID)
             let placed = self.pageItemID == pageItemID && isEditable && acceptsInsertion
             let embeds = report.embeds
@@ -48,24 +63,54 @@ extension EditorController {
                 await !place(embeds.map { ["src": $0.link, "alt": $0.name] }, at: point, height: height, in: pageItemID) {
                 notPlaced = embeds.map(\.name)
             }
-            let failedNames = Set(report.failed.map(\.name))
-            let readNames = Set(files.map(\.name))
-            let told = recoveredNames.filter { readNames.contains($0) && !failedNames.contains($0) }
+            let embedded = Set(embeds.map(\.name))
+            let told = recoveredNames.filter { embedded.contains($0) }
             if !told.isEmpty { Self.tellUnopened(told, to: asked) }
             Self.reportUnplaced(
                 skipped: skipped, failed: report.failed, kept: report.kept, attached: embeds.count,
                 unplaced: placed ? [] : embeds.map(\.name), refused: notPlaced,
                 in: asked.item(pageItemID)?.title ?? "", to: asked
             )
+            await plan.lookup.ended()
+            staged.remove(keeping: Set(report.failed.map(\.name)))
         }
         return true
     }
 
-    /// A pasted image written beside the files, so the same check can read its bytes. Removed on every outcome.
+    /// Access to a file the person chose, held until its bytes have been hashed and read. The resolved file is the
+    /// one both of those use, so a symbolic link is not hashed as one file and read as another. It is not isolated
+    /// to the main actor, because releasing the file can happen as the value is destroyed.
+    private nonisolated final class ScopedChoice: @unchecked Sendable {
+        let resolved: URL
+        private let chosen: URL
+        private let scoped: Bool
+        private let lock = NSLock()
+        private var closed = false
+
+        init(_ chosen: URL) {
+            self.chosen = chosen
+            scoped = chosen.startAccessingSecurityScopedResource()
+            resolved = chosen.resolvingSymlinksInPath()
+        }
+
+        func close() {
+            lock.lock()
+            let should = !closed
+            closed = true
+            lock.unlock()
+            if should, scoped { chosen.stopAccessingSecurityScopedResource() }
+        }
+
+        deinit { close() }
+    }
+
+    /// A pasted image written beside the files, so the same check can read its bytes.
     private struct ImageCheckBatch {
         struct Entry {
             let source: PastedImages.Source
             let url: URL?
+            /// The file's place in `urls`, when it could be staged. Bytes that could not be staged have none.
+            let checkIndex: Int?
             var name: String {
                 switch source {
                 case .file(let url): url.lastPathComponent
@@ -78,9 +123,26 @@ extension EditorController {
         let entries: [Entry]
         var urls: [URL] { entries.compactMap(\.url) }
 
-        func remove() {
+        /// Removes the staged copies. A name in `failed` is left, because neither attaching nor Downloads kept it.
+        func remove(keeping failed: Set<String> = []) {
             guard let directory else { return }
-            try? FileManager.default.removeItem(at: directory)
+            guard !failed.isEmpty else {
+                try? FileManager.default.removeItem(at: directory)
+                return
+            }
+            guard let folders = try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) else { return }
+            for folder in folders {
+                guard let files = try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil) else { continue }
+                for file in files where !failed.contains(file.lastPathComponent) {
+                    try? FileManager.default.removeItem(at: file)
+                }
+                if (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil))?.isEmpty == true {
+                    try? FileManager.default.removeItem(at: folder)
+                }
+            }
+            if (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil))?.isEmpty == true {
+                try? FileManager.default.removeItem(at: directory)
+            }
         }
     }
 
@@ -92,13 +154,15 @@ extension EditorController {
             ? URL.temporaryDirectory.appending(path: "marfa-mac-paste-\(UUID().uuidString)", directoryHint: .isDirectory)
             : nil
         var entries: [ImageCheckBatch.Entry] = []
+        var next = 0
         for (index, source) in sources.enumerated() {
             switch source {
             case .file(let url):
-                entries.append(ImageCheckBatch.Entry(source: source, url: url))
+                entries.append(ImageCheckBatch.Entry(source: source, url: url, checkIndex: next))
+                next += 1
             case .data(let name, let data):
                 guard let directory else {
-                    entries.append(ImageCheckBatch.Entry(source: source, url: nil))
+                    entries.append(ImageCheckBatch.Entry(source: source, url: nil, checkIndex: nil))
                     continue
                 }
                 let folder = directory.appending(path: String(index), directoryHint: .isDirectory)
@@ -106,9 +170,10 @@ extension EditorController {
                 do {
                     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
                     try data.write(to: url, options: .atomic)
-                    entries.append(ImageCheckBatch.Entry(source: source, url: url))
+                    entries.append(ImageCheckBatch.Entry(source: source, url: url, checkIndex: next))
+                    next += 1
                 } catch {
-                    entries.append(ImageCheckBatch.Entry(source: source, url: nil))
+                    entries.append(ImageCheckBatch.Entry(source: source, url: nil, checkIndex: nil))
                 }
             }
         }

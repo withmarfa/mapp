@@ -95,3 +95,34 @@ final class HeldSwitch: Sendable {
         }
     }
 }
+
+/// Holds a call until `open`. Cancellation does not resume it, so a lookup can stay parked after it is cancelled.
+final class Parked: @unchecked Sendable {
+    private struct State {
+        var continuation: CheckedContinuation<Void, Never>?
+        var isParked = false
+    }
+
+    private let state = Mutex(State())
+
+    var isParked: Bool { state.withLock { $0.isParked } }
+
+    func wait() async {
+        await withCheckedContinuation { continuation in
+            state.withLock { state in
+                state.continuation = continuation
+                state.isParked = true
+            }
+        }
+    }
+
+    func open() {
+        let continuation = state.withLock { state -> CheckedContinuation<Void, Never>? in
+            let continuation = state.continuation
+            state.continuation = nil
+            state.isParked = false
+            return continuation
+        }
+        continuation?.resume()
+    }
+}

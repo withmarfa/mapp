@@ -964,7 +964,9 @@ extension Browser {
         }
         if !draft.files.isEmpty {
             quickAdd.checking(true)
-            let plan = await AlreadyInMarfa.check(draft.files.map(\.url), in: library, asking: quickAdd.alreadyInMarfa)
+            let entry = quickAdd.entry
+            let asked = draft.files
+            let plan = await AlreadyInMarfa.check(asked.map(\.url), in: library, asking: quickAdd.alreadyInMarfa)
             quickAdd.checking(false)
             guard quickAdd.draft == typed else {
                 if quickAdd.draft != nil {
@@ -975,11 +977,18 @@ extension Browser {
                 return nil
             }
             if plan.isCancelled { return nil }
-            if !plan.open.isEmpty {
-                let missed = await openMatches(plan.open, in: library, order: order)
-                let kept = Set(plan.recoveredFiles(missed: missed))
-                quickAdd.draft?.files.removeAll { !plan.add.contains($0.url) && !kept.contains($0.url) }
-                if !kept.isEmpty { QuickAdd.tellUnopenedMatches(Array(kept), to: library.notices) }
+            if !plan.matched.isEmpty {
+                let opened = await openMatches(plan.matched, in: library, order: order)
+                guard quickAdd.entry == entry, var current = quickAdd.draft else { return nil }
+                let stayed = Set(opened.fallback.map(\.index))
+                let openedIndices = Set(plan.matched.map(\.index)).subtracting(stayed)
+                for index in openedIndices.sorted() {
+                    guard asked.indices.contains(index), let at = current.files.firstIndex(of: asked[index]) else { continue }
+                    current.files.remove(at: at)
+                }
+                quickAdd.draft?.files = current.files
+                let kept = opened.fallback.map(\.file)
+                if !kept.isEmpty { QuickAdd.tellUnopenedMatches(kept, to: library.notices) }
                 return nil
             }
         }

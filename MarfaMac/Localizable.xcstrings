@@ -750,9 +750,6 @@
     "%lld Days" : {
 
     },
-    "%lld files are already in Marfa." : {
-
-    },
     "%lld Files Are Held Back" : {
 
     },
@@ -1049,6 +1046,9 @@
 
     },
     "%lld events." : {
+
+    },
+    "%lld files are already in Marfa." : {
 
     },
     "%lld files were added because the items already in Marfa couldn’t be opened." : {
@@ -5622,9 +5622,6 @@
     },
     "Images Weren’t Added to the Item" : {
       "extractionState" : "manual"
-    },
-    "Images Weren’t Attached" : {
-
     },
     "Import" : {
 
@@ -10612,9 +10609,6 @@
     "The item was changed somewhere else while you were editing it. The server kept that version, and yours is the copy." : {
       "extractionState" : "manual"
     },
-    "The item was no longer open for editing, so nothing was attached. Add the images again." : {
-
-    },
     "The item wasn’t added, so its files weren’t attached." : {
       "extractionState" : "manual"
     },
@@ -13181,9 +13175,6 @@
     "“%@”" : {
 
     },
-    "“%@” is already in Marfa." : {
-
-    },
     "“%@” already holds this link to “%@”. Remove it there first." : {
       "extractionState" : "manual"
     },
@@ -13248,6 +13239,9 @@
 
     },
     "“%@” is already a choice." : {
+
+    },
+    "“%@” is already in Marfa." : {
 
     },
     "“%@” is in the list twice." : {

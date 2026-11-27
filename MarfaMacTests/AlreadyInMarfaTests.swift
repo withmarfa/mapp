@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 @testable import MarfaMac
 
@@ -11,11 +12,11 @@ struct AlreadyInMarfaTests {
     /// Answers each file by its name: the items `matches` gives it, or no match for any other name.
     static func answering(_ matches: [String: [Item]], more: Set<String> = []) -> ([URL]) async -> FileMatches {
         { files in
-            FileMatches(Dictionary(uniqueKeysWithValues: files.map { file in
+            FileMatches(files.map { file in
                 let name = file.lastPathComponent
                 let found = (matches[name] ?? []).map { FileMatch(id: $0.id, title: $0.displayTitle) }
-                return (file, FileMatchAnswer.answered(found, more: more.contains(name)))
-            }))
+                return FileMatchAnswer.answered(found, more: more.contains(name))
+            })
         }
     }
 
@@ -189,13 +190,13 @@ struct AlreadyInMarfaTests {
         let beach = FakeItemLibrary.note("Beach Day", modified: .now)
         let library = FakeItemLibrary(items: [beach])
         library.sameBytes = { files in
-            FileMatches(Dictionary(uniqueKeysWithValues: files.compactMap { file -> (URL, FileMatchAnswer)? in
+            FileMatches(files.map { file in
                 switch file.lastPathComponent {
-                case "match.png": (file, .answered([FileMatch(id: beach.id, title: "Beach Day")], more: false))
-                case "none.png": (file, .answered([], more: false))
-                default: nil
+                case "match.png": .answered([FileMatch(id: beach.id, title: "Beach Day")], more: false)
+                case "none.png": .answered([], more: false)
+                default: .noAnswer
                 }
-            }))
+            })
         }
         let browser = browser(for: library)
         let adding = Task {
@@ -213,7 +214,7 @@ struct AlreadyInMarfaTests {
 
     @Test func aMatchTheLibraryDoesNotHoldIsNamedAsMarfaNamedIt() async throws {
         let library = FakeItemLibrary()
-        library.sameBytes = { files in FileMatches([files[0]: .answered([FileMatch(id: .mint(), title: "Shared Photo")], more: false)]) }
+        library.sameBytes = { _ in FileMatches([.answered([FileMatch(id: .mint(), title: "Shared Photo")], more: false)]) }
         let browser = browser(for: library)
         let toasts = ToastPresenter()
         let adding = Task { await browser.importFiles([disk.url("a.png")], in: library, order: ItemOrder(), undoManager: nil, toasts: toasts) }
@@ -232,7 +233,7 @@ struct AlreadyInMarfaTests {
         let arriving = FakeItemLibrary.note("Shared Photo", modified: .now, id: id)
         let library = FakeItemLibrary()
         library.arrivals[id] = arriving
-        library.sameBytes = { files in FileMatches([files[0]: .answered([FileMatch(id: id, title: "Shared Photo")], more: false)]) }
+        library.sameBytes = { _ in FileMatches([.answered([FileMatch(id: id, title: "Shared Photo")], more: false)]) }
         let browser = browser(for: library)
         let adding = Task { await browser.importFiles([disk.url("a.png")], in: library, order: ItemOrder(), undoManager: nil) }
         try #require(await eventually { browser.alreadyInMarfa.question != nil })
@@ -311,6 +312,130 @@ struct AlreadyInMarfaTests {
 
     @Test func theWholeCheckIsGivenTenSeconds() {
         #expect(AlreadyInMarfa.limit == .seconds(10))
+    }
+
+    @Test func aTimedOutLookupIsCancelledAndKeepsAccessUntilItFinishes() async {
+        defer { AlreadyInMarfa.accessHooks.set(nil) }
+        let library = FakeItemLibrary()
+        let gate = Parked()
+        let cancelled = Mutex(false)
+        library.sameBytes = { _ in
+            await gate.wait()
+            cancelled.withLock { $0 = Task.isCancelled }
+            return .noAnswer
+        }
+        let files = [disk.url("a.png")]
+        let mine = files[0].path
+        let stops = Mutex(0)
+        AlreadyInMarfa.accessHooks.set(.init(
+            start: { $0.path == mine },
+            stop: { if $0.path == mine { stops.withLock { $0 += 1 } } }
+        ))
+        let asking = AlreadyInMarfa.Asking()
+        asking.viewAppeared()
+        let plan = await FirstAnswer.within(.seconds(2), otherwise: nil) {
+            Optional(await AlreadyInMarfa.check(files, in: library, asking: asking, within: .milliseconds(50)))
+        }
+        if plan == nil { gate.open() }
+        #expect(plan == .some(.addingAll(files)), "the add does not wait out a lookup that has already run over its limit")
+        #expect(gate.isParked, "the lookup is still inside the read when the add goes on")
+        #expect(stops.withLock { $0 } == 0, "file access stays until that read finishes")
+        gate.open()
+        #expect(await eventually { cancelled.withLock { $0 } })
+        #expect(await eventually { stops.withLock { $0 } == 1 })
+        #expect(asking.question == nil)
+    }
+
+    @Test func twoCopiesOfOnePathAreNotBothTakenAsTheSameAnswer() async throws {
+        let beach = FakeItemLibrary.note("Beach", modified: .now)
+        let library = FakeItemLibrary(items: [beach])
+        let file = disk.url("twice.png")
+        library.sameBytes = { _ in
+            FileMatches([
+                .answered([FileMatch(id: beach.id, title: "Beach")], more: false),
+                .noAnswer,
+            ])
+        }
+        let asking = AlreadyInMarfa.Asking()
+        asking.viewAppeared()
+        let checking = Task { await AlreadyInMarfa.check([file, file], in: library, asking: asking) }
+        try #require(await eventually { asking.question != nil })
+        #expect(asking.question?.rows.count == 1, "only the copy Marfa could read is a match")
+        asking.answer(.open)
+        let plan = await checking.value
+        #expect(plan.matched.map(\.index) == [0])
+        #expect(plan.adding == [1])
+        #expect(plan.add.count == 1, "the copy Marfa could not read is added")
+        #expect(plan.open == [beach.id])
+    }
+
+    @Test func openAddsAMatchThatLeavesWhileAnotherIsFetched() async throws {
+        let beach = FakeItemLibrary.note("Beach", modified: .now)
+        let trip = FakeItemLibrary.note("Trip", modified: .now)
+        let library = FakeItemLibrary(items: [beach])
+        library.arrivals[trip.id] = trip
+        library.sameBytes = Self.answering(["a.png": [beach], "b.png": [trip]])
+        library.holding = { id in
+            if id == trip.id { library.items.removeAll { $0.id == beach.id } }
+        }
+        let browser = browser(for: library)
+        let toasts = ToastPresenter()
+        let adding = Task {
+            await browser.importFiles([disk.url("a.png"), disk.url("b.png")], in: library, order: ItemOrder(), undoManager: nil, toasts: toasts)
+        }
+        try #require(await eventually { browser.alreadyInMarfa.question != nil })
+        browser.alreadyInMarfa.answer(.open)
+        let ids = await adding.value
+        #expect(ids.count == 1)
+        #expect(library.addedFiles.map(\.name) == ["a.png"], "the match that left is added")
+        #expect(toasts.current?.message == AlreadyInMarfa.unopenedMessage(1))
+        #expect(browser.selection == [trip.id])
+    }
+
+    @Test func aFileAddedWhileOpenFetchesStaysInTheDraft() async throws {
+        let beach = FakeItemLibrary.note("Beach Day", modified: .now)
+        let library = FakeItemLibrary()
+        library.arrivals[beach.id] = beach
+        library.sameBytes = Self.answering(["map.png": [beach]])
+        let browser = browser(for: library)
+        browser.openNewItem(kind: "core.note", form: .text, in: library)
+        browser.quickAdd.draft?.title = "Trip"
+        let extra = try disk.file("notes.txt")
+        browser.quickAdd.draft?.files = [try disk.file("map.png")]
+        library.holding = { _ in browser.quickAdd.draft?.files.append(extra) }
+        let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
+        try #require(await eventually { browser.quickAdd.alreadyInMarfa.question != nil })
+        browser.quickAdd.alreadyInMarfa.answer(.open)
+        #expect(await saving.value == nil)
+        #expect(browser.quickAdd.draft?.files == [extra], "the file chosen while Open was fetching stays")
+        #expect(browser.quickAdd.draft?.title == "Trip")
+        #expect(browser.selection == [beach.id])
+        #expect(library.created.isEmpty)
+    }
+
+    @Test func replacingTheDraftWhileOpenFetchesLeavesTheNewFiles() async throws {
+        let beach = FakeItemLibrary.note("Beach Day", modified: .now)
+        let library = FakeItemLibrary()
+        library.arrivals[beach.id] = beach
+        library.sameBytes = Self.answering(["map.png": [beach]])
+        let browser = browser(for: library)
+        browser.openNewItem(kind: "core.note", form: .text, in: library)
+        browser.quickAdd.draft?.title = "Trip"
+        browser.quickAdd.draft?.files = [try disk.file("map.png")]
+        let extra = try disk.file("notes.txt")
+        library.holding = { _ in
+            browser.quickAdd.clearDraft()
+            browser.openNewItem(kind: "core.note", form: .text, in: library)
+            browser.quickAdd.draft?.title = "Next"
+            browser.quickAdd.draft?.files = [extra]
+        }
+        let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
+        try #require(await eventually { browser.quickAdd.alreadyInMarfa.question != nil })
+        browser.quickAdd.alreadyInMarfa.answer(.open)
+        #expect(await saving.value == nil)
+        #expect(browser.quickAdd.draft?.title == "Next")
+        #expect(browser.quickAdd.draft?.files == [extra], "a draft begun while Open was fetching is left as the person left it")
+        #expect(library.created.isEmpty)
     }
 
     @Test func questionsWaitTheirTurnAndAGoneViewLetsThemGoAhead() async throws {

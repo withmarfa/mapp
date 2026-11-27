@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 @testable import MarfaMac
 
@@ -117,8 +118,8 @@ extension EditorTests {
         let library = FakeItemLibrary(items: [plan, beach, trip])
         library.sameBytes = { files in
             FileMatches([
-                files[0]: .answered([FileMatch(id: beach.id, title: "Beach"), FileMatch(id: trip.id, title: "Trip")], more: false),
-                files[1]: .answered([FileMatch(id: missing, title: "Gone")], more: false),
+                .answered([FileMatch(id: beach.id, title: "Beach"), FileMatch(id: trip.id, title: "Trip")], more: false),
+                .answered([FileMatch(id: missing, title: "Gone")], more: false),
             ])
         }
         library.attaching = { AttachReport(embeds: [Embed(link: "Attachments/gone.png", name: "gone.png")]) }
@@ -151,5 +152,102 @@ extension EditorTests {
         editor.alreadyInMarfa.answer(.open)
         try #require(await eventually { followed == [beach.id, trip.id] })
         #expect(library.attachedBatches.isEmpty)
+    }
+
+    @Test func aPasteWhosePageChangesDuringTheLookupIsStillAttached() async throws {
+        let first = FakeItemLibrary.note("Plan", modified: .now)
+        let second = FakeItemLibrary.note("Other", modified: .now)
+        let library = FakeItemLibrary(items: [first, second])
+        let gate = Parked()
+        defer { gate.open() }
+        library.sameBytes = { _ in
+            await gate.wait()
+            return .noAnswer
+        }
+        var existedAtAttach = false
+        library.attaching = {
+            let staged = library.askedSameBytes.flatMap { $0 }
+            existedAtAttach = !staged.isEmpty && staged.allSatisfy { FileManager.default.fileExists(atPath: $0.path) }
+            return AttachReport(embeds: [Embed(link: "Attachments/Photo.png", name: "Photo")])
+        }
+        let editor = try await attachingEditor(library)
+        editor.alreadyInMarfa.viewAppeared()
+        #expect(editor.insertImages(Self.pasted))
+        try #require(await eventually { gate.isParked })
+        editor.load(second)
+        try #require(await eventually { editor.pageItemID == second.id })
+        gate.open()
+        try #require(await eventually { library.attachedBatches.contains { $0.item == first.id } })
+        #expect(existedAtAttach, "the staged copy is still there when the image is attached")
+        let staged = library.askedSameBytes.flatMap { $0 }
+        #expect(await eventually { staged.allSatisfy { !FileManager.default.fileExists(atPath: $0.path) } })
+        #expect(library.attachedBatches.map(\.names) == [["Photo.png"]])
+        #expect(library.notices.waiting.contains { $0.message.contains("was attached to “Plan”") })
+        #expect(!library.notices.waiting.contains { $0.message.contains("nothing was attached") })
+        #expect(try await markdown(editor) == nil)
+    }
+
+    @Test func aTimedOutPasteKeepsTheStagedFileUntilTheLookupFinishes() async throws {
+        defer { AlreadyInMarfa.limitOverride.set(nil) }
+        let library = FakeItemLibrary(items: [FakeItemLibrary.note("Plan", modified: .now)])
+        let gate = Parked()
+        defer { gate.open() }
+        let cancelled = Mutex(false)
+        let existedAtEnd = Mutex(false)
+        library.sameBytes = { files in
+            await gate.wait()
+            cancelled.withLock { $0 = Task.isCancelled }
+            existedAtEnd.withLock { $0 = files.allSatisfy { FileManager.default.fileExists(atPath: $0.path) } }
+            return .noAnswer
+        }
+        library.attaching = { AttachReport(embeds: [Embed(link: "Attachments/Photo.png", name: "Photo")]) }
+        AlreadyInMarfa.limitOverride.set(.milliseconds(50))
+        let editor = try await attachingEditor(library)
+        #expect(editor.insertImages(Self.pasted))
+        try #require(await eventually { !library.attachedBatches.isEmpty })
+        #expect(gate.isParked, "the image is attached without waiting out the cancelled lookup")
+        let staged = library.askedSameBytes.flatMap { $0 }
+        #expect(staged.allSatisfy { FileManager.default.fileExists(atPath: $0.path) })
+        gate.open()
+        #expect(await eventually { cancelled.withLock { $0 } })
+        #expect(existedAtEnd.withLock { $0 }, "the staged copy is still there when the lookup finishes")
+        #expect(await eventually { staged.allSatisfy { !FileManager.default.fileExists(atPath: $0.path) } })
+    }
+
+    @Test func aSymbolicLinkIsHashedAndAttachedAsTheFileItNames() async throws {
+        let library = FakeItemLibrary(items: [FakeItemLibrary.note("Plan", modified: .now)])
+        library.sameBytes = { _ in .noAnswer }
+        library.attaching = { AttachReport(embeds: [Embed(link: "Attachments/photo.png", name: "photo.png")]) }
+        let disk = TestFiles()
+        let real = disk.url("photo.png", "pixels")
+        let link = disk.directory.appending(path: "alias.png")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: real)
+        let editor = try await attachingEditor(library)
+        #expect(editor.insertImages([.file(link)]))
+        try #require(await eventually { !library.attachedBatches.isEmpty || library.notices.waiting.last != nil })
+        #expect(library.askedSameBytes.map { $0.map(\.lastPathComponent) } == [["photo.png"]])
+        #expect(library.attachedBatches.map(\.names) == [["photo.png"]])
+        #expect(library.notices.waiting.allSatisfy { !$0.message.contains("can’t be read") })
+    }
+
+    @Test func aRecoveredImageSavedToDownloadsIsNotSaidToBeAttached() async throws {
+        let plan = FakeItemLibrary.note("Plan", modified: .now)
+        let library = FakeItemLibrary(items: [plan])
+        let missing = ItemID.mint()
+        let disk = TestFiles()
+        let image = disk.url("gone.png", "pixels")
+        let saved = disk.url("gone.png")
+        library.sameBytes = { _ in
+            FileMatches([.answered([FileMatch(id: missing, title: "Gone")], more: false)])
+        }
+        library.attaching = { AttachReport(kept: [KeptFile(name: "gone.png", file: saved)]) }
+        let editor = try await attachingEditor(library)
+        editor.alreadyInMarfa.viewAppeared()
+        #expect(editor.insertImages([.file(image)]))
+        try #require(await eventually { editor.alreadyInMarfa.question != nil })
+        editor.alreadyInMarfa.answer(.open)
+        try #require(await eventually { library.notices.waiting.contains { $0.message.contains("saved to Downloads") } })
+        #expect(library.notices.waiting.allSatisfy { !$0.message.contains("was attached") })
+        #expect(library.attachedBatches.map(\.names) == [["gone.png"]])
     }
 }

@@ -34,12 +34,30 @@ extension Browser {
         return reached.missed
     }
 
+    /// Opens matches in this window. Each match that could not be opened comes back with its file, to be added.
+    func openFound(
+        _ matches: [AlreadyInMarfa.Plan.Match], in library: any ItemLibrary, order: ItemOrder, defaults: UserDefaults = .standard
+    ) async -> AlreadyInMarfa.Opened {
+        let opened = await AlreadyInMarfa.opening(matches, in: library)
+        showFound(opened.opened, in: library, order: order, defaults: defaults)
+        return opened
+    }
+
     /// Opens matches in this window, or through `opensFoundElsewhere` when another window is showing the library,
-    /// as the new-item line over another app does. Ids nobody could open come back so their files are not dropped.
-    func openMatches(_ ids: [ItemID], in library: any ItemLibrary, order: ItemOrder) async -> [ItemID] {
-        if isShowing(library) { return await openFound(ids, in: library, order: order) }
-        if let opensFoundElsewhere { return await opensFoundElsewhere(ids) }
-        return ids
+    /// as the new-item line over another app does. A match nobody could open comes back so its file is not dropped.
+    func openMatches(
+        _ matches: [AlreadyInMarfa.Plan.Match], in library: any ItemLibrary, order: ItemOrder
+    ) async -> AlreadyInMarfa.Opened {
+        if isShowing(library) { return await openFound(matches, in: library, order: order) }
+        let ids = matches.flatMap(\.items).reduce(into: [ItemID]()) { ids, id in
+            if !ids.contains(id) { ids.append(id) }
+        }
+        if let opensFoundElsewhere {
+            let missed = Set(await opensFoundElsewhere(ids))
+            let fallback = matches.filter { !$0.items.isEmpty && $0.items.allSatisfy { missed.contains($0) } }
+            return AlreadyInMarfa.Opened(opened: ids.filter { !missed.contains($0) }, fallback: fallback)
+        }
+        return AlreadyInMarfa.Opened(opened: [], fallback: matches)
     }
 
     /// Shows items the library already holds: one as a link to it opens, several in windows where Open Items says

@@ -187,16 +187,16 @@ nonisolated final class MarfaSource: ItemSource {
         }
     }
 
-    /// The items that hold each file's bytes. The package hashes the file an add would upload, symbolic links
-    /// resolved, while the caller still holds any security-scoped access. A lookup that throws, or that the app's
-    /// check gives up on, is no answer for the whole batch. A file the package cannot read is no answer for that
-    /// file alone. Nothing is asked while the server is out of reach or there is no sign-in, so that answer is immediate.
+    /// The items that hold each file's bytes. `files` are the files an add would upload: a caller that follows a
+    /// symbolic link resolves it once and passes that file, and this does not resolve again. The caller still holds
+    /// any security-scoped access. A lookup that throws, or that the app's check gives up on, is no answer for the
+    /// whole batch. A file the package cannot read is no answer for that file alone. Nothing is asked while the
+    /// server is out of reach or there is no sign-in, so that answer is immediate.
     func itemsWithSameBytes(as files: [URL]) async -> FileMatches {
         guard !files.isEmpty else { return .noAnswer }
-        let uploading = files.map { $0.resolvingSymlinksInPath() }
         #if DEBUG
         if let lookup = hooks.holdingBytes.current {
-            return await ByteMatches.answers(for: files) { try await lookup(uploading) }
+            return await ByteMatches.answers(for: files) { try await lookup(files) }
         }
         #endif
         guard hub.connection == .online, let calls else { return .noAnswer }
@@ -208,7 +208,7 @@ nonisolated final class MarfaSource: ItemSource {
         }
         let timeout = await AlreadyInMarfa.limit
         return await ByteMatches.answers(for: files) {
-            try await server.itemsHoldingBytes(of: uploading, timeout: timeout)
+            try await server.itemsHoldingBytes(of: files, timeout: timeout)
         }
     }
 
