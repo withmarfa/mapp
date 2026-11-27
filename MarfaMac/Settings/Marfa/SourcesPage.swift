@@ -12,6 +12,7 @@ struct SourcesPage: View {
     @State private var model: SourcesModel
     @State private var limit: SourceLimitModel
     @State private var allowlist: SourceLimitModel
+    @State private var showsAll = false
     @Environment(\.settingsNavigation) private var navigation
 
     init(host: any MarfaSettingsHost, subpage: SettingsSubpage?) {
@@ -28,14 +29,6 @@ struct SourcesPage: View {
 
     var body: some View {
         content
-            .task(id: host.serverAddress) {
-                async let sources: Void = model.load()
-                if host.grants.contains(.configManage) {
-                    await limit.load(choices: false)
-                    await allowlist.load(choices: false)
-                }
-                await sources
-            }
             .onAppear {
                 host.ownerDrafts.register(model)
                 host.ownerDrafts.register(limit)
@@ -63,7 +56,7 @@ struct SourcesPage: View {
         } else {
             SettingsPageState(
                 symbol: "lock", title: Text("Needs a Permission"), line: Text(verbatim: model.rule.permissionLine),
-                action: (host.isAllowingMore ? "Waiting…" : "Allow More…", { host.askForMore(naming: InstancePermission.configManage.rawValue) }))
+                action: (host.isAllowingMore ? "Waiting…" : "Allow More", { host.askForMore(naming: InstancePermission.configManage.rawValue) }))
             .disabled(host.isAllowingMore)
         }
     }
@@ -71,25 +64,36 @@ struct SourcesPage: View {
     private var list: some View {
         SettingsPageColumn {
             if let failure = model.listFailure { OwnerProblem(title: "Not Changed", failure: failure, page: .sources, host: host) }
-            SettingsSection("Sources") {
-                if model.rows.isEmpty {
+            let rows = model.rows
+            let preview = SettingsTablePreview(total: rows.count, expanded: showsAll)
+            SettingsSection(name: nil) {
+                if rows.isEmpty {
                     SettingsEmptyCard(
                         symbol: "tray.and.arrow.down", title: Text(model.hasLoaded ? "No Sources Yet" : "Reading Sources…"),
                         line: model.hasLoaded ? Text("A source appears here once an app or key has written an item.") : nil)
                 }
-                ForEach(model.rows) { row in sourceRow(row) }
+                ForEach(rows.prefix(preview.visibleCount)) { row in sourceRow(row) }
+                if let count = preview.countLabel {
+                    SettingsRow(verbatim: count) { SettingsShowAllButton { showsAll = true } }
+                }
             }
-            if host.grants.contains(.configManage) { rules }
+            rules
+        }
+        .task { await model.load() }
+        .task(id: host.grants.contains(.configManage)) {
+            if host.grants.contains(.configManage) { await limit.load(choices: false) }
         }
     }
 
     private func sourceRow(_ row: MarfaSourceRow) -> some View {
         SettingsRow(
-            title: Text(verbatim: row.name), line: Text(verbatim: Self.naming(row)),
-            lead: .well(host.markGlyph(row.mark ?? ""))
+            title: Text(verbatim: row.name), line: row.hasChosenName ? Text("Custom name.") : nil,
+            lead: .custom(AnyView(host.markGlyph(row.mark ?? "").accessibilityHidden(true)))
         ) {
             HStack(spacing: SettingsTokens.Metric.buttonGap) {
-                if let count = row.count { SettingsValue(verbatim: String(localized: "\(count.formatted()) items")) }
+                if let count = row.count {
+                    SettingsValue(verbatim: count == 1 ? String(localized: "1 item") : String(localized: "\(count.formatted()) items"))
+                }
                 SettingsMoreMenu {
                     Button("Rename…") { model.beginRename(row.code) }
                     Button("Change Mark…") { model.beginMark(row.code) }
@@ -99,43 +103,29 @@ struct SourcesPage: View {
                 .disabled(!host.canChangeSources || model.isWorking)
             }
         }
+        .help(Text(verbatim: row.name))
     }
 
     private var rules: some View {
-        SettingsSection("Rules for Every App and Key", line: "A key can set its own instead.") {
-            if let failure = limit.failure ?? allowlist.failure {
+        let allowed = host.grants.contains(.configManage)
+        let lock = allowed ? nil : String(localized: "Not allowed")
+        return SettingsSection("Rules for Every App and Key", footer: "A key can set its own instead.") {
+            if allowed, let failure = limit.failure {
                 OwnerProblemRow(title: "Couldn’t Read the Rules", failure: failure, page: .sources, host: host) {
-                    Task {
-                        await limit.load(choices: false)
-                        await allowlist.load(choices: false)
-                    }
+                    Task { await limit.load(choices: false) }
                 }
             }
             SettingsLinkRow(
-                verbatim: SourceRule.allowlist.title, line: String(localized: "Only the sources you name may write these types."),
-                value: Self.value(of: allowlist)
+                verbatim: SourceRule.allowlist.title, lead: .tile("square.and.pencil", .blue),
+                value: limit.status(of: .allowlist), lock: lock
             ) { navigation?.push(Self.whoMayWrite) }
             SettingsLinkRow(
-                verbatim: SourceRule.filter.title, line: String(localized: "Only items from the sources you name are read."),
-                value: Self.value(of: limit)
+                verbatim: SourceRule.filter.title, lead: .tile("eye", .indigo),
+                value: limit.status(of: .filter), lock: lock
             ) { navigation?.push(Self.limitSources) }
         }
     }
 
-    private static func value(of rule: SourceLimitModel) -> String? {
-        guard rule.limit != nil else { return nil }
-        return rule.isOn ? String(localized: "On") : String(localized: "Not Set")
-    }
-
-    /// How a source got its name, in a line.
-    static func naming(_ row: MarfaSourceRow) -> String {
-        switch row.nameOrigin {
-        case .set: String(localized: "Named by you.")
-        case .app: String(localized: "Named by the app.")
-        case .key: String(localized: "Named by its key.")
-        case .code, .other: String(localized: "Not named yet.")
-        }
-    }
 }
 
 /// The sheet that renames a source or chooses its mark.

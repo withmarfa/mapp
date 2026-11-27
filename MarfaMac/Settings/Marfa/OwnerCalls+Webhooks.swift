@@ -2,9 +2,6 @@ import Foundation
 import Marfa
 import MarfaAPI
 
-// What the Webhooks page asks of the server, in values of its own. A key or an app sees only the webhooks it made, so this
-// lists the ones this sign-in made.
-
 /// An event a webhook may send, as the server names it.
 nonisolated enum WebhookEvent: String, CaseIterable, Hashable, Sendable {
     case itemCreated = "item.created"
@@ -179,9 +176,9 @@ extension ClientOwnerCalls {
         try await run { client in _ = try await client.deleteWebhook(path: .init(id: id)).ok }
     }
 
-    func deliveries(of webhook: String) async throws(OwnerFailure) -> [WebhookDeliveryInfo] {
+    func deliveries(of webhook: String, limit: Int = 50) async throws(OwnerFailure) -> [WebhookDeliveryInfo] {
         try await run { client in
-            try await client.listWebhookDeliveries(path: .init(id: webhook), query: .init(limit: 50)).ok.body.json.data
+            try await client.listWebhookDeliveries(path: .init(id: webhook), query: .init(limit: limit)).ok.body.json.data
                 .map(Self.delivery)
         }
     }

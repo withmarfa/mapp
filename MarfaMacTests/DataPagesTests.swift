@@ -355,6 +355,27 @@ import Testing
 
     private let rows = [OwnerSource(code: "readwise", name: "Readwise"), OwnerSource(code: "rss", name: "RSS")]
 
+    @Test func bothRuleValuesComeFromOneReadAndAnUnreadRuleHasNoValue() async {
+        let bench = OwnerBench(grants: [.configManage])
+        let model = model(bench, sources: rows)
+        #expect(model.status(of: .filter) == nil)
+        bench.calls.state.withLock {
+            $0.sourceLimit.allowlist = (types: ["core.note"], sources: ["rss"])
+        }
+        await model.load(choices: false)
+        #expect(model.status(of: .filter) == "Off")
+        #expect(model.status(of: .allowlist) == "On")
+        bench.calls.state.withLock {
+            $0.sourceLimit.set(.filter, to: SourceRuleValue(types: ["core.note"], sources: []))
+        }
+        await model.load(choices: false)
+        #expect(model.status(of: .filter) == "On", "A stored rule allowing zero sources still restricts the named types")
+        #expect(model.checkedSources.isEmpty)
+        bench.calls.fail("sourceLimit", with: .unreachable)
+        await model.load(choices: false)
+        #expect(model.status(of: .allowlist) == nil)
+    }
+
     @Test func theLimitIsReadWithTheTypesAndSourcesItNames() async {
         let bench = OwnerBench(grants: [.configManage])
         bench.calls.state.withLock {
@@ -571,6 +592,17 @@ import Testing
     }
 
     private let sets = [MarfaMarkSet(id: "lucide", title: "Lucide"), MarfaMarkSet(id: "simple-icons", title: "Simple Icons")]
+
+    @Test func sourcesAreOrderedByCountThenNameAndKeepTheirFullNames() {
+        let server = Server()
+        let name = String(repeating: "Studio", count: 33) + " A"
+        server.rows.append(.init(code: "studio", name: name, mark: nil, count: 318, nameOrigin: .app))
+        server.rows.insert(.init(code: "unknown", name: "A", mark: nil, count: nil, nameOrigin: .code), at: 0)
+        let model = SourcesModel(access: server.access, markSets: sets)
+        #expect(model.rows.map(\.code) == ["github", "studio", "rss", "unknown"])
+        model.beginRename("studio")
+        #expect(model.name == name)
+    }
 
     @Test func aRenameIsSentAndClosesTheSheet() async {
         let server = Server()

@@ -59,8 +59,26 @@ struct WebhooksPage: View {
                     symbol: "dot.radiowaves.up.forward", title: Text("This Webhook Is Gone"),
                     line: Text("It was deleted, here or somewhere else."), action: ("Back", { navigation?.back() }))
             }
+        } else if model.webhooks.isEmpty {
+            empty
         } else {
             list
+        }
+    }
+
+    private var empty: some View {
+        GeometryReader { space in
+            SettingsEmptyCard(
+                symbol: "dot.radiowaves.up.forward", title: model.seesEvery ? Text("No Webhooks") : Text("No Webhooks for This Sign-In"),
+                line: Text("A webhook tells another app when your items change."),
+                action: ("New Webhook…", model.beginNew))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // Center in the window, including the toolbar above the detail pane.
+                .padding(.bottom, max(0, space.frame(in: .global).minY))
+        }
+        .background(SettingsTokens.page)
+        .safeAreaInset(edge: .bottom) {
+            if !model.seesEvery { SettingsPageColumn(scrolls: false) { othersNeedKeys } }
         }
     }
 
@@ -76,29 +94,28 @@ struct WebhooksPage: View {
                     Task { await model.load() }
                 }
             }
-            if model.webhooks.isEmpty {
-                SettingsSection(name: Text("Webhooks")) {
-                    SettingsEmptyCard(
-                        symbol: "dot.radiowaves.up.forward", title: Text("No Webhooks"),
-                        line: Text("A webhook sends events to an address you choose, as they happen."))
-                    addRow
-                }
-            } else {
-                let groups = model.groups.filter { $0.isOwn || !$0.webhooks.isEmpty }
-                ForEach(Array(groups.enumerated()), id: \.element.id) { index, group in
-                    SettingsSection(
-                        name: Text(verbatim: model.heading(of: group)),
-                        footer: index == groups.count - 1 && model.seesEvery
-                            ? Text("You can see and end any webhook. Only the app or key that made one changes it.") : nil
-                    ) {
-                        ForEach(group.webhooks) { webhook in
-                            let state = model.isSending(webhook)
-                            SettingsLinkRow(
-                                verbatim: WebhooksModel.display(webhook.url), line: model.summary(of: webhook),
-                                lead: .well(symbol: "dot.radiowaves.up.forward"), value: Self.title(state), dot: Self.dot(state)
-                            ) { navigation?.push(Self.subpage(for: webhook)) }
-                        }
-                        if group.isOwn { addRow }
+            let groups = model.groups.filter { !$0.webhooks.isEmpty }
+            ForEach(Array(groups.enumerated()), id: \.element.id) { index, group in
+                SettingsSection(
+                    name: Text(verbatim: model.heading(of: group)),
+                    footer: index == groups.count - 1 && model.seesEvery
+                        ? Text("You can see and end any webhook. Only the app or key that made one changes it.") : nil
+                ) {
+                    if index == 0 {
+                        SettingsButton("New Webhook…") { model.beginNew() }
+                            .disabled(model.atCap)
+                    }
+                } content: {
+                    if index == 0 && model.atCap {
+                        SettingsRow("Webhook Limit Reached", line: "This sign-in holds \(WebhooksModel.cap) webhooks, the most the server allows.")
+                    }
+                    ForEach(group.webhooks) { webhook in
+                        let state = model.isSending(webhook)
+                        SettingsLinkRow(
+                            verbatim: WebhooksModel.display(webhook.url), line: model.summary(of: webhook),
+                            value: Self.title(state), dot: Self.dot(state), titleGlyph: .link
+                        ) { navigation?.push(Self.subpage(for: webhook)) }
+                        .help(Text(verbatim: webhook.url))
                     }
                 }
             }
@@ -115,16 +132,9 @@ struct WebhooksPage: View {
         }
     }
 
-    @ViewBuilder private var addRow: some View {
-        if model.atCap {
-            SettingsAddRow(off: "New Webhook…", line: "This sign-in holds \(WebhooksModel.cap) webhooks, the most the server allows.")
-        } else {
-            SettingsAddRow("New Webhook…") { model.beginNew() }
-        }
-    }
-
     static func title(_ state: WebhooksModel.Sending) -> String {
         switch state {
+        case .checking: String(localized: "Checking…")
         case .sending: String(localized: "Sending")
         case .off: String(localized: "Off")
         case .failing: String(localized: "Failing")
@@ -135,7 +145,7 @@ struct WebhooksPage: View {
     static func dot(_ state: WebhooksModel.Sending) -> Color {
         switch state {
         case .sending: SettingsTokens.ok
-        case .off: SettingsTokens.tertiaryText
+        case .checking, .off: SettingsTokens.tertiaryText
         case .failing, .unread: SettingsTokens.warning
         }
     }
@@ -190,7 +200,7 @@ private struct WebhookDetail: View {
             deliveries
             SettingsSection("Delete") {
                 SettingsRow(verbatim: String(localized: "Delete This Webhook"), line: String(localized: "It stops sending at once.")) {
-                    SettingsButton("Delete…", role: .destructive) { model.askToDelete(webhook) }
+                    SettingsButton("Delete", role: .destructive) { model.askToDelete(webhook) }
                 }
             }
         }
@@ -400,7 +410,9 @@ private struct SecretSheet: View {
             title: Text("Copy the Signing Secret Now"), line: Text("It is shown only once. The service checks each request with it.")
         ) {
             if let created = model.created {
-                SettingsSheetField(verbatim: WebhooksModel.display(created.webhook.url)) { SettingsReadOnlyValue(text: created.secret) }
+                SettingsSheetField(verbatim: WebhooksModel.display(created.webhook.url)) {
+                    SettingsReadOnlyValue(text: created.secret, isSelectable: false).accessibilityHidden(true)
+                }
             }
         } buttons: {
             SettingsButton(copied ? "Copied" : "Copy") {

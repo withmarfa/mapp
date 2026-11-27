@@ -201,6 +201,33 @@ import Testing
         #expect(!model.atCap)
     }
 
+    @Test func emptyWebhooksNeedNoMakerOrDeliveryLookup() async {
+        let bench = OwnerBench()
+        bench.calls.fail("identity", with: .unreachable)
+        let model = model(bench)
+        await model.load()
+        #expect(model.hasLoaded && model.failure == nil && model.webhooks.isEmpty)
+        #expect(!bench.calls.calls.contains("identity") && !bench.calls.calls.contains("deliveries"))
+        model.beginNew()
+        #expect(model.sheet == .new)
+    }
+
+    @Test func aRetryingDeliveryWithARecordedFailureShowsFailingUntilTheLatestDeliverySucceeds() async throws {
+        let bench = OwnerBench()
+        let model = model(bench, hooks: [Self.hook("a")])
+        var retrying = Self.delivery("d", .pending, code: 503)
+        retrying.error = "The receiver answered 503."
+        bench.calls.state.withLock { $0.deliveries["a"] = [retrying] }
+        await model.load()
+        let hook = try #require(model.webhook("a"))
+        #expect(model.isSending(hook) == .failing)
+        await model.setType("core.note", for: hook)
+        #expect(model.isSending(hook) == .failing)
+        bench.calls.state.withLock { $0.deliveries["a"] = [Self.delivery("d", .succeeded, code: 200)] }
+        await model.loadDeliveries(of: hook.id)
+        #expect(model.isSending(hook) == .sending)
+    }
+
     @Test func aRefusedReadNamesThePermissionAndReadsTheGrantsAgain() async {
         let bench = OwnerBench()
         bench.calls.fail("webhooks", with: .notPermitted("webhooks.manage"))
@@ -346,6 +373,8 @@ import Testing
         }
         let model = model(bench, hooks: [Self.hook("on"), Self.hook("off", active: false)])
         await model.load()
+        #expect(model.isSending(model.webhooks[0]) == .failing)
+        #expect(model.isSending(model.webhooks[1]) == .off)
         await model.loadDeliveries(of: "on")
         await model.loadDeliveries(of: "off")
         #expect(model.canRedeliver(model.deliveries["on"]![0], of: model.webhooks[0]))
@@ -435,6 +464,20 @@ import Testing
         #expect(!model.webhooks[0].active)
         await model.turnOn(model.webhooks[0])
         #expect(model.webhooks[0].active)
+    }
+
+    @Test func refusingToTurnOffKeepsSendingAndExplainsTheFailure() async throws {
+        let bench = OwnerBench()
+        let address = "https://castell.studio/" + String(repeating: "studio/", count: 80)
+        let model = model(bench, hooks: [Self.hook("a", address)])
+        await model.load()
+        let webhook = try #require(model.webhook("a"))
+        #expect(WebhooksPage.subpage(for: webhook).title == String(address.dropFirst(8)))
+        bench.calls.fail("changeWebhook", with: .unreachable)
+        model.askToTurnOff(webhook)
+        await model.confirm(try #require(model.question))
+        #expect(model.webhook("a")?.active == true)
+        #expect(model.rowErrors["a"] == .unreachable)
     }
 
     @Test func deletingAsksFirstThenRemovesAndTellsThePageToGoBack() async throws {

@@ -40,9 +40,15 @@ struct SourceAccess {
         markSet = markSets.first ?? MarfaMarkSet(id: "", title: "")
     }
 
-    var rows: [MarfaSourceRow] { access.rows() }
+    var rows: [MarfaSourceRow] {
+        access.rows().sorted { lhs, rhs in
+            if lhs.count != rhs.count { return (lhs.count ?? -1) > (rhs.count ?? -1) }
+            let byName = lhs.name.localizedStandardCompare(rhs.name)
+            return byName == .orderedSame ? lhs.code < rhs.code : byName == .orderedAscending
+        }
+    }
 
-    func row(_ code: String) -> MarfaSourceRow? { rows.first { $0.code == code } }
+    func row(_ code: String) -> MarfaSourceRow? { access.rows().first { $0.code == code } }
 
     func load() async {
         await access.refresh()
