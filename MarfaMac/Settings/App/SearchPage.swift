@@ -144,8 +144,8 @@ struct SearchPage: View {
                 }
                 .accessibilityIdentifier("SearchOrder")
             }
-            SettingsRow("Show snippets", line: "The words that matched, under each result.", lines: nil) {
-                SettingsToggle(title: "Show snippets", isOn: $showsSnippets).accessibilityIdentifier("SearchSnippets")
+            SettingsRow("Show matched words under each result", lines: nil) {
+                SettingsToggle(title: "Show matched words under each result", isOn: $showsSnippets).accessibilityIdentifier("SearchSnippets")
             }
         }
     }

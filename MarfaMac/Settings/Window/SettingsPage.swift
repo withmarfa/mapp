@@ -160,7 +160,8 @@ nonisolated enum SettingsPage: CaseIterable, Hashable, Sendable {
             [
                 String(localized: "Excluded"), String(localized: "Add…"), String(localized: "Type or source"), String(localized: "Included"),
                 String(localized: "Archived items"), String(localized: "Feed items"), String(localized: "Results"), String(localized: "Order"),
-                String(localized: "Best Match"), String(localized: "Most Recent"), String(localized: "Show snippets"),
+                String(localized: "Best Match"), String(localized: "Most Recent"), String(localized: "Show matched words under each result"),
+                String(localized: "Show snippets"),
             ]
         case .onThisMac:
             [

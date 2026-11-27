@@ -15,8 +15,7 @@ enum LayoutsSubpage {
     }
 }
 
-/// The Layouts page: one row for each type of the server, which opens that type's own page. Nothing is left out, so a type
-/// with no items yet is here too. Export Layouts and Import Layouts move every layout between Macs and servers as a file.
+/// A type in the library catalogue can have a layout before it has any items.
 struct LayoutsPage: View {
     @Environment(Libraries.self) private var libraries
     @Environment(\.settingsNavigation) private var navigation

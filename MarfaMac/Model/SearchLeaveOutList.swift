@@ -6,7 +6,7 @@ import Foundation
 nonisolated enum SearchLeaveOutList {
     nonisolated struct Entry: Identifiable, Hashable, Sendable {
         nonisolated enum Kind: Hashable, Sendable {
-            /// A type left out, with how many of its subtypes go with it.
+            /// A type the person excluded directly.
             case type(TypeID)
             /// A subtype that goes with `parent`, which the person did not choose on its own.
             case subtype(TypeID, parent: TypeID)
@@ -78,12 +78,12 @@ nonisolated enum SearchLeaveOutList {
     /// A type offered in the Add sheet.
     nonisolated struct TypeChoice: Identifiable, Hashable, Sendable {
         let id: TypeID
-        /// The name in the list, which the menu repeats.
+        /// The display name saved with the exclusion.
         let label: String
         /// The subtypes that would be left out with it.
         let subtypes: Int
 
-        /// What the menu says: "Notes, with 2 subtypes", so the person sees that more than one type goes.
+        /// The picker includes the subtype count because excluding the parent excludes its descendants.
         var title: String {
             subtypes == 0 ? label : String(localized: "\(label), with \(subtypes) subtypes")
         }

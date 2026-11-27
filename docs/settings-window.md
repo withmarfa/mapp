@@ -46,10 +46,10 @@ See `docs/owner-settings.md` for Marfa pages and `docs/settings-sync.md` for sto
 | --- | --- |
 | General | Reopen Windows follows the Mac until the person changes it, and only then writes `NSQuitAlwaysKeepsWindows`. Send Error Reports and Updates show only in a build that carries a destination or a feed |
 | Appearance | A color is stored as a name or a hex value. Installed fonts are listed when the page appears, never before |
-| Keyboard | Search by command or keys. Global shortcuts precede the menus. Restore Defaults, Export, and Import apply to all shortcuts (`docs/commands.md`) |
+| Keyboard | Search by command or keys. Export and Restore Defaults include menu and global shortcuts. Import updates commands in the file (`docs/commands.md`) |
 | Editor | Each change reaches an open page. Inkkit's options go as one set (`EditorOptions`), because each of its calls replaces the whole set. Edit Pages As applies to items opened next, never to the page shown |
 | Lists | Density, From (All Items or Library), sort, and grouping. A view or place can override these defaults |
-| Layouts | Yours, Built In, and From Plugins open each type's layout (`docs/type-looks.md`). Export and Import move layouts. Pins, Linked From, and Restore Defaults write through `PagePlacements` |
+| Layouts | Types are grouped by origin. Export and Import transfer the date, secondary line, and facts (`docs/type-looks.md`). `PagePlacements` stores pins and Linked From. Restore Defaults resets both stores for one type |
 | Search | Excluded types and sources keep their names if missing (`SearchLeaveOuts`). Add explains the ten-condition limit. Included controls archived and Feed items. Results controls order and snippets. Searches within a place omit nothing |
 | On This Mac | Opens from Connection. The copy, downloaded files and exports, below |
 | Connection | Sign-in, other Marfas and Disconnect, which reads the queue in the same step and asks about changes that wait |

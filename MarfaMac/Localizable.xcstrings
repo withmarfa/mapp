@@ -9398,6 +9398,9 @@
     "Show in Types" : {
 
     },
+    "Show matched words under each result" : {
+
+    },
     "Show on Page" : {
       "extractionState" : "manual"
     },
@@ -10994,9 +10997,6 @@
     },
     "The window closed or changed library before the item’s files were attached." : {
       "extractionState" : "manual"
-    },
-    "The words that matched, under each result." : {
-
     },
     "Their fields stay read-only until %@ exists again." : {
 
