@@ -355,6 +355,16 @@ import Testing
         #expect(await copy.unitsHeld(item)[look(task)] == created)
     }
 
+    /// Rule 5: another Mac's change to a sibling rewrites the looks here without the held row.
+    @Test func aSiblingTakenOverAHeldRowLeavesItAbsentHere() async throws {
+        let (copy, item, sync) = await lookSetAside()
+        await copy.change(item, [look(note): occurred])
+        await flush(sync)
+        #expect(local()[look(note)] == occurred)
+        #expect(local()[look(task)] == nil)
+        #expect(await copy.unitsHeld(item)[look(task)] == edited)
+    }
+
     @Test func aHeldRowIsNotPutBackByAnotherBuild() async throws {
         let (copy, _, sync) = await lookSetAside()
         sync.detach()

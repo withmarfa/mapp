@@ -53,6 +53,8 @@ actor FakePreferencesCopy: PreferencesCopy {
     private var duringRead: (@MainActor () -> Void)?
     /// Runs once, the next time a step writes to an item, as a store's change made while a step awaits its writes.
     private var duringWrite: (@MainActor () -> Void)?
+    /// Each row write taken, in order: the row's id with the value put, or nil for a delete.
+    private(set) var rowsWritten: [(id: String, value: String?)] = []
     /// The id of each field write, in the order queued.
     private(set) var writeIDs: [String] = []
     /// Whether the next field write is answered as taken the moment it is queued. A test of a conflict answers it itself.
@@ -246,7 +248,10 @@ actor FakePreferencesCopy: PreferencesCopy {
             switch operation {
             case .put(let id?, let values):
                 held[item]?.rows[table, default: [:]][id] = (values["key"]?.string ?? "", values["setting"]?.string ?? "", values["value"]?.string ?? "")
-            case .delete(let id): held[item]?.rows[table]?[id] = nil
+                rowsWritten.append((id, values["value"]?.string ?? ""))
+            case .delete(let id):
+                held[item]?.rows[table]?[id] = nil
+                rowsWritten.append((id, nil))
             default: break
             }
         }
