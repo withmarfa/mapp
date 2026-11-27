@@ -16,7 +16,9 @@ import Testing
     }
 
     /// The folders listed, each with its report and, through the copy, its settings.
-    private func model(_ bench: OwnerBench, folders: [(OwnerFolder, FolderReport)], calls: FakeFolderCalls? = nil) -> FoldersModel {
+    private func model(
+        _ bench: OwnerBench, folders: [(OwnerFolder, FolderReport)], calls: FakeFolderCalls? = nil, thisSignIn: String? = nil
+    ) -> FoldersModel {
         bench.calls.state.withLock { state in
             state.folders = folders.map(\.0)
             state.reports = Dictionary(uniqueKeysWithValues: folders.map { ($0.0.id, $0.1) })
@@ -27,7 +29,7 @@ import Testing
                 state.folders[folder.id] = FakeFolderCalls.folder(folder.id, folder.title)
             }
         }
-        return FoldersModel(context: bench.context, folderCalls: held)
+        return FoldersModel(context: bench.context, folderCalls: held, thisSignIn: thisSignIn)
     }
 
     @Test func stopSyncingIsSentOnlyOnceTheOwnerAgrees() async throws {
@@ -262,6 +264,46 @@ import Testing
         #expect(FoldersModel.needsAttention(Self.copy("1", removals: 2)))
         #expect(FoldersModel.needsAttention(Self.copy("1", problems: [FolderProblem(code: .paused, count: 1)])))
         #expect(!FoldersModel.needsAttention(Self.copy("1", downloads: 4)))
+    }
+
+    @Test func anEmptyFolderListStaysEmpty() async {
+        let bench = OwnerBench()
+        let model = FoldersModel(context: bench.context, folderCalls: FakeFolderCalls())
+        await model.load()
+        #expect(model.folders.isEmpty)
+        #expect(model.hasLoaded)
+        #expect(model.failure == nil)
+        #expect(!model.splitsBySignIn)
+    }
+
+    @Test func aServerThatDoesNotAnswerLeavesFoldersUnread() async {
+        let bench = OwnerBench()
+        bench.calls.fail("folders", with: .unreachable)
+        let model = FoldersModel(context: bench.context, folderCalls: FakeFolderCalls())
+        await model.load()
+        #expect(model.failure == .unreachable)
+        #expect(model.folders.isEmpty)
+    }
+
+    @Test func aPausedCopyReadsPausedAndAKnownSignInSplitsThisMacFromTheOthers() async {
+        var here = Self.copy("c1", "Marfa for Mac", problems: [FolderProblem(code: .paused, count: 1)])
+        here.signInID = "this"
+        var away = Self.copy("c2", "marfa on Mac mini")
+        away.signInID = "other"
+        let bench = OwnerBench()
+        let model = model(
+            bench,
+            folders: [
+                (OwnerFolder(id: "a", title: "Studio Notes"), FolderReport(copies: [here])),
+                (OwnerFolder(id: "b", title: "Client Drawings"), FolderReport(copies: [away])),
+            ],
+            thisSignIn: "this")
+        await model.load()
+        #expect(FoldersModel.condition(of: here) == FoldersModel.Condition(title: "Paused", tone: .quiet))
+        #expect(model.splitsBySignIn)
+        #expect(model.onThisMac.map(\.id) == ["a"])
+        #expect(model.otherFolders.map(\.id) == ["b"])
+        #expect(model.thisCopy(of: model.folders[0])?.id == "c1")
     }
 }
 

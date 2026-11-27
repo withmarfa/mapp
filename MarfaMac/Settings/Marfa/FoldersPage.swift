@@ -11,7 +11,8 @@ struct FoldersPage: View {
     init(host: any MarfaSettingsHost, subpage: SettingsSubpage?) {
         self.host = host
         self.subpage = subpage
-        _model = State(initialValue: FoldersModel(context: OwnerContext(host: host), folderCalls: host.folderCalls))
+        _model = State(initialValue: FoldersModel(
+            context: OwnerContext(host: host), folderCalls: host.folderCalls, thisSignIn: host.folderSignInID))
     }
 
     static func subpage(for folder: OwnerFolder) -> SettingsSubpage {
@@ -61,22 +62,48 @@ struct FoldersPage: View {
 
     private var list: some View {
         SettingsPageColumn {
-            SettingsSection(
-                name: Text("Folders"),
-                footer: Text("A folder is made where it is kept in step, such as with the command line.")
-            ) {
-                if model.folders.isEmpty {
+            if model.folders.isEmpty {
+                SettingsSection(
+                    "Folders", footer: "A folder is made where it is kept in step, such as with the command line."
+                ) {
                     SettingsEmptyCard(
                         symbol: "folder", title: Text("No Folders"),
                         line: Text("Nothing is kept in step with a folder yet."))
                 }
-                ForEach(model.folders) { folder in
-                    let report = model.reports[folder.id]
-                    let condition = model.condition(of: folder)
-                    SettingsLinkRow(
-                        verbatim: folder.title, line: line(folder, report: report),
-                        lead: .tile("folder.fill", .blue), value: condition?.title, dot: condition.map(Self.dot)
-                    ) { navigation?.push(Self.subpage(for: folder)) }
+            } else if model.splitsBySignIn {
+                if !model.onThisMac.isEmpty {
+                    SettingsSection("On This Mac") {
+                        ForEach(model.onThisMac) { folder in
+                            let copy = model.thisCopy(of: folder)
+                            let condition = copy.map { FoldersModel.condition(of: $0) }
+                            SettingsLinkRow(
+                                verbatim: folder.title, line: line(folder, report: model.reports[folder.id]),
+                                lead: .tile("folder.fill", .blue), value: condition?.title, dot: condition.map(Self.dot)
+                            ) { navigation?.push(Self.subpage(for: folder)) }
+                        }
+                    }
+                }
+                if !model.otherFolders.isEmpty {
+                    SettingsSection("Other Folders") {
+                        ForEach(model.otherFolders) { folder in
+                            SettingsLinkRow(
+                                verbatim: folder.title, line: line(folder, report: model.reports[folder.id]),
+                                lead: .tile("folder.fill", .blue)
+                            ) { navigation?.push(Self.subpage(for: folder)) }
+                        }
+                    }
+                }
+            } else {
+                SettingsSection(
+                    "Folders", footer: "A folder is made where it is kept in step, such as with the command line."
+                ) {
+                    ForEach(model.folders) { folder in
+                        let condition = model.condition(of: folder)
+                        SettingsLinkRow(
+                            verbatim: folder.title, line: line(folder, report: model.reports[folder.id]),
+                            lead: .tile("folder.fill", .blue), value: condition?.title, dot: condition.map(Self.dot)
+                        ) { navigation?.push(Self.subpage(for: folder)) }
+                    }
                 }
             }
             if let cut = model.cutLine { SettingsNote(verbatim: cut) }

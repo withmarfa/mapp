@@ -39,7 +39,7 @@ struct SettingsWindowTests {
 
     @Test func searchesForLocalCopySettingsOpenConnection() {
         for word in [
-            "On This Mac", "Keep opened files", "Space used", "Remove downloaded files",
+            "Keep opened files", "Space used", "Remove downloaded files",
             "Export everything", "Download everything again",
         ] {
             let launcher = SettingsLauncher()
@@ -48,6 +48,8 @@ struct SettingsWindowTests {
             launcher.show(results.first)
             #expect(launcher.navigation.page == .connection)
         }
+        // Folders names its own section On This Mac, so that phrase finds both pages.
+        #expect(SettingsPage.sidebarMatches("On This Mac") == [.connection, .folders])
         #expect(SettingsPage.sidebarMatches("Clear").contains(.connection))
     }
 
@@ -103,5 +105,13 @@ struct SettingsWindowTests {
         #expect(MarfaSettingsPage.network.permission == .configManage)
         #expect(MarfaSettingsPage.types.permission == .schemaWrite)
         #expect(MarfaSettingsPage.plugins.permission == .schemaWrite)
+        #expect(MarfaSettingsPage.links.permission == .schemaWrite)
+        #expect(MarfaSettingsPage.links.sidebarEntry == .types)
+        #expect(MarfaSettingsPage.connectors.permission == .connectorsManage)
+        #expect(MarfaSettingsPage.folders.permission == nil)
+        #expect(MarfaSettingsPage.types.missingPermission(in: []) == .schemaWrite)
+        #expect(MarfaSettingsPage.plugins.missingPermission(in: []) == .schemaWrite)
+        #expect(MarfaSettingsPage.connectors.missingPermission(in: [.schemaWrite]) == .connectorsManage)
+        #expect(MarfaSettingsPage.folders.missingPermission(in: []) == nil)
     }
 }

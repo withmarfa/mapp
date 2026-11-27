@@ -110,6 +110,8 @@ struct MarfaMarkSet: Identifiable, Hashable {
     /// The `app.<vendor>` namespace the app keeps its own synced settings in, which the Apps page never removes the data of;
     /// nil where the app keeps none.
     var ownAppVendor: String? { get }
+    /// The id of the sign-in this app is using, when it is known. Folders uses it to tell this Mac's copies from the others.
+    var folderSignInID: String? { get }
 
     /// The address the system's web authentication sheet ends on, which the app registered for its sign-ins: where a
     /// connector's vendor sign-in sends the browser back to.
@@ -178,6 +180,7 @@ struct MarfaMarkSet: Identifiable, Hashable {
 }
 
 extension MarfaSettingsHost {
+    var folderSignInID: String? { nil }
     func show(_ page: MarfaSettingsPage) { show(page, subpage: nil) }
 }
 
@@ -387,6 +390,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
             ]
         case .folders:
             [
+                String(localized: "Folders"), String(localized: "On This Mac"), String(localized: "Other Folders"),
                 String(localized: "Copies"), String(localized: "Needs Attention"), String(localized: "Synced Folders"), String(localized: "Rename"),
                 String(localized: "Ignore"), String(localized: "Include"), String(localized: "Safety"), String(localized: "Pause Removals Over"),
                 String(localized: "Pause Additions Over"), String(localized: "Stop Syncing"),
