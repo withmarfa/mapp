@@ -2,8 +2,9 @@ import SwiftUI
 
 /// A page's notices (`PageNotice`) as the file page and the saved web page draw them: quiet lines in the page's column,
 /// 13 points at the default text size, each with its one action as a small gray button and, for the pictures' notice, a
-/// close button. The wash reaches 12 points beyond the text, so its symbol stands where the text does. The web head draws the
-/// same lines in `editor/src/notice.ts`. A screen reader hears them once, when they appear or say something else.
+/// close button. The wash reaches 12 points beyond the text, so its symbol stands where the text does. The web head
+/// draws the same lines in `editor/src/notice.ts`. A screen reader hears them once, when they appear or say something
+/// else.
 struct PageNoticeView: View {
     @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
     let notices: [PageNotice]

@@ -35,7 +35,7 @@ paths:
 - **Every link the type may hold is a row** (`RelationField`), Empty under Show N More until set; an In Collection row wears the collection's mark. One Marfa will not change (a text's `references`, a folder) is read only, its help tag saying why.
 - **A parent's sub-items and Referenced By wait under Show N More,** since the foot lists them. Values no field describes are the last rows, read only, under Other.
 - **A link's panel** (`ValueEditKind.relation`) serves every edge field, inverses too: ten rows narrowed by typing, each a mark and a name, Archived or "In <name>" beside it, or the one line No Results. The name takes the width before the detail is cut.
-- **A field of one link holds it as a chip and as the first row, lit, with Open under it.** A field of several shows chips, eight lines at most. Chips and a page's link rows show the first 30, then "N More" shows the rest.
+- **A field of one link holds it as a chip and as the first row, lit, with Open under it.** A field of several shows chips, eight lines at most. Chips show the first 30, then "N More" shows the rest; a page's link rows show the first three.
 - **Marfa's answer is obeyed** (`ItemLibrary.changeLinks`): a refusal, or a copy not yet whole, is one red line and the panel stays, with what was typed. One commit is one undo step.
 
 ## Location

@@ -3,8 +3,8 @@ import SwiftUI
 
 /// An item's head drawn in SwiftUI from `PageHead`, for a page the editor does not draw, as the editor's page draws it:
 /// the kicker, then `title`, then the pins while they are on, then the rows with Show More. Values are shown and links
-/// open, the first `PageHead.rowLinkLimit` of a row, then "N More"; the status opens a native menu and writes as the item page's does. A value keeps to one line
-/// but a long text, which keeps to two, with the whole of it in the help.
+/// open, the first `PageHead.rowLinkLimit` of a row, then "N More"; the status opens a native menu and writes as the
+/// item page's does. A value keeps to one line but a long text, which keeps to two, with the whole of it in the help.
 struct PageHeadView<Title: View>: View {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
