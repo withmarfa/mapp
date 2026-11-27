@@ -2933,6 +2933,9 @@
     "As media" : {
 
     },
+    "Ascending" : {
+
+    },
     "Ask" : {
 
     },
@@ -4574,6 +4577,9 @@
     "Density" : {
 
     },
+    "Descending" : {
+
+    },
     "Description" : {
       "extractionState" : "manual"
     },
@@ -4650,9 +4656,6 @@
       "extractionState" : "manual"
     },
     "Disconnecting this app also signs this Mac out." : {
-
-    },
-    "Disconnect…" : {
 
     },
     "Divider" : {
@@ -6516,13 +6519,13 @@
     "Limit Sources" : {
 
     },
-    "Limit sources" : {
-
-    },
     "Limit Sources Not Saved" : {
 
     },
     "Limit requests" : {
+
+    },
+    "Limit sources" : {
 
     },
     "Limits" : {
@@ -8056,9 +8059,6 @@
     "Other Fields in This Version" : {
       "extractionState" : "manual"
     },
-    "Other Folders" : {
-
-    },
     "Other Marfas" : {
 
     },
@@ -8984,9 +8984,6 @@
 
     },
     "Revoked a key" : {
-
-    },
-    "Revoke…" : {
 
     },
     "Revoking this key also signs this Mac out." : {
@@ -12359,13 +12356,13 @@
     "Webhook Created" : {
 
     },
-    "Webhook limit reached" : {
-
-    },
     "Webhook Not Made" : {
 
     },
     "Webhook Unavailable" : {
+
+    },
+    "Webhook limit reached" : {
 
     },
     "Webhooks" : {
@@ -12530,10 +12527,10 @@
     "Who May Write" : {
 
     },
-    "Who may write" : {
+    "Who May Write Not Saved" : {
 
     },
-    "Who May Write Not Saved" : {
+    "Who may write" : {
 
     },
     "Whole Number" : {
