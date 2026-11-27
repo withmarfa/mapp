@@ -2029,9 +2029,6 @@
     "A folder, view, webhook or table stops the move. Nothing moved." : {
 
     },
-    "A key can only be narrowed later, so choose what it needs now." : {
-
-    },
     "A key can set its own instead." : {
 
     },
@@ -2119,6 +2116,9 @@
 
     },
     "A source appears here once an app or key has written an item." : {
+
+    },
+    "A source can’t be “.” or “..”." : {
 
     },
     "A source." : {
@@ -3678,6 +3678,9 @@
     "Choose the settings to go back to." : {
 
     },
+    "Choose type exceptions and owner permissions." : {
+
+    },
     "Choose what to replace with the settings in “%@”." : {
 
     },
@@ -4276,6 +4279,9 @@
     "Custom Color" : {
 
     },
+    "Customize Access" : {
+
+    },
     "Customize Layout…" : {
       "extractionState" : "manual"
     },
@@ -4838,9 +4844,6 @@
     "Every Marfa has these. Base a type on one to add to it." : {
 
     },
-    "Every Type" : {
-
-    },
     "Every Week" : {
 
     },
@@ -4875,6 +4878,9 @@
 
     },
     "Every setting on this Mac. Your items stay." : {
+
+    },
+    "Every type" : {
 
     },
     "Everything" : {
@@ -5453,6 +5459,9 @@
 
     },
     "Hide Month" : {
+
+    },
+    "Hide Options" : {
 
     },
     "Hide Others" : {
@@ -6539,9 +6548,6 @@
     "Look After This Marfa" : {
 
     },
-    "Looking After This Marfa" : {
-
-    },
     "Low" : {
       "extractionState" : "manual"
     },
@@ -6783,6 +6789,9 @@
 
     },
     "More From This Book" : {
+
+    },
+    "More actions for %@" : {
 
     },
     "More changes arrived while you were deciding. Look at them before you choose." : {
@@ -7062,6 +7071,9 @@
 
     },
     "New items are" : {
+
+    },
+    "New items go to" : {
 
     },
     "New password" : {
@@ -7929,6 +7941,9 @@
     "Owner’s Permissions" : {
 
     },
+    "Owner’s permissions" : {
+
+    },
     "PDF" : {
       "extractionState" : "manual"
     },
@@ -8085,6 +8100,9 @@
 
     },
     "Permissions" : {
+
+    },
+    "Permissions no longer available" : {
 
     },
     "Person" : {
@@ -9117,6 +9135,9 @@
     "Set the object store secret key again" : {
 
     },
+    "Set the source and where new items go." : {
+
+    },
     "Set them again if you install it later." : {
 
     },
@@ -9627,7 +9648,7 @@
     "Source Name Not Kept" : {
 
     },
-    "Source, Stamped on What It Writes" : {
+    "Source and Destination" : {
 
     },
     "Source: %@" : {
@@ -10648,6 +10669,9 @@
     "The port it listens on." : {
 
     },
+    "The prefixes oauth:, restored:, and connector-host: are reserved. Use a different source." : {
+
+    },
     "The preview expired before %@ answered." : {
 
     },
@@ -10825,7 +10849,7 @@
     "The sign-in wasn’t confirmed partway through." : {
 
     },
-    "The source can’t change later." : {
+    "The source is stamped on what the key writes and can’t change later." : {
 
     },
     "The time couldn’t be saved." : {
@@ -11378,6 +11402,9 @@
     "This server runs Marfa %@. Update the server to Marfa %@ or later to use this app." : {
       "extractionState" : "manual"
     },
+    "This sign-in can’t grant owner permissions." : {
+
+    },
     "This sign-in doesn’t have permission to empty Trash." : {
 
     },
@@ -11878,6 +11905,9 @@
     },
     "Use a number from %lld to %lld." : {
       "extractionState" : "manual"
+    },
+    "Use a source with at most 200 characters." : {
+
     },
     "Use a whole number." : {
 
@@ -12856,6 +12886,9 @@
     "or drop one here" : {
 
     },
+    "permanently delete trashed items" : {
+
+    },
     "pt" : {
 
     },
@@ -12950,6 +12983,9 @@
 
     },
     "today, %@" : {
+
+    },
+    "update and maintain the server" : {
 
     },
     "update the server and run its housekeeping" : {

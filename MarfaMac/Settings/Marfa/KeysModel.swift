@@ -176,18 +176,24 @@ import Observation
 
     func make() async {
         guard canMakeDraft else { return }
-        isMaking = true
-        defer { isMaking = false }
         draftError = nil
         sourceError = nil
+        let source = draft.source.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let error = Self.invalidSource(source) {
+            sourceError = error
+            return
+        }
+
+        isMaking = true
         var types: [String: AccessLevel] = ["*": draft.everyType]
         for (pattern, level) in draft.exceptions { types[pattern] = level }
         let request = NewKey(
             label: draft.name.trimmingCharacters(in: .whitespacesAndNewlines),
-            source: draft.source.trimmingCharacters(in: .whitespacesAndNewlines), tier: draft.tier,
+            source: source, tier: draft.tier,
             expires: draft.expires.date(), types: types, permissions: draft.permissions.sorted())
         do {
             let made = try await context.calls.create(request)
+            isMaking = false
             if closedWhileMaking {
                 closedWhileMaking = false
                 sheet = nil
@@ -198,6 +204,7 @@ import Observation
             }
             await load()
         } catch {
+            isMaking = false
             if closedWhileMaking {
                 closedWhileMaking = false
                 sheet = nil
@@ -206,6 +213,16 @@ import Observation
             if case .sourceHeld(let reason) = error { sourceError = reason } else { draftError = OwnerWording.line(error) }
             await context.learn(from: error)
         }
+    }
+
+    private static func invalidSource(_ source: String) -> String? {
+        if source.unicodeScalars.count > 200 { return String(localized: "Use a source with at most 200 characters.") }
+        if source == "." || source == ".." { return String(localized: "A source can’t be “.” or “..”.") }
+        let lowered = source.lowercased()
+        if ["oauth:", "restored:", "connector-host:"].contains(where: { lowered.utf8.starts(with: $0.utf8) }) {
+            return String(localized: "The prefixes oauth:, restored:, and connector-host: are reserved. Use a different source.")
+        }
+        return nil
     }
 
     /// The notice for a key made and never copied: its secret can't be shown again.
