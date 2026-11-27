@@ -11,6 +11,9 @@ struct SettingsUsageChart: View {
     }
 
     let days: [Date]
+    /// The instant the days were counted to, so the last day of that window reads Today.
+    var now: Date = .now
+    var calendar: Calendar = .current
     let series: [Series]
     @State private var plotWidth = SettingsTokens.Metric.column
     private typealias Metric = SettingsTokens.Metric.Usage
@@ -62,7 +65,7 @@ struct SettingsUsageChart: View {
                 width: .fixed(barWidth)
             )
             .foregroundStyle(bar.series.tone.color)
-            .accessibilityLabel(Text(days[bar.day], format: .dateTime.month().day().weekday()))
+            .accessibilityLabel(Text(verbatim: Self.dayLabel(days[bar.day], now: now, calendar: calendar)))
             .accessibilityValue(Text("\(bar.series.name), \(bar.end - bar.start, format: .number.precision(.fractionLength(0)))"))
         }
         .chartXScale(domain: days.indices.map { String($0) })
@@ -75,7 +78,7 @@ struct SettingsUsageChart: View {
             AxisMarks { value in
                 if let day = value.as(String.self).flatMap(Int.init), days.indices.contains(day) {
                     AxisValueLabel {
-                        Text(days[day], format: .dateTime.weekday(.abbreviated))
+                        Text(verbatim: Self.dayLabel(days[day], now: now, calendar: calendar))
                             .settingsFont(.chartAxis)
                             .foregroundStyle(SettingsTokens.secondaryText)
                     }
@@ -96,6 +99,13 @@ struct SettingsUsageChart: View {
                 }
             }
         }
+    }
+
+    /// The day under a bar: the weekday and the day of the month, or Today for the day the window was counted to.
+    static func dayLabel(_ day: Date, now: Date, calendar: Calendar) -> String {
+        if calendar.isDate(day, inSameDayAs: now) { return String(localized: "Today") }
+        let weekday = day.formatted(Date.FormatStyle(calendar: calendar).weekday(.abbreviated))
+        return "\(weekday) \(calendar.component(.day, from: day))"
     }
 }
 
