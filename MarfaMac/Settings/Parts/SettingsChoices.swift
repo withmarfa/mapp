@@ -16,36 +16,48 @@ struct ChoiceTiles<Value: Hashable>: View {
     /// empty places stay empty, so two row styles are not stretched to fill the card.
     var columns: Int?
 
+    private typealias Metric = SettingsTokens.Metric
+
     var body: some View {
-        HStack(alignment: .top, spacing: 14) {
+        let outline = RoundedRectangle(cornerRadius: Metric.choiceRadius, style: .continuous)
+        let ringOutset = Metric.choiceRingGap + Metric.choiceRingWidth
+        HStack(alignment: .top, spacing: Metric.choiceGap) {
             ForEach(choices) { choice in
+                let isSelected = selection == choice.value
                 Button { selection = choice.value } label: {
-                    VStack(spacing: 6) {
+                    VStack(spacing: Metric.choiceTitleGap) {
                         // The tile's shape alone sets its size, so every tile in a row is the same height whatever its
                         // picture holds.
                         Color.clear
-                            .aspectRatio(SettingsTokens.Metric.choiceAspect, contentMode: .fit)
+                            .aspectRatio(Metric.choiceAspect, contentMode: .fit)
                             .frame(maxWidth: .infinity)
                             .overlay(alignment: .topLeading) { choice.picture }
-                            .clipShape(.rect(cornerRadius: 8, style: .continuous))
+                            .clipShape(outline)
                             .overlay {
-                                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                    .strokeBorder(
-                                        selection == choice.value ? SettingsTokens.primaryText.opacity(0.55) : SettingsTokens.hairline,
-                                        lineWidth: selection == choice.value ? 2 : 1)
+                                outline.strokeBorder(SettingsTokens.choiceEdge, lineWidth: Metric.choiceEdgeWidth)
+                                    .allowsHitTesting(false)
                             }
-                        choice.title.settingsFont(.small).fontWeight(selection == choice.value ? .semibold : .regular)
+                            .overlay {
+                                if isSelected {
+                                    RoundedRectangle(cornerRadius: Metric.choiceRadius + ringOutset, style: .continuous)
+                                        .strokeBorder(SettingsTokens.choiceSelectionRing, lineWidth: Metric.choiceRingWidth)
+                                        .padding(-ringOutset)
+                                        .allowsHitTesting(false)
+                                }
+                            }
+                        choice.title.settingsFont(.small).fontWeight(isSelected ? .semibold : .regular)
                     }
                     .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
-                .accessibilityAddTraits(selection == choice.value ? .isSelected : [])
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
             }
             ForEach(0..<max(0, (columns ?? choices.count) - choices.count), id: \.self) { _ in
                 Color.clear.frame(maxWidth: .infinity).accessibilityHidden(true)
             }
         }
-        .padding(SettingsTokens.Metric.inset)
+        .padding([.top, .horizontal], Metric.inset)
+        .padding(.bottom, Metric.choiceBottom)
     }
 }
 
@@ -65,7 +77,7 @@ struct SettingsIconChoices<Value: Hashable>: View {
 
     var body: some View {
         let outline = RoundedRectangle(cornerRadius: Metric.controlRadius)
-        HStack(spacing: Metric.swatchSpacing) {
+        HStack(spacing: Metric.iconChoiceSpacing) {
             ForEach(choices) { choice in
                 Button { selection = choice.value } label: {
                     Image(choice.asset)

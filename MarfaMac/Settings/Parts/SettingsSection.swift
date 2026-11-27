@@ -60,9 +60,7 @@ struct SettingsSection<Content: View, Accessory: View>: View {
             SettingsCard(content: { content })
             if let footer {
                 footer
-                    .settingsFont(.footer)
-                    .foregroundStyle(SettingsTokens.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .modifier(SettingsFooterText())
                     .padding(.horizontal, inset)
             }
         }
@@ -88,6 +86,7 @@ struct SettingsCard<Content: View>: View {
     @ViewBuilder let content: Content
 
     var body: some View {
+        let outline = RoundedRectangle(cornerRadius: SettingsTokens.Metric.cardRadius, style: .continuous)
         VStack(spacing: 0) {
             Group(subviews: content) { rows in
                 ForEach(rows.indices, id: \.self) { index in
@@ -97,7 +96,7 @@ struct SettingsCard<Content: View>: View {
                             if index > 0 {
                                 Rectangle()
                                     .fill(SettingsTokens.rule)
-                                    .frame(height: 1)
+                                    .frame(height: SettingsTokens.Metric.cardRuleWidth)
                                     .padding(.leading, rows[index].containerValues.settingsRuleInset)
                                     .padding(.trailing, SettingsTokens.Metric.inset)
                                     .accessibilityHidden(true)
@@ -107,12 +106,12 @@ struct SettingsCard<Content: View>: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SettingsTokens.card, in: .rect(cornerRadius: SettingsTokens.Metric.cardRadius, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SettingsTokens.Metric.cardRadius, style: .continuous)
-                .strokeBorder(SettingsTokens.hairline, lineWidth: 1)
+        .clipShape(outline)
+        .background {
+            outline.fill(SettingsTokens.card)
+                .shadow(color: SettingsTokens.cardShadow, radius: SettingsTokens.Metric.cardShadowRadius, y: SettingsTokens.Metric.cardShadowDrop)
         }
-        .clipShape(.rect(cornerRadius: SettingsTokens.Metric.cardRadius, style: .continuous))
+        .overlay { outline.strokeBorder(SettingsTokens.cardEdge, lineWidth: SettingsTokens.Metric.cardEdgeWidth).allowsHitTesting(false) }
     }
 }
 
@@ -125,9 +124,19 @@ struct SettingsNote: View {
 
     var body: some View {
         text
-            .settingsFont(.footer)
-            .foregroundStyle(SettingsTokens.secondaryText)
+            .modifier(SettingsFooterText())
             .padding(.horizontal, SettingsTokens.Metric.inset)
+    }
+}
+
+private struct SettingsFooterText: ViewModifier {
+    @Environment(\.settingsTextScale) private var scale
+
+    func body(content: Content) -> some View {
+        content
+            .font(SettingsTokens.font(.footer, scale: scale))
+            .lineHeight(.exact(points: SettingsTokens.Metric.footerLineHeight * scale))
+            .foregroundStyle(SettingsTokens.secondaryText)
             .fixedSize(horizontal: false, vertical: true)
     }
 }

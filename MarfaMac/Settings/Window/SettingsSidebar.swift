@@ -24,9 +24,7 @@ struct SettingsSidebar: View {
         for (name, source) in [(LocalizedStringKey("App"), SettingsPage.appGroups), (LocalizedStringKey("Marfa"), SettingsPage.marfaGroups)] {
             let kept = source.map { $0.filter { matches.contains($0) } }.filter { !$0.isEmpty }
             for (index, pages) in kept.enumerated() {
-                let gap = index == 0
-                    ? (result.isEmpty ? SettingsTokens.Metric.sidebarHeadingTop : SettingsTokens.Metric.sidebarHalfGap)
-                    : SettingsTokens.Metric.sidebarGroupGap
+                let gap = index == 0 && !result.isEmpty ? SettingsTokens.Metric.sidebarHalfGap : 0
                 result.append(Group(name: index == 0 ? name : nil, pages: pages, gap: gap, id: result.count))
             }
         }
@@ -37,13 +35,18 @@ struct SettingsSidebar: View {
         let groups = groups
         List(selection: Binding<SettingsPage?> { selection.sidebarEntry } set: { if let page = $0 { selection = page } }) {
             ForEach(groups) { group in
-                groupHeading(group)
-                rows(group.pages)
+                if let name = group.name {
+                    groupHeading(name, gap: group.gap)
+                    rows(group.pages)
+                } else {
+                    Section { rows(group.pages) }
+                }
             }
         }
         .listStyle(.sidebar)
         .environment(\.sidebarRowSize, .small)
         .environment(\.defaultMinListRowHeight, 0)
+        .softSelection(rows: groups.map(\.pages), selection: { selection.sidebarEntry })
         .searchable(text: $search, placement: .sidebar, prompt: Text("Search"))
         .overlay {
             if groups.isEmpty {
@@ -54,8 +57,13 @@ struct SettingsSidebar: View {
         .accessibilityIdentifier("SettingsSidebar")
     }
 
-    private func groupHeading(_ group: Group) -> some View {
-        SidebarGroupHeading(name: group.name, gap: group.gap)
+    private func groupHeading(_ name: LocalizedStringKey, gap: CGFloat) -> some View {
+        Text(name)
+            .settingsFont(.sidebarHeading)
+            .foregroundStyle(SettingsTokens.secondaryText)
+            .padding(.top, gap)
+            .padding(.bottom, SettingsTokens.Metric.sidebarHeadingBottom)
+            .accessibilityAddTraits(.isHeader)
             .listRowInsets(.vertical, 0)
             .listRowSeparator(.hidden)
             .selectionDisabled()
@@ -63,6 +71,7 @@ struct SettingsSidebar: View {
 
     private func rows(_ pages: [SettingsPage]) -> some View {
         ForEach(pages, id: \.self) { page in
+            let isSelected = selection.sidebarEntry == page
             HStack(spacing: SettingsTokens.Metric.buttonGap) {
                 SettingsTile(symbol: page.symbol, tone: page.tone, size: SettingsTokens.Metric.sidebarTile, rich: true)
 
@@ -70,10 +79,13 @@ struct SettingsSidebar: View {
                 Text(page.title)
                     .settingsFont(.sidebar)
                     .fontWeight(.regular)
-                    .environment(\.backgroundProminence, selection.sidebarEntry == page ? .increased : .standard)
+                    .foregroundStyle(isSelected ? SettingsTokens.sidebarSelectedText : Color.primary)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
                 if let badge = badges(page), badge > 0 { problemBadge(badge) }
             }
+            .padding(.leading, SettingsTokens.Metric.sidebarRowLeading)
             .frame(minHeight: SettingsTokens.Metric.sidebarRow * max(1, scale))
             .accessibilityElement(children: .combine)
             .listRowInsets(.vertical, 0)
@@ -108,24 +120,7 @@ struct SettingsSidebar: View {
         .buttonStyle(.plain)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, SettingsTokens.Metric.sidebarFooterInset)
-        .padding(.vertical, SettingsTokens.Metric.sidebarFooterPadding)
-    }
-
-    private struct SidebarGroupHeading: View {
-        let name: LocalizedStringKey?
-        let gap: CGFloat
-
-        var body: some View {
-            if let name {
-                Text(name)
-                    .settingsFont(.sidebarHeading)
-                    .foregroundStyle(SettingsTokens.secondaryText)
-                    .padding(.top, gap)
-                    .padding(.bottom, SettingsTokens.Metric.sidebarHeadingBottom)
-                    .accessibilityAddTraits(.isHeader)
-            } else {
-                Color.clear.frame(height: gap).accessibilityHidden(true)
-            }
-        }
+        .padding(.top, SettingsTokens.Metric.sidebarFooterPadding)
+        .padding(.bottom, SettingsTokens.Metric.sidebarFooterBottom)
     }
 }

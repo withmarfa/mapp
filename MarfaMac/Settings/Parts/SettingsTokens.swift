@@ -43,9 +43,10 @@ enum SettingsTokens {
 
     /// A card: white with a hairline, never gray.
     static let card = adaptive(light: .white, dark: NSColor(white: 0.17, alpha: 1))
+    static let cardEdge = adaptive(light: NSColor(white: 0, alpha: 0.144), dark: NSColor(white: 1, alpha: 0.144))
+    static let cardShadow = Color.black.opacity(0.03)
     static let hairline = adaptive(light: NSColor(white: 0, alpha: 0.09), dark: NSColor(white: 1, alpha: 0.12))
-    /// A row's rule: lighter than the card's edge.
-    static let rule = adaptive(light: NSColor(white: 0, alpha: 0.07), dark: NSColor(white: 1, alpha: 0.09))
+    static let rule = adaptive(light: NSColor(white: 0, alpha: 0.098), dark: NSColor(white: 1, alpha: 0.098))
     /// The fill of a quiet control.
     static let buttonFill = adaptive(light: NSColor(white: 0, alpha: 0.06), dark: NSColor(white: 1, alpha: 0.12))
     /// A chosen row, card or table row: a soft gray, never blue.
@@ -54,40 +55,88 @@ enum SettingsTokens {
     static let hover = adaptive(light: NSColor(white: 0, alpha: 0.04), dark: NSColor(white: 1, alpha: 0.06))
     /// A value that can't be changed, in a field's place.
     static let field = adaptive(light: .white, dark: NSColor(white: 0.12, alpha: 1))
+    static let shortcutField = adaptive(light: .white, dark: NSColor(white: 0.23, alpha: 1))
+    static let shortcutEdge = adaptive(light: NSColor(white: 0, alpha: 0.102), dark: NSColor(white: 1, alpha: 0.102))
+    /// Tertiary ink for the recorder's action, with contrast against its field fill in both appearances.
+    static let shortcutPlaceholder = adaptive(light: NSColor(white: 0.46, alpha: 1), dark: NSColor(white: 0.69, alpha: 1))
+    static let shortcutClear = adaptive(light: NSColor(white: 0, alpha: 0.3), dark: NSColor(white: 1, alpha: 0.38))
     static let page = Color(nsColor: .windowBackgroundColor)
     static let errorRed = adaptive(light: NSColor(red: 0.78, green: 0.13, blue: 0.1, alpha: 1), dark: NSColor(red: 1, green: 0.42, blue: 0.38, alpha: 1))
     static let secondaryText = Color(nsColor: .secondaryLabelColor)
     static let tertiaryText = Color(nsColor: .tertiaryLabelColor)
     static let primaryText = Color(nsColor: .labelColor)
+    static let sidebarSelectedText = adaptive(light: NSColor(white: 0.13, alpha: 1), dark: NSColor(white: 0.9, alpha: 1))
     static let tileForeground = Color.white
     static let tileHighlight = Color.white.opacity(0.35)
     static let tileEdge = Color.black.opacity(0.1)
     static let tileShadow = Color.black.opacity(0.18)
     static let tileGlyphShadow = Color.black.opacity(0.22)
+    static let swatchEdge = Color.black.opacity(0.14)
+    static let swatchDot = Color.white
     /// The swatch of a color the person makes, before they have made one.
-    static let rainbow = AngularGradient(colors: [.red, .orange, .yellow, .green, .blue, .purple, .red], center: .center)
+    static let rainbow = AngularGradient(
+        colors: [rgb(0xff3b30), rgb(0xffcc00), rgb(0x34c759), rgb(0x00c7be), rgb(0x007aff), rgb(0xaf52de), rgb(0xff2d55), rgb(0xff3b30)],
+        center: .center)
     /// The accent the Mac is set to, which the first swatch of a color choice shows.
     static let systemAccent = Color(nsColor: .controlAccentColor)
     static let warning = Color(nsColor: .systemOrange)
     static let ok = Color(nsColor: .systemGreen)
-    /// The one color a chosen choice's ring and a focused control's ring take: gray, never the accent.
+    static let choiceEdge = Color.black.opacity(0.2)
+    static let choiceSelectionRing = adaptive(light: NSColor(white: 0, alpha: 0.339), dark: NSColor(white: 1, alpha: 0.339))
+    /// A focused control's ring is gray.
     static let focusRing = Color.primary.opacity(ChipLooks.defaults.focusRingOpacity)
     /// The scrim behind a centered sheet.
     static let scrim = Color.black.opacity(0.18)
     /// The shadow under a sheet.
     static let sheetShadow = Color.black.opacity(0.22)
 
-    /// The small windows a theme's tile draws: a sidebar of short bars and a page of lines, light and dark, which are the
-    /// pictures of the choices and so do not follow the appearance the window is in.
+    /// The miniature windows keep their own palette and scale independently of Settings.
     enum ThemePreview {
-        static let lightPage = Color(nsColor: NSColor(white: 1, alpha: 1))
-        static let lightSidebar = Color(nsColor: NSColor(srgbRed: 233 / 255, green: 234 / 255, blue: 237 / 255, alpha: 1))
-        static let lightSidebarLine = Color(nsColor: NSColor(srgbRed: 202 / 255, green: 203 / 255, blue: 206 / 255, alpha: 1))
-        static let lightLine = Color(nsColor: NSColor(white: 222 / 255, alpha: 1))
-        static let darkPage = Color(nsColor: NSColor(white: 30 / 255, alpha: 1))
-        static let darkSidebar = Color(nsColor: NSColor(srgbRed: 44 / 255, green: 44 / 255, blue: 54 / 255, alpha: 1))
-        static let darkSidebarLine = Color(nsColor: NSColor(srgbRed: 86 / 255, green: 86 / 255, blue: 94 / 255, alpha: 1))
-        static let darkLine = Color(nsColor: NSColor(white: 75 / 255, alpha: 1))
+        struct Palette {
+            let page: Color, sidebar: Color, text: Color, secondary: Color, tertiary: Color
+            let sidebarSelection: Color, listSelection: Color, rule: Color
+        }
+
+        static let light = Palette(
+            page: .white, sidebar: rgb(0xecedef), text: .black.opacity(0.82), secondary: .black.opacity(0.56),
+            tertiary: .black.opacity(0.36), sidebarSelection: .black.opacity(0.098), listSelection: .black.opacity(0.07),
+            rule: .black.opacity(0.055))
+        static let dark = Palette(
+            page: rgb(0x1e1e1e), sidebar: rgb(0x252533), text: .white.opacity(0.85), secondary: .white.opacity(0.56),
+            tertiary: .white.opacity(0.36), sidebarSelection: .white.opacity(0.13), listSelection: .white.opacity(0.1),
+            rule: .white.opacity(0.1))
+        static let trafficLights = [rgb(0xff5f57), rgb(0xfebc2e), rgb(0x28c840)]
+        static let trafficEdge = Color.black.opacity(0.12)
+        static let note = rgb(0xffcc00)
+        static let task = rgb(0x007aff)
+        static let event = rgb(0xff3b30)
+
+        static let scale: CGFloat = 0.5
+        static let referenceWidth: CGFloat = 372
+        static let sidebarWidth: CGFloat = 132
+        static let sidebarTop: CGFloat = 40
+        static let panelInset: CGFloat = 8
+        static let trafficInset: CGFloat = 14
+        static let trafficSize: CGFloat = 11
+        static let trafficGap: CGFloat = 7
+        static let sidebarRowHeight: CGFloat = 30
+        static let sidebarRowGap: CGFloat = 1
+        static let sidebarGroupGap: CGFloat = 10
+        static let sidebarRadius: CGFloat = 8
+        static let sidebarGlyph: CGFloat = 18
+        static let sidebarLabelGap: CGFloat = 9
+        static let listTop: CGFloat = 30
+        static let listRowHeight: CGFloat = 56
+        static let listRowInset: CGFloat = 10
+        static let listGlyph: CGFloat = 16
+        static let listTitleGap: CGFloat = 8
+        static let listLineGap: CGFloat = 2
+        static let listRadius: CGFloat = 10
+        nonisolated static let splitTop: CGFloat = 0.56
+        nonisolated static let splitBottom: CGFloat = 0.46
+        static let titleFont = Font.system(size: 13, weight: .semibold)
+        static let sidebarFont = Font.system(size: 13)
+        static let detailFont = Font.system(size: 12)
     }
 
     /// The interface fonts of Settings. A page asks for these by role.
@@ -187,12 +236,23 @@ enum SettingsTokens {
         /// The space above and below a table row's cells, which a cell that wraps keeps by growing the row.
         static let tableCellPadding: CGFloat = 7
         static let cardRadius: CGFloat = 12
+        static let cardEdgeWidth: CGFloat = 0.5
+        static let cardShadowRadius: CGFloat = 2
+        static let cardShadowDrop: CGFloat = 1
+        static let cardRuleWidth: CGFloat = 0.5
         static let controlRadius: CGFloat = 7
+        static let shortcutRadius: CGFloat = 6
+        static let shortcutEdgeWidth: CGFloat = 1
+        static let shortcutClearSize: CGFloat = 14
+        static let shortcutClearInset: CGFloat = 7
+        static let shortcutKeysInset: CGFloat = 26
+        static let shortcutPlaceholderInset: CGFloat = 8
+        static let shortcutMinimumLabelScale: CGFloat = 0.75
         static let tile: CGFloat = 24
         /// A tile's corner radius and the box its symbol is fitted in, as shares of its side: the symbol keeps even
         /// padding whatever its shape, as in System Settings' sidebar.
         static let tileRounding: CGFloat = 0.27
-        static let tileGlyph: CGFloat = 0.62
+        static let tileGlyph: CGFloat = 0.75
         /// A well's symbol or mark, as a share of its side: 12 points in the 24 point well.
         static let wellGlyph: CGFloat = 0.5
         static let headTile: CGFloat = 44
@@ -202,10 +262,11 @@ enum SettingsTokens {
         /// The sidebar's tile.
         static let sidebarTile: CGFloat = 24
         static let sidebarRow: CGFloat = 32
-        static let sidebarGroupGap: CGFloat = 13
         static let sidebarHalfGap: CGFloat = 32
+        static let sidebarRowLeading: CGFloat = 2
         static let sidebarFooterInset: CGFloat = 18
         static let sidebarFooterPadding: CGFloat = 10
+        static let sidebarFooterBottom: CGFloat = 14
         static let sidebarFooterGap: CGFloat = 4
         static let sidebarBadgeSize: CGFloat = 18
         static let sidebarBadgePadding: CGFloat = 5
@@ -215,12 +276,16 @@ enum SettingsTokens {
         static let tileShadowRadius: CGFloat = 1.5
         static let tileShadowDrop: CGFloat = 0.5
         static let tileGlyphShadowRadius: CGFloat = 0.5
-        static let sidebarHeadingTop: CGFloat = 12
         static let sidebarHeadingBottom: CGFloat = 5
         /// A color swatch and the dot that marks the chosen one, and the space between swatches.
         static let swatch: CGFloat = 18
         static let swatchDot: CGFloat = 6
-        static let swatchSpacing: CGFloat = 8
+        static let swatchSpacing: CGFloat = 9
+        static let swatchEdgeWidth: CGFloat = 0.5
+        static let swatchDividerHeight: CGFloat = 16
+        static let swatchDividerWidth: CGFloat = 1
+        static let swatchDividerInset: CGFloat = 1
+        static let iconChoiceSpacing: CGFloat = 8
         /// Compensates for the transparent margin built into the icon assets.
         static let iconChoiceScale: CGFloat = 1.25
         static let iconChoiceRingOutset: CGFloat = 3
@@ -228,16 +293,13 @@ enum SettingsTokens {
         static let invisibleWell: Double = 0.02
         /// A choice tile's picture is wider than tall, as the board draws it: 186 by 104 in the column.
         static let choiceAspect: CGFloat = 186 / 104
-        /// A theme tile's sidebar, as a share of its width, and its bars and lines: height, spacing, how many bars the
-        /// sidebar has, the page's side and top padding, the sidebar's side padding, and the heading line's share of the width.
-        static let previewSidebar: CGFloat = 0.3
-        static let previewLine: CGFloat = 5
-        static let previewLineSpacing: CGFloat = 7
-        static let previewSidebarLines = 5
-        static let previewPadding: CGFloat = 14
-        static let previewTop: CGFloat = 22
-        static let previewSidebarPadding: CGFloat = 10
-        static let previewHeading: CGFloat = 0.55
+        static let choiceGap: CGFloat = 14
+        static let choiceTitleGap: CGFloat = 7
+        static let choiceBottom: CGFloat = 12
+        static let choiceRadius: CGFloat = 8
+        static let choiceEdgeWidth: CGFloat = 0.5
+        static let choiceRingGap: CGFloat = 2
+        static let choiceRingWidth: CGFloat = 2.5
         /// The space above and below the rows a preview card draws.
         static let previewCardInset: CGFloat = 4
         /// The side margin of a picture of rows (a density tile) and the thickness of the rule between its rows.
@@ -318,7 +380,8 @@ enum SettingsTokens {
         /// More room above the first section of a page when it opens with its name and a line under it (the boards put the card
         /// 105.5 points under the window's top).
         static let firstHeaderWithLineInset: CGFloat = 2
-        static let pageBottom: CGFloat = 58
+        static let pageBottom: CGFloat = 40
+        static let footerLineHeight: CGFloat = 16
         /// The sheet that asks about changes that wait: its stack spacing, a change's spacing, padding and radius, and
         /// the tallest its list of texts grows.
         static let sheetSpacing: CGFloat = 12
@@ -346,6 +409,10 @@ enum SettingsTokens {
         static let sheetEdgeMargin: CGFloat = 24
         /// How far a section's name sits from the card's edge inside a sheet, which is nearer than on a page.
         static let sheetSectionInset: CGFloat = 4
+    }
+
+    private static func rgb(_ value: UInt32) -> Color {
+        Color(red: Double((value >> 16) & 255) / 255, green: Double((value >> 8) & 255) / 255, blue: Double(value & 255) / 255)
     }
 
     private static func adaptive(light: NSColor, dark: NSColor) -> Color {
