@@ -973,8 +973,8 @@ import Testing
         #expect(embed.name == file.lastPathComponent, "the file the copy took was told as not attached")
     }
 
-    /// A refused image for an item in Recently Deleted is added to the Library, attached to nothing.
-    @Test @MainActor func anImageForAnItemInTheBinIsAddedToTheLibrary() async throws {
+    /// A refused image for an item in Recently Deleted is saved to Downloads, not added as its own item.
+    @Test @MainActor func anImageForAnItemInTheBinIsSavedToDownloads() async throws {
         let scene = try await Self.open(Self.fake([
             Self.row("binned", title: "Old", state: .trashed),
             Self.row("live", title: "Live"),
@@ -982,72 +982,44 @@ import Testing
         let library = MarfaLibrary(source: scene.source, notices: Notices())
         try #require(await eventually { library.isLoaded })
         #expect(library.item(ItemID("binned"))?.state == .trashed)
-        let asked = KeptRecord()
-        Self.keepAside(scene, asked: asked)
-        let bytes = Data("shot".utf8)
-        let report = await library.attach([(name: "Shot.png", data: bytes)], to: ItemID("binned"))
-        let kept = try #require(asked.value.withLock { $0 })
-        #expect(kept.title == nil)
-        #expect(kept.tier == .library)
-        #expect(kept.parent == nil)
-        #expect(kept.bytes == bytes)
-        #expect(kept.file.lastPathComponent == "Shot.png")
-        #expect(!FileManager.default.fileExists(atPath: kept.file.path))
+        let report = try await Self.refusedImage(named: "Shot.png", bytes: Data("shot".utf8), to: ItemID("binned"), in: library, scene: scene)
         #expect(report.embeds.isEmpty)
         #expect(report.failed.isEmpty)
-        #expect(report.kept.map(\.name) == ["Shot.png"])
-        #expect(report.kept.map(\.place) == [.library])
         await scene.close()
     }
 
-    /// A refused image for an item that is gone is added to the Library, attached to nothing.
-    @Test @MainActor func anImageForADeletedItemIsAddedToTheLibrary() async throws {
+    /// A refused image for an item that is gone is saved to Downloads, not added as its own item.
+    @Test @MainActor func anImageForADeletedItemIsSavedToDownloads() async throws {
         let scene = try await Self.open(Self.fake([Self.row("live", title: "Live")]))
         let library = MarfaLibrary(source: scene.source, notices: Notices())
         try #require(await eventually { library.isLoaded })
         #expect(library.item(ItemID("gone")) == nil)
-        let asked = KeptRecord()
-        Self.keepAside(scene, asked: asked)
-        let bytes = Data("shot".utf8)
-        let report = await library.attach([(name: "Shot.png", data: bytes)], to: ItemID("gone"))
-        let kept = try #require(asked.value.withLock { $0 })
-        #expect(kept.title == nil)
-        #expect(kept.tier == .library)
-        #expect(kept.parent == nil)
-        #expect(kept.bytes == bytes)
-        #expect(kept.file.lastPathComponent == "Shot.png")
-        #expect(!FileManager.default.fileExists(atPath: kept.file.path))
+        let report = try await Self.refusedImage(named: "Shot.png", bytes: Data("shot".utf8), to: ItemID("gone"), in: library, scene: scene)
         #expect(report.embeds.isEmpty)
         #expect(report.failed.isEmpty)
-        #expect(report.kept.map(\.name) == ["Shot.png"])
-        #expect(report.kept.map(\.place) == [.library])
         await scene.close()
     }
 
-    private struct KeptAsk: Sendable {
-        var file: URL
-        var title: String?
-        var tier: Marfa.Tier?
-        var parent: String?
-        var bytes: Data
-    }
-
-    private final class KeptRecord: Sendable {
-        let value = Mutex<KeptAsk?>(nil)
-    }
-
-    /// Answers an added file and records what it was asked, since the fake copy refuses `addFile`.
-    private static func keepAside(_ scene: Scene, asked: KeptRecord) {
-        let stamp = stamp
-        scene.source.engine.hooks.adding.set { file, title, tier, parent in
-            let bytes = try Data(contentsOf: file)
-            asked.value.withLock { $0 = KeptAsk(file: file, title: title, tier: tier, parent: parent, bytes: bytes) }
-            func write(_ id: String, _ kind: WriteKind, item: String? = nil) -> Marfa.QueuedWrite {
-                Marfa.QueuedWrite(id: id, kind: kind, itemId: item, idempotencyKey: id, queuedAt: stamp)
-            }
-            return Marfa.Added(
-                upload: write("kept-upload", .uploadBlob), item: write("kept-item", .createItem, item: "kept-file"))
+    /// Attaches one image the item will not take, and checks it landed in Downloads without `addFile`.
+    private static func refusedImage(
+        named name: String, bytes: Data, to id: ItemID, in library: MarfaLibrary, scene: Scene
+    ) async throws -> AttachReport {
+        let downloads = TestFiles()
+        let folder = downloads.directory
+        defer { library.hooks.savingRefusedFile.set(nil) }
+        library.hooks.savingRefusedFile.set { folder }
+        let added = Mutex(false)
+        scene.source.engine.hooks.adding.set { _, _, _, _ in
+            added.withLock { $0 = true }
+            throw CancellationError()
         }
+        defer { scene.source.engine.hooks.adding.set(nil) }
+        let report = await library.attach([(name: name, data: bytes)], to: id)
+        let saved = folder.appending(path: name)
+        #expect(try Data(contentsOf: saved) == bytes)
+        #expect(report.kept == [KeptFile(name: name, file: saved)])
+        #expect(!added.withLock { $0 })
+        return report
     }
 
     /// Replaces the copy's attach, which the fake refuses, with one that waits on `reading` and answers as the

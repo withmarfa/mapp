@@ -1,17 +1,8 @@
-import AppKit
 import Foundation
 
-/// Where a file the item would not take ended up.
-private enum KeptAside {
-    case library
-    case clipboard
-    case left(String)
-}
-
 extension MarfaLibrary {
-    /// Stages each file and attaches it to the item. A file the item will not take is added to the Library, attached
-    /// to nothing, or put on the clipboard when that cannot be done. The staged file is removed only once one of
-    /// those has succeeded.
+    /// Stages each file and attaches it to the item. A file the item will not take is moved into Downloads under its
+    /// own name, or the next free name. The staged file is removed only once that move has succeeded.
     func attach(_ files: [(name: String, data: Data)], to id: ItemID) async -> AttachReport {
         sendWaitingText()
         let directory = URL.temporaryDirectory.appending(path: "marfa-mac-attach-\(UUID().uuidString)", directoryHint: .isDirectory)
@@ -31,15 +22,14 @@ extension MarfaLibrary {
                 report.embeds.append(try await source.embeds.attach(url, to: id))
                 removable.append(url)
             } catch {
-                switch await keptAside(url) {
-                case .library:
-                    report.kept.append((file.name, .library))
+                do {
+                    let saved = try saveRefused(url)
+                    report.kept.append(KeptFile(name: file.name, file: saved))
                     removable.append(url)
-                case .clipboard:
-                    report.kept.append((file.name, .clipboard))
-                    removable.append(url)
-                case .left(let reason):
-                    report.failed.append((file.name, reason))
+                } catch {
+                    // The temporary directory is a symlink, so the path told is the file itself.
+                    let path = url.resolvingSymlinksInPath().path
+                    report.failed.append((file.name, String(localized: "It couldn’t be saved to Downloads. The copy is still at \(path).")))
                 }
             }
         }
@@ -47,34 +37,53 @@ extension MarfaLibrary {
         return report
     }
 
-    /// Adds the staged file as an item of its own, or puts it on the clipboard. Neither posts its own notice:
-    /// the report says where it went, and the file stays put when neither can take it.
-    private func keptAside(_ url: URL) async -> KeptAside {
-        do {
-            _ = try await source.embeds.addFile(url, title: nil, tier: .library, tags: [], parent: nil)
-            return .library
-        } catch {
-            if copyImageToClipboard(url) { return .clipboard }
-            // The temporary directory is a symlink, so the path told is the file itself.
-            let path = url.resolvingSymlinksInPath().path
-            return .left(String(localized: "It couldn’t be copied to the clipboard. The copy is still at \(path)."))
+    /// Moves the staged file into Downloads. A test can name the folder, or throw to leave the file where it is.
+    private func saveRefused(_ url: URL) throws -> URL {
+        let folder: URL
+        #if DEBUG
+        if let replacement = hooks.savingRefusedFile.current {
+            folder = try replacement()
+        } else {
+            folder = try FileManager.default.url(for: .downloadsDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
         }
+        #else
+        folder = try FileManager.default.url(for: .downloadsDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+        #endif
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        return try Self.move(url, into: folder)
     }
 
-    /// Puts the image on the clipboard. False when it cannot, which leaves the staged file where it is.
-    private func copyImageToClipboard(_ url: URL) -> Bool {
-        #if DEBUG
-        if let replacement = hooks.copyingToClipboard.current { return replacement() }
-        #endif
-        // The clipboard is holding text the person has not answered; nothing may write over it.
-        guard !notices.holdsTextOnClipboard else { return false }
-        let pasteboard = NSPasteboard.general
-        let data = try? Data(contentsOf: url)
-        let image = data.flatMap { NSImage(data: $0) }
-        // A write leaves what is already there, so a paste can miss the image.
-        pasteboard.clearContents()
-        if let image, pasteboard.writeObjects([image]) { return true }
-        return pasteboard.writeObjects([url as NSURL])
+    /// How many names to try before the staged file is left where it is.
+    private static let nameTries = 10_000
+
+    /// The move is what finds a free name: looking first can lose it to a file that lands in between.
+    private static func move(_ url: URL, into folder: URL) throws -> URL {
+        let name = url.lastPathComponent
+        let ext = (name as NSString).pathExtension
+        let stem = (name as NSString).deletingPathExtension
+        for number in 1...nameTries {
+            let candidate = number == 1 ? name : (ext.isEmpty ? "\(stem) \(number)" : "\(stem) \(number).\(ext)")
+            do {
+                let destination = folder.appending(path: candidate)
+                try FileManager.default.moveItem(at: url, to: destination)
+                return destination
+            } catch {
+                guard alreadyThere(error) else { throw error }
+            }
+        }
+        throw CocoaError(.fileWriteFileExists)
+    }
+
+    /// Whether the move lost the name to a file already there, including the one error underneath.
+    private static func alreadyThere(_ error: any Error) -> Bool {
+        func matches(_ error: NSError) -> Bool {
+            error.domain == CocoaError.errorDomain && error.code == CocoaError.fileWriteFileExists.rawValue
+                || error.domain == POSIXError.errorDomain && error.code == Int(POSIXError.EEXIST.rawValue)
+        }
+        let ns = error as NSError
+        if matches(ns) { return true }
+        guard let underlying = ns.userInfo[NSUnderlyingErrorKey] as? NSError else { return false }
+        return matches(underlying)
     }
 
     /// Writes each file where the package can read it, in a folder of its own, so two files with one name each

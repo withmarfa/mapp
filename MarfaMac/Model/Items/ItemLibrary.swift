@@ -309,9 +309,8 @@ protocol ItemLibrary: AnyObject, Observable {
     /// Not undoable, so the views confirm it first, and only where `reachesServer`.
     func deletePermanently(_ ids: Set<ItemID>)
     /// Files the item points at, such as pasted images, with the links the page writes for them. A library that
-    /// sends them elsewhere may have to wait. Each file is attached on its own. One the item will not take is added
-    /// to the Library, attached to nothing, or put on the clipboard, and the report says where. Its staged copy is
-    /// removed only once one of those has succeeded.
+    /// sends them elsewhere may have to wait. Each file is attached on its own. One the item will not take is
+    /// moved into Downloads, and the report says where. Its staged copy is removed only once that move has succeeded.
     func attach(_ files: [(name: String, data: Data)], to id: ItemID) async -> AttachReport
     /// Attaches the file at `file` to the item, read where it is while this runs, and says what the item's text
     /// writes to show it. A failure means the file is not attached.

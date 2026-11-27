@@ -46,7 +46,7 @@ A macOS app for a Marfa server's items. It works only through the `marfa-swift` 
 
 ## Data rules
 
-- Never drop or silently overwrite a person's text. A write that cannot be kept where meant is kept where the person can get it back (a conflicted copy, the queue, the clipboard) and the person is told.
+- Never drop or silently overwrite a person's text. A write that cannot be kept where meant is kept where the person can get it back (a conflicted copy, the queue, the clipboard or Downloads) and the person is told.
 - An item's Markdown text is held byte for byte. Opened and left alone, it is never rewritten; an edit keeps the text of every block it did not reach.
 - Views, commands and the editor reach a library only through `ItemLibrary`, read from the environment's `library` value, and name items by `ItemID`, never by path.
 - This app's settings sync through the connected Marfa (`PreferencesSync`), but for what `PreferencesMap.staysOnMac` names.
@@ -66,7 +66,7 @@ A macOS app for a Marfa server's items. It works only through the `marfa-swift` 
 
 Report only a problem you can show: the input, state or step, and what goes wrong.
 
-- **Person's text lost.** Flag any path where a write that fails, is refused or races another change is dropped or written over newer text. Safe path: a conflicted copy, the queue or the clipboard, and tell the person.
+- **Person's text lost.** Flag a write that fails, is refused or races another change and is dropped or written over newer text. Safe path: a conflicted copy, the queue, the clipboard or Downloads, and tell them.
 - **Bytes rewritten.** Flag any change that rewrites an item's text the person did not edit, or blocks outside the edit. Safe path: edit in place and add a fixture to `editor/fixtures/corpus/` for any form found rewritten.
 - **Platform rules.** Flag `#available` checks, shims, hard-coded user-facing strings, a committed team identifier, report destination, update setting or version, and custom chrome where a system control exists.
 - **Note for item.** Flag a name, string, comment or doc that says note where it means any item. Safe path: say item, or the type's own name from the catalogue.

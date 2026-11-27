@@ -56,7 +56,7 @@ extension EditorController {
     }
 
     private static func reportUnplaced(
-        skipped: [String], failed: [(name: String, reason: String)], kept: [(name: String, place: KeptFile)] = [],
+        skipped: [String], failed: [(name: String, reason: String)], kept: [KeptFile] = [],
         attached: Int, unplaced: [String], refused: [String] = [],
         in title: String, to library: any ItemLibrary
     ) {
@@ -65,10 +65,10 @@ extension EditorController {
         let lines = skipped.map { String(localized: "“\($0)” is larger than \(largest) or can’t be read.") }
             + failed.map { String(localized: "“\($0.name)” couldn’t be attached. \($0.reason)") }
             + kept.map { file in
-                switch file.place {
-                case .library: String(localized: "“\(file.name)” was added to your Library instead.")
-                case .clipboard: String(localized: "“\(file.name)” is on the clipboard, so you can paste it back.")
-                }
+                let saved = file.file.lastPathComponent
+                return saved == file.name
+                    ? String(localized: "“\(file.name)” wasn’t attached and was saved to Downloads.")
+                    : String(localized: "“\(file.name)” wasn’t attached and was saved to Downloads as “\(saved)”.")
             }
             + unplaced.map { String(localized: "“\($0)” was attached to “\(title)” but isn’t in its text, because the item was no longer open for editing.") }
             + refused.map { String(localized: "“\($0)” was attached to “\(title)” but isn’t in its text. It was meant for a folded section or text not yet shown.") }
@@ -79,7 +79,8 @@ extension EditorController {
         } else {
             String(localized: "Some Images Weren’t Attached")
         }
-        library.notices.tell(title, lines.joined(separator: "\n"))
+        let saved = kept.map(\.file)
+        library.notices.tell(title, lines.joined(separator: "\n"), action: saved.isEmpty ? nil : .showInFinder(saved))
     }
 
     nonisolated static let hiddenTextTitle = String(localized: "Text Wasn’t Added")

@@ -357,26 +357,20 @@ extension EditorTests {
         #expect(library.notices.waiting.last?.message == "“Photo” was attached to “Plan” but isn’t in its text, because the item was no longer open for editing.")
     }
 
-    @Test func aRefusedImageKeptInTheLibraryIsSaidToBeThere() async throws {
+    @Test func aRefusedImageSavedToDownloadsIsSaidToBeThere() async throws {
         let library = FakeItemLibrary(items: [FakeItemLibrary.note("Plan", modified: .now)])
-        library.attaching = { AttachReport(kept: [(name: "Photo.png", place: .library)]) }
+        let one = URL(fileURLWithPath: "/tmp/Photo.png")
+        let two = URL(fileURLWithPath: "/tmp/Two 2.png")
+        library.attaching = {
+            AttachReport(kept: [KeptFile(name: "Photo.png", file: one), KeptFile(name: "Two.png", file: two)])
+        }
         let editor = try await attachingEditor(library)
         #expect(editor.insertImages(Self.pasted))
         #expect(await eventually { library.notices.waiting.last != nil })
         #expect(try await markdown(editor) == nil, "nothing is inserted")
         #expect(library.notices.waiting.last?.title == "Images Weren’t Added to the Item")
-        #expect(library.notices.waiting.last?.message == "“Photo.png” was added to your Library instead.")
-    }
-
-    @Test func aRefusedImageKeptOnTheClipboardIsSaidToBeThere() async throws {
-        let library = FakeItemLibrary(items: [FakeItemLibrary.note("Plan", modified: .now)])
-        library.attaching = { AttachReport(kept: [(name: "Photo.png", place: .clipboard)]) }
-        let editor = try await attachingEditor(library)
-        #expect(editor.insertImages(Self.pasted))
-        #expect(await eventually { library.notices.waiting.last != nil })
-        #expect(try await markdown(editor) == nil, "nothing is inserted")
-        #expect(library.notices.waiting.last?.title == "Images Weren’t Added to the Item")
-        #expect(library.notices.waiting.last?.message == "“Photo.png” is on the clipboard, so you can paste it back.")
+        #expect(library.notices.waiting.last?.message == "“Photo.png” wasn’t attached and was saved to Downloads.\n“Two.png” wasn’t attached and was saved to Downloads as “Two 2.png”.")
+        #expect(library.notices.waiting.last?.action == .showInFinder([one, two]))
     }
 
     @Test func filesQuickAddAttachedGoAtTheEndOfTheNewItemOnceThePageShowsIt() async throws {

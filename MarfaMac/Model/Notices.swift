@@ -26,6 +26,8 @@ import Observation
     nonisolated enum Action: Hashable, Sendable {
         /// Opens Settings at a page.
         case openSettings(SettingsPage)
+        /// Shows these files in the Finder.
+        case showInFinder([URL])
     }
 
     /// Oldest first. The first is the one shown.
