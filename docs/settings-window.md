@@ -45,7 +45,7 @@ See `docs/owner-settings.md` for Marfa pages and `docs/settings-sync.md` for sto
 | Page | What to know before a change |
 | --- | --- |
 | General | Reopen Windows follows the Mac until the person changes it, and only then writes `NSQuitAlwaysKeepsWindows`. Send Error Reports and Updates show only in a build that carries a destination or a feed |
-| Appearance | Accent colors are names or hex values. App icon sets the Dock icon at launch and while running. Sky uses the bundle icon. Sidebar color applies to the main window |
+| Appearance | App icon updates the Dock at launch and on change. Sky uses the bundle icon. Alternatives are Cobalt, Sea, Leaf, Marigold, and Adobe. Sidebar color applies to the main window |
 | Keyboard | Every menu command with its shortcut, and the any-app ones (`docs/commands.md`) |
 | Editor | Fonts load when the page opens. PDF background shares the choice in View › PDF Background. Inkkit replaces `EditorOptions` as a set. Edit pages as applies to items opened next |
 | Lists | The starting density, sort and group of a place, until a view or the place chooses its own |

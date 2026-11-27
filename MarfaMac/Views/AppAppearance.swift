@@ -16,14 +16,14 @@ nonisolated enum AppearanceKey {
 
 /// The running app's Dock icon. Sky uses the icon macOS loads from the bundle.
 nonisolated enum AppIconChoice: String, CaseIterable {
-    case sky, signal, sea, leaf, marigold, adobe
+    case sky, cobalt, sea, leaf, marigold, adobe
 
     static let key = "appIcon"
 
     var title: LocalizedStringResource {
         switch self {
         case .sky: "Sky"
-        case .signal: "Signal"
+        case .cobalt: "Cobalt"
         case .sea: "Sea"
         case .leaf: "Leaf"
         case .marigold: "Marigold"

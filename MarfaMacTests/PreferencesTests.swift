@@ -24,13 +24,13 @@ import Testing
 @Suite struct PreferencesMapTests {
     @Test func theDockIconSyncsInAppearance() throws {
         let defaults = ThrowawayDefaults.make("PreferencesMapTests")
-        AppIconChoice.signal.store(in: defaults)
+        AppIconChoice.cobalt.store(in: defaults)
         let setting = try #require(PreferencesMap.synced.first { $0.key == AppIconChoice.key })
         guard case .units(let units) = setting.read(defaults, library: "a") else {
             Issue.record("The stored icon did not read as a preference member.")
             return
         }
-        #expect(units == [.member(.appearance, AppIconChoice.key): #""signal""#])
+        #expect(units == [.member(.appearance, AppIconChoice.key): #""cobalt""#])
     }
 
     @Test func everyMacSettingIsSyncedOrStaysOnThisMac() {

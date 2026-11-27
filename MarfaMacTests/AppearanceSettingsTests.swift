@@ -57,9 +57,12 @@ struct AppearanceSettingsTests {
     }
 
     @Test func dockIconChoicesLoadTheirAssetsOrUseTheBundleIcon() {
-        #expect(AppIconChoice.allCases.map(\.dockAsset) == [
-            nil, "DockIcon-signal", "DockIcon-sea", "DockIcon-leaf", "DockIcon-marigold", "DockIcon-adobe",
-        ])
+        let previewAssets = [
+            "DockIcon-sky", "DockIcon-cobalt", "DockIcon-sea", "DockIcon-leaf", "DockIcon-marigold", "DockIcon-adobe",
+        ]
+        #expect(AppIconChoice.allCases.map(\.previewAsset) == previewAssets)
+        #expect(AppIconChoice.allCases.compactMap(\.dockAsset) == Array(previewAssets.dropFirst()))
+        #expect(NSImage(named: AppIconChoice.sky.previewAsset)?.isValid == true)
         #expect(AppIconChoice.sky.dockImage() == nil)
         for choice in AppIconChoice.allCases.dropFirst() {
             #expect(choice.dockImage()?.isValid == true)
@@ -73,6 +76,8 @@ struct AppearanceSettingsTests {
         #expect(AppIconChoice.stored(in: defaults) == .sea)
         AppIconChoice.sky.store(in: defaults)
         #expect(defaults.object(forKey: AppIconChoice.key) == nil)
+        defaults.set("unknown", forKey: AppIconChoice.key)
+        #expect(AppIconChoice.stored(in: defaults) == .sky)
     }
 
     @Test func theGrayPDFBackgroundClearsTheStoredChoice() {

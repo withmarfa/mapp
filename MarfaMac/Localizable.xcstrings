@@ -2816,9 +2816,6 @@
     "Archived, unarchived or moved to or from another state." : {
 
     },
-    "Articles Open In" : {
-
-    },
     "Articles open in" : {
 
     },
@@ -3551,9 +3548,6 @@
     "Check Document Now" : {
 
     },
-    "Check Spelling While Typing" : {
-
-    },
     "Check a source too. With none, no app or key could add items of these types." : {
 
     },
@@ -3768,13 +3762,13 @@
     "Close Modal" : {
 
     },
+    "Cobalt" : {
+
+    },
     "Code" : {
 
     },
     "Code Block" : {
-
-    },
-    "Code Font" : {
 
     },
     "Code Language" : {
@@ -3948,9 +3942,6 @@
     },
     "Contents" : {
       "extractionState" : "manual"
-    },
-    "Continue Lists on Return" : {
-
     },
     "Continue lists on Return" : {
 
@@ -4543,6 +4534,9 @@
     "Divider" : {
 
     },
+    "Dock" : {
+
+    },
     "Docs" : {
 
     },
@@ -4668,9 +4662,6 @@
       "extractionState" : "manual"
     },
     "Edit Meaning…" : {
-
-    },
-    "Edit Pages As" : {
 
     },
     "Edit Property" : {
@@ -5171,9 +5162,6 @@
     "Focus" : {
 
     },
-    "Fold Headings" : {
-
-    },
     "Fold Section" : {
 
     },
@@ -5509,9 +5497,6 @@
     "Highlight color" : {
 
     },
-    "Highlights" : {
-
-    },
     "History" : {
 
     },
@@ -5685,9 +5670,6 @@
 
     },
     "Indent Markdown Source with" : {
-
-    },
-    "Indent With" : {
 
     },
     "Indigo" : {
@@ -6443,12 +6425,6 @@
     "Limits" : {
 
     },
-    "Line Numbers in Code" : {
-
-    },
-    "Line Spacing" : {
-
-    },
     "Line numbers in code" : {
 
     },
@@ -6489,9 +6465,6 @@
 
     },
     "Links in the Text" : {
-
-    },
-    "Links to Items" : {
 
     },
     "Links to items" : {
@@ -8022,9 +7995,6 @@
     "Pages on these sites may call %@." : {
 
     },
-    "Pair Brackets and Quotes" : {
-
-    },
     "Pair brackets and quotes" : {
 
     },
@@ -8035,9 +8005,6 @@
 
     },
     "Panel" : {
-
-    },
-    "Paragraph Spacing" : {
 
     },
     "Paragraph spacing" : {
@@ -8071,9 +8038,6 @@
 
     },
     "Paste" : {
-
-    },
-    "Paste Formatted Text As" : {
 
     },
     "Paste and Match Style" : {
@@ -9525,9 +9489,6 @@
     "Sign-ins, keys and apps" : {
 
     },
-    "Signal" : {
-
-    },
     "Signed In As" : {
 
     },
@@ -9583,9 +9544,6 @@
       "extractionState" : "manual"
     },
     "Small Cards" : {
-
-    },
-    "Smart Quotes and Dashes" : {
 
     },
     "Smart quotes and dashes in formatted text" : {
@@ -9879,9 +9837,6 @@
     "Switched Servers, but the Copy Was Kept" : {
       "extractionState" : "manual"
     },
-    "Symbols on Subtypes" : {
-
-    },
     "Symbols on subtypes in the sidebar" : {
 
     },
@@ -9980,9 +9935,6 @@
 
     },
     "Text" : {
-
-    },
-    "Text Font" : {
 
     },
     "Text Form" : {
@@ -11585,12 +11537,6 @@
     "Title (optional)" : {
 
     },
-    "Title Length" : {
-
-    },
-    "Title When Scrolling" : {
-
-    },
     "Title length" : {
 
     },
@@ -11643,9 +11589,6 @@
 
     },
     "Too many tries. Try again later." : {
-
-    },
-    "Toolbar Background When Scrolling" : {
 
     },
     "Toolbar background when scrolling" : {
@@ -11711,9 +11654,6 @@
     "Type" : {
       "extractionState" : "manual",
       "generatesSymbol" : false
-    },
-    "Type Chips" : {
-
     },
     "Type Description Not Kept" : {
 
@@ -12024,9 +11964,6 @@
 
     },
     "Username" : {
-
-    },
-    "Value Panels" : {
 
     },
     "Value panels" : {

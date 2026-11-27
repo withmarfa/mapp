@@ -1,21 +1,24 @@
 {
-  "fill" : {
-    "automatic-gradient" : "extended-srgb:0.00000,0.53333,1.00000,1.00000"
-  },
+  "fill-specializations" : [
+    {
+      "value" : {
+        "solid" : "srgb:0.90196,0.94902,0.99608,1.00000"
+      }
+    },
+    {
+      "appearance" : "dark",
+      "value" : {
+        "solid" : "srgb:0.10196,0.14510,0.20000,1.00000"
+      }
+    }
+  ],
   "groups" : [
     {
       "layers" : [
         {
           "glass" : true,
-          "image-name" : "Mark.png",
-          "name" : "asset",
-          "position" : {
-            "scale" : 1.25,
-            "translation-in-points" : [
-              213,
-              157
-            ]
-          }
+          "image-name" : "marfa-mark-layer-sky.svg",
+          "name" : "Marfa mark"
         }
       ],
       "shadow" : {
