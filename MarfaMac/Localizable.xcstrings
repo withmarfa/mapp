@@ -162,9 +162,6 @@
     "%@ answers on it too." : {
 
     },
-    "%@ answers there." : {
-
-    },
     "%@ are attached to “%@”, but they couldn’t be put in its text." : {
       "extractionState" : "manual"
     },
@@ -2029,9 +2026,6 @@
     "A folder, view, webhook or table stops the move. Nothing moved." : {
 
     },
-    "A key can only be narrowed later, so choose what it needs now." : {
-
-    },
     "A key can set its own instead." : {
 
     },
@@ -2119,6 +2113,9 @@
 
     },
     "A source appears here once an app or key has written an item." : {
+
+    },
+    "A source can’t be “.” or “..”." : {
 
     },
     "A source." : {
@@ -2361,7 +2358,7 @@
     "Add a Word" : {
 
     },
-    "Add a passkey at the new address." : {
+    "Add a new one at the new address." : {
 
     },
     "Add a passkey to sign in with it." : {
@@ -2744,6 +2741,9 @@
     "Apps and keys using this rule will see items from every source for the types you limited, including subtypes." : {
 
     },
+    "Apps sign out" : {
+
+    },
     "Archive" : {
 
     },
@@ -3108,6 +3108,12 @@
     "Browsers" : {
 
     },
+    "Browsers and apps sign out" : {
+
+    },
+    "Browsers sign out" : {
+
+    },
     "Built In" : {
 
     },
@@ -3376,9 +3382,6 @@
 
     },
     "Change Address" : {
-
-    },
-    "Change Address…" : {
 
     },
     "Change Calendar" : {
@@ -3676,6 +3679,9 @@
 
     },
     "Choose the settings to go back to." : {
+
+    },
+    "Choose type exceptions and owner permissions." : {
 
     },
     "Choose what to replace with the settings in “%@”." : {
@@ -4279,6 +4285,9 @@
     "Custom name." : {
 
     },
+    "Customize Access" : {
+
+    },
     "Customize Layout…" : {
       "extractionState" : "manual"
     },
@@ -4841,22 +4850,10 @@
     "Every Marfa has these. Base a type on one to add to it." : {
 
     },
-    "Every Type" : {
-
-    },
     "Every Week" : {
 
     },
-    "Every app signs out" : {
-
-    },
-    "Every browser and app signs out" : {
-
-    },
     "Every browser sign-in has ended. Apps and keys keep working." : {
-
-    },
-    "Every browser signs out" : {
 
     },
     "Every browser signs out. Apps and keys keep working." : {
@@ -4878,6 +4875,9 @@
 
     },
     "Every setting on this Mac. Your items stay." : {
+
+    },
+    "Every type" : {
 
     },
     "Everything" : {
@@ -5456,6 +5456,9 @@
 
     },
     "Hide Month" : {
+
+    },
+    "Hide Options" : {
 
     },
     "Hide Others" : {
@@ -6542,9 +6545,6 @@
     "Look After This Marfa" : {
 
     },
-    "Looking After This Marfa" : {
-
-    },
     "Low" : {
       "extractionState" : "manual"
     },
@@ -6788,6 +6788,9 @@
     "More From This Book" : {
 
     },
+    "More actions for %@" : {
+
+    },
     "More changes arrived while you were deciding. Look at them before you choose." : {
       "extractionState" : "manual"
     },
@@ -6966,9 +6969,6 @@
     "New %@" : {
       "extractionState" : "manual"
     },
-    "New Address" : {
-
-    },
     "New Child Type" : {
 
     },
@@ -7049,6 +7049,9 @@
     "New Word" : {
 
     },
+    "New address" : {
+
+    },
     "New entry: %@" : {
       "extractionState" : "manual"
     },
@@ -7056,6 +7059,9 @@
 
     },
     "New items are" : {
+
+    },
+    "New items go to" : {
 
     },
     "New password" : {
@@ -7917,6 +7923,9 @@
     "Owner’s Permissions" : {
 
     },
+    "Owner’s permissions" : {
+
+    },
     "PDF" : {
       "extractionState" : "manual"
     },
@@ -7989,7 +7998,7 @@
     "Passkeys" : {
 
     },
-    "Passkeys stop working" : {
+    "Passkeys for other domains stop working" : {
 
     },
     "Password" : {
@@ -8073,6 +8082,9 @@
 
     },
     "Permissions" : {
+
+    },
+    "Permissions no longer available" : {
 
     },
     "Person" : {
@@ -9105,6 +9117,9 @@
     "Set the object store secret key again" : {
 
     },
+    "Set the source and where new items go." : {
+
+    },
     "Set them again if you install it later." : {
 
     },
@@ -9426,6 +9441,9 @@
     "Sign in again" : {
 
     },
+    "Sign in again to check the new address." : {
+
+    },
     "Sign in and switch" : {
 
     },
@@ -9615,7 +9633,7 @@
     "Source Name Not Kept" : {
 
     },
-    "Source, Stamped on What It Writes" : {
+    "Source and Destination" : {
 
     },
     "Source: %@" : {
@@ -10567,6 +10585,9 @@
     "The new address is never shown again." : {
 
     },
+    "The new address works." : {
+
+    },
     "The new entry wasn’t finished, so it wasn’t added." : {
       "extractionState" : "manual"
     },
@@ -10634,6 +10655,9 @@
 
     },
     "The port it listens on." : {
+
+    },
+    "The prefixes oauth:, restored:, and connector-host: are reserved. Use a different source." : {
 
     },
     "The preview expired before %@ answered." : {
@@ -10813,7 +10837,7 @@
     "The sign-in wasn’t confirmed partway through." : {
 
     },
-    "The source can’t change later." : {
+    "The source is stamped on what the key writes and can’t change later." : {
 
     },
     "The time couldn’t be saved." : {
@@ -11366,6 +11390,9 @@
     "This server runs Marfa %@. Update the server to Marfa %@ or later to use this app." : {
       "extractionState" : "manual"
     },
+    "This sign-in can’t grant owner permissions." : {
+
+    },
     "This sign-in doesn’t have permission to empty Trash." : {
 
     },
@@ -11866,6 +11893,9 @@
     },
     "Use a number from %lld to %lld." : {
       "extractionState" : "manual"
+    },
+    "Use a source with at most 200 characters." : {
+
     },
     "Use a whole number." : {
 
@@ -12847,6 +12877,9 @@
     "or drop one here" : {
 
     },
+    "permanently delete trashed items" : {
+
+    },
     "pt" : {
 
     },
@@ -12941,6 +12974,9 @@
 
     },
     "today, %@" : {
+
+    },
+    "update and maintain the server" : {
 
     },
     "update the server and run its housekeeping" : {
