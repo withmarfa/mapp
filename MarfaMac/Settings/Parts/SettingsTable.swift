@@ -132,6 +132,7 @@ private struct TableHeader<Row>: View {
             if column.onSort != nil, let ascending = column.sortedAscending {
                 Image(systemName: ascending ? "chevron.up" : "chevron.down")
                     .font(.system(size: 9, weight: .semibold))
+                    .accessibilityHidden(true)
             }
         }
         .settingsFont(.tableHeader)
@@ -141,9 +142,18 @@ private struct TableHeader<Row>: View {
         if let onSort = column.onSort {
             Button(action: onSort) { label }
                 .buttonStyle(.plain)
-                .accessibilityAddTraits(column.sortedAscending == nil ? [] : .isSelected)
+                .accessibilityValue(Self.sortValue(column.sortedAscending))
         } else {
             label.accessibilityHidden(sorts)
+        }
+    }
+
+    /// The direction of the column the rows are ordered by. Empty when this column is not that one.
+    private static func sortValue(_ ascending: Bool?) -> String {
+        switch ascending {
+        case true: String(localized: "Ascending")
+        case false: String(localized: "Descending")
+        case nil: ""
         }
     }
 }
@@ -170,6 +180,7 @@ private struct TableRow<Row>: View {
         if let onOpen {
             Button(action: onOpen) { contents }
                 .buttonStyle(.plain)
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
         } else {
             contents
         }
@@ -200,7 +211,6 @@ private struct TableRow<Row>: View {
         .background(isSelected ? SettingsTokens.selection : (isHovered ? SettingsTokens.hover : Color.clear))
         .contentShape(.rect)
         .onHover { isHovered = $0 }
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private func cell(_ column: SettingsTableColumn<Row>) -> some View {
