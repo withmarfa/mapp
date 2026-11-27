@@ -315,6 +315,7 @@ struct AlreadyInMarfaTests {
     }
 
     @Test func aTimedOutLookupIsCancelledAndKeepsAccessUntilItFinishes() async {
+        #expect(AlreadyInMarfa.cancelGrace == .milliseconds(200))
         defer { AlreadyInMarfa.accessHooks.set(nil) }
         let library = FakeItemLibrary()
         let gate = Parked()
@@ -333,7 +334,7 @@ struct AlreadyInMarfaTests {
         ))
         let asking = AlreadyInMarfa.Asking()
         asking.viewAppeared()
-        let plan = await FirstAnswer.within(.seconds(2), otherwise: nil) {
+        let plan = await FirstAnswer.within(waitLimit, otherwise: nil) {
             Optional(await AlreadyInMarfa.check(files, in: library, asking: asking, within: .milliseconds(50)))
         }
         if plan == nil { gate.open() }

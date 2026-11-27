@@ -112,7 +112,7 @@ struct ByteMatchesTests {
         await close(opened)
     }
 
-    @Test func theLookupIsGivenTheFileAnAddWouldUpload() async throws {
+    @Test func theLookupPassesTheSuppliedURLWithoutResolvingItAgain() async throws {
         let opened = opened()
         let real = disk.url("photo.png", "pixels")
         let link = disk.directory.appending(path: "alias.png")
@@ -124,7 +124,6 @@ struct ByteMatchesTests {
             return [match]
         }
         let answers = await opened.source.itemsWithSameBytes(as: [link])
-        // The caller resolves a link once. This lookup is given that URL and does not resolve it again.
         #expect(seen.withLock { $0 }.map(\.path) == [link.path])
         #expect(answers[0] == .answered([item("photo", "Photo")], more: false))
         await close(opened)
