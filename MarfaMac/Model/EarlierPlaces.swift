@@ -74,6 +74,31 @@ nonisolated enum EarlierPlace {
     /// at the new key later stays clear, and a later change an earlier copy makes to it is not copied.
     static let carriedEntriesKey = "earlierPlacesCarried"
 
+    /// On resume the current name, including its absence, wins. Settle each earlier name before the
+    /// group takes the original items, so a later read-in cannot create a new local edit.
+    @MainActor static func settleForResume(_ groups: Set<PreferenceGroup>, remote: PreferenceUnits, in defaults: UserDefaults)
+        -> Set<PreferenceGroup>
+    {
+        var done = Set(defaults.stringArray(forKey: carriedEntriesKey) ?? [])
+        var settled: Set<PreferenceGroup> = []
+        if groups.contains(.general) {
+            let synced = remote[.member(.general, StartWith.earlierKey)].flatMap { PreferenceJSON.value($0) as? String }
+            let earlier = defaults.string(forKey: StartWith.earlierKey) ?? synced
+            if earlier.flatMap(StartWith.init(earlier:)) != nil, done.insert(StartWith.key).inserted {
+                settled.insert(.general)
+            }
+        }
+        if groups.contains(.viewsAndPlaces) {
+            for case .row(.places, let setting, let key) in remote.keys {
+                guard let name = ["placeDensity": "density", "placeDefaults": "defaults"][setting],
+                      carriedKey(for: key) != nil, done.insert("\(name) \(key)").inserted else { continue }
+                settled.insert(.viewsAndPlaces)
+            }
+        }
+        if !settled.isEmpty { defaults.set(done.sorted(), forKey: carriedEntriesKey) }
+        return settled
+    }
+
     /// Copies what earlier copies kept for each place to the new keys, where those leave it unset, so a place opens as the
     /// person left it. It runs at launch, for what this Mac holds, and after each settings sync (`synced`, what the
     /// Marfa holds), for what an earlier copy on another Mac wrote. The earlier entries stay for those copies.

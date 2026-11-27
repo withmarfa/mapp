@@ -33,6 +33,7 @@ nonisolated struct SyncedSetting: Sendable {
 
     let key: String
     let place: Place
+    let reader: Reader
 
     /// Where the setting's store sets aside a value it cannot read, where it has such a place.
     var setAsideKind: SetAside? {
@@ -57,45 +58,65 @@ nonisolated struct SyncedSetting: Sendable {
 enum PreferencesMap {
     static let synced: [SyncedSetting] = members + tables
 
-    private static func members(_ keys: [String], in field: PreferencesField) -> [SyncedSetting] {
-        keys.map { SyncedSetting(key: $0, place: .member(field)) }
+    private static func members(_ field: PreferencesField, _ entries: (String, SyncedSetting.Reader)...) -> [SyncedSetting] {
+        entries.map { SyncedSetting(key: $0.0, place: .member(field), reader: $0.1) }
     }
 
-    /// Each field holds the settings of one Settings page.
     private static let members: [SyncedSetting] =
-        members(AppearanceKey.all + [
-            InterfaceKey.textSize, InterfaceKey.valuePanelStyle, InterfaceKey.paletteMaterial, InterfaceKey.showsScrolledTitle,
-            InterfaceKey.showsPageToolbarBackground, InterfaceKey.showsSidebarHistory,
-            SidebarTypeRow.subtypeIconsKey,
-        ], in: .appearance)
-        + members([
-            DateFormat.key, WeekStart.key, StartWith.key, NewItemType.key, NewOpens.key, ListKey.openItemsIn, RemotePictureSetting.key,
-        ], in: .general)
-        + members(PageKey.all + [SourceViewMode.key], in: .editor)
-        + members([ListKey.density, CalendarHourHeight.key, ListScope.defaultScopeKey] + OrderKey.all, in: .lists)
-        + members(SearchOptions.keys, in: .search)
-        + [SyncedSetting(key: SearchLeaveOuts.defaultsKey, place: .serverMember(.search, .data(SearchLeaveOuts.setAsideKey)))]
+        members(.appearance,
+                (AppearanceKey.theme, .word(AppTheme.self)), (AppearanceKey.accent, .word(AccentChoice.self)),
+                (AppearanceKey.highlights, .word(HighlightChoice.self)), (AppearanceKey.textFont, .json(String.self)),
+                (AppearanceKey.codeFont, .json(String.self)), (AppearanceKey.typeChipTint, .word(TypeChipTint.self)),
+                (AppearanceKey.sidebar, .word(SidebarColor.self)), (AppearanceKey.pdfBackground, .word(PDFBackground.self)),
+                (InterfaceKey.textSize, .json(Int.self)), (InterfaceKey.valuePanelStyle, .word(ValuePanelStyle.self)),
+                (InterfaceKey.paletteMaterial, .word(PaletteMaterial.self)), (InterfaceKey.showsScrolledTitle, .json(Bool.self)),
+                (InterfaceKey.showsPageToolbarBackground, .json(Bool.self)), (InterfaceKey.showsSidebarHistory, .json(Bool.self)),
+                (SidebarTypeRow.subtypeIconsKey, .json(Bool.self)))
+        + members(.general,
+                  (DateFormat.key, .word(DateFormat.self)), (WeekStart.key, .json(Int.self)), (StartWith.key, .word(StartWith.self)),
+                  (NewItemType.key, .json(String.self)), (NewOpens.key, .word(NewOpens.self)),
+                  (ListKey.openItemsIn, .word(ItemOpening.self)), (RemotePictureSetting.key, .word(RemotePictureSetting.self)))
+        + members(.editor,
+                  (PageKey.fullWidth, .json(Bool.self)), (PageKey.textSize, .json(Int.self)), (PageKey.checksSpelling, .json(Bool.self)),
+                  (PageKey.readingWidth, .json(Int.self)), (PageKey.titleLines, .json(Int.self)), (PageKey.linkLook, .word(LinkLook.self)),
+                  (PageKey.showsCoordinates, .json(Bool.self)), (PageKey.pinsProperties, .json(Bool.self)),
+                  (LineSpacing.key, .word(LineSpacing.self)), (ParagraphSpacing.key, .word(ParagraphSpacing.self)),
+                  (IndentWith.key, .word(IndentWith.self)), (PasteAs.key, .word(PasteAs.self)), (EditingMode.key, .word(EditingMode.self)),
+                  (PageKey.smartPunctuation, .json(Bool.self)), (PageKey.pairsBrackets, .json(Bool.self)),
+                  (PageKey.continuesLists, .json(Bool.self)), (PageKey.foldsHeadings, .json(Bool.self)),
+                  (PageKey.showsCodeLineNumbers, .json(Bool.self)), (PageKey.cornerShowsFormats, .json(Bool.self)),
+                  (PageKey.cornerShowsTextSize, .json(Bool.self)), (PageKey.cornerShowsFocus, .json(Bool.self)),
+                  (SourceViewMode.key, .word(SourceViewMode.self)))
+        + members(.lists,
+                  (ListKey.density, .word(Density.self)), (CalendarHourHeight.key, .json(Double.self)),
+                  (ListScope.defaultScopeKey, .word(ListScope.self)), (OrderKey.sort, .word(ItemSort.self)),
+                  (OrderKey.groupsByDate, .json(Bool.self)))
+        + members(.search,
+                  (SearchOptions.includesArchivedKey, .json(Bool.self)), (SearchOptions.includesFeedKey, .json(Bool.self)),
+                  (SearchOptions.orderKey, .word(SearchOptions.Order.self)), (SearchOptions.showsSnippetsKey, .json(Bool.self)))
+        + [SyncedSetting(key: SearchLeaveOuts.defaultsKey, place: .serverMember(.search, .data(SearchLeaveOuts.setAsideKey)),
+                         reader: .json(SearchLeaveOut.self))]
 
     private static let tables: [SyncedSetting] = [
         SyncedSetting(key: ShortcutBindings.defaultsKey, place: .rows(
-            .commands, setting: "shortcut", .data, wrapper: "shortcuts", local: [], .data(ShortcutBindings.setAsideKey))),
+            .commands, setting: "shortcut", .data, wrapper: "shortcuts", local: [], .data(ShortcutBindings.setAsideKey)), reader: .json(Shortcut?.self)),
         SyncedSetting(key: PagePlacements.key, place: .rows(
-            .types, setting: "pagePlacements", .string, wrapper: nil, local: [], .string(PagePlacements.setAsideKey))),
+            .types, setting: "pagePlacements", .string, wrapper: nil, local: [], .string(PagePlacements.setAsideKey)), reader: .json(PagePlacements.Choice.self)),
         SyncedSetting(key: PanelParts.key, place: .rows(
-            .types, setting: "panelPart", .string, wrapper: nil, local: [], .string(PanelParts.setAsideKey))),
-        SyncedSetting(key: TypeLooks.defaultsKey, place: .serverRows(.types, setting: "look", .data(TypeLooks.setAsideKey))),
+            .types, setting: "panelPart", .string, wrapper: nil, local: [], .string(PanelParts.setAsideKey)), reader: .json(StoredJSON.self)),
+        SyncedSetting(key: TypeLooks.defaultsKey, place: .serverRows(.types, setting: "look", .data(TypeLooks.setAsideKey)), reader: .json(TypeLookChoice.self)),
         // A table's widths are kept with the view on this Mac alone.
         SyncedSetting(key: ViewLayouts.key, place: .rows(
-            .views, setting: "viewLayout", .string, wrapper: nil, local: ["widths"], .string(ViewLayouts.setAsideKey))),
+            .views, setting: "viewLayout", .string, wrapper: nil, local: ["widths"], .string(ViewLayouts.setAsideKey)), reader: .json(ViewMacSettings.self)),
         SyncedSetting(key: PlaceDefaults.key, place: .rows(
-            .places, setting: "placeDefaults", .data, wrapper: nil, local: [], .data(PlaceDefaults.setAsideKey))),
+            .places, setting: "placeDefaults", .data, wrapper: nil, local: [], .data(PlaceDefaults.setAsideKey)), reader: .json(PlaceDefault.self)),
         SyncedSetting(key: PlaceDensities.key, place: .rows(
-            .places, setting: "placeDensity", .data, wrapper: nil, local: [], .data(PlaceDensities.setAsideKey))),
+            .places, setting: "placeDensity", .data, wrapper: nil, local: [], .data(PlaceDensities.setAsideKey)), reader: .json(Density.self)),
         SyncedSetting(key: ViewOrders.key, place: .rows(
-            .places, setting: "viewOrder", .data, wrapper: nil, local: [], .data(ViewOrders.setAsideKey))),
+            .places, setting: "viewOrder", .data, wrapper: nil, local: [], .data(ViewOrders.setAsideKey)), reader: .json([String].self)),
         SyncedSetting(key: ViewOrders.hiddenKey, place: .rows(
-            .places, setting: "viewHidden", .data, wrapper: nil, local: [], .data(ViewOrders.hiddenSetAsideKey))),
-        SyncedSetting(key: SidebarLayouts.defaultsKey, place: .sidebar(.data(SidebarLayouts.setAsideKey))),
+            .places, setting: "viewHidden", .data, wrapper: nil, local: [], .data(ViewOrders.hiddenSetAsideKey)), reader: .json(Bool.self)),
+        SyncedSetting(key: SidebarLayouts.defaultsKey, place: .sidebar(.data(SidebarLayouts.setAsideKey)), reader: .sidebar),
     ]
 
     /// Settings whose rows this Mac may lack only because it has not read them: an earlier copy kept another Mac's rows in
@@ -110,7 +131,7 @@ enum PreferencesMap {
 
     /// The shortcuts that work in any app, one row for each command, by the command's raw value.
     static let anyAppShortcuts = SyncedSetting(key: AnyAppShortcuts.defaultsKey, place: .rows(
-        .commands, setting: "anyAppShortcut", .data, wrapper: nil, local: [], .data(AnyAppShortcuts.setAsideKey)))
+        .commands, setting: "anyAppShortcut", .data, wrapper: nil, local: [], .data(AnyAppShortcuts.setAsideKey)), reader: .json(Shortcut.self))
 
     /// Every setting a settings file carries (`SettingsFile`).
     static let inFiles: [SyncedSetting] = synced + inFilesOnly
@@ -122,7 +143,7 @@ enum PreferencesMap {
     /// synced either), a table's columns (mostly widths), and the shortcuts that work in any app (`inFilesOnly`).
     static let staysOnMac: [String] = [
         StartWith.lastPlaceKey, ReopenWindows.key, NewItemRecents.key, PlaybackPlaces.key, Reporting.switchKey, UpdateSettings.betaKey, ItemTableColumnLayouts.key,
-        InterfaceKey.inspectorWidth, AnyAppShortcuts.defaultsKey, AutomaticExport.plansKey,
+        InterfaceKey.inspectorWidth, AnyAppShortcuts.defaultsKey, AutomaticExport.plansKey, PreferenceGroups.key,
     ] + ColumnWidth.allCases.map(\.key)
 
     /// Every defaults key a synced setting reads or writes.

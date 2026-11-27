@@ -12,8 +12,7 @@ nonisolated enum PreferencesTable: String, CaseIterable, Codable, Hashable, Send
     case commands, types, views, places, sidebar
 }
 
-/// `app.marfa-mac.preferences`: one hidden item per Marfa that holds the app's own settings, so every Mac that connects to the
-/// Marfa uses them.
+/// `app.marfa-mac.preferences`: one hidden item per Marfa for settings shared between Macs.
 ///
 /// The type can never change shape. Every Mac is another OAuth client to the server, and only the one that registered
 /// the first type under `app.marfa-mac` may replace it (`types/app-vendor-claimed-refused`, withmarfa/marfa#3462), so a new

@@ -17,7 +17,7 @@ import Testing
     @Test func withoutAPermissionTheySayTheyStayOnThisMacAndOfferAllowMore() {
         let needing = words(.off(.needsPermission))
         #expect(needing.title == "Kept on This Mac Only")
-        #expect(needing.line == "The app isn’t allowed to keep them in Home yet. Once it is, every Mac that connects uses them.")
+        #expect(needing.line == "Allow the app to keep the groups you sync in Home.")
         #expect(needing.action == .allowMore && needing.actionTitle == "Allow More…")
     }
 
@@ -28,10 +28,10 @@ import Testing
         #expect(removed.action == .keepAgain && removed.actionTitle == "Keep in Marfa Again")
     }
 
-    @Test func removingAsksFirstAndSaysEveryMacLosesThem() {
+    @Test func removalExplainsThatEachMacKeepsItsSettings() {
         let syncing = words(.syncing)
         #expect(syncing.removeTitle == "Remove This App’s Settings from Home?")
-        #expect(syncing.removeMessage == "Every Mac that connects to Home loses them. This Mac keeps its own, and your items stay.")
+        #expect(syncing.removeMessage == "The shared settings are removed from Home. Each Mac keeps its current settings. Your items stay.")
         #expect(ConnectionSettings.footer == "Each Mac keeps its own window sizes and positions, column widths, global shortcuts, and On This Mac settings.")
     }
 

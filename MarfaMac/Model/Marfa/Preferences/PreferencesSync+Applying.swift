@@ -6,28 +6,50 @@ extension PreferencesSync {
     /// waits for its answer, and each setting a store dropped when it read it again.
     ///
     /// `progress` is told once the defaults hold what this step wrote into them, before any write to the item, and again
-    /// after each write to the item is queued: with `adopted` as it stands then, whose base is `outcome.merged`, and with
+    /// after each write to the item is queued: with `adopted` as it stands then, and with
     /// the units still to be written, whose base the caller keeps as it reconciled them. A write the copy refuses later then
     /// leaves a record that sends only what that write carried again, and never takes another Mac's value this step wrote
     /// into the defaults for a change of this Mac's.
     func apply(_ outcome: PreferencesMerge.Outcome, to item: PreferencesItem, local: Local, adopted: inout Record.Adopted,
-               retrying: Set<PreferenceUnit>, in copy: any PreferencesCopy,
+               retrying: Set<PreferenceUnit>, resuming: Set<PreferenceGroup>, from remote: Remote, in copy: any PreferencesCopy,
                progress: ((Record.Adopted, Set<PreferenceUnit>) -> Void)? = nil) async throws
     {
+        var outcome = outcome
+        try unchanged(since: local, writing: outcome.toLocal, taking: resuming)
+        if !resuming.isEmpty {
+            let returning = remote.merged.filter { resuming.includes($0.key.group) }
+            let replace = Set(local.units.keys.filter { resuming.includes($0.group) }).union(returning.keys)
+            outcome.toLocal.formUnion(replace)
+            outcome.merged.merge(returning) { _, shared in shared }
+            let inherited = Set(returning.keys).subtracting(remote.first.keys)
+            if !inherited.isEmpty { adopted.fromOtherItems = (adopted.fromOtherItems ?? []).union(inherited) }
+        }
         // A dropped setting the Marfa has not changed keeps what the store left, so it is not set aside again.
-        let kept = adopted.frozen.filter { unit, _ in !retrying.contains(unit) && outcome.merged[unit] == adopted.base[unit] }
+        let before = adopted.comparisonBase
+        let kept = adopted.frozen.filter { unit, _ in !retrying.contains(unit) && outcome.merged[unit] == before[unit] }
         var written = outcome.merged.filter { PreferenceJSON.value($0.value) != nil }
         for (unit, frozen) in kept { written[unit] = frozen.left }
-        try unchanged(since: local, writing: outcome.toLocal)
+        var refused: PreferenceUnits = [:]
+        for unit in outcome.toLocal where resuming.includes(unit.group) || adopted.frozen[unit]?.rejected != nil {
+            guard let value = outcome.merged[unit], kept[unit] == nil,
+                  let setting = PreferencesMap.synced.first(where: { $0.owns(unit) }),
+                  !setting.reader.accepts(value, unit) else { continue }
+            if adopted.frozen[unit]?.rejected != value { setting.setAsideRejected(value, in: defaults) }
+            refused[unit] = value
+            written[unit] = local.units[unit].flatMap { setting.reader.accepts($0, unit) ? $0 : nil }
+        }
         let settings = writeLocal(outcome.toLocal, from: written)
+        let held = settings.isEmpty && resuming.isEmpty ? [:] : readLocal().units
         if !settings.isEmpty {
             // A store sets aside what it cannot read, such as a value a later version of the app wrote: that is no change of the
             // person's, so the Marfa keeps it and nothing deletes it or writes its field without it.
-            let held = readLocal().units
+            let compared = Set(outcome.merged.keys).union(held.keys).union(outcome.toLocal)
             for setting in settings {
-                for unit in Set(outcome.merged.keys).union(held.keys) where setting.owns(unit) && kept[unit] == nil {
-                    if let value = written[unit], held[unit] != value {
-                        adopted.frozen[unit] = Record.Frozen(left: held[unit])
+                for unit in compared where setting.owns(unit) && kept[unit] == nil {
+                    if let value = refused[unit] {
+                        adopted.frozen[unit] = Record.Frozen(left: held[unit], rejected: value)
+                    } else if let value = written[unit], held[unit] != value {
+                        adopted.frozen[unit] = Record.Frozen(left: held[unit], rejected: resuming.includes(unit.group) ? value : nil)
                     } else {
                         adopted.frozen[unit] = nil
                     }
@@ -36,21 +58,31 @@ extension PreferencesSync {
         }
         adopted.frozenBuild = build
         adopted.base = outcome.merged
+        if !resuming.isEmpty {
+            // Only what survived the reload can be a shared value that this Mac later deletes.
+            adopted.base = resuming.excludingFrom(adopted.base)
+            adopted.base.merge(held.filter { resuming.includes($0.key.group) }) { _, value in value }
+        }
+        for (unit, frozen) in adopted.frozen where frozen.rejected != nil { adopted.base[unit] = nil }
         var unsent = outcome.toRemote
         if !settings.isEmpty { progress?(adopted, unsent) }
-        let fields = Self.fields(of: outcome.merged, changing: outcome.toRemote)
+        // A field is written whole. Keep the followed item's own members outside this edit.
+        var forItem = remote.first
+        for unit in outcome.toRemote { forItem[unit] = outcome.merged[unit] }
+        let fields = Self.fields(of: forItem, changing: outcome.toRemote)
         if !fields.isEmpty {
             let write = try await copy.update(item.id, fields: fields, readAt: item.version)
             adopted.awaiting[write] = Record.Awaiting(
                 run: copy.run, order: adopted.writes, members: Self.members(outcome.merged, in: outcome.toRemote))
             adopted.writes += 1
             unsent = unsent.filter { if case .member = $0 { false } else { true } }
+            adopted.fromOtherItems?.subtract(outcome.toRemote.subtracting(unsent))
             progress?(adopted, unsent)
         }
-        let sent = adopted
         try await writeRows(outcome.toRemote, of: outcome.merged, to: item, in: copy) { table in
             unsent = unsent.filter { if case .row(table, _, _) = $0 { false } else { true } }
-            progress?(sent, unsent)
+            adopted.fromOtherItems?.subtract(outcome.toRemote.subtracting(unsent))
+            progress?(adopted, unsent)
         }
     }
 

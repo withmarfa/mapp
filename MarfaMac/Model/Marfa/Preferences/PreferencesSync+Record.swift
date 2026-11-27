@@ -14,6 +14,13 @@ extension PreferencesSync {
             var frozen: [PreferenceUnit: Frozen] = [:]
             /// The app that judged `frozen`; another tries those settings again.
             var frozenBuild: String?
+
+            /// A remote value rejected on resume is known separately from what was actually applied.
+            var comparisonBase: PreferenceUnits {
+                base.merging(frozen.compactMapValues(\.rejected)) { _, rejected in rejected }
+            }
+            /// Values taken from a later original while the followed item lacked them.
+            var fromOtherItems: Set<PreferenceUnit>?
             /// Set once this Mac removed the item or saw it in the bin, so an emptied bin does not bring it back.
             var removed: Bool?
 
@@ -21,6 +28,18 @@ extension PreferencesSync {
                 self.item = item
                 self.base = base
                 self.frozenBuild = frozenBuild
+            }
+
+            mutating func forget(_ group: PreferenceGroup) {
+                // After time apart, neither an old base nor an unanswered write can identify the later change.
+                base = base.filter { $0.key.group != group }
+                frozen = frozen.filter { $0.key.group != group }
+                fromOtherItems = fromOtherItems?.filter { $0.group != group }
+                awaiting = awaiting.compactMapValues { write in
+                    var write = write
+                    write.members = write.members.filter { $0.key.group != group }
+                    return write.members.isEmpty ? nil : write
+                }
             }
         }
 
@@ -35,9 +54,14 @@ extension PreferencesSync {
         /// What the store left of a setting it could not read: nothing, or the part it could.
         struct Frozen: Codable, Equatable, Sendable {
             var left: String?
+            var rejected: String?
         }
 
         var marfas: [String: Adopted] = [:]
+        /// Copies left for the Mac that made them while a group was off, until that Mac removes them.
+        var preservedConflicts: [String: Set<String>]?
+        /// Groups that must take this Marfa's settings when next enabled with a whole copy.
+        var paused: [String: Set<PreferenceGroup>]?
         var last: String?
         /// The Marfas whose settings were started again, whose next item is made from this Mac's settings.
         var restarting: Set<String> = []
@@ -47,6 +71,12 @@ extension PreferencesSync {
         /// carries the setting is queued (`PreferencesSync.apply`). A step that switches Marfa or adopts one clears the
         /// marks it read, as the Marfa's settings win whole there.
         var winning: [String: Set<PreferenceUnit>]?
+
+        mutating func setPaused(_ groups: Set<PreferenceGroup>, in instance: String) {
+            var byInstance = paused ?? [:]
+            byInstance[instance] = groups.isEmpty ? nil : groups
+            paused = byInstance.isEmpty ? nil : byInstance
+        }
 
         static func read(_ defaults: UserDefaults) -> Record {
             defaults.data(forKey: PreferencesSync.recordKey).flatMap { try? JSONDecoder().decode(Record.self, from: $0) } ?? Record()

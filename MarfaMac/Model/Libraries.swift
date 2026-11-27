@@ -57,7 +57,7 @@ import MarfaTesting
     /// Export Automatically, checked at launch and about every hour while the app runs.
     @ObservationIgnored let automaticExport: AutomaticExport
 
-    /// The app's own settings, kept in the connected Marfa so every Mac that connects to it uses them.
+    /// The settings this Mac shares with the connected Marfa.
     let preferences: PreferencesSync
 
     /// Asks every open page for its last edit and answers whether they all handed it over. A test gives its own, since
@@ -113,6 +113,11 @@ import MarfaTesting
             library: { [host] in host.libraryKey(for: host.configuredConnection) },
             refusedShortcuts: { [anyAppShortcuts] in Set(anyAppShortcuts.refused.map(\.rawValue)) },
             unsettled: { [librarySettings] library in librarySettings.unsettled[library] ?? [] },
+            groupNotSaved: { [notices = host.notices] in
+                notices.tell(
+                    String(localized: "Sync Couldn’t Turn On"),
+                    String(localized: "A restore point couldn’t be saved first, so nothing was changed. Check that this Mac has free space, then try again."))
+            },
             reload: { [sidebarLayouts, typeLooks, searchLeaveOuts, shortcuts, anyAppShortcuts, automaticExport] in
                 sidebarLayouts.reload()
                 typeLooks.reload()
@@ -144,9 +149,8 @@ import MarfaTesting
     }
 
     /// Puts every setting on this Mac back (`MacSettings`) and the shortcuts already held in memory with it, so the menus
-    /// and the hot keys change at once and nothing writes the old choices back. Where the settings sync, the Marfa's are
-    /// put back with them, for every Mac, even over another Mac's change not yet taken. A restore point is saved first,
-    /// which Restore Earlier Settings… brings back; where it cannot be, nothing changes and the person is told.
+    /// and the hot keys change at once. Only groups previously syncing reset in the Marfa. The other groups resume
+    /// from its values. If the restore point cannot be saved, nothing changes and the person is told.
     ///
     /// It runs between sync steps (`PreferencesSync.resetBetweenSteps`): at once where none is under way, else as soon as
     /// the one under way ends, so no step writes what it read before over the defaults. `then` runs once the settings
@@ -157,6 +161,7 @@ import MarfaTesting
             shortcuts.restoreDefaults()
             anyAppShortcuts.clearAll()
             MacSettings.reset(in: defaults)
+            preferences.groups.reset()
             automaticExport.reset()
             preferences.replaced(PreferencesMap.synced)
             done()

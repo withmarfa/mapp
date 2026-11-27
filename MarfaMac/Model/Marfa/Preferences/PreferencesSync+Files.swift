@@ -3,7 +3,7 @@ import Foundation
 /// Export, Import and restore points: what Settings > General's Export Settings…, Import Settings… and Restore Earlier
 /// Settings… call. Export and Import read and write the defaults as the sync does, for `settingsLibrary`; a restore point
 /// is the app's own defaults themselves (`SettingsSnapshot`). With no Marfa connected they change this Mac only; where the
-/// settings sync, what they wrote wins at the next step (`Record.winning`) and so reaches every Mac.
+/// settings sync, what they wrote wins at the next step (`Record.winning`) for each group this Mac shares.
 extension PreferencesSync {
     /// What an import or a restore did.
     nonisolated struct Applied: Equatable, Sendable {
@@ -70,15 +70,29 @@ extension PreferencesSync {
         return domain
     }
 
+    /// A delayed resume needs another point only if the user edited a returning setting in the meantime.
+    func protectEditsBeforeResume(_ groups: Set<PreferenceGroup>) throws(RestorePoints.Failure) {
+        guard let domain else { throw .notSaved }
+        let current = try SettingsSnapshot(of: defaults, domain: domain)
+        if let last = restorePoints.list().first(where: { $0.reason == .resumingGroup }),
+           let saved = try? restorePoints.snapshot(of: last.id),
+           PreferencesMap.synced.allSatisfy({ !groups.includes($0.group) || saved.values[$0.key] == current.values[$0.key] }) {
+            return
+        }
+        try restorePoints.save(current, reason: .resumingGroup, build: build)
+    }
+
     /// Has the stores read the defaults again after `settings` were replaced on this Mac on purpose, and marks them to
     /// win at the next step that follows the Marfa (`Record.winning`), even over another Mac's change not yet taken, but
     /// for the units `except` names by setting key, where this Mac kept what it held.
     func replaced(_ settings: [SyncedSetting], except: [String: Set<PreferenceUnit>] = [:]) {
         storesReadAgain()
-        guard enabled, !settings.isEmpty else { return }
+        let off = instance.map(groups.off(in:)) ?? []
+        let syncing = settings.filter { !off.includes($0.group) }
+        guard enabled, !syncing.isEmpty else { return }
         var record = Record.read(defaults)
         var marked = record.winning ?? [:]
-        for setting in settings {
+        for setting in syncing {
             let left = except[setting.key] ?? []
             // A unit either mark lets win still wins.
             marked[setting.key] = marked[setting.key].map { $0.intersection(left) } ?? left
