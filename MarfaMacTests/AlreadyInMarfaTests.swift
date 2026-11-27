@@ -555,7 +555,7 @@ struct AlreadyInMarfaTests {
         #expect(library.addedFiles.map(\.name) == ["photo.png"])
     }
 
-    @Test func quickAddSkipRemovesTheAskedFileByTokenAndSendsAReplacementAtTheSamePath() async throws {
+    @Test func quickAddSkipLeavesAnEditedFileSelectionIntactAndUnsent() async throws {
         let beach = FakeItemLibrary.note("Beach Day", modified: .now)
         let library = FakeItemLibrary(items: [beach])
         library.sameBytes = Self.answering(["photo.png": [beach]])
@@ -569,14 +569,32 @@ struct AlreadyInMarfaTests {
         let replacement = try disk.file("photo.png")
         browser.quickAdd.draft?.files.append(replacement)
         browser.quickAdd.alreadyInMarfa.answer(.skipDuplicates)
-        #expect(browser.quickAdd.draft?.files.map(\.token) == [replacement.token])
-        let id = try #require(await saving.value)
-        #expect(library.addedFiles.map(\.name) == ["photo.png"])
-        #expect(toasts.current?.message == "1 file is already in Marfa.")
-        toasts.showMatches()
-        #expect(browser.selection == [beach.id])
-        #expect(library.addedFiles.map(\.name) == ["photo.png"], "Show changes nothing that was added")
-        #expect(library.item(id) != nil)
+        #expect(await saving.value == nil)
+        #expect(browser.quickAdd.draft?.files.map(\.token) == [original.token, replacement.token])
+        #expect(library.addedFiles.isEmpty)
+        #expect(library.notices.waiting.last?.title == "Item Not Added")
+    }
+
+    @Test(arguments: [["photo.png"], ["photo.png", "invoice.pdf"]])
+    func quickAddKeepsTheChangedSelectionAfterANoMatch(_ names: [String]) async throws {
+        let library = FakeItemLibrary()
+        let gate = Parked()
+        defer { gate.open() }
+        library.sameBytes = { _ in
+            await gate.wait()
+            return FileMatches([.answered([], more: false)])
+        }
+        let browser = browser(for: library)
+        browser.openNewItem(kind: TypeID.file.rawValue, form: .text, in: library)
+        browser.quickAdd.draft?.files = [try disk.file("photo.png")]
+        let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
+        try #require(await eventually { gate.isParked })
+        let replacements = try names.map { try disk.file($0) }
+        browser.quickAdd.draft?.files = replacements
+        gate.open()
+        #expect(await saving.value == nil)
+        #expect(library.addedFiles.isEmpty)
+        #expect(browser.quickAdd.draft?.files.map(\.token) == replacements.map(\.token))
     }
 
     @Test func quickAddSkipOfItsOnlyFileAddsNothing() async throws {

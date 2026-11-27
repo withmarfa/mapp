@@ -756,11 +756,6 @@ final class QuickAdd {
     }
 }
 
-/// How many matched files Skip Duplicates took out of a draft, counted inside `answer`.
-private final class SkipCount: @unchecked Sendable {
-    var value = 0
-}
-
 extension Browser {
     /// Tells the person files were left out because they are already in Marfa, and offers Show where a toast can.
     private func tellSkipped(
@@ -923,9 +918,9 @@ extension Browser {
     /// back the add alone. A draft that may be in Marfa already (`QuickAdd.mayBeInMarfa`) is added only `again`.
     /// The draft's files already in Marfa are asked about after the parent (`AlreadyInMarfa`): Cancel adds nothing
     /// and keeps the draft as typed, including the warning that a recovered draft may already be in Marfa. Skip
-    /// Duplicates takes the matched files out of the draft as the person answers, by the token each was given when
-    /// it joined, then the draft is sent as usual. A file kind left with no file is not created, and the person is
-    /// told. The warning is cleared only once a write starts.
+    /// Duplicates takes matched files out of the submitted draft as the person answers. A draft edited during the
+    /// check stays as typed. A file kind left with no file is not created, and the person is told. The warning is
+    /// cleared only once a write starts.
     @discardableResult
     func saveQuickAdd(
         in library: any ItemLibrary, undoManager: UndoManager?, opening: Bool = true, toasts: ToastPresenter? = nil,
@@ -992,32 +987,35 @@ extension Browser {
             quickAdd.checking(true)
             let entry = quickAdd.entry
             let asked = draft.files
-            let removed = SkipCount()
+            func stillHolds(_ expected: QuickAdd.Draft) -> Bool {
+                guard quickAdd.entry == entry, let current = quickAdd.draft else { return false }
+                // File equality compares paths. Choosing the same path again gives it a new token.
+                return current == expected && current.files.map(\.token) == expected.files.map(\.token)
+            }
+            var changedBeforeSkip = false
             quickAdd.alreadyInMarfa.onSkip = { [self] question in
-                guard self.quickAdd.entry == entry else { return }
-                let tokens = Set(question.rows.compactMap { row -> UUID? in
-                    guard asked.indices.contains(row.index) else { return nil }
-                    return asked[row.index].token
-                })
-                let before = self.quickAdd.draft?.files.count ?? 0
-                self.quickAdd.draft?.files.removeAll { tokens.contains($0.token) }
-                removed.value += before - (self.quickAdd.draft?.files.count ?? 0)
+                guard stillHolds(typed) else {
+                    changedBeforeSkip = true
+                    return
+                }
+                let skipped = Set(question.rows.map(\.index))
+                typed.files = asked.indices.filter { !skipped.contains($0) }.map { asked[$0] }
+                quickAdd.draft?.files = typed.files
             }
             let plan = await AlreadyInMarfa.check(asked.map(\.url), in: library, asking: quickAdd.alreadyInMarfa)
             quickAdd.alreadyInMarfa.onSkip = nil
             quickAdd.checking(false)
             if plan.isCancelled { return nil }
-            guard quickAdd.entry == entry, let current = quickAdd.draft else {
-                if quickAdd.entry != entry, quickAdd.draft != nil {
+            guard !changedBeforeSkip, stillHolds(typed) else {
+                if quickAdd.draft != nil {
                     library.notices.tell(
                         String(localized: "Item Not Added"),
                         String(localized: "The new item changed while its files were being checked, so nothing was added. Add it again."))
                 }
                 return nil
             }
-            draft = current
-            typed = current
-            skippedFiles = removed.value
+            draft.files = plan.adding.map { asked[$0] }
+            skippedFiles = asked.count - draft.files.count
             matchesToShow = plan.show
             if QuickAdd.isFile(draft.typeID, in: library.catalogue), draft.files.isEmpty {
                 tellSkipped(skippedFiles, matches: matchesToShow, in: library, order: order, toasts: toasts)
