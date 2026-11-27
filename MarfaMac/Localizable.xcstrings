@@ -7524,9 +7524,6 @@
     "Nothing is kept in step with a folder yet." : {
 
     },
-    "Nothing is sent until a destination is set." : {
-
-    },
     "Nothing is sent until an address is set." : {
 
     },
@@ -9129,6 +9126,9 @@
     "Set a secret again" : {
 
     },
+    "Set a telemetry address or turn on error reports with an address and token." : {
+
+    },
     "Set on the machine %@ runs on." : {
 
     },
@@ -9478,9 +9478,6 @@
       "extractionState" : "manual"
     },
     "Sign in to your Marfa to open your library." : {
-
-    },
-    "Sign Out “%@”?" : {
 
     },
     "Sign-In Address" : {
@@ -9914,9 +9911,6 @@
 
     },
     "Telemetry is sent without these headers." : {
-
-    },
-    "Telemetry stops using this address. Separate destinations for traces, logs, metrics and error reports still apply." : {
 
     },
     "Template" : {
@@ -10795,6 +10789,9 @@
     "The server stops sending its heartbeat." : {
 
     },
+    "The server stops sending traces, logs, and metrics. Error reports use their own address." : {
+
+    },
     "The server takes no backup on a schedule." : {
 
     },
@@ -11047,12 +11044,6 @@
     "Thinned old versions" : {
 
     },
-    "This app can’t check for problems" : {
-
-    },
-    "This app can’t manage sign-ins" : {
-
-    },
     "This App Isn’t Connected" : {
 
     },
@@ -11185,6 +11176,9 @@
     "This app can’t change it: another app or key made it, or this app isn’t allowed to. Change or remove it in Webhooks first." : {
 
     },
+    "This app can’t check for problems" : {
+
+    },
     "This app can’t manage sign-ins" : {
 
     },
@@ -11208,6 +11202,9 @@
     },
     "This change was made for a library the server no longer holds as it was. Try again to send it to the library as it is now, or undo it to put the item back as the server has it." : {
       "extractionState" : "manual"
+    },
+    "This change wasn’t saved." : {
+
     },
     "This changed while the library was being brought up to date, so the change wasn’t made." : {
       "extractionState" : "manual"
@@ -11939,8 +11936,15 @@
     "Username Not Changed" : {
 
     },
-    "Using the default for “%@” may remove %@ sooner than the current setting of %@. Deletion is permanent." : {
-
+    "Using the default for “%@” may remove %@ sooner than the server’s current setting of %@. Deletion is permanent." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Using the default for “%1$@” may remove %2$@ sooner than the server’s current setting of %3$@. Deletion is permanent."
+          }
+        }
+      }
     },
     "Value panels" : {
 
@@ -12362,9 +12366,6 @@
 
     },
     "You closed Settings before this was saved." : {
-
-    },
-    "You left the page before this was saved." : {
 
     },
     "You quit the app before saving the changes to this Marfa’s settings." : {

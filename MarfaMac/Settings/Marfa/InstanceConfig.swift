@@ -165,7 +165,7 @@ nonisolated enum InstanceSetting: String, CaseIterable, Hashable, Sendable {
     /// Whether `value` is so long that nothing a server could be set to keeps more: no limit where zero means it, and the
     /// largest the contract takes for every other setting.
     func isUnlimited(_ value: Int) -> Bool {
-        (zeroMeansNoLimit && value == 0) || value >= range.upperBound
+        zeroMeansNoLimit ? value == 0 : value >= range.upperBound
     }
 
     /// Whether `value` reaches further than `other` in what it keeps. Zero where it means no limit is the furthest; a zero

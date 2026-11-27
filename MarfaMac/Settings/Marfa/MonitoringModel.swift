@@ -47,7 +47,7 @@ nonisolated enum MonitoringSecret: String, CaseIterable, Hashable, Sendable, Ide
         switch self {
         case .heartbeatAddress: String(localized: "The server stops sending its heartbeat.")
         case .postHogHost, .postHogToken: String(localized: "The PostHog host and the project token are removed together, and error reports stop.")
-        case .telemetryAddress: String(localized: "Telemetry stops using this address. Separate destinations for traces, logs, metrics and error reports still apply.")
+        case .telemetryAddress: String(localized: "The server stops sending traces, logs, and metrics. Error reports use their own address.")
         case .telemetryHeaders: String(localized: "Telemetry is sent without these headers.")
         }
     }
@@ -133,7 +133,7 @@ struct MonitoringSecretSheet: Identifiable, Equatable {
     /// Whether the server has what it sends reports with, so a switch that is on does something.
     var heartbeatHasReceiver: Bool { isSet(.heartbeatAddress) }
     var errorReportsHaveReceiver: Bool { isSet(.postHogHost) && isSet(.postHogToken) }
-    var telemetryHasReceiver: Bool { isSet(.telemetryAddress) }
+    var telemetryHasReceiver: Bool { isSet(.telemetryAddress) || (isOn("error_reporting_enabled") && errorReportsHaveReceiver) }
 
     func line(_ key: String) -> String? { lines[key] }
 

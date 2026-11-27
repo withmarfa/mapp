@@ -46,8 +46,8 @@ struct MonitoringPage: View {
                 }
                 SettingsSection("Telemetry") {
                     switchRow(
-                        "Send telemetry", key: "telemetry_enabled", hasReceiver: model.telemetryHasReceiver || model.errorReportsHaveReceiver,
-                        line: "Traces, logs, metrics and error reports. Off sends none of them.", idle: "Nothing is sent until a destination is set.")
+                        "Send telemetry", key: "telemetry_enabled", hasReceiver: model.telemetryHasReceiver,
+                        line: "Traces, logs, metrics and error reports. Off sends none of them.", idle: "Set a telemetry address or turn on error reports with an address and token.")
                     secretRow(.telemetryAddress)
                     secretRow(.telemetryHeaders)
                 }
@@ -58,7 +58,6 @@ struct MonitoringPage: View {
                     secretRow(.postHogHost)
                     secretRow(.postHogToken)
                 }
-                .disabled(!model.isOn("telemetry_enabled"))
             }
         } else {
             OwnerLoading()
@@ -80,10 +79,7 @@ struct MonitoringPage: View {
     @ViewBuilder private func secretRow(_ secret: MonitoringSecret) -> some View {
         let isSet = model.isSet(secret)
         if model.reports(secret.key) {
-            SettingsRow(
-                title: Text(verbatim: secret.title), error: model.line(secret.key),
-                look: secret.partner != nil && !model.isOn("telemetry_enabled") ? .off : .normal
-            ) {
+            SettingsRow(title: Text(verbatim: secret.title), error: model.line(secret.key)) {
                 SettingsButton(isSet ? "Change…" : "Set…") { model.begin(secret) }
                     .disabled(model.isWriting)
                     .accessibilityIdentifier("Monitoring-" + secret.rawValue)

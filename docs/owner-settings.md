@@ -27,14 +27,14 @@ The page gate checks the connection and the sign-in’s permissions. A configure
 | Links | `schema.write` | Link types. Opens from Types |
 | Sources | `keys.manage` | Names and marks of sources. Both source rules need `config.manage` |
 | Trash | `items.purge` | Restore items or empty Trash. Choose Select Items or Show All to permanently delete selected items. Storage controls how long items stay in Trash |
-| Storage | `config.manage` | File locations and sizes need `instance.read`. Configuration controls copies, text extraction, web fetching, unused files, versions, and Trash retention |
+| Storage | `instance.read` or `config.manage` | File locations, sizes, and unused files need `instance.read`. Each configuration control needs `config.manage` |
 | Connectors | `connectors.manage` | Each connector's health, machine, sign-in, settings and mapping |
 | Webhooks | `webhooks.manage` | Webhooks by maker, their events and deliveries |
 | Folders | type access to `system.folder` | Synced folders: patterns, limits, copies, Stop Syncing |
 | Backups | `backups.manage` | Destination, backups, restore. Destination and interval need `config.manage` |
 | Housekeeping | `instance.read` or `config.manage` | Jobs need `instance.read`. Confirming the clock needs `instance.maintain`. Log retention needs `config.manage` |
 | Activity | `audit.read` | The audit log |
-| Monitoring | `config.manage` | Heartbeat and telemetry. Turning off telemetry also pauses error reports |
+| Monitoring | `config.manage` | Pausing telemetry pauses error reports. The owner can still change or remove the reporting destination |
 | Limits | `config.manage` or `instance.read` | Request, rate, inbound delivery, and live update limits need `config.manage`. Either permission can read start-up setting names and whether each is set |
 
 ## Permissions
@@ -51,7 +51,7 @@ The page gate checks the connection and the sign-in’s permissions. A configure
 - **Ask before anything that cannot be got back**, naming what goes and what stays: narrowing, revoking, disconnecting, emptying, shorter retention, less free disk, a raised folder limit, removing a type, plugin or data.
 - **A question holds its version.** What is confirmed is sent on the version it named, whatever is read while the alert is open.
 - **A typed safety number asks when the field is left**, because a person passes through other numbers while typing.
-- **A shorter or unknown retention always asks.** With no value the app can read, any choice may be shorter. Keep Versions asks on every change.
+- **A shorter retention asks.** Compare the proposed and current periods using the server’s reported default for an unset period. With an unknown default, ask if the change could shorten retention. Keep Versions asks on every change.
 - **Removing an app's data counts first and never half-tells.** It repeats until nothing is left, says how many went where it stops, and never says nothing changed once an item has gone.
 - **The app's own data is never removed here.** Connection's Remove… stops `PreferencesSync` first; a purge from here would delete the item under it.
 - **A disconnected app's keys still work** (`keys-and-oauth/grant-revoke-keeps-keys`); its webhooks go.

@@ -325,6 +325,7 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
         // Even a value longer than the documented default, and one equal to it.
         #expect(await asked([:], [.trashRetentionDays: "90"]).count == 1)
         #expect(await asked([:], [.trashRetentionDays: "60"]).count == 1)
+        #expect(await asked([:], [.trashRetentionDays: "36500"]).count == 1, "Even the longest finite period shortens unlimited retention.")
         #expect(await asked([:], [.versionWeeklyDays: "400"]) == [.init(setting: .versionWeeklyDays, change: .mayBeShorter(to: 400))])
         #expect(await asked([:], [.versionMaxVersions: "900"]) == [.init(setting: .versionMaxVersions, change: .mayBeShorter(to: 900))])
         // A zero window is empty, so it is the least a window keeps.
@@ -333,7 +334,6 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
 
     @Test func aValueNothingCouldOutlastAsksNothing() async {
         #expect(await asked([:], [.trashRetentionDays: "0"]).isEmpty)
-        #expect(await asked([:], [.trashRetentionDays: "36500"]).isEmpty)
         #expect(await asked([:], [.versionRecentDays: "36500", .versionDailyDays: "36500", .versionWeeklyDays: "36500"]).isEmpty)
         #expect(await asked([:], [.versionMaxVersions: "1000000"]).isEmpty)
         #expect(await asked([:], [.name: "Home"]).isEmpty)

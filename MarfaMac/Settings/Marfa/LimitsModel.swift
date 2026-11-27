@@ -132,6 +132,7 @@ nonisolated struct LimitSetting: Identifiable, Hashable, Sendable {
 /// Sends changed limits on Return or when the field loses focus. A failed write restores the last value the server reported.
 @Observable @MainActor final class LimitsModel: OwnerDraftHolding {
     private let store: StoredSettings
+    private let returnDraft: (OwnerDraft) -> Void
 
     /// What each field being edited holds; a field with no entry shows what the server holds.
     var drafts: [String: String] = [:]
@@ -141,12 +142,9 @@ nonisolated struct LimitSetting: Identifiable, Hashable, Sendable {
     private(set) var notice: String?
     private(set) var saving: Set<String> = []
 
-    init(store: StoredSettings) {
-        self.store = store
-    }
-
-    convenience init(context: OwnerContext, calls: any InstanceCalls) {
-        self.init(store: StoredSettings(context: context, calls: calls))
+    init(context: OwnerContext, calls: any InstanceCalls) {
+        store = StoredSettings(context: context, calls: calls)
+        returnDraft = context.lateDraft
     }
 
     var failure: OwnerFailure? { store.failure }
@@ -204,7 +202,11 @@ nonisolated struct LimitSetting: Identifiable, Hashable, Sendable {
             }
             change = .set(.int(value))
         }
-        await send([limit.key: change], keys: [limit.key])
+        drafts[limit.key] = nil
+        let result = await send(change, for: limit.key)
+        if result != .saved, !typed.isEmpty {
+            returnDraft(.typed(title: limit.title, text: typed))
+        }
     }
 
     /// Takes what is typed in a field; the notice about an earlier change closes.
@@ -217,26 +219,23 @@ nonisolated struct LimitSetting: Identifiable, Hashable, Sendable {
 
     func setSwitch(_ key: String, _ on: Bool) async {
         guard store.setting(key)?.value?.bool != nil, !saving.contains(key), isOn(key) != on else { return }
-        await send([key: .set(.bool(on))], keys: [key])
+        _ = await send(.set(.bool(on)), for: key)
     }
 
-    private func send(_ changes: [String: StoredSettingChange], keys: [String]) async {
-        saving.formUnion(keys)
-        defer { saving.subtract(keys) }
+    private func send(_ change: StoredSettingChange, for key: String) async -> StoredSettingsWrite {
+        saving.insert(key)
+        defer { saving.remove(key) }
         notice = nil
-        for key in keys { lines[key] = nil }
-        switch await store.write(changes) {
-        case .saved:
-            for key in keys { drafts[key] = nil }
+        lines[key] = nil
+        let result = await store.write([key: change])
+        switch result {
+        case .saved: break
         case .elsewhere(let moved):
-            for key in keys { drafts[key] = nil }
             notice = StoredSettingWording.elsewhere(moved.map(Self.name))
         case .failed(let failure):
-            for key in keys {
-                drafts[key] = nil
-                lines[key] = StoredSettingWording.line(failure)
-            }
+            lines[key] = StoredSettingWording.line(failure)
         }
+        return result
     }
 
     private static func name(_ key: String) -> String {
@@ -252,7 +251,7 @@ nonisolated struct LimitSetting: Identifiable, Hashable, Sendable {
         let held = drafts
         drafts = [:]
         return LimitSetting.all.compactMap { limit in
-            guard let text = held[limit.key]?.trimmingCharacters(in: .whitespaces), !text.isEmpty, limit.entry(from: text) != .value(self.held(limit) ?? -1)
+            guard let text = held[limit.key], !text.isEmpty, limit.entry(from: text) != .value(self.held(limit) ?? -1)
             else { return nil }
             return .typed(title: limit.title, text: text)
         }

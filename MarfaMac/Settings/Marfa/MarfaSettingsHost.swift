@@ -300,7 +300,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
     /// What the app isn't allowed to do on this page without its permission, in the page's own words from what the
     /// permission opens there. Pages that share a permission still say different things, since each opens a different part.
     func missingPermission(in grants: Set<InstancePermission>) -> InstancePermission? {
-        if self == .limits || self == .housekeeping, !grants.isDisjoint(with: [.instanceRead, .configManage]) { return nil }
+        if self == .fileStorage || self == .limits || self == .housekeeping, !grants.isDisjoint(with: [.instanceRead, .configManage]) { return nil }
         return permission.flatMap { grants.contains($0) ? nil : $0 }
     }
 

@@ -16,47 +16,76 @@ struct FileStoragePage: View {
     private let all = InstanceSetting.fileSettings + InstanceSetting.versionSettings + [.trashRetentionDays]
 
     var body: some View {
-        InstanceSettingsGate(page: .fileStorage, host: host) { catalog in
-            SettingsPageColumn {
-                if let notice = catalog.notice { OwnerNotice(title: "Changed Elsewhere", line: notice, close: { catalog.dismissNotice() }) }
-                files(catalog)
-                SettingsSection("Versions", footer: "A type can keep its own.") {
-                    ForEach(InstanceSetting.versionSettings, id: \.self) { setting in
-                        InstanceChoiceRow(model: model, setting: setting, among: all, catalog: catalog)
-                    }
-                }
-                SettingsSection("Trash") {
-                    InstanceChoiceRow(model: model, setting: .trashRetentionDays, among: all, catalog: catalog)
-                }
-                SettingsSection("Reading Files") {
-                    InstanceToggleRow(model: model, setting: .enrichmentEnabled, among: all, catalog: catalog, line: "So search finds words in PDFs and documents.")
-                    InstanceToggleRow(model: model, setting: .enrichmentOcrEnabled, among: all, catalog: catalog)
-                    LimitField(model: catalog, limit: .largestFileRead)
-                    LimitField(model: catalog, limit: .mostTextKept)
-                    LimitField(model: catalog, limit: .tries)
-                }
-                SettingsSection("Files from the Web") {
-                    if catalog.setting(LimitSetting.fetchSwitch)?.value?.bool != nil {
-                        SettingsRow("Let agents fetch files", line: "From a web address, or a file attached in a chat.", error: catalog.lines[LimitSetting.fetchSwitch]) {
-                            SettingsToggle(title: "Let agents fetch files", isOn: Binding { catalog.isOn(LimitSetting.fetchSwitch) } set: { on in
-                                Task { await catalog.setSwitch(LimitSetting.fetchSwitch, on) }
-                            })
-                            .disabled(catalog.saving.contains(LimitSetting.fetchSwitch))
-                        }
-                    }
-                    LimitField(model: catalog, limit: .largestFetch)
-                    LimitField(model: catalog, limit: .fetchTime)
-                }
-                InstanceStatusLine(model: model, settings: all)
+        Group {
+            if host.grants.contains(.configManage) {
+                InstanceSettingsGate(page: .fileStorage, host: host) { catalog in content(catalog) }
+            } else {
+                content(nil)
             }
         }
         .task(id: host.grants) { if host.grants.contains(.instanceRead) { await storage.load() } }
         .accessibilityIdentifier("FileStoragePage")
     }
 
+    private func content(_ catalog: LimitsModel?) -> some View {
+        SettingsPageColumn {
+            if let catalog, let notice = catalog.notice { OwnerNotice(title: "Changed Elsewhere", line: notice, close: { catalog.dismissNotice() }) }
+            files(catalog)
+            SettingsSection("Versions", footer: "A type can keep its own.") {
+                ForEach(InstanceSetting.versionSettings, id: \.self) { setting in
+                    choice(setting, catalog)
+                }
+            }
+            SettingsSection("Trash") {
+                choice(.trashRetentionDays, catalog)
+            }
+            SettingsSection("Reading Files") {
+                toggle(.enrichmentEnabled, catalog, line: "So search finds words in PDFs and documents.")
+                toggle(.enrichmentOcrEnabled, catalog)
+                field(.largestFileRead, catalog)
+                field(.mostTextKept, catalog)
+                field(.tries, catalog)
+            }
+            SettingsSection("Files from the Web") {
+                if let catalog, catalog.setting(LimitSetting.fetchSwitch)?.value?.bool != nil {
+                    SettingsRow("Let agents fetch files", line: "From a web address, or a file attached in a chat.", error: catalog.lines[LimitSetting.fetchSwitch]) {
+                        SettingsToggle(title: "Let agents fetch files", isOn: Binding { catalog.isOn(LimitSetting.fetchSwitch) } set: { on in
+                            Task { await catalog.setSwitch(LimitSetting.fetchSwitch, on) }
+                        })
+                        .disabled(catalog.saving.contains(LimitSetting.fetchSwitch))
+                    }
+                } else if catalog == nil {
+                    locked(InstanceSetting.mcpFetchEnabled.title)
+                }
+                field(.largestFetch, catalog)
+                field(.fetchTime, catalog)
+            }
+            if catalog != nil { InstanceStatusLine(model: model, settings: all) }
+        }
+    }
+
+    private func locked(_ title: String) -> some View {
+        LockedInstanceRow(title: title, permission: .configManage, host: host)
+    }
+
+    @ViewBuilder private func choice(_ setting: InstanceSetting, _ catalog: LimitsModel?) -> some View {
+        if let catalog { InstanceChoiceRow(model: model, setting: setting, among: all, catalog: catalog) }
+        else { locked(setting.title) }
+    }
+
+    @ViewBuilder private func toggle(_ setting: InstanceSetting, _ catalog: LimitsModel?, line: LocalizedStringKey? = nil) -> some View {
+        if let catalog { InstanceToggleRow(model: model, setting: setting, among: all, catalog: catalog, line: line) }
+        else { locked(setting.title) }
+    }
+
+    @ViewBuilder private func field(_ limit: LimitSetting, _ catalog: LimitsModel?) -> some View {
+        if let catalog { LimitField(model: catalog, limit: limit) }
+        else { locked(limit.title) }
+    }
+
     // MARK: Where files are
 
-    private func files(_ catalog: LimitsModel) -> some View {
+    private func files(_ catalog: LimitsModel?) -> some View {
         SettingsSection("Files") {
             if !host.grants.contains(.instanceRead) {
                 LockedInstanceRow(title: String(localized: "File storage details"), permission: .instanceRead, host: host)
@@ -77,10 +106,12 @@ struct FileStoragePage: View {
             } else {
                 SettingsRow("Reading where files are…") { ProgressView().controlSize(.small) }
             }
-            InstanceChoiceRow(model: model, setting: .blobMinCopies, among: all, catalog: catalog)
-            InstanceNumberRow(model: model, setting: .diskReserveMegabytes, among: all, catalog: catalog, unit: "MB", line: "Uploads stop below this.")
-            InstanceToggleRow(model: model, setting: .blobCleanupEnabled, among: all, catalog: catalog)
-            InstanceChoiceRow(model: model, setting: .blobCleanupGraceSeconds, among: all, catalog: catalog)
+            choice(.blobMinCopies, catalog)
+            if let catalog {
+                InstanceNumberRow(model: model, setting: .diskReserveMegabytes, among: all, catalog: catalog, unit: "MB", line: "Uploads stop below this.")
+            } else { locked(InstanceSetting.diskReserveMegabytes.title) }
+            toggle(.blobCleanupEnabled, catalog)
+            choice(.blobCleanupGraceSeconds, catalog)
             if host.grants.contains(.instanceRead) { unused }
         }
     }

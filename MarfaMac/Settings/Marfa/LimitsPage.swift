@@ -38,6 +38,7 @@ struct LimitsPage: View {
                 else { await readStartUp() }
             }
             .onAppear { host.ownerDrafts.register(model) }
+            .onDisappear { host.ownerDrafts.pageLeft(model) }
             .accessibilityIdentifier("LimitsPage")
     }
 

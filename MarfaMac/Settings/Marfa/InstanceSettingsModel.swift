@@ -31,6 +31,7 @@ import Observation
     struct Pending: Identifiable {
         let id = UUID()
         let patch: InstanceConfigPatch
+        let base: InstanceConfig
         let shortenings: [Shortening]
         var revertsOnFailure = false
     }
@@ -181,21 +182,30 @@ import Observation
     // MARK: Saving
 
     func choose(_ choice: Int?, for setting: InstanceSetting, defaultValue: Int?) async {
+        guard !isSaving, pending == nil, let loaded, choice != loaded.number(setting) else { return }
         draft[setting] = choice.map { String($0) } ?? ""
-        await save([setting], revertsOnFailure: true)
+        let related = InstanceSetting.versionWindows.contains(setting) ? InstanceSetting.versionWindows : [setting]
+        let invalid = problems
+        if let problem = related.compactMap({ invalid[$0] }).first {
+            draft[setting] = loaded.text(setting)
+            elsewhere = []
+            failure = .refused(problem.message)
+            return
+        }
+        await save([setting], revertsOnFailure: true, defaults: defaultValue.map { [setting: $0] } ?? [:])
     }
 
     /// Sends the changes, or first asks the person to agree where one keeps things for less time.
     func save() async { await save(Set(InstanceSetting.allCases)) }
 
     /// Sends the changes to `settings` alone. While a question is open, or a change is on its way, it does nothing.
-    func save(_ settings: Set<InstanceSetting>, revertsOnFailure: Bool = false) async {
-        guard canSave(settings), let patch = patch(for: settings) else { return }
-        let shortenings = shortenings(of: patch)
+    func save(_ settings: Set<InstanceSetting>, revertsOnFailure: Bool = false, defaults: [InstanceSetting: Int] = [:]) async {
+        guard canSave(settings), let patch = patch(for: settings), let loaded else { return }
+        let shortenings = shortenings(of: patch, defaults: defaults)
         if shortenings.isEmpty {
-            await send(patch, revertsOnFailure: revertsOnFailure)
+            await send(patch, basedOn: loaded, revertsOnFailure: revertsOnFailure)
         } else {
-            pending = Pending(patch: patch, shortenings: shortenings, revertsOnFailure: revertsOnFailure)
+            pending = Pending(patch: patch, base: loaded, shortenings: shortenings, revertsOnFailure: revertsOnFailure)
         }
     }
 
@@ -208,7 +218,7 @@ import Observation
     @discardableResult func agree(_ agreed: Pending) -> Task<Void, Never> {
         pending = nil
         sending.formUnion(agreed.patch.settings)
-        return Task { await send(agreed.patch, revertsOnFailure: agreed.revertsOnFailure) }
+        return Task { await send(agreed.patch, basedOn: agreed.base, revertsOnFailure: agreed.revertsOnFailure) }
     }
 
     /// The person kept things as they were: what was chosen is put back, so the field shows what the server holds.
@@ -221,18 +231,18 @@ import Observation
         self.pending = nil
     }
 
-    /// The retentions `patch` may make shorter. Only a value the server holds is compared with: an unset setting
-    /// uses a default whoever runs the server may have changed and a key can't read, so a value typed for it asks
-    /// unless nothing could keep more, and clearing a setting asks unless nothing could keep less.
-    func shortenings(of patch: InstanceConfigPatch) -> [Shortening] {
+    /// An unset retention uses the default from the settings catalog. A caller without a catalog asks if the change could shorten it.
+    func shortenings(of patch: InstanceConfigPatch, defaults: [InstanceSetting: Int] = [:]) -> [Shortening] {
         guard let loaded else { return [] }
         return InstanceSetting.allCases.compactMap { setting in
             guard patch.settings.contains(setting) else { return nil }
             if setting == .diskReserveMegabytes { return lowerReserve(patch, loaded) }
             guard setting.isRetention else { return nil }
-            let held = loaded.number(setting)
+            let held = loaded.number(setting) ?? defaults[setting]
             let change: Shortening.Change
-            if case .number(let to)? = patch.values[setting] {
+            let proposed: Int?
+            if case .number(let number)? = patch.values[setting] { proposed = number } else { proposed = defaults[setting] }
+            if let to = proposed {
                 if let held {
                     guard setting.keepsLonger(held, than: to) else { return nil }
                     change = .shorter(from: held, to: to)
@@ -259,7 +269,14 @@ import Observation
         return to < held ? Shortening(setting: setting, change: .shorter(from: held, to: to)) : nil
     }
 
-    private func send(_ patch: InstanceConfigPatch, revertsOnFailure: Bool) async {
+    private func send(_ patch: InstanceConfigPatch, basedOn base: InstanceConfig, revertsOnFailure: Bool) async {
+        let typedReserve = revertsOnFailure && patch.settings.contains(.diskReserveMegabytes) ? draft[.diskReserveMegabytes] : nil
+        var applied = false
+        defer {
+            if !applied, let typedReserve, !typedReserve.isEmpty {
+                returnDraft(.typed(title: InstanceSetting.diskReserveMegabytes.title, text: typedReserve))
+            }
+        }
         sending.formUnion(patch.settings)
         defer { sending.subtract(patch.settings) }
         // A patch made for the server the page was reading is never sent to another one that has replaced it.
@@ -267,7 +284,7 @@ import Observation
         guard let target = adopt(), generation == before, !isSaving else { return }
         let generation = generation
         // The instance the person was shown, which the change is addressed to.
-        let expected = loaded?.instanceID
+        let expected = base.instanceID
         isSaving = true
         failure = nil
         elsewhere = []
@@ -282,13 +299,14 @@ import Observation
                 await instanceChanged()
                 return
             }
-            let moved = InstanceSetting.allCases.filter { patch.settings.contains($0) && current.values[$0] != loaded?.values[$0] }
-            absorb(current)
+            let moved = InstanceSetting.allCases.filter { patch.settings.contains($0) && current.values[$0] != base.values[$0] }
+            absorb(current, resetting: revertsOnFailure && !moved.isEmpty ? patch.settings : [])
             guard moved.isEmpty else {
                 elsewhere = moved
                 return
             }
             let answer = try await target.source.update(patch, expecting: expected)
+            applied = true
             guard generation == self.generation else { return }
             absorb(answer, resetting: patch.settings)
             saved = InstanceSetting.allCases.filter(patch.settings.contains).map {
@@ -407,7 +425,7 @@ nonisolated enum InstanceWording {
         case .mayBeShorter(let to):
             return String(localized: "This may remove \(setting.removes) sooner than the server’s current setting.") + " " + removal(setting, keeping: to)
         case .toDefault(let from):
-            return String(localized: "Using the default for “\(setting.title)” may remove \(setting.removes) sooner than the current setting of \(amount(setting, from)). Deletion is permanent.")
+            return String(localized: "Using the default for “\(setting.title)” may remove \(setting.removes) sooner than the server’s current setting of \(amount(setting, from)). Deletion is permanent.")
         }
     }
 

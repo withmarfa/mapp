@@ -87,12 +87,8 @@ struct InstanceChoiceRow: View {
     let catalog: LimitsModel
     var line: LocalizedStringKey?
 
-    private var held: Int? {
-        if case .value(.number(let number)) = setting.entry(from: model.draft[setting] ?? "") { number } else { nil }
-    }
-
     private var standard: Int? { catalog.setting(setting.serverKey)?.defaultValue?.int }
-    private var shown: Int? { held ?? standard }
+    private var shown: Int? { model.loaded?.number(setting) ?? standard }
 
     var body: some View {
         let errors = InstanceRowErrors(model: model, settings: among)
@@ -101,16 +97,14 @@ struct InstanceChoiceRow: View {
                 SettingsPopUp(
                     title: LocalizedStringKey(setting.title),
                     selection: Binding { shown } set: { choice in
-                        guard choice != held else { return }
-                        model.draft[setting] = choice.map { String($0) } ?? ""
-                        Task { await model.save([setting], revertsOnFailure: true) }
+                        Task { await model.choose(choice, for: setting, defaultValue: standard) }
                     }
                 ) {
                     ForEach(InstanceChoices.options(for: setting, holding: shown, defaultValue: standard), id: \.self) { option in
                         Text(verbatim: option.title).tag(option.value)
                     }
                 }
-                .disabled(model.isSaving)
+                .disabled(model.isSaving || model.pending != nil)
                 .settingsErrorRing(errors.isError(setting))
                 .accessibilityIdentifier("Instance" + setting.rawValue)
             }
@@ -262,6 +256,7 @@ struct InstanceSettingsGate<Content: View>: View {
             await settings
         }
         .onAppear { host.ownerDrafts.register(catalog) }
+        .onDisappear { host.ownerDrafts.pageLeft(catalog) }
         .onChange(of: model.failure) { _, failure in
             if failure == .notPermitted { Task { await host.refreshGrants() } }
         }

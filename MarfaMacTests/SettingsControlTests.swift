@@ -18,7 +18,7 @@ struct SettingsControlTests {
         let window = host(MonitoringPage(host: settings, model: model))
         defer { window.contentView = nil; window.close() }
         try await press(in: window, matching: "Monitoring-postHogHost", attribute: "accessibilityIdentifier")
-        #expect(await eventually { model.sheet?.secret == .postHogHost })
+        #expect(await eventually(within: .seconds(3)) { model.sheet?.secret == .postHogHost })
     }
 
     @Test func storageWithReadAccessLoadsFileDetailsWithoutRequestingConfiguration() async throws {
@@ -31,9 +31,9 @@ struct SettingsControlTests {
         settings.instanceCalls = configuration
         let window = host(MarfaSettingsPageView(page: .fileStorage, host: settings))
         defer { window.contentView = nil; window.close() }
-        #expect(await eventually { calls.calls.contains("fileStores") && calls.calls.contains("instanceMetrics") })
+        #expect(await eventually(within: .seconds(3)) { calls.calls.contains("fileStores") && calls.calls.contains("instanceMetrics") })
         #expect(configuration.calls.isEmpty)
-        #expect(await eventually {
+        #expect(await eventually(within: .seconds(3)) {
             window.contentView?.layoutSubtreeIfNeeded()
             return !elements(window.contentView, matching: "Database", attribute: "accessibilityValue").isEmpty
         })
