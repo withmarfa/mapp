@@ -1,7 +1,7 @@
 import XCTest
 
 nonisolated final class AccountSignOutTests: XCTestCase {
-    @MainActor func testAccountAsksOnceAndReturnKeepsTheLibraryOpen() {
+    @MainActor func testAccountAsksOnceAndEscapeKeepsTheLibraryOpen() {
         continueAfterFailure = false
         let app = XCUIApplication.sample()
         app.launch()
@@ -26,6 +26,8 @@ nonisolated final class AccountSignOutTests: XCTestCase {
         add(attachment)
 
         app.typeKey(.return, modifierFlags: [])
+        XCTAssertTrue(confirm.exists)
+        app.typeKey(.escape, modifierFlags: [])
         XCTAssertTrue(confirm.waitForNonExistence(timeout: 3))
         XCTAssertTrue(library.exists)
 
