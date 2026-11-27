@@ -15,7 +15,7 @@ nonisolated struct ConnectionAddressStatus: Equatable, Sendable {
         case .online where updateReady:
             self.init("arrow.down.circle.fill", .orange, String(localized: "Update ready"))
         case .online:
-            self.init("checkmark", .green, connection.title)
+            self.init("checkmark.circle.fill", .green, connection.title)
         case .connecting:
             self.init("ellipsis.circle.fill", .orange, connection.title)
         case .offline:
@@ -37,7 +37,7 @@ nonisolated struct ConnectionAddressStatus: Equatable, Sendable {
 /// What the Marfa section of Connection holds in each state: who is signed in, what the owner has allowed the app, and
 /// what waits to be sent.
 nonisolated struct ConnectionAccount: Equatable, Sendable {
-    /// Every owner permission, as every sign-in and Allow More… asks for them (`SystemSignIns.askedAtSignIn`): what
+    /// Every owner permission, as every sign-in and Allow More asks for them (`SystemSignIns.askedAtSignIn`): what
     /// Connection counts, as a key's and an app's pages count them.
     static let asked = SystemSignIns.askedAtSignIn
 
@@ -52,9 +52,9 @@ nonisolated struct ConnectionAccount: Equatable, Sendable {
     /// Whether Signed In As is shown: whenever the sign-in is held, so also while the server does not answer.
     var showsName: Bool
     /// Signed In As cannot be told because the sign-in may not read the owner's name, as one made before the app asked for it
-    /// cannot; Allow More… gives it, beside Permissions.
+    /// cannot; Allow More gives it, beside Permissions.
     var offersName: Bool
-    /// Whether Permissions offers Allow More…: the sign-in lacks something the app asks for at sign-in
+    /// Whether Permissions offers Allow More: the sign-in lacks something the app asks for at sign-in
     /// (`MarfaHost.lacksAsked`), an owner permission, the read of the name or a scope the app began to ask for later.
     var offersMore: Bool
 
@@ -80,14 +80,18 @@ nonisolated struct ConnectionAccount: Equatable, Sendable {
         }
     }
 
-    /// What sits under Signed In As where the name is not read: nothing unless Allow More… is there to give it.
+    /// What sits under Signed In As where the name is not read: nothing unless Allow More is there to give it.
     var nameLine: String? {
-        offersName ? String(localized: "Allow More… lets the app read the owner’s name.") : nil
+        offersName ? String(localized: "Allow More lets the app read the owner’s name.") : nil
     }
 
+    /// What the count is of, and what Allow More adds. The count is of owner permissions, which open what the app may
+    /// manage (keys, webhooks, backups). Allow More also asks for the rest of `SystemSignIns.scopes` (items, profile and
+    /// the app's own settings), so with every permission held it can still be offered.
     var permissionsLine: String {
-        if holdsAll && offersMore { return String(localized: "The app holds all \(total) of the owner’s permissions, but not all the access it asks for.") }
-        return String(localized: "The owner’s permissions this app holds.")
+        if !holdsAll { return String(localized: "What you’ve allowed this app to manage. Allow More asks for the rest.") }
+        if offersMore { return String(localized: "Every permission is allowed. Allow More asks for other access the app needs.") }
+        return String(localized: "What you’ve allowed this app to manage.")
     }
 
     /// "All 14" or "12 of 14", where the sign-in can be read.

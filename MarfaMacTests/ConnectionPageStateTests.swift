@@ -24,10 +24,12 @@ import Testing
         let without = ConnectionAccount(
             state: .online, grants: Set(InstancePermission.allCases).subtracting([.signInsManage]), grantsRead: true, waiting: 0)
         #expect(!without.holdsAll && without.permissionsValue == "13 of 14" && without.offersMore)
+        #expect(without.permissionsLine == "What you’ve allowed this app to manage. Allow More asks for the rest.")
+        #expect(all.permissionsLine == "What you’ve allowed this app to manage.")
     }
 
     @Test(arguments: [
-        (MarfaConnectionState.online, false, "checkmark", ConnectionAddressStatus.Tone.green, "Connected"),
+        (MarfaConnectionState.online, false, "checkmark.circle.fill", ConnectionAddressStatus.Tone.green, "Connected"),
         (.online, true, "arrow.down.circle.fill", .orange, "Update ready"),
         (.offline(reason: nil), true, "exclamationmark.circle.fill", .orange, "Not answering"),
         (.keyRefused, true, "xmark.circle.fill", .red, "Sign-in expired"),
@@ -51,10 +53,10 @@ import Testing
     @Test func withoutTheNameScopeSignedInAsIsEmptyAndPointsToTheOneAllowMore() {
         let without = ConnectionAccount(state: .online, grants: [], grantsRead: true, readsProfile: false, waiting: 0)
         #expect(without.showsName && without.offersName)
-        #expect(without.nameLine == "Allow More… lets the app read the owner’s name.")
+        #expect(without.nameLine == "Allow More lets the app read the owner’s name.")
         let with = ConnectionAccount(state: .online, grants: [], grantsRead: true, readsProfile: true, waiting: 0)
         #expect(with.nameLine == nil)
-        // Where no Allow More… is there to give the name, no line promises one.
+        // Where no Allow More is there to give the name, no line promises one.
         let unreached = ConnectionAccount(state: .offline(reason: nil), grants: [], grantsRead: true, readsProfile: false, waiting: 0)
         #expect(unreached.showsName && unreached.nameLine == nil)
     }
