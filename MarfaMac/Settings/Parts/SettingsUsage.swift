@@ -109,7 +109,7 @@ struct SettingsUsageChart: View {
     }
 }
 
-/// Storage used by each kind, followed by the remaining free capacity.
+/// Storage used by each kind, then the free space when the server could read it.
 struct SettingsStorageBar: View {
     struct Part {
         let name: String
@@ -118,21 +118,28 @@ struct SettingsStorageBar: View {
     }
 
     let parts: [Part]
-    let freeBytes: Int64
+    /// Nil when the server could not read the free space, which leaves that segment and its legend entry out.
+    var freeBytes: Int64?
+    var freeName: String = String(localized: "Free")
     var label: LocalizedStringKey = "Storage Usage"
     private typealias Metric = SettingsTokens.Metric.Usage
 
     private var shares: [(bytes: Double, color: Color)] {
         let used = parts.filter { $0.bytes > 0 }.map { (Double($0.bytes), $0.tone.color) }
-        return freeBytes > 0 ? used + [(Double(freeBytes), SettingsTokens.selection)] : used
+        guard let freeBytes, freeBytes > 0 else { return used }
+        return used + [(Double(freeBytes), SettingsTokens.selection)]
+    }
+
+    private var legend: [UsageLegend.Entry] {
+        let used = parts.map { UsageLegend.Entry(name: $0.name, value: size($0.bytes), tone: $0.tone) }
+        guard let freeBytes else { return used }
+        return used + [UsageLegend.Entry(name: freeName, value: size(freeBytes), tone: nil)]
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Metric.storageLegendGap) {
             bar
-            UsageLegend(entries: parts.map {
-                UsageLegend.Entry(name: $0.name, value: size($0.bytes), tone: $0.tone)
-            } + [UsageLegend.Entry(name: String(localized: "Free"), value: size(freeBytes), tone: nil)])
+            UsageLegend(entries: legend)
         }
         .padding(.horizontal, SettingsTokens.Metric.inset)
         .padding(.top, SettingsTokens.Metric.inset)
@@ -149,7 +156,9 @@ struct SettingsStorageBar: View {
 
             HStack(spacing: Metric.storageGap) {
                 ForEach(shares.indices, id: \.self) { index in
-                    Rectangle().fill(shares[index].color).frame(width: width * shares[index].bytes / total)
+                    // A new Marfa has nothing to divide.
+                    let share = total > 0 ? width * shares[index].bytes / total : 0
+                    Rectangle().fill(shares[index].color).frame(width: share)
                 }
             }
         }
