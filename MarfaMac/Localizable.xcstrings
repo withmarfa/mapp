@@ -4,6 +4,16 @@
     "" : {
 
     },
+    "%@\n%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@\n%2$@"
+          }
+        }
+      }
+    },
     "%@  %@" : {
       "localizations" : {
         "en" : {
@@ -163,9 +173,6 @@
 
     },
     "%@ answers on it too." : {
-
-    },
-    "%@ answers there." : {
 
     },
     "%@ are attached to “%@”, but they couldn’t be put in its text." : {
@@ -721,6 +728,9 @@
           }
         }
       }
+    },
+    "%lld Changes Haven’t Been Sent" : {
+
     },
     "%lld Conditions" : {
 
@@ -1795,6 +1805,9 @@
     "0 sets no limit." : {
 
     },
+    "1 Change Hasn’t Been Sent" : {
+
+    },
     "1 Condition" : {
 
     },
@@ -2032,9 +2045,6 @@
     "A folder, view, webhook or table stops the move. Nothing moved." : {
 
     },
-    "A key can only be narrowed later, so choose what it needs now." : {
-
-    },
     "A key can set its own instead." : {
 
     },
@@ -2122,6 +2132,9 @@
 
     },
     "A source appears here once an app or key has written an item." : {
+
+    },
+    "A source can’t be “.” or “..”." : {
 
     },
     "A source." : {
@@ -2367,7 +2380,7 @@
     "Add a Word" : {
 
     },
-    "Add a passkey at the new address." : {
+    "Add a new one at the new address." : {
 
     },
     "Add a passkey to sign in with it." : {
@@ -2581,7 +2594,7 @@
     "Also remove its data" : {
 
     },
-    "Also remove this app’s settings from %@" : {
+    "Also remove this app’s settings from this Marfa" : {
 
     },
     "Always" : {
@@ -2745,6 +2758,9 @@
 
     },
     "Apps and keys using this rule will see items from every source for the types you limited, including subtypes." : {
+
+    },
+    "Apps sign out" : {
 
     },
     "Archive" : {
@@ -3111,6 +3127,12 @@
     "Browsers" : {
 
     },
+    "Browsers and apps sign out" : {
+
+    },
+    "Browsers sign out" : {
+
+    },
     "Built In" : {
 
     },
@@ -3379,9 +3401,6 @@
 
     },
     "Change Address" : {
-
-    },
-    "Change Address…" : {
 
     },
     "Change Calendar" : {
@@ -3691,6 +3710,9 @@
 
     },
     "Choose the settings to go back to." : {
+
+    },
+    "Choose type exceptions and owner permissions." : {
 
     },
     "Choose what to replace with the settings in “%@”." : {
@@ -4288,6 +4310,9 @@
     "Custom Color" : {
 
     },
+    "Customize Access" : {
+
+    },
     "Customize Layout…" : {
       "extractionState" : "manual"
     },
@@ -4516,6 +4541,9 @@
     "Discard Copy" : {
       "extractionState" : "manual"
     },
+    "Discard and Sign Out" : {
+
+    },
     "Discard the New View?" : {
 
     },
@@ -4529,15 +4557,6 @@
 
     },
     "Disconnect %@?" : {
-
-    },
-    "Disconnect Anyway" : {
-
-    },
-    "Disconnect from %@" : {
-
-    },
-    "Disconnect from %@?" : {
 
     },
     "Disconnect it again to finish." : {
@@ -4859,22 +4878,10 @@
     "Every Marfa has these. Base a type on one to add to it." : {
 
     },
-    "Every Type" : {
-
-    },
     "Every Week" : {
 
     },
-    "Every app signs out" : {
-
-    },
-    "Every browser and app signs out" : {
-
-    },
     "Every browser sign-in has ended. Apps and keys keep working." : {
-
-    },
-    "Every browser signs out" : {
 
     },
     "Every browser signs out. Apps and keys keep working." : {
@@ -4896,6 +4903,9 @@
 
     },
     "Every setting on this Mac. Your items stay." : {
+
+    },
+    "Every type" : {
 
     },
     "Everything" : {
@@ -5459,6 +5469,9 @@
 
     },
     "Hide Month" : {
+
+    },
+    "Hide Options" : {
 
     },
     "Hide Others" : {
@@ -6152,6 +6165,9 @@
     "Keep Copy and Disconnect" : {
       "extractionState" : "manual"
     },
+    "Keep Copy and Sign Out" : {
+
+    },
     "Keep Copy and Switch" : {
       "extractionState" : "manual"
     },
@@ -6192,6 +6208,9 @@
     "Keep opened files" : {
 
     },
+    "Keep the copy and the change is sent when you sign in to this Marfa again. Discard it and the change is lost." : {
+
+    },
     "Keep the copy and the changes stay on this Mac." : {
       "extractionState" : "manual"
     },
@@ -6200,6 +6219,9 @@
     },
     "Keep the copy and the changes stay on this Mac. Install the previous version of the app and connect it to the same server, and it sends them. Discard the copy and they’re lost." : {
       "extractionState" : "manual"
+    },
+    "Keep the copy and they’re sent when you sign in to this Marfa again. Discard it and they’re lost." : {
+
     },
     "Keep the gallery grid aligned when the window resizes" : {
 
@@ -6533,9 +6555,6 @@
     "Look for problems" : {
 
     },
-    "Looking After This Marfa" : {
-
-    },
     "Low" : {
       "extractionState" : "manual"
     },
@@ -6707,6 +6726,12 @@
     "Marfa for Mac couldn’t check this link in time. Try opening it again." : {
 
     },
+    "Marfa for Mac removes its copy from this Mac and deletes the webhooks it made." : {
+
+    },
+    "Marfa for Mac removes its copy from this Mac and deletes the webhooks it made. Your items stay." : {
+
+    },
     "Marfa isn’t answering." : {
 
     },
@@ -6774,6 +6799,9 @@
 
     },
     "More From This Book" : {
+
+    },
+    "More actions for %@" : {
 
     },
     "More changes arrived while you were deciding. Look at them before you choose." : {
@@ -6969,9 +6997,6 @@
     "New %@" : {
       "extractionState" : "manual"
     },
-    "New Address" : {
-
-    },
     "New Child Type" : {
 
     },
@@ -7052,6 +7077,9 @@
     "New Word" : {
 
     },
+    "New address" : {
+
+    },
     "New entry: %@" : {
       "extractionState" : "manual"
     },
@@ -7059,6 +7087,9 @@
 
     },
     "New items are" : {
+
+    },
+    "New items go to" : {
 
     },
     "New password" : {
@@ -7932,6 +7963,9 @@
     "Owner’s Permissions" : {
 
     },
+    "Owner’s permissions" : {
+
+    },
     "PDF" : {
       "extractionState" : "manual"
     },
@@ -8004,7 +8038,7 @@
     "Passkeys" : {
 
     },
-    "Passkeys stop working" : {
+    "Passkeys for other domains stop working" : {
 
     },
     "Password" : {
@@ -8085,6 +8119,9 @@
 
     },
     "Permissions" : {
+
+    },
+    "Permissions no longer available" : {
 
     },
     "Person" : {
@@ -8607,9 +8644,6 @@
     "Removed old revoked keys" : {
 
     },
-    "Removes this Mac’s copy and signs the app out." : {
-
-    },
     "Remove…" : {
 
     },
@@ -8619,7 +8653,10 @@
     "Removing them also sends the changes above, so it can’t be combined with discarding them." : {
 
     },
-    "Removing them also sends the changes you chose to discard. Keep the copy to send them, or disconnect anyway and the settings stay in %@." : {
+    "Removing them also sends the changes you chose to discard. Keep the copy to send them, or sign out anyway and the settings stay in %@." : {
+
+    },
+    "Removing this app’s settings can also move linked items to Trash." : {
 
     },
     "Rename" : {
@@ -9159,6 +9196,9 @@
     "Set the object store secret key again" : {
 
     },
+    "Set the source and where new items go." : {
+
+    },
     "Set them again if you install it later." : {
 
     },
@@ -9471,10 +9511,19 @@
     "Sign Out" : {
 
     },
+    "Sign Out Anyway" : {
+
+    },
     "Sign Out “%@”?" : {
 
     },
+    "Sign Out?" : {
+
+    },
     "Sign in again" : {
+
+    },
+    "Sign in again to check the new address." : {
 
     },
     "Sign in and switch" : {
@@ -9512,6 +9561,15 @@
     },
     "Signed Out of Your Marfa Server" : {
       "extractionState" : "manual"
+    },
+    "Signed Out, but Not Everything Was Removed" : {
+
+    },
+    "Signed Out, but This App May Still Be Approved" : {
+
+    },
+    "Signed Out, but the Copy Was Kept" : {
+
     },
     "Signed in" : {
 
@@ -9663,7 +9721,7 @@
     "Source Name Not Kept" : {
 
     },
-    "Source, Stamped on What It Writes" : {
+    "Source and Destination" : {
 
     },
     "Source: %@" : {
@@ -9762,7 +9820,7 @@
     "Statuses" : {
 
     },
-    "Stay Connected" : {
+    "Stay Signed In" : {
 
     },
     "Stays" : {
@@ -10006,6 +10064,9 @@
     "The Marfa server doesn’t have this file’s contents." : {
       "extractionState" : "manual"
     },
+    "The Marfa server no longer accepts this library’s sign-in. Sign in again in Connection, or choose Sign Out in Account and start again." : {
+
+    },
     "The Marfa server no longer accepts this library’s sign-in. Sign in again in Settings, or disconnect the library there and start again." : {
       "extractionState" : "manual"
     },
@@ -10114,7 +10175,7 @@
     "The app couldn’t find the server by name. Check the address and your connection, then try again." : {
 
     },
-    "The app couldn’t finish removing them from %@, so you’re still connected. Disconnect anyway and they may stay there." : {
+    "The app couldn’t finish removing them from %@, so you’re still signed in. Sign out anyway and they may stay there." : {
 
     },
     "The app couldn’t finish signing in. Check your connection and try again, or sign in with a code." : {
@@ -10329,9 +10390,6 @@
     },
     "The app reads and writes your library on a Marfa server. Enter its address and sign in from Settings." : {
       "extractionState" : "manual"
-    },
-    "The app removes its copy from this Mac and signs out. Webhooks it made are deleted. Your items stay." : {
-
     },
     "The app shows one Marfa at a time." : {
 
@@ -10615,6 +10673,9 @@
     "The new address is never shown again." : {
 
     },
+    "The new address works." : {
+
+    },
     "The new entry wasn’t finished, so it wasn’t added." : {
       "extractionState" : "manual"
     },
@@ -10685,6 +10746,9 @@
 
     },
     "The port it listens on." : {
+
+    },
+    "The prefixes oauth:, restored:, and connector-host: are reserved. Use a different source." : {
 
     },
     "The preview expired before %@ answered." : {
@@ -10867,7 +10931,7 @@
     "The sign-in wasn’t confirmed partway through." : {
 
     },
-    "The source can’t change later." : {
+    "The source is stamped on what the key writes and can’t change later." : {
 
     },
     "The time couldn’t be saved." : {
@@ -11299,8 +11363,8 @@
     "This item changed elsewhere, so your changes were saved as a copy." : {
       "extractionState" : "manual"
     },
-    "This item couldn’t be read from the copy of the library on this Mac, so it can’t be shown or changed. The app reads it again from the server when it can. If it stays like this, disconnect the library in Settings and connect it again. The copy on the server isn’t affected." : {
-      "extractionState" : "manual"
+    "This item couldn’t be read from the copy of the library on this Mac, so it can’t be shown or changed. The app reads it again from the server when it can. If it stays like this, sign out from Account in Settings and sign in again. The copy on the server isn’t affected." : {
+
     },
     "This item couldn’t be read on this Mac." : {
 
@@ -11428,6 +11492,9 @@
     },
     "This server runs Marfa %@. Update the server to Marfa %@ or later to use this app." : {
       "extractionState" : "manual"
+    },
+    "This sign-in can’t grant owner permissions." : {
+
     },
     "This sign-in doesn’t have permission to empty Trash." : {
 
@@ -11561,8 +11628,14 @@
     "To send any changes it holds, install the previous version of the app and connect it to this server if it isn’t already. The app can’t remove a copy it can’t count, so when that version has sent everything, update the app, choose Disconnect, then Keep Copy and Disconnect, and move the copy’s folder to the Trash. After that, connect to the server again." : {
       "extractionState" : "manual"
     },
+    "To send any changes it holds, install the previous version of the app and connect it to this server if it isn’t already. The app can’t remove a copy it can’t count, so when that version has sent everything, update the app, choose Sign Out in Account, then Keep Copy and Sign Out, and move the copy’s folder to the Trash. After that, connect to the server again." : {
+
+    },
     "To start a new copy from this server, choose Disconnect in Settings, then connect again." : {
       "extractionState" : "manual"
+    },
+    "To start a new copy from this server, choose Sign Out in Account, then connect again." : {
+
     },
     "To: %@" : {
 
@@ -11794,6 +11867,9 @@
     "Unresolved connections will be preserved." : {
       "extractionState" : "manual"
     },
+    "Unsent change" : {
+
+    },
     "Unsent changes" : {
 
     },
@@ -11923,6 +11999,9 @@
     },
     "Use a number from %lld to %lld." : {
       "extractionState" : "manual"
+    },
+    "Use a source with at most 200 characters." : {
+
     },
     "Use a whole number." : {
 
@@ -12905,6 +12984,9 @@
     "or drop one here" : {
 
     },
+    "permanently delete trashed items" : {
+
+    },
     "pt" : {
 
     },
@@ -12999,6 +13081,9 @@
 
     },
     "unused files" : {
+
+    },
+    "update and maintain the server" : {
 
     },
     "update the server and run its housekeeping" : {

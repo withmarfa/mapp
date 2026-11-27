@@ -1726,6 +1726,26 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         #expect(model.sheet == .new)
     }
 
+    @Test(arguments: [
+        ".", " .. ", "OAuth:reserved", "oauth:\u{0301}reserved", "restored:reserved", "connector-host:reserved", String(repeating: "x", count: 201),
+    ])
+    func anInvalidSourceKeepsTheDraftAndShowsTheFieldWithoutMakingAKey(source: String) async {
+        let bench = bench([])
+        let model = KeysModel(context: bench.context)
+        model.beginNewKey()
+        model.draft.name = "Lisbon zine importer"
+        model.draft.source = source
+
+        await model.make()
+
+        #expect(model.sourceError != nil)
+        #expect(model.draftError == nil)
+        #expect(model.draft.source == source)
+        #expect(model.draft.name == "Lisbon zine importer")
+        #expect(model.sheet == .new)
+        #expect(!bench.calls.calls.contains("create"))
+    }
+
     @Test func closingSettingsHandsBackTheNewKeysTypedFields() async {
         let bench = bench([])
         let model = KeysModel(context: bench.context)
@@ -1788,6 +1808,27 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
             ])
         #expect(model.created == nil, "the secret is dropped, not kept for a window that is gone")
         #expect(model.sheet == nil)
+    }
+
+    @Test func closingDuringTheKeyListRefreshDropsTheShownSecretAndTellsTheOwner() async throws {
+        let bench = bench([])
+        let model = KeysModel(context: bench.context)
+        model.beginNewKey()
+        model.draft.name = "Lisbon zine importer"
+        model.draft.source = "lisbon-zine"
+        let refresh = bench.calls.hold("keys")
+        defer { refresh.open() }
+        let making = Task { await model.make() }
+        try #require(await eventually { model.sheet == .shown })
+        let drafts = model.takeDrafts()
+        #expect(drafts.count == 1)
+        #expect(String(describing: drafts).contains("Key Not Copied"))
+        #expect(!String(describing: drafts).contains("marfa_k1_secret"))
+        #expect(model.created == nil)
+        #expect(model.sheet == nil)
+        refresh.open()
+        await making.value
+        #expect(bench.late.isEmpty)
     }
 
     @Test func aKeyRefusedWhileSettingsClosesHandsBackWhatWasTyped() async throws {
@@ -2173,7 +2214,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         #expect(model.settings?.signIn == "https://studio.castell.design")
     }
 
-    @Test func aMoveTheOwnerDidNotConfirmKeepsTheSheetAndTheInput() async {
+    @Test func aMoveTheOwnerDidNotConfirmKeepsTheDraftForAnotherAttempt() async {
         let bench = OwnerBench()
         bench.calls.state.withLock { $0.reach = .answers; $0.requiresConfirmation = true }
         let (model, _) = await model(bench)
@@ -2182,10 +2223,18 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         await model.check()
         bench.calls.fail("apply", with: .notConfirmed)
         await model.confirm()
-        #expect(model.inputError == "Nothing was changed: the sign-in wasn’t confirmed.")
+        #expect(model.approvalNotice == "Nothing was changed: the sign-in wasn’t confirmed.")
+        #expect(model.inputError == nil)
         #expect(model.input == "studio.castell.design")
         #expect(model.sheet == .changeSignIn)
         #expect(model.settings?.signIn == "https://marfa.test")
+        #expect(model.canConfirm)
+
+        bench.calls.fail("apply", with: nil)
+        await model.confirm()
+        #expect(model.approvalNotice == nil)
+        #expect(model.sheet == nil)
+        #expect(model.settings?.signIn == "https://studio.castell.design")
     }
 
     @Test func removingAnAddressChecksThenAsksThenWrites() async throws {

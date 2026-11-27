@@ -27,7 +27,6 @@ struct ConnectionPage: View {
                         .id(connection)
                     let hasOtherMarfas = host.hasOtherMarfas(besides: connection)
                     if hasOtherMarfas || isChoosingOther { otherServer(hasOtherMarfas: hasOtherMarfas) }
-                    disconnect
                 }
             } else {
                 disconnected
@@ -39,21 +38,6 @@ struct ConnectionPage: View {
             ConnectToMarfaSheet(model: model, dismiss: dismissConnect)
         }
         .onDisappear { model.closeConnectSheet() }
-        .onChange(of: model.isConfirmingDisconnect, initial: true) { _, isAsking in
-            guard isAsking else { return }
-            model.isConfirmingDisconnect = false
-            askToDisconnect()
-        }
-        .alert(
-            "Couldn’t Remove This App’s Settings",
-            isPresented: Binding { model.settingsRemovalFailure != nil } set: { if !$0 { model.stayConnected() } }
-        ) {
-            Button("Stay Connected", role: .cancel) {}
-            Button("Disconnect Anyway", role: .destructive) { Task { await model.disconnectAnyway() } }
-        } message: {
-            Text(verbatim: model.settingsRemovalFailure?.reason == .discardedChangesWait
-                ? appSettingsWords.discardedChangesWait : appSettingsWords.removalNotTaken)
-        }
         .task(id: NameRequest(connection: host.configuredConnection, isOnline: host.state == .online, readsProfile: host.readsProfile)) {
             if accountNameServer != host.configuredConnection {
                 accountName = nil
@@ -244,42 +228,6 @@ struct ConnectionPage: View {
                 codeSignInRow(canStart: model.canSwitch, step: .switchServer(usingCode: true), identifier: "MarfaSwitchCode")
                 if model.isWorking { signInProgress }
             }
-        }
-    }
-
-    private var disconnect: some View {
-        SettingsSection("Disconnect") {
-            SettingsRow(
-                verbatim: String(localized: "Disconnect from \(LibraryDescription.name(libraries))"),
-                line: String(localized: "Removes this Mac’s copy and signs the app out.")
-            ) {
-                HStack(spacing: SettingsTokens.Metric.buttonGap) {
-                    if model.isWorking { ProgressView().controlSize(.small) }
-                    SettingsButton("Disconnect…", role: .destructive) { model.requestDisconnect() }
-                        .disabled(model.isWorking)
-                        .accessibilityIdentifier(host.state == .keyRefused ? "MarfaRefusedDisconnect" : "MarfaDisconnect")
-                }
-            }
-        }
-    }
-
-    private var appSettingsWords: ConnectionSettings {
-        ConnectionSettings(standing: libraries.preferences.standing, name: LibraryDescription.name(libraries))
-    }
-
-    /// The question before Disconnect, with the choice to take this app's settings out of the Marfa too where they are kept there.
-    private func askToDisconnect() {
-        let name = LibraryDescription.name(libraries)
-        SettingsAlert.confirm(
-            title: String(localized: "Disconnect from \(name)?"),
-            message: String(localized: "The app removes its copy from this Mac and signs out. Webhooks it made are deleted. Your items stay."),
-            confirm: String(localized: "Disconnect"),
-            checkbox: model.offersSettingsRemoval ? appSettingsWords.disconnectChoice : nil,
-            window: NSApp.keyWindow
-        ) { confirmed, checked in
-            guard confirmed else { return }
-            model.alsoRemovesSettings = checked
-            Task { await model.disconnect() }
         }
     }
 

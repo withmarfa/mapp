@@ -1,6 +1,6 @@
 import Foundation
 
-/// What General says about settings kept in the Marfa, and what Disconnect says about removing them.
+/// What General says about settings kept in the Marfa, and what Sign Out says about removing them.
 nonisolated struct ConnectionSettings: Equatable, Sendable {
     nonisolated enum Action: Equatable, Sendable {
         /// Moves the settings out of the Marfa.
@@ -62,8 +62,8 @@ nonisolated struct ConnectionSettings: Equatable, Sendable {
         String(localized: "Every Mac that connects to \(name) loses them. This Mac keeps its own, and your items stay.")
     }
 
-    /// The checkbox on Disconnect's alert.
-    var disconnectChoice: String { String(localized: "Also remove this app’s settings from \(name)") }
+    /// The checkbox on the Sign Out alert.
+    var signOutChoice: String { String(localized: "Also remove this app’s settings from this Marfa") }
 
     /// Under the checkbox on the question about changes that wait: removing the settings sends the queue, so it can't go
     /// with discarding what is in it.
@@ -71,18 +71,22 @@ nonisolated struct ConnectionSettings: Equatable, Sendable {
         String(localized: "Removing them also sends the changes above, so it can’t be combined with discarding them.")
     }
 
+    static var removalRisk: String {
+        String(localized: "Removing this app’s settings can also move linked items to Trash.")
+    }
+
     /// Where one of the changes that wait is the removal itself, which has no text to show.
     var removalWaiting: String {
         String(localized: "One of them removes this app’s settings from \(name). Discard the copy and the settings stay there.")
     }
 
-    /// Why Disconnect stopped, where the removal could not be made without sending what the person chose to discard.
+    /// Why sign-out stopped when removal would have sent what the person chose to discard.
     var discardedChangesWait: String {
-        String(localized: "Removing them also sends the changes you chose to discard. Keep the copy to send them, or disconnect anyway and the settings stay in \(name).")
+        String(localized: "Removing them also sends the changes you chose to discard. Keep the copy to send them, or sign out anyway and the settings stay in \(name).")
     }
 
-    /// Why Disconnect stopped, where the server did not take the removal.
+    /// Why sign-out stopped when the server did not take the removal.
     var removalNotTaken: String {
-        String(localized: "The app couldn’t finish removing them from \(name), so you’re still connected. Disconnect anyway and they may stay there.")
+        String(localized: "The app couldn’t finish removing them from \(name), so you’re still signed in. Sign out anyway and they may stay there.")
     }
 }

@@ -40,6 +40,7 @@ import Observation
     private(set) var plan: AddressPlan?
     /// Why the typed address can't be used, in one line; the sheet keeps what was typed.
     private(set) var inputError: String?
+    private(set) var approvalNotice: String?
     private(set) var isChecking = false
     private(set) var isWriting = false
     /// One line under the page's rows after a refused change, by the address or website.
@@ -99,6 +100,7 @@ import Observation
         input = ""
         plan = nil
         inputError = nil
+        approvalNotice = nil
         self.sheet = sheet
     }
 
@@ -107,6 +109,7 @@ import Observation
         sheet = nil
         plan = nil
         inputError = nil
+        approvalNotice = nil
         input = ""
     }
 
@@ -117,6 +120,7 @@ import Observation
         isChecking = false
         plan = nil
         inputError = nil
+        approvalNotice = nil
         guard let settings, let sheet else { return }
         guard let origin = Self.origin(from: input) else {
             if !input.trimmingCharacters(in: .whitespaces).isEmpty {
@@ -182,6 +186,7 @@ import Observation
             await commitWebsite(adding: Self.origin(from: input))
         case .addAddress, .changeSignIn:
             guard canConfirm, let plan = currentPlan else { return }
+            approvalNotice = nil
             isWriting = true
             defer { isWriting = false }
             do {
@@ -190,6 +195,10 @@ import Observation
                 self.plan = nil
                 input = ""
             } catch {
+                if sheet == .changeSignIn, error == .notConfirmed {
+                    approvalNotice = OwnerWording.line(error)
+                    return
+                }
                 inputError = OwnerWording.line(error)
                 await context.learn(from: error)
                 if error == .conflict { await readAgainAndCheck(telling: error) }

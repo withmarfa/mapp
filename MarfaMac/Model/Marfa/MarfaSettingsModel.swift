@@ -85,6 +85,8 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
     var otherAddress = ""
     var showsConnectSheet = false
     private(set) var notice: Notice?
+    private var wasSigningOut = false
+    var signOutNotice: Notice? { wasSigningOut ? notice : nil }
     private(set) var isWorking = false
     private(set) var isAllowingMore = false
 
@@ -258,21 +260,31 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
     /// A disconnect with nothing waiting is confirmed once, since it ends the sign-in. With changes waiting, the
     /// question about them is the confirmation, so it is not asked twice.
     func requestDisconnect() {
+        guard !isWorking, let connection = host.configuredConnection else { return }
         offersSettingsRemoval = settingsKept?.isKept() ?? false
         alsoRemovesSettings = false
         settingsRemovalFailure = nil
         if host.waitingChanges == 0 {
             isConfirmingDisconnect = true
         } else {
-            Task { await disconnect() }
+            isWorking = true
+            Task {
+                defer { isWorking = false }
+                let unsent = await host.unsentChangesBeforeSignOut()
+                guard host.configuredConnection == connection else { return }
+                if unsent?.ids.isEmpty == true {
+                    isConfirmingDisconnect = true
+                } else {
+                    await ask(.disconnect, unsent, askedAgain: false)
+                }
+            }
         }
     }
 
     func disconnect(_ choice: Choice? = nil) async {
         guard !isWorking else { return }
-        // The removal comes before the sign-out, since after it nothing can be removed. With changes still waiting and no
-        // answer yet the question comes first, so a person who cancels it has removed nothing.
-        if offersSettingsRemoval, alsoRemovesSettings, choice != nil || host.waitingChanges == 0 {
+        // The removal comes before sign-out, while the approval still lets the app remove the settings.
+        if offersSettingsRemoval, alsoRemovesSettings {
             guard await removeSettingsBeforeLeaving(choice) else { return }
         }
         await run(.leaving) { () async throws(MarfaHost.Problem) in
@@ -290,12 +302,28 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         isWorking = true
         defer { isWorking = false }
         notice = nil
+        if choice == nil {
+            // Refused writes also belong in the question, even though sending the removal cannot send them.
+            let unsent = await host.unsentChangesBeforeSignOut()
+            if unsent?.ids.isEmpty != true {
+                await ask(.disconnect, unsent, askedAgain: false)
+                return false
+            }
+        }
         do {
-            // Sending the removal sends the whole queue, so it is never made while the person is discarding what waits in it.
-            try await settingsKept.remove(choice != .discardCopy)
+            // Sending other changes needs the person's explicit Keep Copy choice.
+            try await settingsKept.remove(choice == .keepCopy)
         } catch {
             let blocked = (error as? PreferencesSync.RemovalError) == .otherChangesWait
-            settingsRemovalFailure = SettingsRemovalFailure(reason: blocked ? .discardedChangesWait : .notDone, choice: choice)
+            if blocked, choice == nil {
+                let unsent = await host.unsentChangesBeforeSignOut()
+                if unsent?.ids.isEmpty != true {
+                    await ask(.disconnect, unsent, askedAgain: false)
+                    return false
+                }
+            }
+            settingsRemovalFailure = SettingsRemovalFailure(
+                reason: blocked && choice == .discardCopy ? .discardedChangesWait : .notDone, choice: choice)
             // A removal that was queued and not taken is no longer something to offer; one that never started still is.
             offersSettingsRemoval = settingsKept.isKept()
             alsoRemovesSettings = false
@@ -387,7 +415,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
             switch reached {
             case .left:
                 Notice(
-                    title: String(localized: "Disconnected, but Not Everything Was Removed"),
+                    title: String(localized: "Signed Out, but Not Everything Was Removed"),
                     message: withApproval(removalMessage(signIn: signIn, copy: copy), approvalAt, .left))
             case .switched:
                 Notice(
@@ -502,7 +530,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         let message = withApproval(told, approvalAt, .left)
         switch reached {
         case .left:
-            return Notice(title: String(localized: "Disconnected, but the Copy Was Kept"), message: message)
+            return Notice(title: String(localized: "Signed Out, but the Copy Was Kept"), message: message)
         case .switched:
             return Notice(title: String(localized: "Switched Servers, but the Copy Was Kept"), message: message)
         case .notOpened, .signedInAgain:
@@ -566,6 +594,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
             code = nil
         }
         notice = nil
+        if case .leaving = step { wasSigningOut = true } else { wasSigningOut = false }
         lastEnding = nil
         do {
             try await work()

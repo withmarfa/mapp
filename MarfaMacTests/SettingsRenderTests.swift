@@ -836,10 +836,31 @@ struct RenderedWindow<Detail: View>: View {
         let model = KeysModel(context: context(host))
         await model.load()
         model.beginNewKey()
-        model.draft.name = "Lisbon zine importer"
-        model.draft.source = "lisbon-zine"
-        model.draft.exceptions["core.bookmark"] = .write
+        model.draft.name = "Newsletter script"
+        model.draft.source = "newsletter-script"
         try await page(.keys, host, sheet: AnyView(KeySheet(model: model)), named: "New Key")
+    }
+
+    @Test(arguments: [ColorScheme.light, .dark], [13, 24])
+    func newKeyWithChosenAccess(appearance: ColorScheme, textSize: Int) async throws {
+        let host = owner()
+        (host.ownerCalls as? FakeOwnerCalls)?.state.withLock { state in
+            state.names["core.event"] = "Events"
+            state.names["core.place"] = "Places"
+        }
+        let model = KeysModel(context: context(host))
+        await model.load()
+        model.beginNewKey()
+        model.draft.name = "Studio site"
+        model.draft.source = "studio-site"
+        model.draft.everyType = .none
+        model.draft.exceptions = ["core.note": .write, "core.event": .read, "core.place": .read]
+        model.draft.permissions = ["instance.read", "webhooks.manage"]
+        try await SettingsRender.png(
+            RenderedWindow(selection: .marfa(.keys), sheet: AnyView(KeySheet(model: model)),
+                           detail: MarfaSettingsPageView(page: .keys, host: host))
+                .environment(\.settingsTextScale, InterfaceStyle.scale(for: textSize)),
+            size: Self.size, named: "New Key, chosen access, \(appearance), \(textSize) pt", appearance: appearance)
     }
 
     @Test func aKeysOwnerPermissions() async throws {
@@ -872,16 +893,17 @@ struct RenderedWindow<Detail: View>: View {
             named: "New Key, in a short window")
     }
 
-    @Test func newKeyRefused() async throws {
+    @Test(arguments: [true, false]) func newKeyRefused(sourceHeld: Bool) async throws {
         let host = owner()
-        (host.ownerCalls as? FakeOwnerCalls)?.fail("create", with: .refused("That source is taken by another key."))
+        if sourceHeld { (host.ownerCalls as? FakeOwnerCalls)?.fail("create", with: .sourceHeld("That source is taken by another key.")) }
         let model = KeysModel(context: context(host))
         await model.load()
         model.beginNewKey()
         model.draft.name = "Lisbon zine importer"
-        model.draft.source = "lisbon-zine"
+        model.draft.source = sourceHeld ? "lisbon-zine" : "."
         await model.make()
-        try await page(.keys, host, sheet: AnyView(KeySheet(model: model)), named: "New Key, refused")
+        try await page(.keys, host, sheet: AnyView(KeySheet(model: model)),
+                       named: sourceHeld ? "New Key, source held" : "New Key, invalid source")
     }
 
     @Test func theKeyShownOnce() async throws {

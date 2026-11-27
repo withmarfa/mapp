@@ -337,6 +337,13 @@ import os
         return hasCopy(connection) ? nil : 0
     }
 
+    /// Reads what a sign-out question can show while leaving the copy and approval in place.
+    func unsentChangesBeforeSignOut() async -> UnsentChanges? {
+        if let source { return await source.unsentWrites() }
+        guard let connection = configuredConnection, hasCopy(connection) else { return UnsentChanges(ids: []) }
+        return await Self.unsentChanges(in: location.store(for: connection))
+    }
+
     /// Opens the saved library's copy and paints from it, then asks the server.
     func launch() async {
         // The question that held it is gone with the last run. It is never the address this run connects to: an
