@@ -266,13 +266,15 @@ import Testing
         #expect(!model.isConnected)
     }
 
-    @Test func aChangeArrivingWhileSignOutIsConfirmedWaitsForKeepCopy() async throws {
+    @Test(arguments: [true, false])
+    func aChangeArrivingWhileSignOutIsConfirmedWaitsForKeepCopy(sendable: Bool) async throws {
         let copy = FakePreferencesCopy()
         let (model, sync, bench) = try await overSync(copy)
         model.requestDisconnect()
         #expect(model.isConfirmingDisconnect)
         model.alsoRemovesSettings = true
-        await copy.queueLibraryWrite()
+        if sendable { await copy.queueLibraryWrite() }
+        // Refused writes are visible in the departure question but excluded from the removal's send check.
         try #require(bench.servers.last).unsentCount.withLock { $0 = 1 }
 
         await model.disconnect()
@@ -284,7 +286,7 @@ import Testing
         #expect(await copy.removed.isEmpty && sync.syncs)
 
         await model.answer(.keepCopy)
-        #expect(await copy.sentLibraryWrites == ["library-write"])
+        #expect(await copy.sentLibraryWrites == (sendable ? ["library-write"] : []))
         #expect(!model.isConnected)
     }
 

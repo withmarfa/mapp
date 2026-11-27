@@ -302,6 +302,14 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         isWorking = true
         defer { isWorking = false }
         notice = nil
+        if choice == nil {
+            // Refused writes also belong in the question, even though sending the removal cannot send them.
+            let unsent = await host.unsentChangesBeforeSignOut()
+            if unsent?.ids.isEmpty != true {
+                await ask(.disconnect, unsent, askedAgain: false)
+                return false
+            }
+        }
         do {
             // Sending other changes needs the person's explicit Keep Copy choice.
             try await settingsKept.remove(choice == .keepCopy)

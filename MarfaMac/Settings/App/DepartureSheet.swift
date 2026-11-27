@@ -71,11 +71,17 @@ struct DepartureSheet: View {
                         .accessibilityIdentifier("DepartureRemovalWaiting")
                 }
                 if isDisconnecting, model.offersSettingsRemoval {
-                    SettingsCheckRow(
-                        verbatim: words.signOutChoice, line: "\(words.sendsWaitingChanges) \(ConnectionSettings.removalRisk)",
-                        isOn: Bindable(model).alsoRemovesSettings
-                    )
-                    .accessibilityIdentifier("DepartureRemoveSettings")
+                    VStack(alignment: .leading, spacing: SettingsTokens.Metric.sheetFieldGap) {
+                        SettingsCheckRow(
+                            verbatim: words.signOutChoice, line: words.sendsWaitingChanges,
+                            isOn: Bindable(model).alsoRemovesSettings
+                        )
+                        .accessibilityIdentifier("DepartureRemoveSettings")
+                        Text(verbatim: ConnectionSettings.removalRisk)
+                            .settingsFont(.small)
+                            .foregroundStyle(SettingsTokens.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
         } leading: {
