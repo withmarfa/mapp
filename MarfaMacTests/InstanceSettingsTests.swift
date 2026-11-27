@@ -102,6 +102,44 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
         #expect(!model.canSave)
     }
 
+    @Test func rejectedRetentionChoicesShowTheAppliedValue() async throws {
+        let (model, source) = await loaded([.versionDailyDays: .number(30), .versionWeeklyDays: .number(90)])
+        await model.choose(7, for: .versionWeeklyDays, defaultValue: 365)
+        #expect(model.draft[.versionWeeklyDays] == "90")
+        #expect(model.failure != nil)
+        #expect(model.pending == nil)
+        await model.choose(60, for: .versionWeeklyDays, defaultValue: 365)
+        let pending = try #require(model.pending)
+        source.config.withLock { $0.values[.versionWeeklyDays] = .number(180) }
+        await model.confirm(pending)
+        #expect(model.draft[.versionWeeklyDays] == "180")
+        #expect(model.elsewhere == [.versionWeeklyDays])
+        #expect(source.sent.isEmpty)
+    }
+
+    @Test func retentionChoicesCompareTheEffectiveValuesIncludingWhenCleared() async {
+        for (stored, standard, choice, asks) in [
+            (nil, 90, 60, true), (nil, 14, 60, false), (nil, 0, 36500, true),
+            (60, 90, nil, false), (60, 14, nil, true), (60, 0, nil, false), (0, 90, nil, true),
+        ] as [(Int?, Int, Int?, Bool)] {
+            let (model, source) = await loaded(stored.map { [.trashRetentionDays: .number($0)] } ?? [:])
+            await model.choose(choice, for: .trashRetentionDays, defaultValue: standard)
+            #expect((model.pending != nil) == asks)
+            #expect(source.sent.isEmpty == asks)
+        }
+    }
+
+    @Test func aRefusedDiskReserveReturnsTheTypedTextAndShowsTheAppliedValue() async {
+        let (model, source) = await loaded([.diskReserveMegabytes: .number(128)])
+        var returned: [OwnerDraft] = []
+        model.returnDraft = { returned.append($0) }
+        source.updateFailure.withLock { $0 = .refused("Disk unavailable") }
+        model.draft[.diskReserveMegabytes] = " 0256 "
+        await model.save([.diskReserveMegabytes], revertsOnFailure: true)
+        #expect(model.draft[.diskReserveMegabytes] == "128")
+        #expect(returned == [.typed(title: InstanceSetting.diskReserveMegabytes.title, text: " 0256 ")])
+    }
+
     @Test func anEmptyFieldRemovesTheSettingSoItsDefaultApplies() async {
         let (model, source) = await loaded([.versionMaxVersions: .number(50), .name: .text("Library")])
         model.draft[.versionMaxVersions] = " "

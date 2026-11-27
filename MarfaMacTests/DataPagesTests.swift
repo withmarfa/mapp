@@ -110,6 +110,9 @@ import Testing
 
     @Test func eachPageNamesThePermissionItNeeds() {
         #expect(MarfaSettingsPage.fileStorage.permission == .configManage)
+        #expect(MarfaSettingsPage.fileStorage.missingPermission(in: [.instanceRead]) == nil)
+        #expect(MarfaSettingsPage.fileStorage.missingPermission(in: [.configManage]) == nil)
+        #expect(MarfaSettingsPage.fileStorage.missingPermission(in: []) == .configManage)
         #expect(MarfaSettingsPage.sources.permission == .keysManage)
         #expect(MarfaSettingsPage.trash.permission == .itemsPurge)
     }

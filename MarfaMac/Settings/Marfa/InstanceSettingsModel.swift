@@ -41,6 +41,7 @@ import Observation
     /// Run after a save is taken, with the server's answer and the settings it changed, so the rest of the app reads
     /// the new name and the bin's new retention.
     @ObservationIgnored var onSaved: @MainActor (InstanceConfig, Set<InstanceSetting>, String) -> Void = { _, _, _ in }
+    @ObservationIgnored var returnDraft: (OwnerDraft) -> Void = { _ in }
 
     /// The configuration as the server last gave it; nil until one has been read.
     private(set) var loaded: InstanceConfig?
@@ -178,6 +179,11 @@ import Observation
     }
 
     // MARK: Saving
+
+    func choose(_ choice: Int?, for setting: InstanceSetting, defaultValue: Int?) async {
+        draft[setting] = choice.map { String($0) } ?? ""
+        await save([setting], revertsOnFailure: true)
+    }
 
     /// Sends the changes, or first asks the person to agree where one keeps things for less time.
     func save() async { await save(Set(InstanceSetting.allCases)) }

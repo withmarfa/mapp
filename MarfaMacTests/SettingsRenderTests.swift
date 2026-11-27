@@ -579,6 +579,9 @@ struct RenderedWindow<Detail: View>: View {
             try await SettingsRender.png(windowed(page, host: host), size: CGSize(width: Self.size.width, height: CGFloat(height)),
                 named: "\(page.title), \(appearance)", appearance: appearance, settle: .milliseconds(900))
         }
+        host.grants = [.instanceRead]
+        try await SettingsRender.png(windowed(.fileStorage, host: host), size: CGSize(width: Self.size.width, height: 1460),
+            named: "Storage, read only, \(appearance)", appearance: appearance, settle: .milliseconds(900))
     }
 
     @Test func trash() async throws {

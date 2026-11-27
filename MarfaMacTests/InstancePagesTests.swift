@@ -224,13 +224,15 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
     @Test func aRefusedWriteRestoresTheHeldValueWithOneLineInPlainWords() async {
         let calls = FakeInstanceCalls()
         calls.state.withLock { $0.refusal = "`max_request_bytes` can't be less than the bulk limit; PATCH /config refused." }
-        let model = limitsModel(calls)
+        var returned: [OwnerDraft] = []
+        let model = LimitsModel(context: OwnerContext(calls: FakeOwnerCalls(), grants: { [.configManage] }, lateDraft: { returned.append($0) }), calls: calls)
         await model.load()
         model.drafts["max_request_bytes"] = "2"
         await model.commit(.largestRequest)
         #expect(model.text(.largestRequest) == "1", "the last server value returns")
         #expect(model.line(.largestRequest) == "The server refused this change. Nothing was changed.", "no backticks, names or routes")
         #expect(model.hasProblem(.largestRequest))
+        #expect(returned == [.typed(title: LimitSetting.largestRequest.title, text: "2")])
         calls.state.withLock { $0.refusal = "A request can't be larger than the bulk limit." }
         model.type("2", for: .largestRequest)
         await model.commit(.largestRequest)
@@ -456,6 +458,46 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
 }
 
 @Suite(.hangLimit) @MainActor struct MonitoringTests {
+    @Test func aPausedReportDestinationCanBeEditedAndRemovedBeforeResuming() async throws {
+        let calls = FakeInstanceCalls()
+        calls.changeElsewhere("telemetry_enabled", to: .bool(false))
+        let model = monitoringModel(calls)
+        await model.load()
+        #expect(!model.isOn("error_reporting_enabled"))
+        model.begin(.postHogHost)
+        model.sheet?.inputs["posthog_host"] = "https://reports.example"
+        model.sheet?.inputs["posthog_project_token"] = "test"
+        await model.save()
+        #expect(model.errorReportsHaveReceiver)
+        model.askToRemove(.postHogToken)
+        let question = try #require(model.question)
+        await model.confirm(question)
+        await model.setSwitch("telemetry_enabled", true)
+        #expect(!model.telemetryHasReceiver)
+        #expect(!model.errorReportsHaveReceiver)
+    }
+
+    @Test(arguments: ["traces", "logs", "metrics"])
+    func signalOverridesNeedABaseAndErrorReportsNeedTheirOwnSwitch(signal: String) async {
+        let calls = FakeInstanceCalls()
+        let key = "otel_exporter_otlp_\(signal)_endpoint"
+        calls.state.withLock {
+            $0.settings[key] = StoredSetting(key: key, value: nil, defaultValue: nil, isStored: true, isSecret: true, isSet: true)
+            $0.settings["posthog_host"]?.isSet = true
+            $0.settings["posthog_project_token"]?.isSet = true
+        }
+        calls.changeElsewhere("error_reporting_enabled", to: .bool(false))
+        let model = monitoringModel(calls)
+        await model.load()
+        #expect(!model.telemetryHasReceiver)
+        await model.setSwitch("error_reporting_enabled", true)
+        #expect(model.telemetryHasReceiver)
+        await model.setSwitch("error_reporting_enabled", false)
+        calls.state.withLock { $0.settings["otel_exporter_otlp_endpoint"]?.isSet = true }
+        await model.load()
+        #expect(model.telemetryHasReceiver)
+    }
+
     @Test func aSecretIsOnlySetOrNotSet() async {
         let calls = FakeInstanceCalls()
         calls.state.withLock { $0.settings["heartbeat_url"]?.isSet = true }
