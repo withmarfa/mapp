@@ -138,7 +138,9 @@ struct SettingsPopUp<Value: Hashable, Content: View>: View {
     }
 
     var body: some View {
+        // A compact row pop-up is 120 points at the default size, as both boards draw it, and grows only when text is larger.
         let width = compact ? SettingsTokens.Metric.popUpMinimumWidth * max(1, scale) : SettingsTokens.Metric.controlWidth
+        let holdsWidth = (compact && scale <= 1) || currentValueLabel != nil
         Group {
             if let currentValueLabel {
                 Picker(selection: $selection) { content } label: { title } currentValueLabel: {
@@ -152,8 +154,8 @@ struct SettingsPopUp<Value: Hashable, Content: View>: View {
         .pickerStyle(.menu)
         .settingsControlSize()
         .buttonSizing(.flexible)
-        .frame(minWidth: width, maxWidth: currentValueLabel == nil ? nil : width)
-        .fixedSize(horizontal: currentValueLabel == nil, vertical: false)
+        .frame(minWidth: width, maxWidth: holdsWidth ? width : nil)
+        .fixedSize(horizontal: !holdsWidth, vertical: false)
         .settingsErrorRing(isError)
     }
 }

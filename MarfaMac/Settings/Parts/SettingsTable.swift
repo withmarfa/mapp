@@ -244,7 +244,9 @@ struct SettingsSectionTable<Row: Identifiable>: View {
         SettingsCard {
             VStack(spacing: 0) {
                 TableHeader(columns: columns, hasAction: action != nil, height: SettingsTokens.Metric.tableRow, hasChevron: onOpen != nil)
-                Rectangle().fill(SettingsTokens.rule).frame(height: SettingsTokens.Metric.ruleThickness)
+                    .overlay(alignment: .bottom) {
+                        Rectangle().fill(SettingsTokens.rule).frame(height: SettingsTokens.Metric.cardRuleWidth)
+                    }
                 ForEach(rows.prefix(preview.visibleCount)) { row in
                     TableRow(
                         row: row, columns: columns, action: action, isSelected: isSelected(row), showsChevron: onOpen != nil,
