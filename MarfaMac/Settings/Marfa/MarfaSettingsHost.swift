@@ -361,8 +361,9 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
             ]
         case .plugins:
             [
-                String(localized: "Installed"), String(localized: "Plugin Updates"), String(localized: "Available"), String(localized: "Install"),
-                String(localized: "Install From a File"), String(localized: "Update"), String(localized: "Remove"), String(localized: "Connector"),
+                String(localized: "Installed"), String(localized: "Updates"), String(localized: "Plugin Updates"), String(localized: "Available"),
+                String(localized: "Install"), String(localized: "Install from a File"), String(localized: "Update"), String(localized: "Remove"),
+                String(localized: "Connector"),
             ]
         case .sources:
             [String(localized: "Rename"), String(localized: "Change Mark"), String(localized: "Limit Sources"), String(localized: "Rules for Every App and Key")]

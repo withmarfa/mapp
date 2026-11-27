@@ -80,15 +80,16 @@ struct PluginsPage: View {
     }
 
     private var installedSection: some View {
-        SettingsSection(
-            name: Text("Installed"), line: Text("What you added to \(host.serverName). Browse \(host.pluginCalls.releaseName) under Available.")
-        ) {
+        SettingsSection("Installed") {
             if model.installed.isEmpty {
-                SettingsRow("No Plugins Installed", look: .off)
+                SettingsEmptyCard(
+                    symbol: "puzzlepiece.extension", title: Text("No Plugins"),
+                    line: Text("Install one from the list below, or from a file."))
             }
             ForEach(model.installed) { plugin in
                 SettingsLinkRow(
-                    verbatim: plugin.title, line: plugin.description, lead: .well(host.markGlyph(plugin.mark)), value: plugin.version
+                    verbatim: plugin.title, line: model.catalogueLine(of: plugin), lead: .well(host.markGlyph(plugin.mark)),
+                    value: plugin.version
                 ) { navigation?.push(Self.subpage(named: plugin.name, title: plugin.title)) }
             }
         }
@@ -97,7 +98,7 @@ struct PluginsPage: View {
     @ViewBuilder private var updatesSection: some View {
         let updates = model.updates
         if !updates.isEmpty {
-            SettingsSection("Plugin Updates") {
+            SettingsSection("Updates") {
                 ForEach(updates) { update in
                     PluginUpdateRow(model: model, update: update, host: host) {
                         navigation?.push(Self.subpage(named: update.id, title: update.installed.title))
@@ -108,7 +109,10 @@ struct PluginsPage: View {
     }
 
     private var availableSection: some View {
-        SettingsSection(name: Text("Available"), line: Text("Nothing is installed until you choose it.")) {
+        SettingsSection("Available", footer: "Nothing is installed until you choose it.") {
+            SettingsButton("Install from a File…") { Task { await model.installFile() } }
+                .disabled(model.isInstallingFile)
+        } content: {
             switch model.release {
             case .reading:
                 SettingsRow("Reading the Plugins Release…") { ProgressView().controlSize(.small) }
@@ -132,8 +136,6 @@ struct PluginsPage: View {
                     ) { navigation?.push(Self.subpage(named: entry.name, title: entry.title)) }
                 }
             }
-            SettingsAddRow("Install From a File…") { Task { await model.installFile() } }
-                .disabled(model.isInstallingFile)
         }
     }
 }
@@ -328,7 +330,11 @@ private struct PluginDetail: View {
         } else {
             line = String(localized: "Connects \(connector.sourceName). It runs on no machine yet.")
         }
-        return SettingsLinkRow(verbatim: String(localized: "Connector"), line: line, lead: .well(symbol: "arrow.triangle.2.circlepath")) {
+        let allowed = host.grants.contains(.connectorsManage)
+        return SettingsLinkRow(
+            verbatim: String(localized: "Connector"), line: line, lead: .well(symbol: "arrow.triangle.2.circlepath"),
+            lock: allowed ? nil : String(localized: "Not allowed")
+        ) {
             host.show(.connectors, subpage: ConnectorsPage.subpage(plugin: plugin.name, title: plugin.title))
         }
     }

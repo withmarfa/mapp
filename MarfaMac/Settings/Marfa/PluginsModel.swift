@@ -214,6 +214,11 @@ struct PluginsAccess {
     /// The installed plugin's types, in the order the server lists them, named as the server names them.
     func typeTitle(_ id: String) -> String { typeInfo[id]?.title ?? id }
 
+    /// The line under an installed plugin in the list.
+    func catalogueLine(of plugin: InstalledPlugin) -> String {
+        PluginWording.catalogueLine(hasConnector: plugin.connector != nil, typeTitles: plugin.types.map(typeTitle))
+    }
+
     func hostName(of plugin: InstalledPlugin) -> String? { plugin.host.flatMap { hostNames[$0] } }
 
     func items(ofType id: String) -> Int { access.ownItems(id) }

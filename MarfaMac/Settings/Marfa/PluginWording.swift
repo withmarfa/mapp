@@ -5,6 +5,24 @@ import MarfaAPI
 nonisolated enum PluginWording {
     static func list(_ names: [String]) -> String { names.formatted(.list(type: .and)) }
 
+    /// The line under an installed plugin: what it brings, as the list reads it.
+    /// "A connector, and 10 types such as GitHub Issues." Two or three types are named. None says so.
+    static func catalogueLine(hasConnector: Bool, typeTitles: [String]) -> String {
+        let titles = typeTitles.filter { !$0.isEmpty }
+        switch (hasConnector, titles.count) {
+        case (true, 0): return String(localized: "A connector.")
+        case (false, 0): return String(localized: "Nothing else.")
+        case (true, 1): return String(localized: "A connector, and \(titles[0]).")
+        case (false, 1): return String(localized: "\(titles[0]).")
+        case (true, 2): return String(localized: "A connector, and \(titles[0]) and \(titles[1]).")
+        case (false, 2): return String(localized: "\(titles[0]) and \(titles[1]).")
+        case (true, 3): return String(localized: "A connector, and \(list(titles)).")
+        case (false, 3): return String(localized: "\(list(titles)).")
+        case (true, _): return String(localized: "A connector, and \(titles.count) types such as \(titles[0]).")
+        case (false, _): return String(localized: "\(titles.count) types such as \(titles[0]).")
+        }
+    }
+
     /// "the type Spikes", "the types Tickets and Spikes".
     static func addedTypes(_ titles: [String]) -> String {
         titles.count == 1
