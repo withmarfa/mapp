@@ -18,9 +18,6 @@ struct ItemRow: View {
     var excerpt: SearchExcerpt?
     /// The item the row is for, which its status chip changes by a click. Nil for a row with no item behind it.
     var itemID: ItemID?
-    /// Whether the row draws a sample picture, for a preview with no item behind it (`SamplePicture`).
-    var showsSample = false
-
     /// A match in the title is shown in the title itself, since the excerpt would only say it again.
     private var titleExcerpt: SearchExcerpt? {
         guard let excerpt, !content.title.isEmpty,
@@ -66,10 +63,10 @@ struct ItemRow: View {
                 Spacer(minLength: 8)
                 dateText
             }
-            if content.picture != nil || showsSample {
+            if let picture = content.picture {
                 HStack(alignment: .top, spacing: 8) {
                     if hasDetails { details.frame(maxWidth: .infinity, alignment: .leading) } else { Spacer(minLength: 0) }
-                    picture
+                    RowPictureView(picture: picture, icon: content.typeIcon)
                 }
             } else if hasDetails {
                 details
@@ -101,14 +98,6 @@ struct ItemRow: View {
                 ChipLine(content: content, statusItem: itemID, typeFont: InterfaceStyle.captionFont)
                     .padding(.top, 1)
             }
-        }
-    }
-
-    @ViewBuilder private var picture: some View {
-        if showsSample {
-            RowPictureFrame { SamplePicture() }
-        } else if let picture = content.picture {
-            RowPictureView(picture: picture, icon: content.typeIcon)
         }
     }
 

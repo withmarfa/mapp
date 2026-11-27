@@ -65,20 +65,21 @@ private struct LayoutsList: View {
             let order = $0.plural.localizedStandardCompare($1.plural)
             return order == .orderedSame ? $0.id.rawValue < $1.id.rawValue : order == .orderedAscending
         }
-        let yours = types.filter { $0.origin == .registered || $0.origin == .unknown }
-        let builtIn = types.filter { $0.origin == .platform }
-        let plugins = types.filter { $0.origin == .plugin }
+        let groups = Dictionary(grouping: types, by: LayoutsGroup.init)
         return SettingsPageColumn {
-            if !yours.isEmpty {
+            if let yours = groups[.yours] {
                 SettingsSection("Yours", footer: "How each type shows in rows, on cards and on its own page.") {
                     ForEach(yours) { row($0, describesLayout: true) }
                 }
             }
-            if !builtIn.isEmpty {
+            if let builtIn = groups[.builtIn] {
                 SettingsSection("Built In") { ForEach(builtIn) { row($0) } }
             }
-            if !plugins.isEmpty {
+            if let plugins = groups[.plugins] {
                 SettingsSection("From Plugins") { ForEach(plugins) { row($0) } }
+            }
+            if let registered = groups[.registered] {
+                SettingsSection("Registered Types") { ForEach(registered) { row($0) } }
             }
             SettingsBar {
                 SettingsButton("Export…", small: true) { LooksFiles.export(from: libraries) }.accessibilityIdentifier("ExportLayouts")
@@ -100,6 +101,18 @@ private struct LayoutsList: View {
     private func changeCount(of type: TypeID) -> Int {
         libraries.typeLooks.changeCount(for: type, in: libraries.libraryKey)
             + (placements.hasChoice(for: type) ? 1 : 0)
+    }
+}
+
+nonisolated enum LayoutsGroup: Hashable {
+    case yours, builtIn, plugins, registered
+
+    init(_ type: ItemTypeInfo) {
+        switch type.origin {
+        case .platform, .unknown: self = .builtIn
+        case .plugin: self = .plugins
+        case .registered: self = type.id.rawValue.hasPrefix("user.") ? .yours : .registered
+        }
     }
 }
 

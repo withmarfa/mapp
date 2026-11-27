@@ -7,6 +7,7 @@ struct ConnectionPage: View {
     @Environment(Libraries.self) private var libraries
     @Environment(\.library) private var library
     @Environment(\.settingsNavigation) private var navigation
+    @Environment(\.colorScheme) private var colorScheme
     @State private var isChoosingOther = false
     /// The owner's name and the server it was read from, kept while that server does not answer.
     @State private var accountName: String?
@@ -115,7 +116,7 @@ struct ConnectionPage: View {
             if account.showsName {
                 let page = SettingsPage.account
                 SettingsLinkRow(
-                    verbatim: String(localized: "Signed in as"), line: account.nameLine, lead: .tile(page.symbol, page.tone),
+                    verbatim: String(localized: "Signed in as"), line: account.nameLine, lead: accountTile(symbol: page.symbol),
                     value: (accountNameServer == connection ? accountName : nil) ?? settingsHost.overview.owner, lines: nil
                 ) { navigation?.show(page) }
                 .accessibilityIdentifier("SignedInAs")
@@ -153,6 +154,17 @@ struct ConnectionPage: View {
                 }
             }
         }
+    }
+
+    private func accountTile(symbol: String) -> SettingsLead {
+        let size = SettingsTokens.Metric.tile
+        return .custom(AnyView(
+            RoundedRectangle(cornerRadius: size * SettingsTokens.Metric.tileRounding)
+                .fill(colorScheme == .dark ? SettingsTokens.accountLinkIndigoDark : SettingsTokens.accountLinkIndigo)
+                .frame(width: size, height: size)
+                .overlay { SettingsTileGlyph(symbol: symbol, tileSize: size).foregroundStyle(SettingsTokens.tileForeground) }
+                .accessibilityHidden(true)
+        ))
     }
 
     private func statusMark(_ status: ConnectionAddressStatus) -> some View {
@@ -322,6 +334,11 @@ struct ConnectionPage: View {
             }
         }
     }
+}
+
+private extension SettingsTokens {
+    static let accountLinkIndigo = Color(red: 88 / 255, green: 86 / 255, blue: 214 / 255)
+    static let accountLinkIndigoDark = Color(red: 125 / 255, green: 122 / 255, blue: 1)
 }
 
 /// One change that needs the person, drawn as a problem row with its actions, then the text they wrote where it can be

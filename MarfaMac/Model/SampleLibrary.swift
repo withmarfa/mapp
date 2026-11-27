@@ -126,6 +126,8 @@ nonisolated enum SampleLibrary {
 
     // MARK: Catalogue
 
+    static let projectType = "user.project"
+
     /// The built-in types the sample uses, as Marfa's catalogue defines them, and one of its own.
     static let itemTypes: [Marfa.ItemType] = [
         ItemType(
@@ -133,7 +135,7 @@ nonisolated enum SampleLibrary {
             fields: [
                 TypeField(name: "title", type: "string", declaredBy: "core.note"),
                 TypeField(name: "body", type: "string", declaredBy: "core.note"),
-            ], titleField: "title", bodyField: "body", icon: "lucide:sticky-note", feedDays: 30),
+            ], titleField: "title", bodyField: "body", icon: "lucide:sticky-note", feedDays: 30, origin: .platform),
         ItemType(
             id: "core.task", label: "Task", description: "Something to do.",
             fields: [
@@ -154,7 +156,7 @@ nonisolated enum SampleLibrary {
                     definition: ["items_type": "object", "items_fields": [
                         "name": ["type": "string"], "email": ["type": "email"],
                     ]]),
-            ], titleField: "title", bodyField: "body", icon: "lucide:square-check-big"),
+            ], titleField: "title", bodyField: "body", icon: "lucide:square-check-big", origin: .platform),
         ItemType(
             id: "core.event", label: "Event", description: "Something that happens at a time.",
             fields: [
@@ -169,12 +171,12 @@ nonisolated enum SampleLibrary {
                         "name": ["type": "string"], "email": ["type": "email"],
                         "response": ["type": "enum", "enum_values": ["needs_action", "accepted", "declined", "tentative"]],
                     ]]),
-            ], titleField: "title", bodyField: "body", icon: "lucide:calendar"),
+            ], titleField: "title", bodyField: "body", icon: "lucide:calendar", origin: .platform),
         ItemType(
             id: "core.entity", label: "Entity", plural: "Entities", description: "Someone or something with a name.",
             fields: [
                 TypeField(name: "title", type: "string", required: true, declaredBy: "core.entity"),
-            ], titleField: "title", icon: "lucide:shapes"),
+            ], titleField: "title", icon: "lucide:shapes", origin: .platform),
         ItemType(
             id: "core.entity.person", label: "Person", plural: "People", description: "Someone you know.", parent: "core.entity",
             fields: [
@@ -196,7 +198,7 @@ nonisolated enum SampleLibrary {
                         "label": ["type": "string"], "street_address": ["type": "string"], "locality": ["type": "string"],
                         "region": ["type": "string"], "postal_code": ["type": "string"], "country": ["type": "string"],
                     ]]),
-            ], titleField: "title", icon: "lucide:user"),
+            ], titleField: "title", icon: "lucide:user", origin: .platform),
         ItemType(
             id: "core.media", label: "Media", plural: "Media", description: "Something to read, watch or play.",
             fields: [
@@ -208,14 +210,14 @@ nonisolated enum SampleLibrary {
                         ["value": "finished", "group": "completed"], ["value": "abandoned", "group": "canceled"],
                     ]]),
                 TypeField(name: "rating", type: "integer", declaredBy: "core.media", definition: ["minimum": 1, "maximum": 5]),
-            ], titleField: "title", icon: "lucide:library-big"),
+            ], titleField: "title", icon: "lucide:library-big", origin: .platform),
         ItemType(
-            id: "sample.project", label: "Project", description: "Work with an outcome.", parent: "core.note",
+            id: projectType, label: "Project", description: "Work with an outcome.", parent: "core.note",
             fields: [
                 TypeField(name: "title", type: "string", declaredBy: "core.note"),
                 TypeField(name: "body", type: "string", declaredBy: "core.note"),
-                TypeField(name: "description", type: "string", declaredBy: "sample.project"),
-            ], titleField: "title", bodyField: "body", icon: "lucide:briefcase", feedDays: 30),
+                TypeField(name: "description", type: "string", declaredBy: projectType),
+            ], titleField: "title", bodyField: "body", icon: "lucide:briefcase", feedDays: 30, origin: .registered),
         ItemType(
             id: "core.collection", label: "Collection",
             description: "Items of any type that you gather together. Members join it through the in-collection edge, and it can hold any item but another container.",
@@ -223,7 +225,7 @@ nonisolated enum SampleLibrary {
                 TypeField(name: "title", type: "string", required: true, description: "Name of the collection", declaredBy: "core.collection"),
                 TypeField(
                     name: "description", type: "string", description: "What the collection gathers", declaredBy: "core.collection"),
-            ], titleField: "title", bodyField: "description", icon: "lucide:layers", roles: ["container"]),
+            ], titleField: "title", bodyField: "description", icon: "lucide:layers", roles: ["container"], origin: .platform),
     ]
 
     static let edgeTypes: [Marfa.EdgeType] = [
@@ -400,7 +402,7 @@ nonisolated enum SampleLibrary {
         }
         for (index, title) in projectTitles.enumerated() {
             let created = date(daysAgo: 14 + index, hour: 9)
-            rows.append(row("project-\(index + 1)", type: "sample.project", properties: ["title": .string(title)], created: created, edited: created))
+            rows.append(row("project-\(index + 1)", type: projectType, properties: ["title": .string(title)], created: created, edited: created))
         }
         let met = date(daysAgo: 20, hour: 9)
         rows.append(row("person-1", type: "core.entity.person", properties: [

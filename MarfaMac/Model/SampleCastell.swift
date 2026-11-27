@@ -72,7 +72,7 @@ nonisolated enum SampleCastell {
         static let event = "core.event"
         static let person = "core.entity.person"
         static let place = "core.entity.place"
-        static let project = "sample.project"
+        static let project = SampleLibrary.projectType
         static let collection = "core.collection"
         static let bookmark = "core.bookmark"
         static let highlight = "core.highlight"
