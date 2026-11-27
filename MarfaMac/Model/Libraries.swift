@@ -127,7 +127,7 @@ import MarfaTesting
         self.instanceSettings.onSaved = { [host] answer, settings, address in host.instanceSaved(answer, changing: settings, of: address) }
         isLaunching = host.configuredConnection != nil
         ownerDrafts.arrival = { [ownerDrafts, notices = host.notices] draft in
-            ownerDrafts.deliver(draft, to: notices, because: String(localized: "You closed Settings before this was saved."))
+            ownerDrafts.deliver(draft, to: notices, because: String(localized: "You left the page before this was saved."))
         }
         host.handOverEdits = { [weak self] in await self?.flushEditors() ?? false }
         newItemDrafts.notices = host.notices

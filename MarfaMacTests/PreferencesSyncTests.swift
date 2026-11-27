@@ -328,6 +328,112 @@ import Testing
         #expect(await copy.creates == 2)
     }
 
+    @Test(arguments: [false, true])
+    func removedSettingsDoNotSyncWhileTheItemListCatchesUp(confirmed: Bool) async throws {
+        let copy = FakePreferencesCopy()
+        let sync = await sync(copy)
+        let removed = try #require(await copy.activeIDs.first)
+        let sibling = await copy.add([:])
+        await copy.showBinnedItems([removed, sibling])
+        try await sync.remove(confirmed: confirmed)
+        #expect(Set(try await copy.items().map(\.id)) == [removed, sibling])
+
+        defaults.set("dark", forKey: AppearanceKey.theme)
+        await sync.flush()
+        #expect(sync.standing == .off(.removed))
+        #expect(await copy.writesToBinned == 0)
+        sync.detach()
+        sync.attach(copy, library: "marfa:https://one", name: { "Demo" })
+        await sync.flush()
+        #expect(sync.standing == .off(.removed))
+        #expect(await copy.writesToBinned == 0)
+
+        try await sync.startAgain()
+        #expect(sync.standing == .off(.removed))
+        #expect(await copy.writesToBinned == 0)
+        await copy.showBinnedItems([sibling])
+        await sync.flush()
+        #expect(sync.standing == .off(.removed))
+        #expect(await copy.writesToBinned == 0)
+        await copy.showBinnedItems([])
+        await sync.flush()
+        #expect(sync.standing == .syncing)
+        let made = try #require(await copy.activeIDs.first)
+        #expect(made != removed)
+        #expect(await copy.unitsHeld(made)[theme] == #""dark""#)
+        #expect(await copy.writesToBinned == 0)
+    }
+
+    @Test func settingsCanBeKeptAgainAfterMarfaRefusesRemoval() async throws {
+        defaults.set("light", forKey: AppearanceKey.theme)
+        let copy = FakePreferencesCopy()
+        let sync = await sync(copy)
+        let item = try #require(await copy.activeIDs.first)
+        try await sync.remove()
+        await copy.refuseRemoval(of: item)
+        defaults.set("dark", forKey: AppearanceKey.theme)
+        await sync.flush()
+        #expect(sync.standing == .off(.removed))
+        #expect(await copy.unitsHeld(item)[theme] == #""light""#)
+
+        try await sync.startAgain()
+        #expect(await eventually { sync.standing == .syncing })
+        #expect(await copy.activeIDs == [item])
+        #expect(defaults.string(forKey: AppearanceKey.theme) == "dark")
+        #expect(await copy.unitsHeld(item)[theme] == #""dark""#)
+    }
+
+    @Test func flushingSettingsDoesNotWaitForTheServerToSettleRemoval() async throws {
+        let copy = FakePreferencesCopy()
+        let sync = await sync(copy)
+        let item = try #require(await copy.activeIDs.first)
+        try await sync.remove()
+        await copy.refuseRemoval(of: item)
+
+        copy.settlingRemovals.withLock { $0 = true }
+        defer { copy.settlingRemovals.withLock { $0 = false } }
+        let restarting = Task { try await sync.startAgain() }
+        try #require(await eventuallyAsking { await copy.isSettlingRemovals })
+        var flushed = false
+        let handOver = Task {
+            await sync.flush()
+            flushed = true
+        }
+        let flushedBeforeServer = await eventually(within: .seconds(1)) { flushed }
+        copy.settlingRemovals.withLock { $0 = false }
+        try await restarting.value
+        await handOver.value
+        #expect(flushedBeforeServer)
+    }
+
+    @Test func catchingUpDoesNotValidateAnOlderSettingsItemList() async throws {
+        defaults.set("light", forKey: AppearanceKey.theme)
+        let copy = FakePreferencesCopy()
+        let sync = await sync(copy)
+        let item = try #require(await copy.activeIDs.first)
+        await copy.showBinnedItems([item])
+        try await sync.remove(confirmed: true)
+        copy.settlingRemovals.withLock { $0 = true }
+        defer { copy.settlingRemovals.withLock { $0 = false } }
+        try await sync.startAgain()
+        try #require(await eventuallyAsking { await copy.isSettlingRemovals })
+
+        copy.readingAnswers.withLock { $0 = true }
+        defer { copy.readingAnswers.withLock { $0 = false } }
+        let flushing = Task { await sync.flush() }
+        try #require(await eventuallyAsking { await copy.isReadingAnswers })
+        await copy.showBinnedItems([])
+        copy.settlingRemovals.withLock { $0 = false }
+        try #require(await eventuallyAsking { await !copy.isSettlingRemovals })
+        copy.readingAnswers.withLock { $0 = false }
+        await flushing.value
+        #expect(await eventually { sync.standing == .syncing })
+        let newItem = try #require(await copy.activeIDs.first)
+        #expect(newItem != item)
+        #expect(defaults.string(forKey: AppearanceKey.theme) == "light")
+        #expect(await copy.unitsHeld(newItem)[theme] == #""light""#)
+    }
+
     // MARK: Review findings
 
     /// A value a later version of the app wrote, which a store here sets aside, stays in the Marfa for the Macs that read it: the

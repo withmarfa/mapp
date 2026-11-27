@@ -39,6 +39,64 @@ struct SettingsControlTests {
         })
     }
 
+    @Test(arguments: [
+        (OwnerFailure.signedOut, "Signed Out"), (.instanceChanged, "Another Marfa Answers"),
+        (.notPermitted("profile:read"), "Needs a Permission"), (.unsupported, "No Server Settings"),
+    ])
+    func profileFailureGatesAccountControls(_ failure: OwnerFailure, title: String) async throws {
+        let settings = StubMarfaHost(settings: InstanceSettingsModel { nil })
+        let calls = FakeOwnerCalls()
+        calls.fail("profile", with: failure)
+        settings.ownerCalls = calls
+        let window = host(AccountPage(host: settings))
+        defer {
+            window.contentView = nil
+            window.close()
+        }
+        try await press(in: window, matching: "AccountSignOut", attribute: "accessibilityIdentifier")
+        #expect(await eventually(within: .seconds(3)) {
+            window.contentView?.layoutSubtreeIfNeeded()
+            return !elements(window.contentView, matching: title, attribute: "accessibilityValue").isEmpty
+                && elements(window.contentView, matching: "AccountChangePassword", attribute: "accessibilityIdentifier").isEmpty
+        })
+    }
+
+    @Test func returningToAccountRefreshesProblemsAndTheirBadge() async throws {
+        let settings = StubMarfaHost(settings: InstanceSettingsModel { nil })
+        let calls = FakeOwnerCalls()
+        calls.state.withLock { $0.concerns = [.init(kind: .clock, reference: "clock_ahead", title: "Clock changed")] }
+        settings.ownerCalls = calls
+        settings.bindOverview()
+        await settings.overview.load()
+        #expect(settings.overview.attentionBadge == 1)
+        let window = host(AnyView(AccountPage(host: settings)))
+        defer {
+            window.contentView = nil
+            window.close()
+        }
+        let content = try #require(window.contentView as? NSHostingView<AnyView>)
+        try #require(await eventually { calls.calls.contains("housekeepingJobs") })
+        content.rootView = AnyView(Text("Another page"))
+        content.layoutSubtreeIfNeeded()
+        calls.state.withLock { $0.concerns = [] }
+        content.rootView = AnyView(AccountPage(host: settings))
+        content.layoutSubtreeIfNeeded()
+        #expect(await eventually(within: .seconds(3)) { settings.overview.concerns.isEmpty && settings.overview.attentionBadge == nil })
+    }
+
+    @Test func lockedProblemsAskForInstanceRead() async throws {
+        let settings = StubMarfaHost(settings: InstanceSettingsModel { nil })
+        settings.grants.remove(.instanceRead)
+        settings.bindOverview()
+        let window = host(AccountPage(host: settings))
+        defer {
+            window.contentView = nil
+            window.close()
+        }
+        try await press(in: window, matching: "Allow More", attribute: "accessibilityLabel")
+        #expect(await eventually(within: .seconds(3)) { settings.allowed == [[.instanceRead]] })
+    }
+
     @Test(arguments: [MarfaSettingsPage.account, .keys])
     func movedPagesFollowConnectionAndReadFailures(page: MarfaSettingsPage) async throws {
         let settings = StubMarfaHost(settings: InstanceSettingsModel { nil })

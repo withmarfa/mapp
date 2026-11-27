@@ -89,7 +89,7 @@ The page gate checks the connection and the sign-in’s permissions. A configure
 - **One reader of health** (`ServerHealthModel`) and one follower of an update (`UpdatesModel`) serve every page.
 - **A part's word comes from its own status**, and unreadable is Couldn't Check, never Working.
 - **A server that does not answer during an update is restarting**, not at fault. When the app stops waiting it offers Check Again, not Update, because the server may still be updating.
-- **An update put back offers Try Again and no second Update.**
+- **After a rollback,** a release the server can still install offers Try Again to a sign-in with `instance.maintain`. Other sign-ins see Allow More.
 - **A connector's health is derived**, because the server gives no word for it (`ConnectorHealth.of`). Unreadable is never "waiting to start".
 - **Pause, Resume and Run Now are stored choices** that the connector follows at its next run. The app never runs a connector.
 
@@ -97,7 +97,7 @@ The page gate checks the connection and the sign-in’s permissions. A configure
 
 - **The server's own error texts are never shown**, because they name settings by key and requests by path. Pages word a title and one line; details go to the app's log. A field may show the server's reason where it holds no key, code or route.
 - **A setting with no name in the app is counted or described**, never shown by its key.
-- **Problems and the Account badge share the server’s attention list.** Each problem opens the relevant settings page. A locked page offers Allow More.
+- **Problems and the Account badge share the server’s attention list.** Account refreshes it when opened. A problem opens the page that fixes it or offers a command to copy for settings the app cannot change. Without `instance.read`, Problems offers Allow More.
 - **A problem row's title is a sentence.**
 
 ## Plugins, types and connectors

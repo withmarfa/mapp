@@ -32,9 +32,9 @@ import Observation
 
     var attentionBadge: Int? { failure != nil || concerns.isEmpty ? nil : concerns.count }
 
-    func load() async {
+    func load(waitForPrevious: Bool = false) async {
         await loader.load(
-            in: context,
+            in: context, waitForPrevious: waitForPrevious,
             primary: { () throws(OwnerFailure) in
                 concerns = try await context.calls.attention()
             },

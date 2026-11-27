@@ -49,7 +49,7 @@ nonisolated enum ProfileContactField: Hashable {
     /// Whether the name is being sent, or the grants read again after a refusal: the field takes no typing meanwhile, so
     /// one name is sent at a time.
     private(set) var isSavingName = false
-    /// Counts each time Settings closes, so a send that fails after it hands back what was typed instead of showing it.
+    /// A save that fails after draft handover returns the text through a notice.
     private var closings = 0
     /// A small copy of the picture for its row, where there is one the sign-in may read. Nothing larger is kept.
     private(set) var picture: Data?
@@ -60,6 +60,12 @@ nonisolated enum ProfileContactField: Hashable {
     /// Why the page can't be shown at all.
     private let loader = OwnerLoader()
     var failure: OwnerFailure? { loader.failure }
+    var gateFailure: OwnerFailure? {
+        switch failure {
+        case .signedOut, .unreachable, .instanceChanged, .unsupported, .notPermitted: failure
+        default: nil
+        }
+    }
     /// Why the passkeys and browsers couldn't be read, where the profile could.
     private let signInsRead = OwnerLoader.ReadStatus()
     var listsFailure: OwnerFailure? { signInsRead.failure }

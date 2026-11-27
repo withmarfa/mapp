@@ -2566,6 +2566,9 @@
     "Allow more removals before pausing?" : {
 
     },
+    "Allow this app to read the server’s status." : {
+
+    },
     "Allowed" : {
 
     },
@@ -3949,6 +3952,9 @@
     "Contents" : {
       "extractionState" : "manual"
     },
+    "Continue" : {
+
+    },
     "Continue lists on Return" : {
 
     },
@@ -4220,6 +4226,9 @@
       "extractionState" : "manual"
     },
     "Couldn’t sync" : {
+
+    },
+    "Couldn’t tell whether this Marfa is set up." : {
 
     },
     "Couldn’t update" : {
@@ -5204,6 +5213,9 @@
     "Forward 15 Seconds" : {
 
     },
+    "Found" : {
+
+    },
     "Found %@" : {
 
     },
@@ -5607,6 +5619,9 @@
       "extractionState" : "manual"
     },
     "In Progress First" : {
+
+    },
+    "In Terminal, run %@ for this Marfa, then enter the secret key when prompted." : {
 
     },
     "In Two Weeks" : {
@@ -6686,6 +6701,9 @@
     "Marfa for Mac couldn’t check this link in time. Try opening it again." : {
 
     },
+    "Marfa isn’t answering." : {
+
+    },
     "Marfa keeps this link itself." : {
 
     },
@@ -7079,6 +7097,9 @@
     "Next run: %@." : {
 
     },
+    "Next, you sign in on its own page." : {
+
+    },
     "No" : {
       "extractionState" : "manual"
     },
@@ -7398,6 +7419,9 @@
     "Not Set" : {
       "extractionState" : "manual"
     },
+    "Not Signed In" : {
+
+    },
     "Not Started" : {
       "extractionState" : "manual"
     },
@@ -7418,6 +7442,9 @@
     },
     "Not connected yet" : {
       "extractionState" : "manual"
+    },
+    "Not found" : {
+
     },
     "Not heard from" : {
 
@@ -7634,9 +7661,6 @@
       "extractionState" : "manual"
     },
     "On the local network." : {
-
-    },
-    "On the server’s own page, in a sheet." : {
 
     },
     "On this Mac" : {
@@ -9123,6 +9147,9 @@
     "Set the client settings the sign-in needs first." : {
 
     },
+    "Set the object store secret key again" : {
+
+    },
     "Set them again if you install it later." : {
 
     },
@@ -9426,6 +9453,9 @@
     "Sign In to %@" : {
 
     },
+    "Sign In with a Code…" : {
+
+    },
     "Sign In…" : {
 
     },
@@ -9446,6 +9476,12 @@
     },
     "Sign in to this server again to see them." : {
       "extractionState" : "manual"
+    },
+    "Sign in to your Marfa to open your library." : {
+
+    },
+    "Sign Out “%@”?" : {
+
     },
     "Sign-In Address" : {
 
@@ -11011,6 +11047,12 @@
     "Thinned old versions" : {
 
     },
+    "This app can’t check for problems" : {
+
+    },
+    "This app can’t manage sign-ins" : {
+
+    },
     "This App Isn’t Connected" : {
 
     },
@@ -11078,6 +11120,9 @@
       "extractionState" : "manual"
     },
     "This Marfa answers on these too." : {
+
+    },
+    "This Marfa isn’t set up yet." : {
 
     },
     "This Marfa must be reachable." : {
@@ -12317,6 +12362,9 @@
 
     },
     "You closed Settings before this was saved." : {
+
+    },
+    "You left the page before this was saved." : {
 
     },
     "You quit the app before saving the changes to this Marfa’s settings." : {

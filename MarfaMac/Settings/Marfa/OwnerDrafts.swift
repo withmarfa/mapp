@@ -23,8 +23,9 @@ nonisolated enum OwnerDraft: Equatable, Sendable {
     }
 
     private var holders: [Holder] = []
+    private var departed: [OwnerDraft] = []
 
-    /// Where a draft goes that a page hands over after Settings has closed, which the app sets.
+    /// The app supplies the destination for a save that fails after draft handover.
     var arrival: ((OwnerDraft) -> Void)?
 
     /// Takes a draft from a page whose work ended after its hand-over, so the person is told it all the same.
@@ -37,9 +38,16 @@ nonisolated enum OwnerDraft: Equatable, Sendable {
         holders.append(Holder(value: holder))
     }
 
-    /// Everything the open pages hold, taken from them.
+    /// Keeps unsaved text until handover even when navigation releases its page.
+    func pageLeft(_ holder: any OwnerDraftHolding) {
+        departed += holder.takeDrafts()
+        holders.removeAll { $0.value == nil || $0.value === holder }
+    }
+
+    /// Everything the open and departed pages hold, taken once.
     func takeAll() -> [OwnerDraft] {
         holders.removeAll { $0.value == nil }
-        return holders.flatMap { $0.value?.takeDrafts() ?? [] }
+        defer { departed.removeAll() }
+        return departed + holders.flatMap { $0.value?.takeDrafts() ?? [] }
     }
 }

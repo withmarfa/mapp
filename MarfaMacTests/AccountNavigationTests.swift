@@ -31,9 +31,15 @@ import Testing
     }
 
     @Test func aCheckThatDidNotAnswerOpensThePageForThatCheck() {
-        #expect(AttentionConcern(kind: .unavailable, reference: "API keys", title: "").destination == .keys)
-        #expect(AttentionConcern(kind: .unavailable, reference: "Webhooks", title: "").destination == .webhooks)
-        #expect(AttentionConcern(kind: .webhook, reference: "hook-id", title: "").destination == .webhooks)
+        #expect(AttentionConcern(kind: .unavailable, reference: "API keys", title: "").repair == .page(.keys))
+        #expect(AttentionConcern(kind: .unavailable, reference: "Webhooks", title: "").repair == .page(.webhooks))
+        #expect(AttentionConcern(kind: .webhook, reference: "hook-id", title: "").repair == .page(.webhooks))
+    }
+
+    @Test func anUnreadableObjectStoreKeyGivesTheCommandInsteadOfOpeningStorage() {
+        let concern = AttentionConcern(kind: .setting, reference: "object_store_secret_access_key", title: "")
+        #expect(concern.repair == .command("marfa config set object_store_secret_access_key"))
+        #expect(concern.shownLine?.contains("marfa config set object_store_secret_access_key") == true)
     }
 
     @Test func problemsUseTheirSettingsDestinationAndCount() async {
@@ -51,6 +57,6 @@ import Testing
         }
         await model.load()
         #expect(model.attentionBadge == 3)
-        #expect(model.concerns.map(\.destination) == [.keys, .connectors, .housekeeping])
+        #expect(model.concerns.map(\.repair) == [.page(.keys), .page(.connectors), .page(.housekeeping)])
     }
 }

@@ -45,9 +45,9 @@ nonisolated final class DisconnectWhileShownTests: XCTestCase {
         confirm.click()
     }
 
-    /// Once the library is gone the main window asks for a server again, and Settings shows Connection's server form.
+    /// Once the library is gone the main window asks for a server again, and Connection offers to sign in.
     @MainActor private func assertLeft(_ extra: String) {
-        XCTAssertTrue(app.textFields["MarfaAddress"].waitForExistence(timeout: 20), "the window asks for a server again \(extra)")
+        XCTAssertTrue(app.buttons["MarfaOpenConnect"].waitForExistence(timeout: 20), "the window offers to sign in again \(extra)")
         XCTAssertNotEqual(app.state, .notRunning, "the app is still running")
         XCTAssertFalse(app.buttons["MarfaDisconnect"].exists, "there is no library to disconnect from")
         XCTAssertFalse(app.descendants(matching: .any)["SidebarNew"].exists, "the library is gone from the window")

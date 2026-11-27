@@ -6,6 +6,7 @@ import SwiftUI
 struct SettingsSidebar: View {
     @Binding var selection: SettingsPage
     @Binding var search: String
+    var hasMarfa = true
     /// The count a page's row shows at its trailing edge, if it has one.
     var badges: (SettingsPage) -> Int? = { _ in nil }
     @Environment(\.settingsTextScale) private var scale
@@ -33,7 +34,9 @@ struct SettingsSidebar: View {
 
     var body: some View {
         let groups = groups
-        List(selection: Binding<SettingsPage?> { selection.sidebarEntry } set: { if let page = $0 { selection = page } }) {
+        List(selection: Binding<SettingsPage?> { selection.sidebarEntry } set: {
+            if let page = $0, canSelect(page) { selection = page }
+        }) {
             ForEach(groups) { group in
                 if let name = group.name {
                     groupHeading(name, gap: group.gap)
@@ -72,6 +75,7 @@ struct SettingsSidebar: View {
     private func rows(_ pages: [SettingsPage]) -> some View {
         ForEach(pages, id: \.self) { page in
             let isSelected = selection.sidebarEntry == page
+            let isEnabled = canSelect(page)
             HStack(spacing: SettingsTokens.Metric.buttonGap) {
                 SettingsTile(symbol: page.symbol, tone: page.tone, size: SettingsTokens.Metric.sidebarTile, rich: true)
 
@@ -90,12 +94,20 @@ struct SettingsSidebar: View {
             .accessibilityElement(children: .combine)
             .listRowInsets(.vertical, 0)
             .listRowSeparator(.hidden)
+            .opacity(isEnabled ? 1 : SettingsTokens.Metric.lockedTileOpacity)
+            .selectionDisabled(!isEnabled)
+            .disabled(!isEnabled)
             .simultaneousGesture(TapGesture().onEnded {
-                if selection != page, selection.sidebarEntry == page { selection = page }
+                if isEnabled, selection != page, selection.sidebarEntry == page { selection = page }
             })
             .tag(page)
             .accessibilityIdentifier("SettingsPage-\(page.key)")
         }
+    }
+
+    private func canSelect(_ page: SettingsPage) -> Bool {
+        if case .marfa = page { return hasMarfa }
+        return true
     }
 
     private func problemBadge(_ count: Int) -> some View {
