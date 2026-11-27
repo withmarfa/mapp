@@ -39,7 +39,7 @@ The page gate checks connection and permissions. A configured Marfa keeps its Ac
 
 ## Permissions
 
-- **A page never shows content behind a missing permission.** It shows Needs a Permission in its own words, with Allow More, because a row that cannot load looks like a fault. `MarfaPageGate` decides.
+- **A missing page permission shows Needs a Permission with Allow More.** `MarfaPageGate` decides. Apps and Keys checks access to each section independently and shows a locked row for an unavailable action.
 - **A sign-in asks for every permission an app can hold**, and the owner grants what they choose. A page rereads the grants after approval and still says what is missing.
 - **A `forbidden` answer rereads the grants** and offers Allow More… in the problem row (`OwnerProblemRow`).
 - **Owner permissions are counted, never all or nothing**, and can only be turned off on a key's or an app's page (`OwnerPermissionsRow`).

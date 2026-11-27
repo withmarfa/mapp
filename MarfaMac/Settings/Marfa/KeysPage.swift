@@ -139,7 +139,7 @@ struct KeysPage: View {
                 SettingsValue(verbatim: OwnerWording.used(key.lastUsed)).fixedSize()
                 SettingsMoreMenu {
                     Button("Open Key Settings") { navigation?.push(Self.subpage(for: key)) }
-                    Button("Revoke…", role: .destructive) { model.askToRevoke(key) }
+                    Button("Revoke", role: .destructive) { model.askToRevoke(key) }
                 }
                 .accessibilityLabel(Text("Actions for \(key.label)"))
             }
@@ -195,7 +195,12 @@ private struct KeyDetail: View {
             SettingsHead(symbol: "key.fill", tone: .amber, title: Text(verbatim: key.label), line: Text(verbatim: line)) {
                 SettingsButton("Rename…") { model.beginRename(key) }
             }
-            if let failure = model.rowErrors[key.id] { OwnerProblem(title: "Not Changed", failure: failure, page: .keys, host: host) }
+            if let failure = model.rowErrors[key.id] {
+                let line = failure == .unreachable ? String(localized: "The app can’t reach the server to confirm the result.") : nil
+                SettingsSection(name: nil) {
+                    OwnerProblemRow(title: "Couldn’t Change Key", failure: failure, line: line, page: .keys, host: host)
+                }
+            }
             SettingsSection("Key") {
                 expires
                 SettingsRow("New Items Go To", line: "The feed, or straight into the library.") {
@@ -222,7 +227,7 @@ private struct KeyDetail: View {
             }
             SettingsSection("Revoke") {
                 SettingsRow(verbatim: String(localized: "Revoke \(key.label)"), line: String(localized: "Anything using it stops at once.")) {
-                    SettingsButton("Revoke…", role: .destructive) { model.askToRevoke(key) }
+                    SettingsButton("Revoke", role: .destructive) { model.askToRevoke(key) }
                 }
             }
         }

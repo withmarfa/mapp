@@ -228,14 +228,14 @@ private struct AppDetail: View {
                     verbatim: String(localized: "Disconnect \(name)"),
                     line: String(localized: "Its webhooks are deleted. The keys it made keep working.")
                 ) {
-                    SettingsButton("Disconnect…", role: .destructive) { model.askToDisconnect(app) }
+                    SettingsButton("Disconnect", role: .destructive) { model.askToDisconnect(app) }
                 }
             }
         }
     }
 }
 
-/// What one app keeps under its own `app.<vendor>` namespaces, counted by state, with Remove…. Marfa answers counts, never a
+/// What one app keeps under its own `app.<vendor>` namespaces, counted by state, with Remove. Marfa answers counts, never a
 /// size. The app's own settings are shown and never removed here.
 private struct AppDataSection: View {
     let model: AppsModel
@@ -285,7 +285,7 @@ private struct AppDataSection: View {
             verbatim: title, line: AppDataWording.line(held, appName: name, keptByApp: model.isOwn(held.vendor)), lines: nil
         ) {
             if model.canRemoveData, !model.isOwn(held.vendor), !held.types.isEmpty {
-                SettingsButton("Remove…", role: .destructive) { model.askToRemoveData(app, vendor: held.vendor) }
+                SettingsButton("Remove", role: .destructive) { model.askToRemoveData(app, vendor: held.vendor) }
                     .disabled(model.removing.contains(app.id))
             }
         }
