@@ -119,8 +119,7 @@ import Testing
         #expect(MarfaSettingsPage.history.permission == .configManage)
         #expect(MarfaSettingsPage.fileStorage.permission == .configManage)
         #expect(MarfaSettingsPage.sources.permission == .keysManage)
-        #expect(MarfaSettingsPage.recentlyDeleted.permission == .itemsPurge)
-        #expect(Set(MarfaSettingsPage.groups.flatMap { $0 }) == Set(MarfaSettingsPage.allCases))
+        #expect(MarfaSettingsPage.trash.permission == .itemsPurge)
     }
 }
 
@@ -138,7 +137,7 @@ import Testing
         }
         let model = OverviewModel(context: bench.context)
         await model.load()
-        #expect(model.attentionCount == 2)
+        #expect(model.attentionBadge == 2)
         #expect(model.hasLoaded)
     }
 
@@ -147,9 +146,22 @@ import Testing
         let model = OverviewModel(context: bench.context)
         await model.load()
         #expect(model.concerns.isEmpty)
-        #expect(model.attentionCount == 0)
+        #expect(model.attentionBadge == nil)
         #expect(model.health(of: .database).condition == .ok)
         #expect(model.backups.state == .ok)
+    }
+
+    @Test func anAvailableUpdateAloneDoesNotBadgeAccount() async {
+        let bench = bench()
+        bench.calls.state.withLock {
+            $0.update.running = "0.0.89"
+            $0.update.available = true
+            $0.update.latest = UpdateRelease(version: "0.0.90")
+        }
+        let model = OverviewModel(context: bench.context)
+        await model.load()
+        #expect(model.updateReady == "0.0.90")
+        #expect(model.attentionBadge == nil)
     }
 
     private func overview(health: ServerHealth?, concerns: [AttentionConcern] = []) async -> OverviewModel {

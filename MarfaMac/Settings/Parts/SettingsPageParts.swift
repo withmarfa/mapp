@@ -37,12 +37,13 @@ struct SettingsPageColumn<Content: View>: View {
 /// A state that fills the page (`SettingsPageState`, a read in progress) under sections that keep their place, for
 /// what holds whatever the state.
 struct SettingsStandingState<Above: View, State: View>: View {
+    var scrolls = false
     @ViewBuilder let above: Above
     @ViewBuilder let state: State
 
     var body: some View {
         VStack(spacing: 0) {
-            SettingsPageColumn(scrolls: false) { above }
+            SettingsPageColumn(scrolls: scrolls) { above }
             state
         }
     }
@@ -278,5 +279,32 @@ enum SettingsWording {
     static func hostName(of address: URL) -> String {
         guard let host = address.host(percentEncoded: false) else { return address.absoluteString }
         return address.port.map { "\(host):\($0)" } ?? host
+    }
+}
+
+/// A page heading with its address and actions at the trailing edge, without a card.
+struct SettingsPageHeader<Trailing: View>: View {
+    let name: String
+    let address: String
+    @ViewBuilder let trailing: Trailing
+
+    var body: some View {
+        HStack(spacing: SettingsTokens.Metric.tableColumnGap) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(verbatim: name)
+                    .settingsFont(.pageHeader)
+                    .frame(minHeight: SettingsTokens.Metric.pageHeaderNameHeight)
+                    .accessibilityAddTraits(.isHeader)
+                Text(verbatim: address).withSettingsGlyph(.link)
+                    .settingsFont(.title)
+                    .frame(minHeight: SettingsTokens.Metric.pageHeaderAddressHeight)
+                    .foregroundStyle(SettingsTokens.secondaryText)
+                    .textSelection(.enabled)
+            }
+            Spacer(minLength: 0)
+            trailing.fixedSize(horizontal: true, vertical: false)
+        }
+        .padding(.horizontal, SettingsTokens.Metric.inset)
+        .padding(.top, SettingsTokens.Metric.pageHeaderTop)
     }
 }

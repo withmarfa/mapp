@@ -85,7 +85,7 @@ protocol ItemLibrary: AnyObject, Observable {
     func favoriteCount(in scope: ListScope) -> Int
     /// Which items belong to the place's listing, independent of their order.
     func listed(_ ids: Set<ItemID>, in place: PlaceView, listing: PlaceListing) -> Set<ItemID>
-    /// What Recently Deleted holds, newest first. It is a page of Settings, not a place, so no window lists it.
+    /// The items Settings lists in Trash, newest first.
     var deletedItems: [Item] { get }
     var deletedCount: Int { get }
     /// The items the saved view `view` would list with `query` in place of its own, which a window shows while it

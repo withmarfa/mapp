@@ -74,7 +74,6 @@ Search this page before you propose a look. Each line is a refused design, then 
 ## Buttons and messages
 
 - **Black buttons, or one shape at every size.** The shape follows the size.
-- **A button in a Settings section's header.** Adding is the card's last row.
 - **A row's action only on the row under the pointer in Settings.** Show it on every row.
 - **A sheet or alert under the toolbar.** The middle of the window.
 - **A blue focus ring or a solid red button.** A gray ring, and pale red with red text.

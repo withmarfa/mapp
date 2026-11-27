@@ -36,6 +36,7 @@ extension ItemLibrary {
 /// below, for the caller to clip.
 struct TagFlowLayout: Layout {
     var spacing: CGFloat = 6
+    var rowSpacing: CGFloat?
     var maxRows: Int?
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
@@ -72,7 +73,7 @@ struct TagFlowLayout: Layout {
             let itemWidth = min(size.width, width)
             if !row.items.isEmpty && row.width + spacing + itemWidth > width {
                 rows.append(row)
-                y += row.height + spacing
+                y += row.height + (rowSpacing ?? spacing)
                 row = Row(y: y)
             }
             row.y = y

@@ -20,14 +20,14 @@ struct MarfaPageGate<Content: View>: View {
                 SettingsPageState(
                     symbol: "server.rack", title: Text("No Marfa Open"),
                     line: Text("Connect to a Marfa in Connection to see this page."),
-                    action: ("Open Connection…", { host.showConnection() }))
+                    action: ("Open Connection", { host.showConnection() }))
             }
         case .signedOut:
             standing {
                 SettingsPageState(
                     symbol: "person.crop.circle.badge.exclamationmark", title: Text("Signed Out"),
                     line: Text("\(host.serverName) ended the app’s sign-in. Sign in again in Connection."),
-                    action: ("Open Connection…", { host.showConnection() }))
+                    action: ("Open Connection", { host.showConnection() }))
             }
         case .notAnswering(let lastAnswered):
             standing {
@@ -41,7 +41,7 @@ struct MarfaPageGate<Content: View>: View {
                 standing {
                     SettingsPageState(
                         symbol: "lock", title: Text("Needs a Permission"), line: Text(verbatim: page.permissionLine),
-                        action: (host.isAllowingMore ? "Waiting…" : "Allow More…", { host.askForMore(naming: permission.rawValue) }))
+                        action: (host.isAllowingMore ? "Waiting…" : "Allow More", { host.askForMore(naming: permission.rawValue) }))
                     .disabled(host.isAllowingMore)
                 }
             } else {
@@ -53,7 +53,7 @@ struct MarfaPageGate<Content: View>: View {
     /// A state, under `above` where the page has something to offer in any state.
     @ViewBuilder private func standing<State: View>(@ViewBuilder _ state: () -> State) -> some View {
         if let above {
-            SettingsStandingState { above } state: { state() }
+            SettingsStandingState(scrolls: page == .account) { above } state: { state() }
         } else {
             state()
         }
@@ -80,7 +80,7 @@ struct MarfaSettingsPageView: View {
     @State private var links = OpenLinksModel()
 
     var body: some View {
-        MarfaPageGate(page: page, host: host, above: page == .apps && subpage == nil ? AnyView(OpenLinksSection(model: links)) : nil) {
+        MarfaPageGate(page: page, host: host, above: standingContent) {
             switch page {
             case .overview: OverviewPage(host: host)
             case .account: AccountPage(host: host)
@@ -89,13 +89,13 @@ struct MarfaSettingsPageView: View {
             case .addresses: AddressesPage(host: host)
             case .plugins: PluginsPage(host: host, subpage: subpage)
             case .sources: SourcesPage(host: host, subpage: subpage)
-            case .types:
-                if LinksPage.shows(subpage) { LinksPage(host: host, subpage: subpage) } else { TypesPage(host: host, subpage: subpage) }
+            case .types: TypesPage(host: host, subpage: subpage)
+            case .links: LinksPage(host: host, subpage: subpage)
             case .activity: ActivityPage(host: host)
             case .monitoring: MonitoringPage(host: host)
             case .limits: LimitsPage(host: host)
             case .startUp: StartUpPage(host: host)
-            case .recentlyDeleted: RecentlyDeletedPage(host: host, showsAll: subpage?.id == RecentlyDeletedPage.allDeleted.id)
+            case .trash: TrashPage(host: host, showsAll: subpage?.id == TrashPage.allDeleted.id)
             case .history: HistoryPage(host: host)
             case .fileStorage: FileStoragePage(host: host)
             case .connectors: ConnectorsPage(host: host, subpage: subpage)
@@ -106,5 +106,31 @@ struct MarfaSettingsPageView: View {
             case .housekeeping: HousekeepingPage(host: host)
             }
         }
+    }
+
+    private var standingContent: AnyView? {
+        guard subpage == nil else { return nil }
+        switch page {
+        case .account: return AnyView(AccountServerSettingsSection(host: host))
+        case .apps: return AnyView(OpenLinksSection(model: links))
+        case .keys: return AnyView(AppsSettingsSection(host: host))
+        default: return nil
+        }
+    }
+}
+
+/// A link to another Marfa page. A locked link still opens its gate, where the owner can grant access.
+struct MarfaSettingsPageRow: View {
+    let page: MarfaSettingsPage
+    let host: any MarfaSettingsHost
+
+    private var lock: String? {
+        guard host.connection == .connected, let permission = page.permission, !host.grants.contains(permission) else { return nil }
+        return String(localized: "Not allowed")
+    }
+
+    var body: some View {
+        SettingsLinkRow(verbatim: page.title, lead: .tile(page.symbol, page.tone), lock: lock) { host.show(page) }
+            .accessibilityIdentifier("SettingsLink-\(page.rawValue)")
     }
 }

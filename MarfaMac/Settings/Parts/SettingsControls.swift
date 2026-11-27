@@ -1,8 +1,26 @@
 import SwiftUI
 
-// The trailing controls of a row. Every one is the system's: bordered buttons, menu pop-ups, switches and rounded text fields,
-// at the size the boards draw: 28 points tall, which the system calls large and draws as a capsule (24 inside a table, which it
-// calls regular and draws as a rounded rectangle).
+extension EnvironmentValues {
+    @Entry var settingsCompactControls = false
+    @Entry var settingsUsesSheetControls = false
+}
+
+private struct SettingsControlSize: ViewModifier {
+    var small: Bool
+    @Environment(\.settingsCompactControls) private var compact
+    @Environment(\.settingsTextScale) private var scale
+
+    func body(content: Content) -> some View {
+        let usesSmall = (small || compact) && scale < SettingsTokens.Metric.controlScaleForLarge
+        content.controlSize(usesSmall ? .regular : .large)
+
+            .frame(minHeight: usesSmall ? SettingsTokens.Metric.smallControlHeight : nil)
+    }
+}
+
+extension View {
+    func settingsControlSize(small: Bool = false) -> some View { modifier(SettingsControlSize(small: small)) }
+}
 
 /// What a Settings button is for. `confirm` is a sheet's or a dialog's one main action: the accent fill and Return, so a
 /// page cannot leave it gray. `update` is the accent fill without Return. `destructive` is a pale red fill with red text, the
@@ -54,7 +72,7 @@ struct SettingsButton: View {
             case .normal: button.buttonStyle(.bordered)
             }
         }
-        .controlSize(small ? .regular : .large)
+        .settingsControlSize(small: small)
         .keyboardShortcut(role == .confirm ? .defaultAction : nil)
     }
 
@@ -81,27 +99,19 @@ struct SettingsMoreMenu<Content: View>: View {
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
+        .settingsControlSize(small: true)
         .fixedSize()
     }
 }
 
-extension View {
-    /// The system's menu pop-up at Settings' one input size: 160 wide, and 28 tall, which the large control size draws.
-    /// Without the flexible sizing the system pop-up fits its title instead of filling the width.
-    func settingsPopUpSize() -> some View {
-        controlSize(.large)
-            .buttonSizing(.flexible)
-            .frame(width: SettingsTokens.Metric.controlWidth)
-    }
-}
-
-/// A pop-up of choices, as the system draws it, at the one width every pop-up of Settings has, so those of a page line
-/// up in a column at the rows' trailing edge. `isError` puts the red ring round it.
+/// A system pop-up at the row's trailing edge, with room for its choices. `isError` puts the red ring round it.
 struct SettingsPopUp<Value: Hashable, Content: View>: View {
     private let title: Text
     @Binding var selection: Value
     var isError = false
     @ViewBuilder let content: Content
+    @Environment(\.settingsCompactControls) private var compact
+    @Environment(\.settingsTextScale) private var scale
 
     init(title: LocalizedStringKey, selection: Binding<Value>, isError: Bool = false, @ViewBuilder content: () -> Content) {
         self.init(label: Text(title), selection: selection, isError: isError, content: content)
@@ -123,7 +133,10 @@ struct SettingsPopUp<Value: Hashable, Content: View>: View {
         Picker(selection: $selection) { content } label: { title }
             .labelsHidden()
             .pickerStyle(.menu)
-            .settingsPopUpSize()
+            .settingsControlSize()
+            .buttonSizing(.flexible)
+            .frame(minWidth: compact ? SettingsTokens.Metric.popUpMinimumWidth * max(1, scale) : SettingsTokens.Metric.controlWidth)
+            .fixedSize(horizontal: true, vertical: false)
             .settingsErrorRing(isError)
     }
 }
@@ -156,21 +169,26 @@ struct SettingsToggle: View {
 struct SettingsValue: View {
     private let text: Text
     private let dot: Color?
+    private let glyph: SettingsTextGlyph?
 
-    init(_ text: LocalizedStringKey, dot: Color? = nil) {
-        self.text = Text(text)
-        self.dot = dot
+    init(_ text: LocalizedStringKey, dot: Color? = nil, glyph: SettingsTextGlyph? = nil) {
+        self.init(text: Text(text), dot: dot, glyph: glyph)
     }
 
-    init(verbatim text: String, dot: Color? = nil) {
-        self.text = Text(verbatim: text)
+    init(verbatim text: String, dot: Color? = nil, glyph: SettingsTextGlyph? = nil) {
+        self.init(text: Text(verbatim: text), dot: dot, glyph: glyph)
+    }
+
+    init(text: Text, dot: Color? = nil, glyph: SettingsTextGlyph? = nil) {
+        self.text = text
         self.dot = dot
+        self.glyph = glyph
     }
 
     var body: some View {
-        HStack(spacing: SettingsTokens.Metric.dotGap) {
+        HStack(spacing: SettingsTokens.Metric.lockGap) {
             if let dot { SettingsStatusDot(color: dot) }
-            text
+            text.withSettingsGlyph(glyph)
                 .settingsFont(.title)
                 .foregroundStyle(SettingsTokens.secondaryText)
                 .lineLimit(1)
@@ -196,7 +214,7 @@ struct SettingsLockedValue: View {
     var body: some View {
         HStack(spacing: SettingsTokens.Metric.dotGap) {
             Image(systemName: "lock").font(.system(size: SettingsTokens.Metric.lockGlyph)).foregroundStyle(SettingsTokens.tertiaryText).accessibilityHidden(true)
-            SettingsValue(verbatim: text)
+            Text(verbatim: text).settingsFont(.small).foregroundStyle(SettingsTokens.secondaryText)
         }
     }
 }
@@ -291,7 +309,7 @@ struct SettingsField: View {
         }
         .labelsHidden()
         .textFieldStyle(.roundedBorder)
-        .controlSize(.large)
+        .settingsControlSize()
         .font(isMonospaced ? SettingsTokens.font(.mono, scale: scale) : nil)
         .autocorrectionDisabled()
         .focused($isFocused)
@@ -359,6 +377,8 @@ struct SettingsNumberField: View {
     var onSubmit: () -> Void = {}
     var onEndEditing: (() -> Void)?
     @FocusState private var isFocused: Bool
+    @Environment(\.settingsCompactControls) private var compact
+    @Environment(\.settingsTextScale) private var scale
 
     init(
         title: LocalizedStringKey, text: Binding<String>, unit: LocalizedStringKey?, prompt: String? = nil, isError: Bool = false,
@@ -390,19 +410,24 @@ struct SettingsNumberField: View {
         self.onEndEditing = onEndEditing
     }
 
+    private var fieldWidth: CGFloat {
+        if unit == nil { return SettingsTokens.Metric.controlWidth }
+        return compact ? SettingsTokens.Metric.smallNumberWidth * max(1, scale) : SettingsTokens.Metric.numberWidth
+    }
+
     var body: some View {
         HStack(spacing: SettingsTokens.Metric.buttonGap) {
             TextField(text: $text, prompt: Text(verbatim: prompt ?? "")) { title }
                 .labelsHidden()
                 .textFieldStyle(.roundedBorder)
-                .controlSize(.large)
+                .settingsControlSize()
                 .multilineTextAlignment(unit == nil ? .leading : .trailing)
                 .autocorrectionDisabled()
                 .focused($isFocused)
                 .appFocusRing(isFocused: isFocused)
                 .onSubmit(onSubmit)
                 .onChange(of: isFocused) { if !$1 { onEndEditing?() } }
-                .frame(width: unit == nil ? SettingsTokens.Metric.controlWidth : SettingsTokens.Metric.numberWidth)
+                .frame(width: fieldWidth)
                 .settingsErrorRing(isError)
             if let unit {
                 Text(unit)

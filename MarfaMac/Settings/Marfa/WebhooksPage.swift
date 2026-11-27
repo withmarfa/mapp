@@ -147,10 +147,8 @@ private struct WebhookDetail: View {
     let webhook: OwnerWebhook
     let host: any MarfaSettingsHost
     @State private var showsAllEvents = false
-    @State private var showsAllDeliveries = false
 
     private static let firstEvents = 6
-    private static let firstDeliveries = 10
 
     private var isOwn: Bool { model.isOwn(webhook) }
 
@@ -290,7 +288,7 @@ private struct WebhookDetail: View {
                 }
             } else {
                 SettingsSectionTable(
-                    rows: showsAllDeliveries ? all : Array(all.prefix(Self.firstDeliveries)),
+                    rows: all,
                     columns: [
                         SettingsTableColumn<WebhookDeliveryInfo>("When", width: SettingsTokens.Metric.Column.time) { Text(verbatim: Self.when($0.created)) },
                         SettingsTableColumn("Event") { Text(verbatim: WebhookEvent(rawValue: $0.event)?.title ?? $0.event) },
@@ -300,8 +298,7 @@ private struct WebhookDetail: View {
                         ? SettingsRowAction(
                             title: "Redeliver", isEnabled: { model.canRedeliver($0, of: webhook) },
                             perform: { delivery in Task { await model.redeliver(delivery, of: webhook) } })
-                        : nil,
-                    total: all.count, showAll: showsAllDeliveries || all.count <= Self.firstDeliveries ? nil : { showsAllDeliveries = true })
+                        : nil)
             }
         }
     }

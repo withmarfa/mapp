@@ -3,9 +3,8 @@ import SwiftUI
 
 /// Links between items, a page the Types page opens (its Links Between Items section), as the boards draw it: the owner's
 /// link types with New Link Type…, those plugins brought and those Marfa ships, read only. One of the owner's opens a page of
-/// its own with Delete…. It stands behind the Types page's gate.
+/// its own with Delete….
 struct LinksPage: View {
-    static let subpage = SettingsSubpage(id: "links", title: String(localized: "Links"))
     private static let linkPrefix = "link:"
 
     let host: any MarfaSettingsHost
@@ -17,12 +16,6 @@ struct LinksPage: View {
         self.host = host
         self.subpage = subpage
         _model = State(initialValue: LinksModel(context: OwnerContext(host: host)))
-    }
-
-    /// Whether `subpage` is this page or one of its link types' pages.
-    static func shows(_ subpage: SettingsSubpage?) -> Bool {
-        guard let id = subpage?.id else { return false }
-        return id == Self.subpage.id || id.hasPrefix(linkPrefix)
     }
 
     private var openID: String? {
@@ -208,7 +201,7 @@ struct NewLinkTypeSheet: View {
     }
 }
 
-/// The Types page's Links Between Items section: one row that names the first link types and opens the Links page.
+// Temporary until Account and Types are rebuilt in session 266c.
 struct LinksSection: View {
     @State private var model: LinksModel
     let host: any MarfaSettingsHost
@@ -222,9 +215,10 @@ struct LinksSection: View {
     var body: some View {
         SettingsSection("Links Between Items") {
             SettingsLinkRow(
-                verbatim: String(localized: "Links"), line: model.summary, lead: .symbol("link"),
+                verbatim: MarfaSettingsPage.links.title, line: model.summary,
+                lead: .tile(MarfaSettingsPage.links.symbol, MarfaSettingsPage.links.tone),
                 value: model.hasLoaded && model.failure == nil ? model.linkTypes.count.formatted() : nil
-            ) { navigation?.push(LinksPage.subpage) }
+            ) { navigation?.show(.links) }
         }
         .task(id: host.serverAddress) { await model.load() }
     }

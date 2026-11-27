@@ -27,7 +27,7 @@ nonisolated struct SettingsNavigationActions: Equatable, Sendable {
     @MainActor func push(_ subpage: SettingsSubpage) { navigation.push(subpage) }
     @MainActor func back() { navigation.back() }
     /// Shows another page of the window, at one of its sub-pages if given, as a link to it does; Back returns here.
-    @MainActor func show(_ page: SettingsPage, subpage: SettingsSubpage?) { navigation.show(page, subpage: subpage) }
+    @MainActor func show(_ page: SettingsPage, subpage: SettingsSubpage? = nil) { navigation.show(page, subpage: subpage) }
 }
 
 extension EnvironmentValues {
