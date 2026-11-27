@@ -4,17 +4,19 @@ import SwiftUI
 struct SettingsTableColumn<Row> {
     let title: LocalizedStringKey
     var width: CGFloat?
+    let alignment: Alignment
     /// How many lines a cell may take; a cell that needs more is cut, and `truncation` says where.
     var lines = 1
     var truncation: Text.TruncationMode = .tail
     let cell: (Row) -> AnyView
 
     init(
-        _ title: LocalizedStringKey, width: CGFloat? = nil, lines: Int = 1, truncation: Text.TruncationMode = .tail,
+        _ title: LocalizedStringKey, width: CGFloat? = nil, numeric: Bool = false, lines: Int = 1, truncation: Text.TruncationMode = .tail,
         @ViewBuilder cell: @escaping (Row) -> some View
     ) {
         self.title = title
         self.width = width
+        self.alignment = numeric ? .trailing : .leading
         self.lines = lines
         self.truncation = truncation
         self.cell = { AnyView(cell($0)) }
@@ -45,53 +47,76 @@ struct SettingsTableFilter<Value: Hashable, Choices: View>: View {
 
     var body: some View {
         HStack(spacing: SettingsTokens.Metric.searchSpacing) {
-            SettingsFilterPopUp(selection: $choice) { choices }
+            SettingsHeaderPopUp("Filter", selection: $choice) { choices }
             SettingsTableSearch(text: $search)
         }
     }
 }
 
-/// A table's filter: a pop-up with no fill, as a header row draws every control, which shows its shape only under the pointer.
-struct SettingsFilterPopUp<Value: Hashable, Choices: View>: View {
+/// A section or list header choice that fits its title and only shows its shape under the pointer.
+struct SettingsHeaderPopUp<Value: Hashable, Choices: View>: View {
+    let title: LocalizedStringKey
     @Binding var selection: Value
     @ViewBuilder let choices: Choices
     @State private var isHovered = false
 
+    init(_ title: LocalizedStringKey, selection: Binding<Value>, @ViewBuilder choices: () -> Choices) {
+        self.title = title
+        _selection = selection
+        self.choices = choices()
+    }
+
     var body: some View {
-        Picker("Filter", selection: $selection) { choices }
+        Picker(title, selection: $selection) { choices }
             .labelsHidden()
             .pickerStyle(.menu)
             .buttonStyle(.borderless)
             .controlSize(.large)
             .fontWeight(.regular)
             .fixedSize()
-            .frame(height: SettingsTokens.Metric.controlHeight)
-            .padding(.horizontal, 4)
+            .frame(minHeight: SettingsTokens.Metric.controlHeight)
+            .padding(.horizontal, SettingsTokens.Metric.headerChoicePadding)
             .background(isHovered ? SettingsTokens.buttonFill : .clear, in: .capsule)
             .onHover { isHovered = $0 }
+    }
+}
+
+/// A bar above a list, with a count or tabs leading and search or choices trailing.
+struct SettingsListHeader<Leading: View, Trailing: View>: View {
+    @ViewBuilder let leading: Leading
+    @ViewBuilder let trailing: Trailing
+
+    var body: some View {
+        HStack(spacing: SettingsTokens.Metric.searchSpacing) {
+            leading
+            Spacer(minLength: 0)
+            trailing
+        }
     }
 }
 
 private struct TableHeader<Row>: View {
     let columns: [SettingsTableColumn<Row>]
     let hasAction: Bool
-    var inset = SettingsTokens.Metric.inset
+    var inset = SettingsTokens.Metric.sectionTableInset
+    var height = SettingsTokens.Metric.tableHeader
     var hasCheck = false
 
     var body: some View {
-        HStack(spacing: SettingsTokens.Metric.tableColumnGap) {
+        HStack(spacing: SettingsTokens.Metric.sectionTableColumnGap) {
             if hasCheck { Color.clear.frame(width: CheckWidth.value) }
             ForEach(columns.indices, id: \.self) { index in
-                Text(columns[index].title)
+                let column = columns[index]
+                Text(column.title)
                     .settingsFont(.tableHeader)
                     .foregroundStyle(SettingsTokens.secondaryText)
-                    .frame(width: columns[index].width, alignment: .leading)
-                    .frame(maxWidth: columns[index].width == nil ? .infinity : nil, alignment: .leading)
+                    .frame(width: column.width, alignment: column.alignment)
+                    .frame(maxWidth: column.width == nil ? .infinity : nil, alignment: column.alignment)
             }
             if hasAction { Color.clear.frame(width: ActionWidth.value) }
         }
         .padding(.horizontal, inset)
-        .frame(height: SettingsTokens.Metric.tableHeader)
+        .frame(minHeight: height)
         .accessibilityHidden(true)
     }
 }
@@ -104,15 +129,14 @@ private struct TableRow<Row>: View {
     let columns: [SettingsTableColumn<Row>]
     let action: SettingsRowAction<Row>?
     let isSelected: Bool
-    var isBanded = false
-    var inset = SettingsTokens.Metric.inset
+    var inset = SettingsTokens.Metric.sectionTableInset
     var height = SettingsTokens.Metric.tableRow
     /// Where the table is a page with a checkbox column: whether this row is ticked.
     var check: Binding<Bool>?
     @State private var isHovered = false
 
     var body: some View {
-        HStack(spacing: SettingsTokens.Metric.tableColumnGap) {
+        HStack(spacing: SettingsTokens.Metric.sectionTableColumnGap) {
             if let check {
                 Toggle(isOn: check) { EmptyView() }
                     .toggleStyle(.checkbox)
@@ -130,7 +154,7 @@ private struct TableRow<Row>: View {
         }
         .padding(.horizontal, inset)
         .frame(maxWidth: .infinity, minHeight: height, alignment: .leading)
-        .background(isSelected ? SettingsTokens.selection : (isHovered ? SettingsTokens.hover : (isBanded ? SettingsTokens.band : Color.clear)))
+        .background(isSelected ? SettingsTokens.selection : (isHovered ? SettingsTokens.hover : Color.clear))
         .contentShape(.rect)
         .onHover { isHovered = $0 }
     }
@@ -143,54 +167,54 @@ private struct TableRow<Row>: View {
             // A cell that wraps grows its row rather than being cut, keeping the row's padding; a row of one line stays at its height.
             .fixedSize(horizontal: false, vertical: true)
             .padding(.vertical, SettingsTokens.Metric.tableCellPadding)
-            .frame(width: column.width, alignment: .leading)
-            .frame(maxWidth: column.width == nil ? .infinity : nil, alignment: .leading)
+            .frame(width: column.width, alignment: column.alignment)
+            .frame(maxWidth: column.width == nil ? .infinity : nil, alignment: column.alignment)
     }
 }
 
-/// A table in a section: light, with no rules between rows but every other row shaded, a page at a time. Its foot says how many it shows of how many
-/// and has Show All, which opens the table as a page.
+/// A section table shows a preview of longer lists. Show All expands the table or opens a dedicated page.
 struct SettingsSectionTable<Row: Identifiable>: View {
     let rows: [Row]
     let columns: [SettingsTableColumn<Row>]
     var action: SettingsRowAction<Row>?
-    /// How many rows there are in all, where the table holds only a page of them.
-    var total: Int?
     var showAll: (() -> Void)?
-    /// Whether the foot says how many; a table that is the whole of a short list has none.
-    var showsCount = true
+    @State private var expanded = false
+
+    private var preview: SettingsTablePreview { SettingsTablePreview(total: rows.count, expanded: expanded) }
 
     var body: some View {
         SettingsCard {
             VStack(spacing: 0) {
-                TableHeader(columns: columns, hasAction: action != nil)
-                Rectangle().fill(SettingsTokens.rule).frame(height: 1)
-                ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                    TableRow(row: row, columns: columns, action: action, isSelected: false, isBanded: index.isMultiple(of: 2))
+                TableHeader(columns: columns, hasAction: action != nil, height: SettingsTokens.Metric.tableRow)
+                Rectangle().fill(SettingsTokens.rule).frame(height: SettingsTokens.Metric.ruleThickness)
+                ForEach(rows.prefix(preview.visibleCount)) { row in
+                    TableRow(row: row, columns: columns, action: action, isSelected: false)
                 }
-                if showsCount || showAll != nil {
-                    Rectangle().fill(SettingsTokens.rule).frame(height: 1)
+                if let count = preview.countLabel {
+                    Rectangle().fill(SettingsTokens.rule).frame(height: SettingsTokens.Metric.ruleThickness)
                     HStack {
-                        if showsCount {
-                            Text(count)
-                                .settingsFont(.line)
-                                .foregroundStyle(SettingsTokens.secondaryText)
-                        }
+                        Text(verbatim: count).settingsFont(.line).foregroundStyle(SettingsTokens.secondaryText)
                         Spacer(minLength: 0)
-                        if let showAll { SettingsShowAllButton(action: showAll) }
+                        SettingsShowAllButton { if let showAll { showAll() } else { expanded = true } }
                     }
-                    .padding(.horizontal, SettingsTokens.Metric.inset)
-                    .frame(height: 38)
+                    .padding(.horizontal, SettingsTokens.Metric.sectionTableInset)
+                    .frame(minHeight: SettingsTokens.Metric.tableFooterHeight)
                 }
             }
         }
     }
+}
 
-    private var count: String {
-        let all = total ?? rows.count
-        return rows.count == all
-            ? String(localized: "\(all) items")
-            : String(localized: "\(rows.count) of \(all.formatted())")
+struct SettingsTablePreview {
+    let total: Int
+    var expanded = false
+
+    var visibleCount: Int {
+        !expanded && total > SettingsTokens.Metric.tablePreviewThreshold ? SettingsTokens.Metric.tablePreviewCount : total
+    }
+
+    var countLabel: String? {
+        visibleCount < total ? String(localized: "\(visibleCount.formatted()) of \(total.formatted())") : nil
     }
 }
 
@@ -209,22 +233,22 @@ struct SettingsPageTable<Row: Identifiable, Filter: View, Foot: View>: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
+            SettingsListHeader {
                 count.settingsFont(.small).foregroundStyle(SettingsTokens.secondaryText)
-                Spacer(minLength: 12)
+            } trailing: {
                 filter
             }
             .padding(.horizontal, inset)
-            .frame(height: SettingsTokens.Metric.pageTableBar)
+            .frame(minHeight: SettingsTokens.Metric.pageTableBar)
             Rectangle().fill(SettingsTokens.rule).frame(height: 1)
             TableHeader(columns: columns, hasAction: false, inset: inset, hasCheck: true)
             Rectangle().fill(SettingsTokens.rule).frame(height: 1)
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                    ForEach(rows) { row in
                         TableRow(
                             row: row, columns: columns, action: nil, isSelected: selection.contains(row.id),
-                            isBanded: index.isMultiple(of: 2), inset: inset, height: SettingsTokens.Metric.pageTableRow, check: checked(row.id))
+                            inset: inset, height: SettingsTokens.Metric.pageTableRow, check: checked(row.id))
                             .onTapGesture { checked(row.id).wrappedValue.toggle() }
                     }
                 }
@@ -278,13 +302,13 @@ struct SettingsLogTable<Row: Identifiable, Filter: View, Foot: View, Empty: View
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
+            SettingsListHeader {
                 count.settingsFont(.small).foregroundStyle(SettingsTokens.secondaryText)
-                Spacer(minLength: 12)
+            } trailing: {
                 filter
             }
             .padding(.horizontal, inset)
-            .frame(height: SettingsTokens.Metric.logTableBar)
+            .frame(minHeight: SettingsTokens.Metric.logTableBar)
             Rectangle().fill(SettingsTokens.rule).frame(height: 1)
             TableHeader(columns: columns, hasAction: false, inset: inset)
             Rectangle().fill(SettingsTokens.rule).frame(height: 1)
@@ -293,9 +317,9 @@ struct SettingsLogTable<Row: Identifiable, Filter: View, Foot: View, Empty: View
             } else {
                 ScrollView {
                     LazyVStack(spacing: 0) {
-                        ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                        ForEach(rows) { row in
                             TableRow(
-                                row: row, columns: columns, action: nil, isSelected: false, isBanded: index.isMultiple(of: 2), inset: inset,
+                                row: row, columns: columns, action: nil, isSelected: false, inset: inset,
                                 height: SettingsTokens.Metric.pageTableRow)
                         }
                     }

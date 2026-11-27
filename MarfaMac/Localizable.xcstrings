@@ -1541,9 +1541,6 @@
     "%lld not started" : {
       "extractionState" : "manual"
     },
-    "%lld of %@" : {
-
-    },
     "%lld of %lld" : {
       "extractionState" : "manual"
     },
@@ -2554,6 +2551,9 @@
     "Allow" : {
 
     },
+    "Allow More" : {
+
+    },
     "Allow More…" : {
 
     },
@@ -2742,6 +2742,9 @@
 
     },
     "Apps" : {
+
+    },
+    "Apps and Keys" : {
 
     },
     "Apps and keys using this rule will be able to add items of these types from any source." : {
@@ -3881,6 +3884,9 @@
     "Connected" : {
       "extractionState" : "manual"
     },
+    "Connected Apps" : {
+
+    },
     "Connecting…" : {
       "extractionState" : "manual"
     },
@@ -4527,6 +4533,9 @@
     "Divider" : {
 
     },
+    "Docs" : {
+
+    },
     "Done" : {
 
     },
@@ -4708,11 +4717,11 @@
     "Empty Recently Deleted…" : {
 
     },
+    "Empty Trash" : {
+
+    },
     "Emptying “%@” goes back to the server’s own default, which the app can’t read. That may remove items sooner than the server’s current setting, %@. What it removes can’t be recovered." : {
       "extractionState" : "manual"
-    },
-    "Empty…" : {
-
     },
     "End Day" : {
 
@@ -5196,6 +5205,9 @@
     },
     "Four Pins at Most" : {
       "extractionState" : "manual"
+    },
+    "Free" : {
+
     },
     "From" : {
       "extractionState" : "manual"
@@ -6247,9 +6259,6 @@
 
     },
     "Keyboard Shortcuts" : {
-
-    },
-    "Keys" : {
 
     },
     "Keys It Made" : {
@@ -7436,6 +7445,9 @@
     "Not Yet" : {
 
     },
+    "Not allowed" : {
+
+    },
     "Not answering since %@. The app keeps trying." : {
 
     },
@@ -7474,9 +7486,6 @@
     },
     "Nothing Hidden" : {
       "extractionState" : "manual"
-    },
-    "Nothing Is in Recently Deleted" : {
-
     },
     "Nothing Matches" : {
 
@@ -7791,6 +7800,9 @@
       }
     },
     "Open Beside the List" : {
+
+    },
+    "Open Connection" : {
 
     },
     "Open Connection…" : {
@@ -8246,6 +8258,9 @@
 
     },
     "Problems" : {
+
+    },
+    "Problems: %lld" : {
 
     },
     "Profile" : {
@@ -9022,6 +9037,9 @@
     "Select All" : {
 
     },
+    "Select Items" : {
+
+    },
     "Selected" : {
       "extractionState" : "manual"
     },
@@ -9087,6 +9105,9 @@
 
     },
     "Server" : {
+
+    },
+    "Server Settings" : {
 
     },
     "Session" : {
@@ -9671,6 +9692,9 @@
     "Standard Width" : {
 
     },
+    "Start" : {
+
+    },
     "Start Again" : {
 
     },
@@ -9759,6 +9783,9 @@
 
     },
     "Stopped syncing a folder" : {
+
+    },
+    "Storage Usage" : {
 
     },
     "Strict" : {
@@ -10186,6 +10213,9 @@
 
     },
     "The app isn’t allowed to add link types. Choose Allow More… to ask for it." : {
+
+    },
+    "The app isn’t allowed to change link types." : {
 
     },
     "The app isn’t allowed to change types, their icons, words or fields." : {
@@ -11100,6 +11130,9 @@
     "This Link Type Is Gone" : {
 
     },
+    "This Mac" : {
+
+    },
     "This Mac can’t play this kind of file. Open it in another app." : {
 
     },
@@ -11576,6 +11609,12 @@
 
     },
     "Translucent" : {
+
+    },
+    "Trash" : {
+
+    },
+    "Trash Is Empty" : {
 
     },
     "Tried %@" : {

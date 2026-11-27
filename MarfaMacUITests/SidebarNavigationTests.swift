@@ -35,7 +35,7 @@ nonisolated final class SidebarNavigationTests: XCTestCase {
         XCTAssertTrue(element("SidebarSearch").exists, "Search is a row of the top block")
         XCTAssertFalse(sidebarText("Browse").exists, "New and Search have no heading")
         XCTAssertFalse(element("SidebarOpenSettings").exists, "Settings is the foot's cog")
-        XCTAssertFalse(element("SidebarRecentlyDeleted").exists, "Recently Deleted is a Settings page")
+        XCTAssertFalse(element("SidebarRecentlyDeleted").exists, "Trash is a Settings page")
         for title in ["Sources", "Collections"] {
             let row = sidebar.outlineRows.containing(NSPredicate(format: "label == %@ OR value == %@", title, title)).element(boundBy: 0)
             XCTAssertFalse(row.disclosureTriangles.firstMatch.exists, "Indexes do not expand in the sidebar")
@@ -98,7 +98,7 @@ nonisolated final class SidebarNavigationTests: XCTestCase {
         instanceName.click()
         XCTAssertTrue(settingsPages.waitForExistence(timeout: 3))
         XCTAssertFalse(window.menuItems["Settings"].firstMatch.exists, "the cog opens Settings directly")
-        XCTAssertTrue(element("SettingsPage-recentlyDeleted").exists)
+        XCTAssertTrue(element("SettingsPage-trash").exists)
     }
 
     @MainActor func testTheCogOpensSettingsInAWindowOfItsOwnAndTheMainWindowStays() {

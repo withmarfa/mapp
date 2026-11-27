@@ -12,19 +12,20 @@ These pages show and change what the server holds for its owner. Every call goes
 
 ## Pages
 
-A page opens with the permission here (`MarfaSettingsPage.permission`). A part that needs another permission says so in its place.
+A page opens with the permission here (`MarfaSettingsPage.permission`). A part that needs another permission says so in its place. Account opens the server settings pages, and Apps and Keys opens Apps.
 
 | Page | Opens with | Its job |
 | --- | --- | --- |
 | Overview | `instance.read` | How the Marfa stands, what needs attention, its name and release |
 | Account | none | The owner's name and picture, password, passkeys, browsers signed in |
 | Apps | `grants.manage` | Connected apps: access, owner permissions, keys they made, data they keep |
-| Keys | `keys.manage` | The owner's keys and apps' keys. Making one needs `keys.mint` |
+| Apps and Keys | `keys.manage` | The owner's keys and apps' keys. Making one needs `keys.mint` |
 | Addresses | `config.manage` | Sign-in and other addresses, websites allowed, private addresses |
 | Plugins | `schema.write` | Plugins installed, newer and available. One with a connector needs `connectors.manage` |
-| Types | `schema.write` | Types, fields, status words, rules; Links Between Items opens from it |
+| Types | `schema.write` | Types, fields, status words, and rules |
+| Links | `schema.write` | Link types. Opens from Types |
 | Sources | `keys.manage` | Names and marks of sources. Both source rules need `config.manage` |
-| Recently Deleted | `items.purge` | The server's bin. How long items wait needs `config.manage` |
+| Trash | `items.purge` | The server's bin. How long items wait needs `config.manage` |
 | History | `config.manage` | How long and how many versions, and how long logs, are kept |
 | File Storage | `config.manage` | Where files are kept, copies, reading text, removing unused files |
 | Connectors | `connectors.manage` | Each connector's health, machine, sign-in, settings and mapping |
@@ -40,7 +41,7 @@ A page opens with the permission here (`MarfaSettingsPage.permission`). A part t
 
 ## Permissions
 
-- **A page never shows content behind a missing permission.** It shows Needs a Permission in its own words, with Allow More…, because a row that cannot load looks like a fault. `MarfaPageGate` decides.
+- **A page never shows content behind a missing permission.** It shows Needs a Permission in its own words, with Allow More, because a row that cannot load looks like a fault. `MarfaPageGate` decides.
 - **A sign-in asks for every permission an app can hold**, and the owner grants what they choose. A page rereads the grants after approval and still says what is missing.
 - **A `forbidden` answer rereads the grants** and offers Allow More… in the problem row (`OwnerProblemRow`).
 - **Owner permissions are counted, never all or nothing**, and can only be turned off on a key's or an app's page (`OwnerPermissionsRow`).

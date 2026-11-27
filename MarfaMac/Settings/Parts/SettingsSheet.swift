@@ -59,6 +59,7 @@ struct SettingsSheet<Content: View, Leading: View, Buttons: View>: View {
                     .padding(.horizontal, padding)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .environment(\.settingsSectionInset, SettingsTokens.Metric.sheetSectionInset)
+                    .environment(\.settingsUsesSheetControls, true)
                     .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
             }
             .scrollBounceBehavior(.basedOnSize)

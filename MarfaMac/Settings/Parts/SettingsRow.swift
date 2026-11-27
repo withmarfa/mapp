@@ -46,14 +46,31 @@ struct SettingsTile: View {
     let symbol: String
     let tone: SettingsTokens.Tone
     var size: CGFloat = SettingsTokens.Metric.tile
+    var rich = false
+
+    private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: size * SettingsTokens.Metric.tileRounding) }
 
     var body: some View {
-        RoundedRectangle(cornerRadius: size * SettingsTokens.Metric.tileRounding, style: .continuous)
-            .fill(tone.color)
+        shape.fill(rich ? tone.sidebarColor : tone.color)
+            .overlay {
+                if rich {
+                    shape.fill(.linearGradient(
+                        colors: [.white.opacity(SettingsTokens.Metric.richTileHighlightOpacity), .black.opacity(SettingsTokens.Metric.richTileShadeOpacity)],
+                        startPoint: .top, endPoint: .bottom))
+                    shape.strokeBorder(SettingsTokens.tileEdge, lineWidth: SettingsTokens.Metric.tileEdgeWidth)
+                    shape.strokeBorder(.linearGradient(colors: [SettingsTokens.tileHighlight, .clear], startPoint: .top, endPoint: .center),
+                                       lineWidth: SettingsTokens.Metric.tileEdgeWidth)
+                }
+            }
             .frame(width: size, height: size)
             .overlay {
-                SettingsTileGlyph(symbol: symbol, tileSize: size).foregroundStyle(.white)
+                SettingsTileGlyph(symbol: symbol, tileSize: size)
+                    .foregroundStyle(SettingsTokens.tileForeground)
+                    .shadow(color: rich ? SettingsTokens.tileGlyphShadow : .clear,
+                            radius: SettingsTokens.Metric.tileGlyphShadowRadius, y: SettingsTokens.Metric.tileShadowDrop)
             }
+            .shadow(color: rich ? SettingsTokens.tileShadow : .clear,
+                    radius: SettingsTokens.Metric.tileShadowRadius, y: SettingsTokens.Metric.tileShadowDrop)
             .accessibilityHidden(true)
     }
 }
@@ -82,6 +99,8 @@ struct SettingsRow<Trailing: View>: View {
 
     private let title: Text
     private let line: Text?
+    private let titleGlyph: SettingsTextGlyph?
+    private let lineGlyph: SettingsTextGlyph?
     private let error: String?
     private let lead: SettingsLead
     private let size: Size
@@ -89,13 +108,17 @@ struct SettingsRow<Trailing: View>: View {
     private let lines: Int?
     private let trailing: Trailing
     @Environment(\.settingsTextScale) private var scale
+    @Environment(\.settingsUsesSheetControls) private var usesSheetControls
 
     init(
-        title: Text, line: Text? = nil, error: String? = nil, lead: SettingsLead = .none, size: Size = .standard,
+        title: Text, line: Text? = nil, titleGlyph: SettingsTextGlyph? = nil, lineGlyph: SettingsTextGlyph? = nil,
+        error: String? = nil, lead: SettingsLead = .none, size: Size = .standard,
         look: Look = .normal, lines: Int? = 2, @ViewBuilder trailing: () -> Trailing
     ) {
         self.title = title
         self.line = line
+        self.titleGlyph = titleGlyph
+        self.lineGlyph = lineGlyph
         self.error = error
         self.lead = lead
         self.size = size
@@ -121,9 +144,10 @@ struct SettingsRow<Trailing: View>: View {
             }
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
-                    title
+                    title.withSettingsGlyph(titleGlyph)
                         .settingsFont(.title)
-                        .lineLimit(1)
+                        .lineLimit(scale < SettingsTokens.Metric.controlScaleForLarge ? 1 : nil)
+                        .fixedSize(horizontal: false, vertical: true)
                         .truncationMode(.tail)
                         .foregroundStyle(look == .off ? SettingsTokens.tertiaryText : SettingsTokens.primaryText)
                     if let error {
@@ -133,7 +157,7 @@ struct SettingsRow<Trailing: View>: View {
                             .lineLimit(lines)
                             .fixedSize(horizontal: false, vertical: true)
                     } else if let line {
-                        line
+                        line.withSettingsGlyph(lineGlyph)
                             .settingsFont(.line)
                             .foregroundStyle(look == .off ? SettingsTokens.tertiaryText : SettingsTokens.secondaryText)
                             .lineLimit(lines)
@@ -143,6 +167,7 @@ struct SettingsRow<Trailing: View>: View {
                 .padding(.vertical, size == .standard ? SettingsTokens.Metric.rowTextPadding : 0)
                 Spacer(minLength: 0)
                 trailing
+                    .environment(\.settingsCompactControls, !usesSheetControls)
                     .disabled(look == .off)
             }
         }
@@ -178,8 +203,8 @@ struct SettingsRow<Trailing: View>: View {
 }
 
 extension SettingsRow where Trailing == EmptyView {
-    init(title: Text, line: Text? = nil, error: String? = nil, lead: SettingsLead = .none, size: Size = .standard, look: Look = .normal, lines: Int? = 2) {
-        self.init(title: title, line: line, error: error, lead: lead, size: size, look: look, lines: lines, trailing: { EmptyView() })
+    init(title: Text, line: Text? = nil, titleGlyph: SettingsTextGlyph? = nil, lineGlyph: SettingsTextGlyph? = nil, error: String? = nil, lead: SettingsLead = .none, size: Size = .standard, look: Look = .normal, lines: Int? = 2) {
+        self.init(title: title, line: line, titleGlyph: titleGlyph, lineGlyph: lineGlyph, error: error, lead: lead, size: size, look: look, lines: lines, trailing: { EmptyView() })
     }
 }
 

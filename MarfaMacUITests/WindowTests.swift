@@ -117,12 +117,12 @@ nonisolated final class WindowTests: XCTestCase {
         XCTAssertEqual(count(of: "Items"), before)
     }
 
-    @MainActor func testRecentlyDeletedIsASettingsPageAndNotAMenuItem() {
+    @MainActor func testTrashIsASettingsPageAndNotAMenuItem() {
         app.menuBars.menuBarItems["View"].click()
-        XCTAssertFalse(app.menuBars.menuItems["Recently Deleted"].firstMatch.exists, "Recently Deleted is a Settings page only")
+        XCTAssertFalse(app.menuBars.menuItems["Trash"].firstMatch.exists, "Trash is a Settings page only")
         app.typeKey(.escape, modifierFlags: [])
         app.typeKey(",", modifierFlags: .command)
-        let page = app.descendants(matching: .any).matching(identifier: "SettingsPage-recentlyDeleted").firstMatch
+        let page = app.descendants(matching: .any).matching(identifier: "SettingsPage-trash").firstMatch
         XCTAssertTrue(page.waitForExistence(timeout: 3))
         page.click()
         XCTAssertTrue(app.staticTexts["Old packing list"].waitForExistence(timeout: 3))

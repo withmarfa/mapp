@@ -119,8 +119,7 @@ import Testing
         #expect(MarfaSettingsPage.history.permission == .configManage)
         #expect(MarfaSettingsPage.fileStorage.permission == .configManage)
         #expect(MarfaSettingsPage.sources.permission == .keysManage)
-        #expect(MarfaSettingsPage.recentlyDeleted.permission == .itemsPurge)
-        #expect(Set(MarfaSettingsPage.groups.flatMap { $0 }) == Set(MarfaSettingsPage.allCases))
+        #expect(MarfaSettingsPage.trash.permission == .itemsPurge)
     }
 }
 

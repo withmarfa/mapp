@@ -5,7 +5,6 @@ import SwiftUI
 /// Restore on every row. Show All opens every backup as a page of its own, where one can be chosen and restored.
 struct BackupsPage: View {
     static let allBackups = SettingsSubpage(id: "all-backups", title: String(localized: "All Backups"))
-    private static let pageSize = 4
 
     let host: any MarfaSettingsHost
     let showsAll: Bool
@@ -190,7 +189,7 @@ struct BackupsPage: View {
     private var columns: [SettingsTableColumn<BackupRecord>] {
         [
             SettingsTableColumn("Taken") { Text(verbatim: UpkeepWording.moment($0.taken)) },
-            SettingsTableColumn("Size", width: SettingsTokens.Metric.Column.day) { Text(verbatim: UpkeepWording.size($0.bytes)).foregroundStyle(SettingsTokens.secondaryText) },
+            SettingsTableColumn("Size", width: SettingsTokens.Metric.Column.day, numeric: true) { Text(verbatim: UpkeepWording.size($0.bytes)).foregroundStyle(SettingsTokens.secondaryText) },
         ]
     }
 
@@ -202,9 +201,9 @@ struct BackupsPage: View {
                     line: Text(hasDestination ? "Back Up Now takes the first." : "The first is taken once there is somewhere to keep it."))
             } else {
                 SettingsSectionTable(
-                    rows: Array(model.backups.prefix(Self.pageSize)), columns: columns,
-                    action: SettingsRowAction(title: "Restore…") { model.beginRestore($0) }, total: model.backups.count,
-                    showAll: model.backups.count > Self.pageSize ? { navigation?.push(Self.allBackups) } : nil)
+                    rows: model.backups, columns: columns,
+                    action: SettingsRowAction(title: "Restore…") { model.beginRestore($0) },
+                    showAll: { navigation?.push(Self.allBackups) })
             }
         }
     }

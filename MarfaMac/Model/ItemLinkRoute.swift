@@ -22,7 +22,7 @@ nonisolated enum ItemLinkRoute: Equatable, Sendable {
             guard instanceID.lowercased() == link.instanceID else { return .refuse(.otherMarfa) }
             switch held {
             case nil: return .refuse(.notFound)
-            // Showing it would open Settings at Recently Deleted, which reads the server; the person chooses that.
+            // Showing it would open Settings at Trash, which reads the server; the person chooses that.
             case .trashed: return .refuse(.inRecentlyDeleted)
             case .active, .archived: return .open(link.item)
             }
@@ -64,12 +64,12 @@ nonisolated enum ItemLinkRefusal: Equatable, Sendable, CaseIterable {
         }
     }
 
-    /// The Settings page where the person can go on: Connection to connect, Recently Deleted to find the item. The
+    /// The Settings page where the person can go on: Connection to connect, Trash to find the item. The
     /// person opens it; the link never does.
     var action: Notices.Action? {
         switch self {
         case .notConnected, .unavailable: .openSettings(.connection)
-        case .inRecentlyDeleted: .openSettings(.recentlyDeleted)
+        case .inRecentlyDeleted: .openSettings(.trash)
         case .malformed, .otherMarfa, .stillOpening, .notFound, .instanceUnknown: nil
         }
     }

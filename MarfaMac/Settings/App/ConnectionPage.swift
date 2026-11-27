@@ -8,6 +8,7 @@ struct ConnectionPage: View {
     let settingsHost: AppSettingsHost
     @Environment(Libraries.self) private var libraries
     @Environment(\.library) private var library
+    @Environment(\.settingsNavigation) private var navigation
     @State private var isChoosingOther = false
     /// The owner's name and the server it was read from, kept while that server does not answer.
     @State private var accountName: String?
@@ -33,6 +34,7 @@ struct ConnectionPage: View {
                 otherServer
                 disconnect(from: connection)
             }
+            thisMac
         }
         .accessibilityIdentifier("ConnectionPage")
         .onChange(of: model.isConfirmingDisconnect) { _, isAsking in
@@ -63,6 +65,14 @@ struct ConnectionPage: View {
             }
             guard let connection = host.configuredConnection, host.state == .online else { return }
             accountName = host.readsProfile ? await MarfaServerCalls(connection: connection, signIns: host.signIns).ownerName() : nil
+        }
+    }
+
+    // Temporary until Account and Types are rebuilt in session 266c.
+    private var thisMac: some View {
+        SettingsSection("This Mac") {
+            let page = SettingsPage.onThisMac
+            SettingsLinkRow(verbatim: page.title, lead: .tile(page.symbol, page.tone)) { navigation?.show(page) }
         }
     }
 

@@ -47,7 +47,11 @@ struct KeysPage: View {
 
     @ViewBuilder private var content: some View {
         if let failure = model.failure {
-            OwnerFailureState(page: .keys, failure: failure, host: host) { Task { await model.load() } }
+            SettingsStandingState {
+                AppsSettingsSection(host: host)
+            } state: {
+                OwnerFailureState(page: .keys, failure: failure, host: host) { Task { await model.load() } }
+            }
         } else if !model.hasLoaded {
             OwnerLoading()
         } else if let id = openKeyID {
@@ -78,6 +82,7 @@ struct KeysPage: View {
                     ForEach(model.appKeys) { row($0) }
                 }
             }
+            AppsSettingsSection(host: host)
         }
     }
 
@@ -420,6 +425,17 @@ private struct ExtendKeySheet: View {
         } buttons: {
             SettingsButton("Cancel") { model.closeSheet() }
             SettingsButton("Extend", role: .confirm) { Task { await model.extend() } }.disabled(model.isExtending)
+        }
+    }
+}
+
+// Temporary until Account and Types are rebuilt in session 266c.
+struct AppsSettingsSection: View {
+    let host: any MarfaSettingsHost
+
+    var body: some View {
+        SettingsSection("Connected Apps") {
+            MarfaSettingsPageRow(page: .apps, host: host)
         }
     }
 }

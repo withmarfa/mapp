@@ -2,7 +2,7 @@ import AppKit
 import Marfa
 import SwiftUI
 
-/// The Settings window's content: a sidebar of pages, a toolbar with Back, Forward and the page's name, and the page in
+/// The Settings window's content: a sidebar with history, the page's title, and the page in
 /// its centered column. It is a `Window` scene of its own, not the system's `Settings` scene: that scene is sized to its
 /// content and meant for a few tabs, with no toolbar of ours and no remembered, resizable frame, and a `Window` is one
 /// instance that `openWindow` brings forward.
@@ -21,35 +21,49 @@ struct SettingsWindowView: View {
     }
 
     private var navigation: SettingsNavigation { launcher.navigation }
+    private var badgeAddress: String? {
+        host.connection == .connected && host.grants.contains(.instanceRead) ? host.serverAddress : nil
+    }
 
     var body: some View {
         NavigationSplitView {
             SettingsSidebar(
                 selection: Binding { navigation.page } set: { navigation.show($0) }, search: $search,
                 badges: { page in
-                    if page == .overview, host.overview.attentionCount > 0 { return host.overview.attentionCount }
-                    if page == .updates, host.overview.releaseFailure == nil, host.overview.updateReady != nil { return 1 }
-                    return nil
+                    guard page == .account, badgeAddress != nil else { return nil }
+                    let updateCount = host.overview.releaseFailure == nil && host.overview.updateReady != nil ? 1 : 0
+                    let count = host.overview.attentionCount + updateCount
+                    return count > 0 ? count : nil
                 }
             )
             .frame(minWidth: SettingsTokens.Metric.sidebarWidth, maxWidth: SettingsTokens.Metric.sidebarWidth)
             .navigationSplitViewColumnWidth(min: SettingsTokens.Metric.sidebarWidth, ideal: SettingsTokens.Metric.sidebarWidth, max: SettingsTokens.Metric.sidebarWidth)
             .toolbar(removing: .sidebarToggle)
-        } detail: {
-            SettingsDetail(navigation: navigation, host: host, libraries: libraries)
-                .navigationTitle(navigation.title)
-                .toolbar {
-                    ToolbarItemGroup(placement: .navigation) {
-                        Button("Back", systemImage: "chevron.left") { navigation.back() }
+            .toolbar {
+                ToolbarSpacer(.flexible)
+                ToolbarItem {
+                    HStack(spacing: 0) {
+                        Button("Back", systemImage: "chevron.backward") { navigation.back() }
                             .disabled(!navigation.canGoBack)
                             .help("Back")
                             .accessibilityIdentifier("SettingsBack")
-                        Button("Forward", systemImage: "chevron.right") { navigation.forward() }
+                        Button("Forward", systemImage: "chevron.forward") { navigation.forward() }
                             .disabled(!navigation.canGoForward)
                             .help("Forward")
                             .accessibilityIdentifier("SettingsForward")
                     }
+                    .labelStyle(.iconOnly)
+                    .frame(minWidth: SettingsTokens.Metric.sidebarHistoryButtonWidth * 2,
+                           minHeight: SettingsTokens.Metric.sidebarHistoryHeight)
+
+                    .padding(.horizontal, SettingsTokens.Metric.sidebarHistoryPadding)
+                    .glassEffect(.regular.interactive(), in: .capsule)
                 }
+                .sharedBackgroundVisibility(.hidden)
+            }
+        } detail: {
+            SettingsDetail(navigation: navigation, host: host, libraries: libraries)
+                .navigationTitle(navigation.title)
         }
         .frame(minWidth: SettingsTokens.Metric.windowMinWidth, minHeight: SettingsTokens.Metric.windowMinHeight)
         .interfaceTextStyle()
@@ -76,8 +90,8 @@ struct SettingsWindowView: View {
         }
         .background(WindowCloseWatch(frameName: "MarfaMacSettings") { closed() })
         .settingsClickOutsideEndsEditing()
-        .task(id: host.serverAddress) {
-            if host.connection == .connected, host.grants.contains(.instanceRead) { await host.overview.load() }
+        .task(id: badgeAddress) {
+            if badgeAddress != nil { await host.overview.load() }
         }
         .accessibilityIdentifier("SettingsWindow")
     }
@@ -120,7 +134,7 @@ struct SettingsDetail: View {
     }
 }
 
-/// The library dialogs, for a window that may have no library: a purge asked for in Recently Deleted is confirmed here.
+/// The library dialogs, for a window that may have no library: a purge asked for in Trash is confirmed here.
 private struct OptionalLibraryDialogs: ViewModifier {
     @Environment(\.library) private var library
 

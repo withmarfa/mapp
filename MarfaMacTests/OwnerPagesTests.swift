@@ -2444,16 +2444,4 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         #expect(OwnerWording.used(now.addingTimeInterval(-86_400 * 3), now: now, calendar: calendar) == "Used 3 days ago")
         #expect(OwnerWording.used(nil, now: now, calendar: calendar) == "Never used")
     }
-
-    @Test func theNewPagesAreInTheSidebarInTheBoardsOrder() {
-        #expect(
-            MarfaSettingsPage.groups == [
-                [.overview], [.account, .apps, .keys, .addresses], [.plugins, .types, .sources], [.recentlyDeleted, .history, .fileStorage], [.connectors, .webhooks, .folders],
-                [.backups, .updates, .housekeeping], [.activity, .monitoring], [.limits, .startUp],
-            ])
-        for page in [MarfaSettingsPage.account, .apps, .keys, .addresses] {
-            #expect(SettingsPage.marfa(page).matches(page.title))
-        }
-        #expect(SettingsPage.marfa(.account).matches("Passkeys"))
-    }
 }

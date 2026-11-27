@@ -42,7 +42,7 @@ paths:
 - **What was put under them is pinned; what a hidden one held stays hidden, row by row.** `views` in `hidden` hides every saved view; one shown again goes in `shown`. The Library and the Feed stay fixed.
 - **A row whose section is gone shows under Pinned, a page under the Library;** its home is kept.
 - **The later arrangement wins whole,** also when two Macs change what is hidden before syncing.
-- **Recently Deleted is a page of Settings**, never a row.
+- **Open Trash in Settings** to see recently deleted items.
 
 ## Foot
 

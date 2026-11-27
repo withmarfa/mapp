@@ -232,7 +232,7 @@ extension CommandPalette {
         entries.append(Entry(id: "command:" + settingsTitle, title: settingsTitle, icon: .symbol("gearshape"), shortcut: keys(.settings), takesFocus: true, group: .settings) {
             browser.showSettings()
         })
-        for page in SettingsPage.all {
+        for page in SettingsPage.allCases {
             let title = String(localized: "Settings: \(page.title)")
             // Only typing finds a page, so ⌘K with nothing typed lists Settings… once.
             entries.append(Entry(id: "command:" + title, title: title, icon: .symbol(page.symbol), takesFocus: true, group: nil) {

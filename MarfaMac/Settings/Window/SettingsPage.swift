@@ -1,8 +1,7 @@
 import Foundation
 
-/// A page of Settings: one of the app's own, or one of the Marfa's. The window lists a page only once it exists, so a later
-/// piece adds its pages here and to the sidebar's groups, and nothing else.
-nonisolated enum SettingsPage: Hashable, Sendable {
+/// A routable page of Settings, including pages opened from a sidebar entry.
+nonisolated enum SettingsPage: CaseIterable, Hashable, Sendable {
     case general, appearance, keyboard, lists, editor, layouts, search, onThisMac, connection
     case marfa(MarfaSettingsPage)
 
@@ -14,7 +13,8 @@ nonisolated enum SettingsPage: Hashable, Sendable {
     static let plugins = SettingsPage.marfa(.plugins)
     static let types = SettingsPage.marfa(.types)
     static let sources = SettingsPage.marfa(.sources)
-    static let recentlyDeleted = SettingsPage.marfa(.recentlyDeleted)
+    static let trash = SettingsPage.marfa(.trash)
+    static let links = SettingsPage.marfa(.links)
     static let history = SettingsPage.marfa(.history)
     static let fileStorage = SettingsPage.marfa(.fileStorage)
     static let connectors = SettingsPage.marfa(.connectors)
@@ -29,11 +29,24 @@ nonisolated enum SettingsPage: Hashable, Sendable {
     static let startUp = SettingsPage.marfa(.startUp)
 
     /// The app's pages as the sidebar lists them, in groups split by space.
-    static let appGroups: [[SettingsPage]] = [[.general, .appearance, .keyboard], [.editor, .lists, .layouts, .search], [.onThisMac, .connection]]
+    static let appGroups: [[SettingsPage]] = [[.general, .connection, .appearance, .keyboard], [.editor, .lists, .layouts, .search]]
     /// The Marfa's pages, in groups.
     static let marfaGroups: [[SettingsPage]] = MarfaSettingsPage.groups.map { $0.map(SettingsPage.marfa) }
 
-    static var all: [SettingsPage] { (appGroups + marfaGroups).flatMap { $0 } }
+    static let allCases: [SettingsPage] = appGroups.flatMap { $0 } + [.onThisMac] + MarfaSettingsPage.allCases.map(Self.marfa)
+
+    var sidebarEntry: SettingsPage {
+        switch self {
+        case .onThisMac: .connection
+        case .marfa(let page): .marfa(page.sidebarEntry)
+        default: self
+        }
+    }
+
+    /// Search hits from pages reached through another page appear under their sidebar entry.
+    static func sidebarMatches(_ query: String) -> Set<SettingsPage> {
+        Set(allCases.lazy.filter { $0.matches(query) }.map(\.sidebarEntry))
+    }
 
     /// A name for tests and accessibility, which never changes with the language.
     var key: String {
@@ -73,7 +86,7 @@ nonisolated enum SettingsPage: Hashable, Sendable {
         case .keyboard: "keyboard"
         case .lists: "list.bullet"
         case .editor: "square.and.pencil"
-        case .layouts: "rectangle.grid.1x2.fill"
+        case .layouts: "rectangle.split.1x2.fill"
         case .search: "magnifyingglass"
         case .onThisMac: "laptopcomputer"
         case .connection: "antenna.radiowaves.left.and.right"

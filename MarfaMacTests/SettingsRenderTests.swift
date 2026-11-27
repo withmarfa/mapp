@@ -126,10 +126,8 @@ struct RenderedWindow<Detail: View>: View {
     let selection: SettingsPage
     var search = ""
     var sheet: AnyView?
-    /// What the Overview's sidebar badge counts.
+    /// The number of problems on Account.
     var badge: Int?
-    /// Whether Updates carries its badge, as it does while a release is ready.
-    var updatesBadge = false
     let detail: Detail
 
     var body: some View {
@@ -141,7 +139,7 @@ struct RenderedWindow<Detail: View>: View {
         HStack(spacing: 0) {
             SettingsSidebar(
                 selection: .constant(selection), search: .constant(search),
-                badges: { page in page == .updates && updatesBadge ? 1 : (page == .overview ? badge : nil) })
+                badges: { page in page == .account ? badge : nil })
                 .frame(width: SettingsTokens.Metric.sidebarWidth)
                 .background(Color(white: 0.93))
             VStack(spacing: 0) {
@@ -492,7 +490,7 @@ struct RenderedWindow<Detail: View>: View {
         try await SettingsRender.png(windowed(.fileStorage, host: host), size: Self.size, named: "File Storage")
     }
 
-    @Test func recentlyDeleted() async throws {
+    @Test func trash() async throws {
         let titles = [
             "Order oak for the Harbour Joinery worktops", "Lisbon zine: first cover ideas", "Kiln hire in East Sussex",
             "“The joint is the detail that tells you who made it”", "Lewes Trust site walk", "Allotment shed: felt roof quote",
@@ -507,16 +505,16 @@ struct RenderedWindow<Detail: View>: View {
             $0.deletedCount = 1_204
         }
         try await SettingsRender.png(
-            RenderedWindow(selection: .recentlyDeleted, detail: MarfaSettingsPageView(page: .recentlyDeleted, host: host)),
+            RenderedWindow(selection: .trash, detail: MarfaSettingsPageView(page: .trash, host: host)),
             size: Self.size, named: "Recently Deleted")
         try await SettingsRender.png(
-            windowed(.recentlyDeleted, host: host, subpage: RecentlyDeletedPage.allDeleted), size: Self.size, named: "All deleted items")
+            windowed(.trash, host: host, subpage: TrashPage.allDeleted), size: Self.size, named: "All deleted items")
     }
 
     @Test func needsAPermission() async throws {
         let host = await stub { $0.grants = [] }
         try await SettingsRender.png(
-            RenderedWindow(selection: .recentlyDeleted, detail: MarfaSettingsPageView(page: .recentlyDeleted, host: host)),
+            RenderedWindow(selection: .trash, detail: MarfaSettingsPageView(page: .trash, host: host)),
             size: Self.size, named: "A page the app may not open")
     }
 

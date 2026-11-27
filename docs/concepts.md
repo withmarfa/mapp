@@ -122,7 +122,7 @@ The server one person owns, and the source of every item the app shows.
 - **Any view can show archived items**, or only those. Library › Archive is the one page of everything archived.
 - **An archived page says so and can still be edited.**
 - **Archiving an item with sub-items asks**, and counts everything beneath it, because Marfa leaves the sub-items where they are.
-- **Recently Deleted is a page of Settings**, not a place.
+- **Open Trash in Settings** to see recently deleted items.
 
 ## Source
 

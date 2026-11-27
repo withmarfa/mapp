@@ -50,7 +50,10 @@ struct AccountPage: View {
 
     @ViewBuilder private var content: some View {
         if let failure = model.failure {
-            OwnerFailureState(page: .account, failure: failure, host: host) { Task { await model.load() } }
+            VStack(spacing: 0) {
+                OwnerFailureState(page: .account, failure: failure, host: host) { Task { await model.load() } }
+                SettingsPageColumn { serverSettings }
+            }
         } else if !model.hasLoaded {
             OwnerLoading()
         } else {
@@ -77,6 +80,17 @@ struct AccountPage: View {
                         .disabled(host.isAllowingMore)
                     }
                 }
+                serverSettings
+            }
+        }
+    }
+
+    // Temporary until Account and Types are rebuilt in session 266c.
+    private var serverSettings: some View {
+        let pages: [MarfaSettingsPage] = [.overview, .updates, .addresses, .fileStorage, .history, .housekeeping, .limits, .monitoring, .startUp]
+        return SettingsSection("Server Settings") {
+            ForEach(pages, id: \.self) { page in
+                MarfaSettingsPageRow(page: page, host: host)
             }
         }
     }

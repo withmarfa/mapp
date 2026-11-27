@@ -40,7 +40,7 @@ struct ItemLinkRouteTests {
             ItemLinkRoute.decide(link(), mode: .marfa, isLoaded: true, instanceID: Self.instance, held: .trashed)
                 == .refuse(.inRecentlyDeleted))
         #expect(ItemLinkRefusal.inRecentlyDeleted.message == "This item is in Recently Deleted.")
-        #expect(ItemLinkRefusal.inRecentlyDeleted.action == .openSettings(.recentlyDeleted))
+        #expect(ItemLinkRefusal.inRecentlyDeleted.action == .openSettings(.trash))
     }
 
     @Test func aCopyThatDoesNotKnowItsMarfaSaysSoAndNotNotFound() {
@@ -426,7 +426,7 @@ struct ItemLinkRouteTests {
         opener.receive([link().url])
         #expect(await eventually { notices.told == 1 })
         #expect(notices.waiting.map(\.message) == [ItemLinkRefusal.inRecentlyDeleted.message])
-        #expect(notices.waiting.first?.action == .openSettings(.recentlyDeleted))
+        #expect(notices.waiting.first?.action == .openSettings(.trash))
         #expect(opener.request == nil)
         #expect(browser.selection.isEmpty && !browser.isModalPresented)
         #expect(writes(library) == before)

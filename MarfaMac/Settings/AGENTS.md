@@ -11,11 +11,12 @@
 
 ## Controls
 
-- **Use the system's control through its part:** `SettingsToggle`, `SettingsPopUp` (never a bare `Picker`, so a page's pop-ups line up), `SettingsField`, `SettingsNumberField`, `SettingsSearchField` and `SettingsButton`. Only `SettingsFilterPopUp` holds a bare `Picker`, because it fits its title.
+- **Use the system's control through its part:** `SettingsToggle`, `SettingsPopUp` (never a bare `Picker`, so a page's pop-ups line up), `SettingsField`, `SettingsNumberField`, `SettingsSearchField` and `SettingsButton`. Use `SettingsHeaderPopUp` for choices that fit their title.
 - **Text size goes through `settingsTextScale`.**
 - **A click outside a field ends editing once for the window** (`settingsClickOutsideEndsEditing`), never per field.
 - **A page hands over its sheet with `settingsSheet(presenting:dismiss:sheet:)`.** A question before what cannot be undone is the system's alert.
-- **Pages push sub-pages through the `settingsNavigation` environment value.** The window keeps its sidebar (`toolbar(removing: .sidebarToggle)`).
+- **Pages push sub-pages through `settingsNavigation`.** Every routable page maps to its sidebar entry for selection and search.
+- **Put an add button beside the section's title** through `SettingsSection`'s accessory. Use `SettingsTabs` for page views.
 
 ## Drafts
 

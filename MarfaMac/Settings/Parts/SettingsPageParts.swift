@@ -280,3 +280,30 @@ enum SettingsWording {
         return address.port.map { "\(host):\($0)" } ?? host
     }
 }
+
+/// A page heading with its address and actions at the trailing edge, without a card.
+struct SettingsPageHeader<Trailing: View>: View {
+    let name: String
+    let address: String
+    @ViewBuilder let trailing: Trailing
+
+    var body: some View {
+        HStack(spacing: SettingsTokens.Metric.tableColumnGap) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(verbatim: name)
+                    .settingsFont(.pageHeader)
+                    .frame(minHeight: SettingsTokens.Metric.pageHeaderNameHeight)
+                    .accessibilityAddTraits(.isHeader)
+                Text(verbatim: address).withSettingsGlyph(.link)
+                    .settingsFont(.title)
+                    .frame(minHeight: SettingsTokens.Metric.pageHeaderAddressHeight)
+                    .foregroundStyle(SettingsTokens.secondaryText)
+                    .textSelection(.enabled)
+            }
+            Spacer(minLength: 0)
+            trailing.fixedSize(horizontal: true, vertical: false)
+        }
+        .padding(.horizontal, SettingsTokens.Metric.inset)
+        .padding(.top, SettingsTokens.Metric.pageHeaderTop)
+    }
+}

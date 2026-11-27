@@ -11,7 +11,7 @@ extension ContainerValues {
 
 /// A named group of rows in one card: its name outside the card, a line under the name, the rows divided by rules that
 /// start at their text, and a footer under the card. Every section is named, except a thing's head card
-/// (`SettingsHead`). A table's filter and search sit at the name's trailing edge (`accessory`), and nothing else.
+/// (`SettingsHead`). Put an add button, choices or a filter at the name's trailing edge (`accessory`).
 struct SettingsSection<Content: View, Accessory: View>: View {
     private let name: Text?
     private let line: Text?
@@ -19,6 +19,7 @@ struct SettingsSection<Content: View, Accessory: View>: View {
     private let accessory: Accessory
     private let content: Content
     @Environment(\.settingsSectionInset) private var inset
+    @Environment(\.settingsUsesSheetControls) private var usesSheetControls
 
     init(
         name: Text?, line: Text? = nil, footer: Text? = nil,
@@ -31,20 +32,27 @@ struct SettingsSection<Content: View, Accessory: View>: View {
         self.content = content()
     }
 
+    init(
+        _ name: LocalizedStringKey, line: LocalizedStringKey? = nil, footer: LocalizedStringKey? = nil,
+        @ViewBuilder accessory: () -> Accessory, @ViewBuilder content: () -> Content
+    ) {
+        self.init(name: Text(name), line: line.map { Text($0) }, footer: footer.map { Text($0) }, accessory: accessory, content: content)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: SettingsTokens.Metric.sectionGap) {
             if name != nil || line != nil {
-                HStack(alignment: .bottom, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 1) {
+                VStack(alignment: .leading, spacing: SettingsTokens.Metric.rowTextPadding) {
+                    HStack(spacing: SettingsTokens.Metric.tableColumnGap) {
                         if let name {
                             name.settingsFont(.sectionName).accessibilityAddTraits(.isHeader)
                         }
-                        if let line {
-                            line.settingsFont(.sectionLine).foregroundStyle(SettingsTokens.secondaryText)
-                        }
+                        Spacer(minLength: 0)
+                        accessory.environment(\.settingsCompactControls, !usesSheetControls)
                     }
-                    Spacer(minLength: 0)
-                    accessory
+                    if let line {
+                        line.settingsFont(.sectionLine).foregroundStyle(SettingsTokens.secondaryText)
+                    }
                 }
                 .frame(minHeight: SettingsTokens.Metric.sectionHeader, alignment: .bottom)
                 .padding(.horizontal, inset)
