@@ -27,7 +27,6 @@ struct ConnectionPage: View {
                         .id(connection)
                     let hasOtherMarfas = host.hasOtherMarfas(besides: connection)
                     if hasOtherMarfas || isChoosingOther { otherServer(hasOtherMarfas: hasOtherMarfas) }
-                    disconnect
                 }
             } else {
                 disconnected
@@ -228,22 +227,6 @@ struct ConnectionPage: View {
                 }
                 codeSignInRow(canStart: model.canSwitch, step: .switchServer(usingCode: true), identifier: "MarfaSwitchCode")
                 if model.isWorking { signInProgress }
-            }
-        }
-    }
-
-    private var disconnect: some View {
-        SettingsSection("Disconnect") {
-            SettingsRow(
-                verbatim: String(localized: "Disconnect from \(LibraryDescription.name(libraries))"),
-                line: String(localized: "Removes this Mac’s copy and signs the app out.")
-            ) {
-                HStack(spacing: SettingsTokens.Metric.buttonGap) {
-                    if model.isWorking { ProgressView().controlSize(.small) }
-                    SettingsButton("Disconnect…", role: .destructive) { model.requestDisconnect() }
-                        .disabled(model.isWorking)
-                        .accessibilityIdentifier(host.state == .keyRefused ? "MarfaRefusedDisconnect" : "MarfaDisconnect")
-                }
             }
         }
     }

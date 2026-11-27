@@ -174,7 +174,7 @@ struct ConnectionStatusTests {
 
         // The count stays unread after the previous version sends everything, and the package never removes a copy it can’t count, so the way out is to remove the copy’s folder.
         let unknown = try #require(ConnectionStatus(.otherVersion(unsent: nil)).detail)
-        #expect(unknown.contains("Keep Copy and Disconnect"), "an uncountable copy is never removed for the person, so the way out is named")
+        #expect(unknown.contains("Keep Copy and Sign Out"), "an uncountable copy is never removed for the person, so the way out is named")
 
         let inUse = ConnectionStatus(.inUse)
         #expect(inUse.title == "Library unavailable")
