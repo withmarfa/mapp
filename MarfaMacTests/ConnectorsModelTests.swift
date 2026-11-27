@@ -518,8 +518,8 @@ import Testing
         #expect(model.health(of: read, now: Self.now) == .ran(Self.now.addingTimeInterval(-120)))
     }
 
-    @Test func theSidebarListsConnectorsBesideWebhooksAndFoldersAndItNeedsConnectorsManage() {
-        #expect(MarfaSettingsPage.groups.contains([.connectors, .webhooks, .folders]))
+    @Test func theSidebarListsConnectorsBesidePluginsAndFoldersAndItNeedsConnectorsManage() {
+        #expect(MarfaSettingsPage.groups.contains([.types, .plugins, .connectors, .folders, .backups, .trash]))
         #expect(MarfaSettingsPage.connectors.permission == .connectorsManage)
         #expect(MarfaSettingsPage.connectors.permissionLine.contains("connectors"))
     }

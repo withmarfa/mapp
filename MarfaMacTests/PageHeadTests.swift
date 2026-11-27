@@ -1,5 +1,6 @@
 import Foundation
 import Marfa
+import SwiftUI
 import Testing
 @testable import MarfaMac
 
@@ -175,6 +176,14 @@ struct PageHeadTests {
     }
 
     // MARK: Pins
+
+    @MainActor @Test func anItemPageReadsItsPinsWhenAnotherTypesPlacementIsUnreadable() {
+        let defaults = ThrowawayDefaults.make("PageHeadTests.placements")
+        defaults.set(#"{"aic.ticket":{"pins":["priority"]},"other":{"pins":false}}"#, forKey: PagePlacements.key)
+        let placements = AppStorage(wrappedValue: PagePlacements(), PagePlacements.key, store: defaults)
+        let head = Self.head(Self.item(["priority": .string("high")]), placements: placements.wrappedValue, pins: true)
+        #expect(head.pins.map(\.id) == ["priority"])
+    }
 
     @Test func pinsAreOffByDefaultAndWhenOnAPinnedRowLeavesTheRows() {
         let item = Self.item(["state": .string("pending"), "priority": .string("high")])

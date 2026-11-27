@@ -51,13 +51,15 @@ paths:
 - **The record of what both hold is saved before the item is written**, so a refused write never sends another Mac's change back as this Mac's.
 - **The later write wins**, row by row and member by member. A table's change log can undo a batch from the command line.
 - **A conflicted copy of a field is answered by member:** what this Mac sent is written again, the rest is taken; the copy goes to the bin.
-- **After another Mac's change reaches the defaults, the stores read them again**, so open windows and shortcuts follow. A store that reads its value once joins the `reload` `Libraries` gives `PreferencesSync`.
-- **A row that no setting here owns is the Marfa's.** A later version may have written it, so it is never changed or deleted.
+- **Stores reload incoming changes** so windows and shortcuts follow. Register stores that cache values with the `reload` callback in `Libraries`.
+- **Search remembers display names in memory.** Adding an exclusion saves its name.
+- **Sync preserves unrecognized rows.** A later version may own them.
 
 ## Unreadable values
 
-- **An unreadable value is never deleted or written over.** It is set aside under the store's `...SetAside` key, and the store starts from its defaults.
-- **Stored text that this Mac cannot read is not sent**, and a value that the defaults cannot hold is skipped before anything is written.
+- **Stores preserve unreadable values** under their `...SetAside` keys and use defaults.
+- **Sync skips unreadable text and values the defaults cannot hold.**
+- **Page placements are read by type.** An edit keeps every other entry byte for byte. The first edit with unreadable entries saves the original document under `pagePlacementsSetAside`.
 - **Reset keeps every value that was set aside.**
 
 ## Removing and disconnecting

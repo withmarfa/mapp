@@ -36,17 +36,17 @@ struct KeyboardPage: View {
             }
             if !model.anyAppCommands.isEmpty {
                 SettingsSection(
-                    "Global Shortcuts", line: "Off until you set one. They work from any app while Marfa is running."
+                    "Global Shortcuts", footer: "Off until you set one. They work in any app while Marfa for Mac is open."
                 ) {
                     ForEach(model.anyAppCommands, id: \.self) { command in
-                        row(command.title, line: command.line, target: .anyApp(command))
+                        row(command.title, target: .anyApp(command))
                     }
                 }
             }
             ForEach(model.sections, id: \.menu) { section in
                 SettingsSection(name: Text(verbatim: section.menu.title), line: model.line(forCount: section.commands.count).map { Text(verbatim: $0) }) {
                     ForEach(section.commands) { command in
-                        row(command.title, line: nil, target: .menu(command))
+                        row(command.title, target: .menu(command))
                     }
                 }
             }
@@ -54,19 +54,13 @@ struct KeyboardPage: View {
                 SettingsNote("With the keyboard button on, pressing keys searches for that shortcut. Typing searches by name.")
             }
             if !model.isSearching {
-                SettingsSection("Your Shortcuts") {
-                    SettingsRow("Export Shortcuts", line: "As a file you can keep or share.") {
-                        SettingsButton("Export…") { KeyboardFiles.export(from: libraries) }
-                            .accessibilityIdentifier("ExportShortcuts")
-                    }
-                    SettingsRow("Import Shortcuts", line: "Updates the shortcuts included in the file.") {
-                        SettingsButton("Import…") { KeyboardFiles.importShortcuts(into: libraries) }
-                            .accessibilityIdentifier("ImportShortcuts")
-                    }
-                    SettingsRow("Restore Defaults", line: "Every shortcut as Marfa ships it.") {
-                        SettingsButton("Restore…") { confirmsRestore = true }
-                            .accessibilityIdentifier("RestoreShortcuts")
-                    }
+                SettingsBar {
+                    SettingsButton("Restore Defaults", small: true) { confirmsRestore = true }
+                        .accessibilityIdentifier("RestoreShortcuts")
+                    SettingsButton("Export…", small: true) { KeyboardFiles.export(from: libraries) }
+                        .accessibilityIdentifier("ExportShortcuts")
+                    SettingsButton("Import…", small: true) { KeyboardFiles.importShortcuts(into: libraries) }
+                        .accessibilityIdentifier("ImportShortcuts")
                 }
             }
         }
@@ -89,8 +83,8 @@ struct KeyboardPage: View {
         .accessibilityIdentifier("KeyboardPage")
     }
 
-    private func row(_ title: String, line: String?, target: KeyboardPageModel.Target) -> some View {
-        SettingsRow(verbatim: title, line: line, error: model.error(for: target)) {
+    private func row(_ title: String, target: KeyboardPageModel.Target) -> some View {
+        SettingsRow(verbatim: title, error: model.error(for: target), lines: nil) {
             SettingsShortcutField(
                 title: LocalizedStringKey(title),
                 keys: model.keys(for: target),

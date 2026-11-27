@@ -132,11 +132,15 @@ nonisolated enum SettingsPage: CaseIterable, Hashable, Sendable {
             [
                 String(localized: "Shortcuts"), String(localized: "Export Shortcuts"), String(localized: "Import Shortcuts"),
                 String(localized: "Restore Defaults"), String(localized: "Global Shortcuts"),
-            ] + AnyAppCommand.allCases.map(\.title) + ShortcutCommand.all.map(\.title)
+                String(localized: "Search Shortcuts"), String(localized: "Search by Pressing a Shortcut"),
+                String(localized: "Export…"), String(localized: "Import…"),
+            ] + AnyAppCommand.allCases.map(\.title) + ShortcutMenu.allCases.map(\.title) + ShortcutCommand.all.map(\.title)
         case .lists:
             [
-                String(localized: "Density"), String(localized: "Sort By"), String(localized: "Group By"), String(localized: "Order"),
-            ]
+                String(localized: "Density"), String(localized: "Standard"), String(localized: "Compact"), String(localized: "Defaults"),
+                String(localized: "From"), String(localized: "All Items"), String(localized: "Library"), String(localized: "Sort by"),
+                String(localized: "Group by"), String(localized: "None"), String(localized: "Date"),
+            ] + ItemSort.allCases.map { String(localized: $0.title) }
         case .editor:
             [
                 String(localized: "Font"), String(localized: "Code font"), String(localized: "Text size"),
@@ -154,13 +158,15 @@ nonisolated enum SettingsPage: CaseIterable, Hashable, Sendable {
             [
                 String(localized: "Preview"), String(localized: "Row"), String(localized: "Facts"), String(localized: "Page"),
                 String(localized: "Linked From"), String(localized: "Restore Defaults"), String(localized: "Import…"),
-                String(localized: "Export…"),
+                String(localized: "Export…"), String(localized: "Yours"), String(localized: "Built In"), String(localized: "From Plugins"),
+                String(localized: "Date"), String(localized: "Secondary line"), String(localized: "Color"), String(localized: "Pin a Property…"),
             ]
         case .search:
             [
-                String(localized: "Left Out of Search"), String(localized: "Leave Out a Type or Source"), String(localized: "Archived Items"),
-                String(localized: "Feed Items"), String(localized: "Order"), String(localized: "Best Match"), String(localized: "Most Recent"),
-                String(localized: "Show Snippets"),
+                String(localized: "Excluded"), String(localized: "Add…"), String(localized: "Type or source"), String(localized: "Included"),
+                String(localized: "Archived items"), String(localized: "Feed items"), String(localized: "Results"), String(localized: "Order"),
+                String(localized: "Best Match"), String(localized: "Most Recent"), String(localized: "Show matched words under each result"),
+                String(localized: "Show snippets"),
             ]
         case .connection:
             [

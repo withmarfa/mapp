@@ -12,10 +12,8 @@ nonisolated enum FieldLock: Hashable, Sendable {
 nonisolated extension TypeID {
     /// The roots the contract reserves: `core`, `system` and `marfa` for what Marfa ships
     /// (`types/id-reserved-namespace`, and the server refuses to replace or delete one, `types/shipped-immutable`),
-    /// and `common` for the shared types a plugin brings (`types/id-reserved-common`). The app changes none of them. This
-    /// is the one place the app tells such a type from the owner's by its name; the catalogue carries no provenance, so
-    /// a plugin's type under a root of its own is told only where the server's own answer is read
-    /// (`TypeDefinitionEdit.run`).
+    /// and `common` for the shared types a plugin brings (`types/id-reserved-common`). The app changes none of them.
+    /// Before editing a type outside these roots, `TypeDefinitionEdit.run` checks its origin on the server.
     var isShipped: Bool {
         guard let root = rawValue.split(separator: ".", maxSplits: 1).first else { return false }
         return ["core", "system", "marfa", "common"].contains(String(root))

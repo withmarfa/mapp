@@ -46,12 +46,12 @@ See `docs/owner-settings.md` for Marfa pages and `docs/settings-sync.md` for sto
 | --- | --- |
 | General | Reopen windows follows the Mac until changed. Open Marfa links in sets the system default. Error reports and updates require configured destinations. Settings holds Remove, Export, Import, Restore, and Reset |
 | Appearance | App icon updates the Dock at launch and on change. Sky uses the bundle icon. Alternatives are Cobalt, Sea, Leaf, Marigold, and Adobe. Sidebar color applies to the main window |
-| Keyboard | Every menu command with its shortcut, and the any-app ones (`docs/commands.md`) |
+| Keyboard | Search by command or keys. Export and Restore Defaults include menu and global shortcuts. Import updates commands in the file (`docs/commands.md`) |
 | Editor | Fonts load when the page opens. PDF background shares the choice in View › PDF Background. Inkkit replaces `EditorOptions` as a set. Edit pages as applies to items opened next |
-| Lists | The starting density, sort and group of a place, until a view or the place chooses its own |
-| Layouts | How each type looks, through the stores of `docs/type-looks.md`. Only what differs from the type's preset is kept, so a better preset still reaches it. Page pins properties and holds the one Linked From row, which reads and writes the type's stored choice (`PagePlacements.linkedFrom`) |
-| Search | What searches of the whole library leave out (`SearchLeaveOuts`). A search in one place leaves nothing out. A type or source that would pass a query's ten conditions is dimmed, with the reason |
-| Connection | Address status, Account link, permission and queue counts, downloads, space used, and exports. Other Marfas shows when other copies exist. Disconnect asks about unsent changes |
+| Lists | Density, From (All Items or Library), sort, and grouping. A view or place can override these defaults |
+| Layouts | Types are grouped by origin. Export and Import transfer the date, secondary line, and facts (`docs/type-looks.md`). `PagePlacements` stores pins and Linked From. Restore Defaults resets both stores for one type |
+| Search | Excluded types and sources keep their names if missing (`SearchLeaveOuts`). Add explains the ten-condition limit. Included controls archived and Feed items. Results controls order and snippets. Searches within a place omit nothing |
+| Connection | Sign-in, address status, Account link, permission and queue counts, downloads, space used, and exports. Other Marfas shows when other copies exist. Disconnect reads the queue and asks about unsent changes |
 
 - **A choice whose thing is gone keeps its name, marked as missing** (`MissingChoice`), and the app uses the default meanwhile.
 - **Import, restore and reset save a restore point first.** If that fails, nothing changes.
