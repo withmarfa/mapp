@@ -32,13 +32,13 @@ paths:
 - **Search and New, Library and Feed, then Pinned, Types and custom sections** (`SidebarLayout`). Missing items keep their rows.
 - **Pinned holds views, collections and items.** Saved views stay until unpinned.
 - **Five types show, then "N More".** Counts include kinds.
-- **Hover highlights rows,** swaps type, kind or collection counts for Add, and shows Add and More on headings. Sections stay open.
+- **Hover highlights rows,** swaps counts for Add and shows Add and More on headings. Sections stay open. The chosen row stays soft gray, focused or not.
 - **Customize Sidebar** uses a menu on each faded place.
 - **Go lists sidebar places, views and types, plus Archive** (`GoMenu`).
 
 ### A layout an earlier copy stored
 
-- **An earlier Library or Views section is kept, drawn as nothing;** `places` and `pinned` stand there instead.
+- **An earlier Library or Views section is kept, drawn as nothing;** `places` and `pinned` stand there.
 - **What was put under them is pinned; what a hidden one held stays hidden, row by row.** `views` in `hidden` hides every saved view; one shown again goes in `shown`. The Library and the Feed stay fixed.
 - **A row whose section is gone shows under Pinned, a page under the Library;** its home is kept.
 - **The later arrangement wins whole,** also when two Macs change what is hidden before syncing.
@@ -46,14 +46,14 @@ paths:
 
 ## Foot
 
-- **The foot is one button that opens the Marfa's panel** (`SidebarFoot`, `MarfaPanel`). Refresh, Settings and a warning line are separate buttons; the line opens Settings › Connection.
+- **The foot is one button that opens the Marfa's panel** (`SidebarFoot`, `MarfaPanel`), with no hover fill. Refresh, Settings and a warning line are buttons; the line opens Settings › Connection.
 
 ## Toolbar
 
 - **The top row is drawn in the content under a title the window hides** (`TopRowFrame`); a plain `toolbar` holds only the buttons.
 - **The views are a radio group;** VoiceOver reads every view, folded or not.
 - **The first pill's capsule aligns with the title's left edge.**
-- **The row folds by the room it has** (`ToolbarRoomProbe`) into N More, with hidden pills and New View…, and holds no width. One view makes no row.
+- **The row folds by its room** (`ToolbarRoomProbe`) into N More, with hidden pills and New View…, and holds no width. One view makes no row.
 - **An on button is gray, never the accent.** An item that cannot act dims.
 - **Trap:** hide the title on the window (`hidesWindowTitle`), or it returns in full screen. Read the row's line from `TopRowSpace`, never a safe area: full screen hides the toolbar.
 
@@ -69,7 +69,7 @@ paths:
 
 ## Corner
 
-- **The corner holds only controls for viewing** the page or list in front (`WindowCorner`, `PageCorner`): formats, text size, focus, zoom, pages. A control turned off in Settings is in More instead.
+- **The corner holds only controls for viewing** the page or list in front (`WindowCorner`, `PageCorner`): formats, text size, focus, zoom, pages. A control turned off in Settings is in More.
 - **Labels on content glass dim with the window** (`windowGlass`).
 - **The modal has no corner,** and the column beside a layout has Open as Page alone.
 

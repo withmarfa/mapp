@@ -1,9 +1,9 @@
 import SwiftUI
 
 /// The Marfa at the foot of the sidebar, below its places, types and views: its name with a line under it saying how
-/// the library stands with its server, a Refresh that shows while the pointer is over the row, and a cog that opens
-/// Settings. The row opens the Marfa's panel (`MarfaPanel`); a line that asks the person to act opens Settings'
-/// Connection page instead, where the problems are listed.
+/// the library stands with its server, a Refresh and a cog that opens Settings, the same size. The row opens the
+/// Marfa's panel (`MarfaPanel`); a line that asks the person to act opens Settings' Connection page instead, where the
+/// problems are listed.
 struct SidebarFoot: View {
     @CurrentLibrary private var library
     @Environment(Libraries.self) private var libraries
@@ -16,17 +16,16 @@ struct SidebarFoot: View {
         let name = LibraryDescription.name(libraries)
         if let host, host.source != nil {
             SyncFootReading(host: host) { line in
-                row(name, line: line, canRefresh: host.canRefresh, refresh: host.refresh, host: host)
+                row(name, line: line, refresh: (canRefresh: host.canRefresh, run: host.refresh), host: host)
             }
         } else {
-            row(name, line: nil, canRefresh: false, refresh: {}, host: nil)
+            row(name, line: nil, refresh: nil, host: nil)
         }
     }
 
-    private func row(_ name: String, line: SyncFootLine?, canRefresh: Bool, refresh: @escaping () -> Void, host: MarfaHost?) -> some View {
+    private func row(_ name: String, line: SyncFootLine?, refresh: (canRefresh: Bool, run: () -> Void)?, host: MarfaHost?) -> some View {
         SidebarFootRow(
-            name: name, line: line, canRefresh: canRefresh, isPanelOpen: showsPanel,
-            refresh: refresh,
+            name: name, line: line, refresh: refresh, isPanelOpen: showsPanel,
             openPanel: host == nil ? nil : { showsPanel.toggle() },
             openProblems: { browser.showSettings(.connection) },
             openSettings: { browser.showSettings() })
@@ -52,24 +51,23 @@ struct SidebarFoot: View {
     }
 }
 
-/// The foot's row, given what it shows and what its controls do. Refresh is disabled where it has nothing to do.
+/// The foot's row, given what it shows and what its controls do. Refresh is disabled where it has nothing to do, and
+/// absent where there is no server to refresh from.
 ///
-/// The whole row is a button that opens the Marfa's panel, with a soft fill under the pointer. The name lets a click
-/// through and the line passes it on, so the line keeps its tooltip; Refresh, the cog and a line that asks for action are buttons of their own. They are
-/// plain labels that dim with the window, as the sidebar's rows do. A pointer click hands the keyboard back, so no focus
-/// ring stays on a control that was clicked; tabbing still reaches each. Refresh is only drawn while the pointer is over
-/// the row or the keyboard is on it, but it stays in the accessibility tree.
+/// The whole row is a button that opens the Marfa's panel, with a soft fill only while the panel is open. The name lets
+/// a click through and the line passes it on, so the line keeps its tooltip; Refresh, the cog and a line that asks for
+/// action are buttons of their own. They are plain labels that dim with the window, as the sidebar's rows do. A pointer
+/// click hands the keyboard back, so no focus ring stays on a control that was clicked; tabbing still reaches each.
 struct SidebarFootRow: View {
     @Environment(\.appearsActive) private var appearsActive
     @FocusState private var focus: Control?
-    @State private var isHovering = false
     let name: String
     /// Nil where the Marfa has nothing to say of itself.
     let line: SyncFootLine?
-    let canRefresh: Bool
+    /// Nil where there is no server to refresh from.
+    let refresh: (canRefresh: Bool, run: () -> Void)?
     /// The panel is open, so the row keeps its fill.
     let isPanelOpen: Bool
-    let refresh: () -> Void
     /// Nil where there is no panel to open.
     let openPanel: (() -> Void)?
     let openProblems: () -> Void
@@ -85,7 +83,7 @@ struct SidebarFootRow: View {
         ZStack {
             Button(action: { openPanel?() }) {
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(.primary.opacity(isPanelOpen ? 0.055 : isHovering ? 0.045 : 0))
+                    .fill(.primary.opacity(isPanelOpen ? 0.055 : 0))
                     .contentShape(.rect)
             }
             .buttonStyle(.plain)
@@ -95,7 +93,7 @@ struct SidebarFootRow: View {
             .accessibilityLabel(Text(verbatim: name))
             .accessibilityHint(Text("Shows the Marfa’s latest updates."))
             .accessibilityIdentifier("SidebarMarfa")
-            // The cog's own frame leaves the room between it and the line.
+            // The controls' own frames leave the room between them and the line.
             HStack(alignment: .center, spacing: 0) {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(verbatim: name)
@@ -108,17 +106,9 @@ struct SidebarFootRow: View {
                     if let line { syncRow(line) }
                 }
                 Spacer(minLength: 0)
-                Button(action: openSettings) {
-                    Image(systemName: "gearshape")
-                        .interfaceFont(.body)
-                        .imageScale(.large)
-                        .foregroundStyle(tint)
-                        .frame(width: 28, height: 28)
-                        .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
+                if let refresh { refreshButton(refresh) }
+                footButton("gearshape", action: openSettings)
                 .focused($focus, equals: .settings)
-                .simultaneousGesture(TapGesture().onEnded { focus = nil })
                 .help(Self.settingsHelp(Bundle.main.infoDictionary))
                 .accessibilityLabel(Text("Settings"))
                 .accessibilityIdentifier("SidebarSettings")
@@ -127,7 +117,6 @@ struct SidebarFootRow: View {
             .padding(.trailing, 6)
         }
         .frame(height: 48)
-        .onHover { isHovering = $0 }
         .onChange(of: appearsActive) { if !appearsActive { focus = nil } }
         .padding(.horizontal, 10)
         .padding(.vertical, 4)
@@ -141,12 +130,33 @@ struct SidebarFootRow: View {
         return String(localized: "Settings (\(version), build \(build))")
     }
 
-    /// One quiet line, a step below the name, and the small Refresh after it. Where the person has to act the line is
-    /// as strong as the name, after a warning mark, and opens Settings' Connection page.
+    /// A control at the row's trailing end: a symbol in a square as large as the cog's.
+    private func footButton(_ symbol: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .interfaceFont(.body)
+                .imageScale(.large)
+                .foregroundStyle(tint)
+                .frame(width: 28, height: 28)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .simultaneousGesture(TapGesture().onEnded { focus = nil })
+    }
+
+    private func refreshButton(_ refresh: (canRefresh: Bool, run: () -> Void)) -> some View {
+        footButton("arrow.clockwise", action: refresh.run)
+            .disabled(!refresh.canRefresh)
+            .focused($focus, equals: .refresh)
+            .help("Refresh")
+            .accessibilityLabel(Text("Refresh"))
+            .accessibilityIdentifier("SidebarRefresh")
+    }
+
+    /// One quiet line, a step below the name. Where the person has to act the line is as strong as the name, after a
+    /// warning mark, and opens Settings' Connection page.
     private func syncRow(_ line: SyncFootLine) -> some View {
-        // Refresh takes no room until it shows, so a long line keeps the whole of its width.
-        let showsRefresh = isHovering || focus == .refresh
-        return HStack(spacing: 0) {
+        HStack(spacing: 0) {
             if line.asksForAction {
                 Button(action: openProblems) { syncLine(line) }
                     .buttonStyle(.plain)
@@ -165,23 +175,6 @@ struct SidebarFootRow: View {
                     .padding(.leading, 4)
                     .accessibilityHidden(true)
             }
-            Button(action: refresh) {
-                Image(systemName: "arrow.clockwise")
-                    .interfaceFont(.caption.weight(.semibold))
-                    .foregroundStyle(tint)
-                    .contentShape(.rect)
-            }
-            .buttonStyle(.plain)
-            .disabled(!canRefresh)
-            .focused($focus, equals: .refresh)
-            .simultaneousGesture(TapGesture().onEnded { focus = nil })
-            .opacity(showsRefresh ? 1 : 0)
-            .padding(.leading, showsRefresh ? 4 : 0)
-            .frame(width: showsRefresh ? nil : 0)
-            .accessibilityHidden(false)
-            .help("Refresh")
-            .accessibilityLabel(Text("Refresh"))
-            .accessibilityIdentifier("SidebarRefresh")
         }
     }
 

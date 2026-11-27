@@ -49,10 +49,9 @@ struct SidebarTypesSection: View, Equatable {
     @ViewBuilder private var typeRows: some View {
         let limited = SidebarPlan.limited(rows, showsAll: showsAll, open: open)
         let rows = limited.rows
-        let steps = SidebarTypeRow.steps(for: rows, subtypeIcons: showsSubtypeIcons)
         let widest = rows.filter(\.isExpandable).map(\.node.count).max() ?? 0
-        ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-            typeRow(row, widestFoldingCount: widest, steps: steps[index])
+        ForEach(rows, id: \.id) { row in
+            typeRow(row, widestFoldingCount: widest)
         }
         if limited.more > 0 { moreRow(limited.more) }
     }
@@ -84,10 +83,10 @@ struct SidebarTypesSection: View, Equatable {
     /// A type opens its own items; a type with subtypes also folds them open, and a group only folds. The rows are
     /// one flat list, a subtype's drawn one step in under its parent, because the system's disclosure puts its chevron
     /// at the leading edge and cannot be moved or guided.
-    @ViewBuilder private func typeRow(_ row: SidebarPlan.TypeRow, widestFoldingCount: Int, steps: [SidebarTypeRow.Step]) -> some View {
+    @ViewBuilder private func typeRow(_ row: SidebarPlan.TypeRow, widestFoldingCount: Int) -> some View {
         let node = row.node
         let content = SidebarTypeRow(
-            row: row, count: row.node.count, widestFoldingCount: widestFoldingCount, steps: steps,
+            row: row, count: row.node.count, widestFoldingCount: widestFoldingCount, depth: row.depth,
             showsIcon: SidebarTypeRow.showsIcon(row, subtypeIcons: showsSubtypeIcons), add: add(node), addName: addName(node),
             toggle: { toggle(row) })
         if node.opens, let type = node.type {
