@@ -80,6 +80,7 @@ struct SettingsSheet<Content: View, Leading: View, Buttons: View>: View {
         .overlay {
             RoundedRectangle(cornerRadius: SettingsTokens.Metric.sheetRadius, style: .continuous).strokeBorder(SettingsTokens.hairline, lineWidth: 1)
         }
+        .compositingGroup()
         .shadow(color: SettingsTokens.sheetShadow, radius: SettingsTokens.Metric.sheetShadowRadius, y: SettingsTokens.Metric.sheetShadowDrop)
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(.isModal)

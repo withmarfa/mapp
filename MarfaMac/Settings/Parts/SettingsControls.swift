@@ -3,6 +3,7 @@ import SwiftUI
 extension EnvironmentValues {
     @Entry var settingsCompactControls = false
     @Entry var settingsUsesSheetControls = false
+    @Entry var settingsFitsPopUpLabels = false
 }
 
 private struct SettingsControlSize: ViewModifier {
@@ -67,9 +68,9 @@ struct SettingsButton: View {
     var body: some View {
         Group {
             switch role {
-            case .confirm, .update: button.buttonStyle(.borderedProminent)
+            case .update: button.buttonStyle(.borderedProminent)
             case .destructive: button.buttonStyle(.bordered).foregroundStyle(SettingsTokens.errorRed)
-            case .normal: button.buttonStyle(.bordered)
+            case .normal, .confirm: button.buttonStyle(.bordered)
             }
         }
         .settingsControlSize(small: small)
@@ -112,6 +113,7 @@ struct SettingsPopUp<Value: Hashable, Content: View>: View {
     var isError = false
     @ViewBuilder let content: Content
     @Environment(\.settingsCompactControls) private var compact
+    @Environment(\.settingsFitsPopUpLabels) private var fitsLabels
     @Environment(\.settingsTextScale) private var scale
 
     init(
@@ -138,9 +140,10 @@ struct SettingsPopUp<Value: Hashable, Content: View>: View {
     }
 
     var body: some View {
-        // A compact row pop-up is 120 points at the default size, as both boards draw it, and grows only when text is larger.
+        // Fit labels where the page opts in. Other compact rows keep the board's 120-point width at the default size.
         let width = compact ? SettingsTokens.Metric.popUpMinimumWidth * max(1, scale) : SettingsTokens.Metric.controlWidth
-        let holdsWidth = (compact && scale <= 1) || currentValueLabel != nil
+        let holdsWidth = !fitsLabels && ((compact && scale <= 1) || currentValueLabel != nil)
+        let fitsCustomLabel = fitsLabels && currentValueLabel != nil
         Group {
             if let currentValueLabel {
                 Picker(selection: $selection) { content } label: { title } currentValueLabel: {
@@ -153,9 +156,9 @@ struct SettingsPopUp<Value: Hashable, Content: View>: View {
         .labelsHidden()
         .pickerStyle(.menu)
         .settingsControlSize()
-        .buttonSizing(.flexible)
-        .frame(minWidth: width, maxWidth: holdsWidth ? width : nil)
-        .fixedSize(horizontal: !holdsWidth, vertical: false)
+        .buttonSizing(fitsCustomLabel ? .fitted : .flexible)
+        .frame(minWidth: width, maxWidth: holdsWidth ? width : nil, alignment: .trailing)
+        .fixedSize(horizontal: !holdsWidth && !fitsCustomLabel, vertical: false)
         .settingsErrorRing(isError)
     }
 }

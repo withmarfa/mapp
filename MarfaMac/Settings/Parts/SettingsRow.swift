@@ -46,47 +46,34 @@ struct SettingsTile: View {
     let symbol: String
     let tone: SettingsTokens.Tone
     var size: CGFloat = SettingsTokens.Metric.tile
-    var rich = false
+    var isSidebar = false
 
     private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: size * SettingsTokens.Metric.tileRounding) }
 
     var body: some View {
-        shape.fill(rich ? tone.sidebarColor : tone.color)
-            .overlay {
-                if rich {
-                    shape.fill(.linearGradient(
-                        colors: [.white.opacity(SettingsTokens.Metric.richTileHighlightOpacity), .black.opacity(SettingsTokens.Metric.richTileShadeOpacity)],
-                        startPoint: .top, endPoint: .bottom))
-                    shape.strokeBorder(SettingsTokens.tileEdge, lineWidth: SettingsTokens.Metric.tileEdgeWidth)
-                    shape.strokeBorder(.linearGradient(colors: [SettingsTokens.tileHighlight, .clear], startPoint: .top, endPoint: .center),
-                                       lineWidth: SettingsTokens.Metric.tileEdgeWidth)
-                }
-            }
+        shape.fill(isSidebar ? tone.sidebarColor : tone.color)
             .frame(width: size, height: size)
             .overlay {
-                SettingsTileGlyph(symbol: symbol, tileSize: size)
+                SettingsTileGlyph(symbol: symbol, tileSize: size,
+                                  proportion: isSidebar ? SettingsTokens.Metric.sidebarTileGlyph : SettingsTokens.Metric.tileGlyph)
                     .foregroundStyle(SettingsTokens.tileForeground)
-                    .shadow(color: rich ? SettingsTokens.tileGlyphShadow : .clear,
-                            radius: SettingsTokens.Metric.tileGlyphShadowRadius, y: SettingsTokens.Metric.tileShadowDrop)
             }
-            .shadow(color: rich ? SettingsTokens.tileShadow : .clear,
-                    radius: SettingsTokens.Metric.tileShadowRadius, y: SettingsTokens.Metric.tileShadowDrop)
             .accessibilityHidden(true)
     }
 }
 
-/// A tile's symbol, fitted in a square of `SettingsTokens.Metric.tileGlyph` of the tile's side, so a wide or a tall symbol
-/// keeps the same padding as a square one and never reaches the tile's edge.
+/// A tile's symbol, fitted into a square so wide and tall symbols keep the same padding.
 struct SettingsTileGlyph: View {
     let symbol: String
     let tileSize: CGFloat
+    var proportion: CGFloat = SettingsTokens.Metric.tileGlyph
 
     var body: some View {
         Image(systemName: symbol)
             .resizable()
             .scaledToFit()
             .fontWeight(.medium)
-            .frame(width: tileSize * SettingsTokens.Metric.tileGlyph, height: tileSize * SettingsTokens.Metric.tileGlyph)
+            .frame(width: tileSize * proportion, height: tileSize * proportion)
     }
 }
 

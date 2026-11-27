@@ -218,7 +218,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
     }
 
     func connect(usingCode: Bool = false) async {
-        guard canConnect else { return }
+        guard !isWorking, usingCode || canConnect else { return }
         let target = address
         let method = method(usingCode: usingCode)
         await run(.reaching(target)) { () async throws(MarfaHost.Problem) in

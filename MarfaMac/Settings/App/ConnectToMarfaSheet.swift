@@ -66,7 +66,6 @@ struct ConnectToMarfaSheet: View {
         } leading: {
             if model.code == nil, !model.isWorking {
                 SettingsButton("Sign In with a Code…") { model.start(.connect(usingCode: true)) }
-                    .disabled(!model.canConnect)
                     .accessibilityIdentifier("MarfaConnectCode")
             }
         } buttons: {
@@ -88,7 +87,8 @@ struct ConnectToMarfaSheet: View {
         VStack(alignment: .leading, spacing: SettingsTokens.Metric.sheetFieldGap) {
             SettingsSheetField(label: "Address") {
                 SettingsField(
-                    title: "Address", text: $model.address, width: nil, trailingAccessory: AnyView(statusMark),
+                    title: "Address", text: $model.address, prompt: String(localized: "marfa.example"),
+                    width: nil, trailingAccessory: AnyView(statusMark),
                     onSubmit: continueSignIn
                 )
                 .disabled(model.isWorking)

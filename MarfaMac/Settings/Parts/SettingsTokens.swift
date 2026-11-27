@@ -25,19 +25,16 @@ enum SettingsTokens {
         }
 
         var sidebarColor: Color {
-            let rgb: UInt32 = switch self {
-            case .gray: 0x8e8e93
-            case .blue: 0x2f83f5
-            case .indigo: 0x5e5ce6
-            case .amber: 0xeaa910
-            case .orange: 0xf78b12
-            case .purple: 0xa55adb
-            case .teal: 0x18a8c4
-            case .green: 0x2fb24f
-            case .pink: 0xec4a7f
-            case .red: 0xee4b44
+            switch self {
+            case .gray: Color(nsColor: .systemGray)
+            case .blue: rgb(0x1f6bf2) // Signal
+            case .indigo: rgb(0x1a4fd6) // Cobalt
+            case .amber: rgb(0xf5b316) // Marigold
+            case .orange, .pink, .red: rgb(0xe4572e) // Adobe
+            case .purple: rgb(0x111113) // Ink
+            case .teal: rgb(0x0e9488) // Sea
+            case .green: rgb(0x2e9e4f) // Leaf
             }
-            return Color(red: Double((rgb >> 16) & 255) / 255, green: Double((rgb >> 8) & 255) / 255, blue: Double(rgb & 255) / 255)
         }
     }
 
@@ -70,10 +67,6 @@ enum SettingsTokens {
     static let primaryText = Color(nsColor: .labelColor)
     static let sidebarSelectedText = adaptive(light: NSColor(white: 0.13, alpha: 1), dark: NSColor(white: 0.9, alpha: 1))
     static let tileForeground = Color.white
-    static let tileHighlight = Color.white.opacity(0.35)
-    static let tileEdge = Color.black.opacity(0.1)
-    static let tileShadow = Color.black.opacity(0.18)
-    static let tileGlyphShadow = Color.black.opacity(0.22)
     static let swatchEdge = Color.black.opacity(0.14)
     static let swatchDot = Color.white
     /// The swatch of a color the person makes, before they have made one.
@@ -147,15 +140,13 @@ enum SettingsTokens {
 
     /// The interface fonts of Settings. A page asks for these by role.
     enum Role: Hashable, Sendable {
-        case title, line, sectionName, sectionLine, footer, small, mono, stateTitle, headTitle, pageHeader, usageFigure, sidebar, sidebarHeading, sidebarBadge, largeGlyph, tableHeader, linkGlyph, pathGlyph, chartAxis, chartTick
+        case title, line, sectionName, sectionLine, footer, small, mono, stateTitle, headTitle, pageHeader, usageFigure, sidebarBadge, largeGlyph, tableHeader, linkGlyph, pathGlyph, chartAxis, chartTick
     }
 
     static func font(_ role: Role, scale: CGFloat = 1) -> Font {
         switch role {
         case .title: .system(size: 13 * scale)
-        case .sidebar: .system(size: 15 * scale)
         case .sidebarBadge: .system(size: 11 * scale, weight: .semibold)
-        case .sidebarHeading: .system(size: 12 * scale, weight: .semibold)
         case .pageHeader: .system(size: 17 * scale, weight: .semibold)
         case .usageFigure: .system(size: 20 * scale, weight: .semibold)
         case .linkGlyph: .system(size: 9 * scale, weight: .medium)
@@ -259,8 +250,7 @@ enum SettingsTokens {
         static let shortcutMinimumLabelScale: CGFloat = 0.75
         static let tile: CGFloat = 24
         static let avatarInitialsMinimumScale: CGFloat = 0.35
-        /// A tile's corner radius and the box its symbol is fitted in, as shares of its side: the symbol keeps even
-        /// padding whatever its shape, as in System Settings' sidebar.
+        /// A tile's radius and symbol box, as shares of its side.
         static let tileRounding: CGFloat = 0.27
         static let tileGlyph: CGFloat = 0.75
         /// A well's symbol or mark, as a share of its side: 12 points in the 24 point well.
@@ -270,9 +260,8 @@ enum SettingsTokens {
         static let searchWidth: CGFloat = 200
         static let searchSpacing: CGFloat = 8
         /// The sidebar's tile.
-        static let sidebarTile: CGFloat = 24
-        static let sidebarRow: CGFloat = 32
-        static let sidebarHalfGap: CGFloat = 32
+        static let sidebarTile: CGFloat = 20
+        static let sidebarTileGlyph: CGFloat = 0.63
         static let sidebarRowLeading: CGFloat = 2
         static let sidebarFooterInset: CGFloat = 18
         static let sidebarFooterPadding: CGFloat = 10
@@ -280,13 +269,7 @@ enum SettingsTokens {
         static let sidebarFooterGap: CGFloat = 4
         static let sidebarBadgeSize: CGFloat = 18
         static let sidebarBadgePadding: CGFloat = 5
-        static let richTileHighlightOpacity = 0.18
-        static let richTileShadeOpacity = 0.07
         static let tileEdgeWidth: CGFloat = 0.5
-        static let tileShadowRadius: CGFloat = 1.5
-        static let tileShadowDrop: CGFloat = 0.5
-        static let tileGlyphShadowRadius: CGFloat = 0.5
-        static let sidebarHeadingBottom: CGFloat = 5
         /// A color swatch and the dot that marks the chosen one, and the space between swatches.
         static let swatch: CGFloat = 18
         static let swatchDot: CGFloat = 6
@@ -413,7 +396,7 @@ enum SettingsTokens {
         static let sheetFormGap: CGFloat = 16
         static let sheetHeadSpacing: CGFloat = 3
         static let sheetLabelSpacing: CGFloat = 5
-        static let sheetRadius: CGFloat = 14
+        static let sheetRadius: CGFloat = 18
         static let sheetShadowRadius: CGFloat = 24
         static let sheetShadowDrop: CGFloat = 8
         /// The most lines a copy of an unsent text shows in a sheet.

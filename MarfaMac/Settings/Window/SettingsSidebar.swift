@@ -9,12 +9,10 @@ struct SettingsSidebar: View {
     var hasMarfa = true
     /// The count a page's row shows at its trailing edge, if it has one.
     var badges: (SettingsPage) -> Int? = { _ in nil }
-    @Environment(\.settingsTextScale) private var scale
 
     private struct Group: Identifiable {
         let name: LocalizedStringKey?
         let pages: [SettingsPage]
-        let gap: CGFloat
         let id: Int
     }
 
@@ -25,8 +23,7 @@ struct SettingsSidebar: View {
         for (name, source) in [(LocalizedStringKey("App"), SettingsPage.appGroups), (LocalizedStringKey("Marfa"), SettingsPage.marfaGroups)] {
             let kept = source.map { $0.filter { matches.contains($0) } }.filter { !$0.isEmpty }
             for (index, pages) in kept.enumerated() {
-                let gap = index == 0 && !result.isEmpty ? SettingsTokens.Metric.sidebarHalfGap : 0
-                result.append(Group(name: index == 0 ? name : nil, pages: pages, gap: gap, id: result.count))
+                result.append(Group(name: index == 0 ? name : nil, pages: pages, id: result.count))
             }
         }
         return result
@@ -38,6 +35,7 @@ struct SettingsSidebar: View {
             sidebarList(groups)
             docsLink
         }
+        .font(nil)
         .searchable(text: $search, placement: .sidebar, prompt: Text("Search"))
         .accessibilityIdentifier("SettingsSidebar")
     }
@@ -47,17 +45,14 @@ struct SettingsSidebar: View {
             if let page = $0, canSelect(page) { selection = page }
         }) {
             ForEach(groups) { group in
-                if let name = group.name {
-                    groupHeading(name, gap: group.gap)
+                Section {
                     rows(group.pages)
-                } else {
-                    Section { rows(group.pages) }
+                } header: {
+                    if let name = group.name { Text(name) }
                 }
             }
         }
         .listStyle(.sidebar)
-        .environment(\.sidebarRowSize, .small)
-        .environment(\.defaultMinListRowHeight, 0)
         .softSelection(rows: groups.map(\.pages), selection: { selection.sidebarEntry })
         .overlay {
             if groups.isEmpty {
@@ -66,39 +61,22 @@ struct SettingsSidebar: View {
         }
     }
 
-    private func groupHeading(_ name: LocalizedStringKey, gap: CGFloat) -> some View {
-        Text(name)
-            .settingsFont(.sidebarHeading)
-            .foregroundStyle(SettingsTokens.secondaryText)
-            .padding(.top, gap)
-            .padding(.bottom, SettingsTokens.Metric.sidebarHeadingBottom)
-            .accessibilityAddTraits(.isHeader)
-            .listRowInsets(.vertical, 0)
-            .listRowSeparator(.hidden)
-            .selectionDisabled()
-    }
-
     private func rows(_ pages: [SettingsPage]) -> some View {
         ForEach(pages, id: \.self) { page in
             let isSelected = selection.sidebarEntry == page
             let isEnabled = canSelect(page)
             HStack(spacing: SettingsTokens.Metric.buttonGap) {
-                SettingsTile(symbol: page.symbol, tone: page.tone, size: SettingsTokens.Metric.sidebarTile, rich: true)
+                SettingsTile(symbol: page.symbol, tone: page.tone, size: SettingsTokens.Metric.sidebarTile, isSidebar: true)
 
-                // The system bolds a chosen row's label; the boards and System Settings keep it regular.
                 Text(page.title)
-                    .settingsFont(.sidebar)
                     .fontWeight(.regular)
                     .foregroundStyle(isSelected ? SettingsTokens.sidebarSelectedText : Color.primary)
-                    .lineLimit(nil)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(1)
                 Spacer(minLength: 0)
                 if let badge = badges(page), badge > 0 { problemBadge(badge) }
             }
             .padding(.leading, SettingsTokens.Metric.sidebarRowLeading)
-            .frame(minHeight: SettingsTokens.Metric.sidebarRow * max(1, scale))
             .accessibilityElement(children: .combine)
-            .listRowInsets(.vertical, 0)
             .listRowSeparator(.hidden)
             .opacity(isEnabled ? 1 : SettingsTokens.Metric.lockedTileOpacity)
             .selectionDisabled(!isEnabled)
@@ -130,10 +108,11 @@ struct SettingsSidebar: View {
     private var docsLink: some View {
         Link(destination: AppLinks.marfaDocumentation) {
             HStack(spacing: SettingsTokens.Metric.sidebarFooterGap) {
-                Text("Docs").settingsFont(.title)
-                Image(systemName: "arrow.up.right").settingsFont(.linkGlyph).accessibilityHidden(true)
+                Text("Docs")
+                Image(systemName: "arrow.up.right").imageScale(.small).accessibilityHidden(true)
             }
-            .foregroundStyle(SettingsTokens.secondaryText)
+            .font(.callout)
+            .foregroundStyle(.secondary)
         }
         .buttonStyle(.plain)
         .frame(maxWidth: .infinity, alignment: .leading)

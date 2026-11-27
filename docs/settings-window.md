@@ -19,12 +19,12 @@ See `docs/owner-settings.md` for Marfa pages and `docs/settings-sync.md` for sto
 - **The sidebar always has both halves.** App: General, Connection, Appearance, Keyboard, then Editor, Lists, Layouts, and Search. Marfa: Account, Activity, Apps and Keys, Sources, Webhooks, then Types, Plugins, Connectors, Folders, Backups, and Trash. Account badges the number of problems.
 - **Every route has a sidebar entry** (`SettingsPage.sidebarEntry`, `MarfaSettingsPage.sidebarEntry`). Search includes the words of pages opened through that entry. The Docs link opens Marfa's documentation.
 - **A page is one column of sections.** Push a new page for a thing's own settings.
-- **Back and Forward are at the top of the sidebar.** The current page's title is above the detail. The View menu's Back and Forward commands use the same history.
+- **Back and Forward sit above the sidebar.** The title sits above the page. Settings sheets suspend history navigation, including the View menu commands.
 
 ## Parts
 
 - **Pages draw with `Parts/`.** Keep app models out of parts.
-- **Every measure, color and font is in `SettingsTokens`.**
+- **Settings uses the native sidebar list's text and row sizes.** Custom measures, colors, and fonts are in `SettingsTokens`.
 - **A row is a lead, a title, one line and one trailing control** (`SettingsRow`), two lines at most. A problem row may hold two buttons, as may the release row on Account.
 - **A value a button acts on goes in the row's line**, except Connection’s permission count and opened-file size. Show problem text in full.
 - **A refused input keeps what was typed**, with one line under the title that says why.

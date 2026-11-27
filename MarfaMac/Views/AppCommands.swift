@@ -14,6 +14,7 @@ struct AppCommands: Commands {
     @FocusedValue(\.detailsPresentation) private var details
     @FocusedValue(\.sidebarVisibility) private var sidebarVisibility
     @FocusedValue(\.settingsNavigation) private var settingsNavigation
+    @FocusedValue(\.settingsHistoryBlocked) private var settingsHistoryBlocked
     @Environment(\.openWindow) private var openWindow
     @StoredOrder private var order
 
@@ -236,13 +237,13 @@ extension AppCommands {
     }
 
     private var canGoBack: Bool {
-        if let settingsNavigation { return settingsNavigation.canGoBack }
+        if let settingsNavigation { return settingsHistoryBlocked != true && settingsNavigation.canGoBack }
         guard let browser, let library else { return false }
         return browser.canStepBack(in: library)
     }
 
     private var canGoForward: Bool {
-        if let settingsNavigation { return settingsNavigation.canGoForward }
+        if let settingsNavigation { return settingsHistoryBlocked != true && settingsNavigation.canGoForward }
         guard let browser, let library else { return false }
         return browser.canStepForward(in: library)
     }
