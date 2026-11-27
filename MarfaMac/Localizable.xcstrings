@@ -13278,6 +13278,9 @@
     "manage webhooks" : {
       "extractionState" : "manual"
     },
+    "marfa.example" : {
+
+    },
     "more than %lld conditions" : {
 
     },

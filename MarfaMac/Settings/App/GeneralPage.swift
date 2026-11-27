@@ -35,6 +35,7 @@ struct GeneralPage: View {
             updates
             appSettings
         }
+        .environment(\.settingsFitsPopUpLabels, true)
         .accessibilityIdentifier("GeneralPage")
         .onAppear { files.refresh() }
         .settingsSheet(presenting: files.sheet != nil, dismiss: { files.close() }) { SettingsFilesSheet(model: files) }

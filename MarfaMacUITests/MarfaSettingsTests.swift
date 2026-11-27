@@ -40,8 +40,11 @@ nonisolated final class MarfaSettingsTests: XCTestCase {
         openConnectionPage()
         XCTAssertTrue(app.staticTexts["Not Signed In"].waitForExistence(timeout: 3))
         XCTAssertFalse(address.exists)
+        let back = app.buttons["SettingsBack"]
+        XCTAssertTrue(back.isEnabled)
         attachScreenshot("SettingsMarfaSignedOut")
         openSignInSheet()
+        XCTAssertTrue(!back.exists || !back.isEnabled)
         XCTAssertFalse(app.secureTextFields.firstMatch.exists, "no key is typed into the app")
         XCTAssertTrue(connect.exists, "Continue opens the server's own page")
         XCTAssertTrue(connectWithCode.exists, "Sign In with a Code is for a Mac that cannot open the browser")
@@ -51,13 +54,17 @@ nonisolated final class MarfaSettingsTests: XCTestCase {
         app.buttons["MarfaConnectCancel"].click()
         XCTAssertTrue(address.waitForNonExistence(timeout: 3))
         XCTAssertTrue(openConnect.exists)
+        XCTAssertTrue(back.isEnabled)
     }
 
     @MainActor func testSigningInWaitsForAnAddress() {
         openConnectionPage()
         openSignInSheet()
         XCTAssertFalse(connect.isEnabled)
-        XCTAssertFalse(connectWithCode.isEnabled)
+        XCTAssertTrue(connectWithCode.isEnabled)
+        XCTAssertEqual(address.placeholderValue, "marfa.example")
+        connectWithCode.click()
+        XCTAssertTrue(app.staticTexts["Check the Address"].waitForExistence(timeout: 3))
         address.click()
         address.typeText("https")
         address.typeKey(";", modifierFlags: .shift)

@@ -64,6 +64,7 @@ import SwiftUI
 extension FocusedValues {
     /// The navigation of the Settings window while it is key, which the Back and Forward commands move.
     @Entry var settingsNavigation: SettingsNavigation?
+    @Entry var settingsHistoryBlocked: Bool?
 }
 
 /// Marfa > Settings…, which opens the window. Back and Forward (⌘[ and ⌘]) are the View menu's own, which move through the

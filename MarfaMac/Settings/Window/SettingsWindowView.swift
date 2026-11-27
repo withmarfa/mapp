@@ -21,6 +21,7 @@ struct SettingsWindowView: View {
     }
 
     private var navigation: SettingsNavigation { launcher.navigation }
+    private var hasSettingsSheet: Bool { sheets.isPresented || libraries.marfaSettings.departure != nil }
     private var badgeAddress: String? {
         host.connection == .connected && host.grants.contains(.instanceRead) ? host.serverAddress : nil
     }
@@ -43,12 +44,12 @@ struct SettingsWindowView: View {
                 ToolbarItemGroup {
                     Button("Back", systemImage: "chevron.backward") { navigation.back() }
                         .labelStyle(.iconOnly)
-                        .disabled(!navigation.canGoBack)
+                        .disabled(hasSettingsSheet || !navigation.canGoBack)
                         .help("Back")
                         .accessibilityIdentifier("SettingsBack")
                     Button("Forward", systemImage: "chevron.forward") { navigation.forward() }
                         .labelStyle(.iconOnly)
-                        .disabled(!navigation.canGoForward)
+                        .disabled(hasSettingsSheet || !navigation.canGoForward)
                         .help("Forward")
                         .accessibilityIdentifier("SettingsForward")
                 }
@@ -65,6 +66,7 @@ struct SettingsWindowView: View {
         .environment(\.library, libraries.current)
         .containerBackground(SettingsTokens.page, for: .window)
         .focusedSceneValue(\.settingsNavigation, navigation)
+        .focusedSceneValue(\.settingsHistoryBlocked, hasSettingsSheet)
         .notices(libraries.host.notices) { launcher.show($0) }
         .modifier(OptionalLibraryDialogs())
         .settingsSheet(

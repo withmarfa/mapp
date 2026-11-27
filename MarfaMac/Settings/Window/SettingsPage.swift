@@ -79,7 +79,7 @@ nonisolated enum SettingsPage: CaseIterable, Hashable, Sendable {
         case .appearance: "paintbrush.pointed.fill"
         case .keyboard: "keyboard"
         case .lists: "list.bullet"
-        case .editor: "square.and.pencil"
+        case .editor: "pencil"
         case .layouts: "rectangle.split.1x2.fill"
         case .search: "magnifyingglass"
         case .connection: "antenna.radiowaves.left.and.right"
