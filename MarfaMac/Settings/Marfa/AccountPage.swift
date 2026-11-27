@@ -254,7 +254,7 @@ private struct ProfilePictureMark: View {
     let name: String?
 
     private var initials: String {
-        String((name ?? "").split(separator: " ").prefix(2).compactMap(\.first)).uppercased()
+        String((name ?? "").uppercased().split(separator: " ").prefix(2).compactMap(\.first))
     }
 
     var body: some View {
@@ -269,7 +269,7 @@ private struct ProfilePictureMark: View {
                         Text(verbatim: initials)
                             .settingsFont(.small)
                             .lineLimit(1)
-                            .minimumScaleFactor(0.35)
+                            .minimumScaleFactor(SettingsTokens.Metric.avatarInitialsMinimumScale)
                     }
                 }
                 .foregroundStyle(SettingsTokens.tileForeground)
