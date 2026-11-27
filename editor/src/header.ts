@@ -831,7 +831,6 @@ export class ItemHeader {
     // Focus hides the head only, and the rows that follow a leading text are the head's.
     this.rowsBox.hidden =
       (visible.length === 0 && !folded) || (this.rowsFollowText(model) && model.focused)
-    this.rowsBox.classList.toggle('bare', visible.length === 0)
 
     this.drawMap(model.map)
     this.foot.draw(model.item, model.foot, this.symbols)

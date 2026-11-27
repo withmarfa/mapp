@@ -65,7 +65,7 @@ paths:
 
 - **The main window's minimum is 760 by 520,** set on its content. The panel folds below 1000 and the sidebar below 900. The app reopens only what it folded. Below 800, views share one pill.
 - **The panel starts at 300 points** and can be widened (`PanelWidth`).
-- **The page beside a layout shrinks from 372 to 300 points,** or less below 600 shared points (`BesideColumn`). Their divider reaches the window's top.
+- **The page beside a layout starts at 440 points,** and its divider drags between 300 and 600 (`BesideWidth`). It gives way to the layout's 600, down to 300 (`BesideColumn`).
 
 ## Corner
 

@@ -2,8 +2,8 @@ import AppKit
 import SwiftUI
 
 /// An item's head drawn in SwiftUI from `PageHead`, for a page the editor does not draw, as the editor's page draws it:
-/// the kicker, then `title`, then the pins while they are on, then the rows with Show More, over a hairline. Values are
-/// shown and links open; the status opens a native menu and writes as the item page's does. A value keeps to one line
+/// the kicker, then `title`, then the pins while they are on, then the rows with Show More. Values are shown and links
+/// open, the first `PageHead.rowLinkLimit` of a row, then "N More"; the status opens a native menu and writes as the item page's does. A value keeps to one line
 /// but a long text, which keeps to two, with the whole of it in the help.
 struct PageHeadView<Title: View>: View {
     @CurrentLibrary private var library
@@ -19,6 +19,16 @@ struct PageHeadView<Title: View>: View {
     var edit: ((PropertyRow, NSView) -> Void)?
     @ViewBuilder let title: Title
     @State private var expanded = false
+    /// The rows whose links the person opened past `PageHead.rowLinkLimit`.
+    @State private var openLinks: Set<String> = []
+    /// The width of the rows, which the names' column follows; 0 until measured.
+    @State private var rowsWidth: CGFloat = 0
+
+    /// The names' column in rows `width` wide, at `size` points of text: 40% of the row, between 112 and 150 points at
+    /// 13, so a narrow page leaves its values the room. The editor's page does the same (`.item-prop-label`).
+    static func labelWidth(in width: CGFloat, size: CGFloat) -> CGFloat {
+        min(max(width * 0.4, size * 112 / 13), size * 150 / 13)
+    }
 
     var body: some View {
         let size = CGFloat(InterfaceStyle.defaultTextSize) * InterfaceStyle.scale(for: textSize)
@@ -68,7 +78,7 @@ struct PageHeadView<Title: View>: View {
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
                             }
-                            .frame(width: size * 150 / 13, alignment: .leading)
+                            .frame(width: Self.labelWidth(in: rowsWidth, size: size), alignment: .leading)
                             EditableValue(row: row, edit: edit) {
                                 value(of: row, step: step)
                                     .help(row.wholeValue)
@@ -80,20 +90,22 @@ struct PageHeadView<Title: View>: View {
                     }
                     if head.foldedCount > 0 {
                         Button(expanded ? String(localized: "Show Less") : head.showMore) { expanded.toggle() }
-                            .buttonStyle(.plain)
-                            .foregroundStyle(.tertiary)
-                            // A symbol is `size` wide, centered in a slot of 16 points: the line starts at its edge.
-                            .padding(.leading, (size * 16 / 13 - size) / 2)
+                            .buttonStyle(ShowMoreStyle())
+                            // The names' edge: after the symbol's slot of 16 points and the gap.
+                            .padding(.leading, size * 16 / 13 + step * 2)
                             .frame(minHeight: size * 30 / 13)
                     }
                 }
                 .padding(.top, step * (head.pins.isEmpty ? 4 : 4.5))
                 .padding(.bottom, step * 2)
-                .overlay(alignment: .bottom) { Divider() }
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { rowsWidth = $0 }
             }
         }
         .font(.system(size: size))
-        .onChange(of: item.id) { expanded = false }
+        .onChange(of: item.id) {
+            expanded = false
+            openLinks = []
+        }
     }
 
     @ViewBuilder private func value(of row: PropertyRow, step: CGFloat) -> some View {
@@ -110,7 +122,8 @@ struct PageHeadView<Title: View>: View {
                     .buttonStyle(.plain)
                 }
             case .items(let targets):
-                ForEach(targets, id: \.item) { target in
+                let links = PageHead.linksShown(targets, isOpen: openLinks.contains(row.id))
+                ForEach(links.shown, id: \.item) { target in
                     Button { open(target.item) } label: {
                         switch target.kind {
                         case .link: MarkedName(text: target.title, icon: target.icon, underlinesOnHover: true)
@@ -118,6 +131,13 @@ struct PageHeadView<Title: View>: View {
                         }
                     }
                     .buttonStyle(.plain)
+                }
+                if links.hidden > 0 {
+                    Button { openLinks.insert(row.id) } label: {
+                        Text(verbatim: PageHead.moreLinksText(links.hidden))
+                    }
+                    .buttonStyle(ShowMoreStyle())
+                    .fixedSize()
                 }
             case .people(let names):
                 ForEach(Array(names.enumerated()), id: \.offset) { index, name in
@@ -185,6 +205,20 @@ struct PageHeadView<Title: View>: View {
         .foregroundStyle(.tint)
     }
 
+}
+
+/// A line that opens more, Show More and "N More": secondary text in medium weight that reads as a control, and darkens
+/// under the pointer.
+private struct ShowMoreStyle: ButtonStyle {
+    @State private var isHovered = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .fontWeight(.medium)
+            .foregroundStyle(isHovered || configuration.isPressed ? Color.primary : Color.secondary)
+            .contentShape(.rect)
+            .onHover { isHovered = $0 }
+    }
 }
 
 /// The status pin: its group's mark and the status in a chip. Where the item can be changed it is a native menu of the

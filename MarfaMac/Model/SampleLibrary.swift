@@ -90,7 +90,7 @@ nonisolated enum SampleLibrary {
         let fake = WorkingCopy.fake(
             items: given ?? castell?.items ?? (items(now: now, tasksAndEvents: withCollections) + (gallery ? SampleGallery.rows(now: now, files: galleryFiles) : [])),
             edges: edges ?? (given == nil
-                ? castell?.edges ?? (memberships(now: now) + (withCollections ? taskLinks(now: now) : []) + SampleGallery.edges(now: now, files: galleryFiles))
+                ? castell?.edges ?? (memberships(now: now) + referenceLinks(now: now) + (withCollections ? taskLinks(now: now) : []) + SampleGallery.edges(now: now, files: galleryFiles))
                 : []),
             itemTypes: castell == nil ? itemTypes + (gallery ? SampleGallery.types : []) : SampleCastell.itemTypes,
             edgeTypes: edgeTypes, views: views + feed.map(\.view), displays: display)
@@ -438,6 +438,15 @@ nonisolated enum SampleLibrary {
                     properties: collection.positioned ? ["position": .number(Double(index + 1))] : [:], version: 1,
                     createdAt: stamp(now), updatedAt: stamp(now))
             }
+        }
+    }
+
+    /// One note that references many others, so a links row has more than it shows.
+    static func referenceLinks(now: Date) -> [Marfa.Edge] {
+        ["design-of-everyday-things", "lisbon", "recipes", "design-review", "garden-ideas", "reading-list", "gift-ideas"].map { target in
+            Marfa.Edge(
+                id: "references-pattern-language-\(target)", fromId: "pattern-language", toId: target, edgeType: "references",
+                properties: [:], version: 1, createdAt: stamp(now), updatedAt: stamp(now))
         }
     }
 
@@ -802,6 +811,12 @@ nonisolated private let patternLanguage = """
 # A Pattern Language
 
 Pattern 159, light on two sides of every room. Worth remembering for the kitchen.
+
+![Morning light](https://pictures.example/light-morning.jpg)
+
+![Window seat](https://pictures.example/window-seat.jpg)
+
+![Kitchen corner](https://pictures.example/kitchen-corner.jpg)
 """
 
 nonisolated private let movingChecklist = """

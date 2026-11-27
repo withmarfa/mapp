@@ -142,8 +142,19 @@ nonisolated struct PageHead: Equatable, Sendable {
     /// Most values of a list a pin shows before "+N more": the first, so it can be shown whole.
     static let listLimit = 1
 
-    /// Most links a row or a link panel shows before "N More", which reveals the rest.
+    /// Most links a row of the page shows before "N More", which opens the rest in place, so a song linked to many things
+    /// does not flood the page.
+    static let rowLinkLimit = 3
+
+    /// Most chips a link field's panel shows before "N More", which reveals the rest.
     static let linkLimit = 30
+
+    /// The links a row shows, and how many it keeps behind "N More": all of them once `isOpen`, or while there are no more
+    /// than `rowLinkLimit`.
+    static func linksShown<Link>(_ links: [Link], isOpen: Bool) -> (shown: [Link], hidden: Int) {
+        guard !isOpen, links.count > rowLinkLimit else { return (links, 0) }
+        return (Array(links.prefix(rowLinkLimit)), links.count - rowLinkLimit)
+    }
 
     /// "12 More", the button that shows the links past the limit. The page draws these words and never counts.
     static func moreLinksText(_ count: Int) -> String { String(localized: "\(count) More") }

@@ -45,7 +45,8 @@ One item page serves every type. The type determines which fields appear and whe
 
 - **One head, built once.** `PageHead` decides the kicker, pins and rows; `editor/src/header.ts` draws them on a page with text, `PageHeadView` on a saved web page, which has no menu or drag. A rule added in one drawing must be added in the other.
 - **The kicker** is the type's mark and name, then Read Only, Feed or Archived where true. Its name opens Change Type where the item can change type.
-- **Rows show what has a value, six at most, then Show N More,** which lists every property in the type's order, Empty where unset, hidden ones grey. On read-only and deleted pages nothing opens.
+- **Rows show what has a value, six at most, then Show N More,** which lists every property in the type's order, Empty where unset, hidden ones grey. On read-only and deleted pages nothing opens. The rows have no divider.
+- **A links row shows three items, then N More.**
 - **A type with no text shows its first six rows,** empty or not.
 - **A row is dragged by its name.** A drag or Move Up or Down moves only that row in the type's one order.
 - **An event's When row comes first.** It shows how far away the event is or says All Day. Each attendee's response appears in gray after their name.
@@ -95,7 +96,7 @@ The page and the panel draw what `Item.allows(_:)` answers, and never judge an i
 
 ## Page notices
 
-Quiet lines at the top of the column say what is not ordinary (`PageNotice.all`). The web head, a file's page and a saved web page draw them the same way, with one action at most and no fill. VoiceOver hears them once. The wash reaches 12 points beyond the text, with 22 points under it.
+Quiet lines at the top of the column say what is not ordinary (`PageNotice.all`). The web head, a file's page and a saved web page draw them the same way, with one action at most, a small gray button. On a narrow page it stands under the words. VoiceOver hears them once. The wash reaches 12 points beyond the text, with 22 points under it.
 
 | The item has | The action |
 | --- | --- |
