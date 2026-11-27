@@ -295,7 +295,7 @@ import Testing
             Issue.record("a secret is told about, never handed back")
             return
         }
-        #expect(title == "Signing Secret Not Copied")
+        #expect(title == "Webhook Created")
         #expect(message.contains("hooks.ledgerly.app/marfa"))
         #expect(!message.contains("whsec_"))
         #expect(model.created == nil)
@@ -342,7 +342,7 @@ import Testing
         await making.value
         #expect(drafts.count == 1, "the secret was made and is told about, not forgotten")
         if case .told(let title, let message)? = drafts.first {
-            #expect(title == "Signing Secret Not Copied")
+            #expect(title == "Webhook Created")
             #expect(!message.contains("whsec_"))
         } else {
             Issue.record("told")

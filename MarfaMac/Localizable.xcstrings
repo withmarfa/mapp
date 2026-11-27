@@ -6410,6 +6410,9 @@
     "Limit Sources" : {
 
     },
+    "Limit sources" : {
+
+    },
     "Limit Sources Not Saved" : {
 
     },
@@ -9498,9 +9501,6 @@
     "Signing Secret" : {
 
     },
-    "Signing Secret Not Copied" : {
-
-    },
     "Signs sign-ins. Never shown." : {
 
     },
@@ -11600,9 +11600,6 @@
     "Turn Off %@?" : {
 
     },
-    "Turn Off…" : {
-
-    },
     "Turn off “%@”?" : {
 
     },
@@ -12093,7 +12090,10 @@
     "Webhook Address Not Changed" : {
 
     },
-    "Webhook Limit Reached" : {
+    "Webhook Created" : {
+
+    },
+    "Webhook limit reached" : {
 
     },
     "Webhook Not Made" : {
@@ -12275,6 +12275,9 @@
 
     },
     "Who May Write" : {
+
+    },
+    "Who may write" : {
 
     },
     "Who May Write Not Saved" : {

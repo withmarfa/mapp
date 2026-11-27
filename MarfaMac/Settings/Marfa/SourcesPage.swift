@@ -116,11 +116,11 @@ struct SourcesPage: View {
                 }
             }
             SettingsLinkRow(
-                verbatim: SourceRule.allowlist.title, lead: .tile("square.and.pencil", .blue),
+                verbatim: String(localized: "Who may write"), lead: .tile("square.and.pencil", .blue),
                 value: limit.status(of: .allowlist), lock: lock
             ) { navigation?.push(Self.whoMayWrite) }
             SettingsLinkRow(
-                verbatim: SourceRule.filter.title, lead: .tile("eye", .indigo),
+                verbatim: String(localized: "Limit sources"), lead: .tile("eye", .indigo),
                 value: limit.status(of: .filter), lock: lock
             ) { navigation?.push(Self.limitSources) }
         }
@@ -272,7 +272,7 @@ private struct SourceRulePage: View {
                 if model.isOn {
                     SettingsSection("Turn Off") {
                         SettingsRow(verbatim: words.turnOff, line: words.turnOffLine) {
-                            SettingsButton("Turn Off…", role: .destructive) { asksToTurnOff = true }.disabled(model.isSaving)
+                            SettingsButton("Turn Off", role: .destructive) { asksToTurnOff = true }.disabled(model.isSaving)
                         }
                     }
                 }

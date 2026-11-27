@@ -156,8 +156,8 @@ import Observation
         return .standing
     }
 
-    /// The webhooks grouped by who made them: this sign-in's own first, always, so New Webhook… has its place; then each
-    /// app, then each key, by name, a maker that has expired or is gone last. Oldest first within a group.
+    /// Groups this sign-in’s webhooks first, then the other apps and keys. Expired or missing makers come last.
+    /// Each group lists its oldest webhook first.
     var groups: [Group] {
         let sorted = webhooks.sorted { ($0.created ?? .distantFuture) < ($1.created ?? .distantFuture) }
         let own = sorted.filter(isOwn)
@@ -574,7 +574,7 @@ import Observation
         if closedWhileMaking {
             closedWhileMaking = false
             sheet = nil
-            context.lateDraft(Self.notCopied(made.webhook.url))
+            context.lateDraft(Self.creationNotice(made.webhook.url))
         } else {
             created = made
             sheet = .secret
@@ -584,10 +584,9 @@ import Observation
         await reloadIfScopeChanged()
     }
 
-    /// The notice for a webhook made whose signing secret was never copied: it can't be shown again.
-    private static func notCopied(_ address: String) -> OwnerDraft {
+    private static func creationNotice(_ address: String) -> OwnerDraft {
         .told(
-            title: String(localized: "Signing Secret Not Copied"),
+            title: String(localized: "Webhook Created"),
             message: String(localized: "The webhook “\(display(address))” was made, and its signing secret can’t be shown again. If you didn’t copy it, delete the webhook on the Webhooks page and make it again."))
     }
 
@@ -618,7 +617,7 @@ import Observation
         }
         switch sheet {
         case .secret:
-            return created.map { [Self.notCopied($0.webhook.url)] } ?? []
+            return created.map { [Self.creationNotice($0.webhook.url)] } ?? []
         case .new:
             return typedDraft().map { [$0] } ?? []
         case .address(let id):

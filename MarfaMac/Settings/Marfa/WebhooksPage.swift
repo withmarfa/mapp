@@ -107,7 +107,7 @@ struct WebhooksPage: View {
                     }
                 } content: {
                     if index == 0 && model.atCap {
-                        SettingsRow("Webhook Limit Reached", line: "This sign-in holds \(WebhooksModel.cap) webhooks, the most the server allows.")
+                        SettingsRow("Webhook limit reached", line: "This sign-in holds \(WebhooksModel.cap) webhooks, the most the server allows.")
                     }
                     ForEach(group.webhooks) { webhook in
                         let state = model.isSending(webhook)
