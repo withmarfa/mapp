@@ -10897,6 +10897,9 @@
     "The view won’t keep:" : {
       "extractionState" : "manual"
     },
+    "The webhook may have been deleted, or this sign-in may have lost access." : {
+
+    },
     "The webhook “%@” was made, and its signing secret can’t be shown again. If you didn’t copy it, delete the webhook on the Webhooks page and make it again." : {
 
     },
@@ -11133,9 +11136,6 @@
     },
     "This Version" : {
       "extractionState" : "manual"
-    },
-    "This Webhook Is Gone" : {
-
     },
     "This Week" : {
 
@@ -12097,6 +12097,9 @@
 
     },
     "Webhook Not Made" : {
+
+    },
+    "Webhook Unavailable" : {
 
     },
     "Webhooks" : {

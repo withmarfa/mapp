@@ -56,8 +56,8 @@ struct WebhooksPage: View {
                 WebhookDetail(model: model, webhook: webhook, host: host)
             } else {
                 SettingsPageState(
-                    symbol: "dot.radiowaves.up.forward", title: Text("This Webhook Is Gone"),
-                    line: Text("It was deleted, here or somewhere else."), action: ("Back", { navigation?.back() }))
+                    symbol: "dot.radiowaves.up.forward", title: Text("Webhook Unavailable"),
+                    line: Text("The webhook may have been deleted, or this sign-in may have lost access."), action: ("Back", { navigation?.back() }))
             }
         } else if model.webhooks.isEmpty {
             empty
