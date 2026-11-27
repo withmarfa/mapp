@@ -266,7 +266,10 @@ private struct ProfilePictureMark: View {
                     if initials.isEmpty {
                         SettingsTileGlyph(symbol: "person.fill", tileSize: SettingsTokens.Metric.tile)
                     } else {
-                        Text(verbatim: initials).settingsFont(.small)
+                        Text(verbatim: initials)
+                            .settingsFont(.small)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.35)
                     }
                 }
                 .foregroundStyle(SettingsTokens.tileForeground)
