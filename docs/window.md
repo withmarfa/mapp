@@ -34,7 +34,6 @@ paths:
 - **Five types show, then "N More".** Counts include kinds.
 - **Hover highlights rows,** swaps counts for Add and shows Add and More on headings. Sections stay open. The chosen row stays soft gray, focused or not.
 - **Customize Sidebar** uses a menu on each faded place.
-- **Go lists sidebar places, views and types, plus Archive** (`GoMenu`).
 
 ### A layout an earlier copy stored
 

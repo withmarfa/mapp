@@ -32,7 +32,7 @@ Each kind of thing has one drawing, used on the page and in a panel, row, card o
 
 - **A value from a set is a chip, and anything else is text or a fact**.
 - **A chip has one gray wash and no edge.** Only the type being given to an item is tinted (`TintedChip`); Appearance chooses Tinted (default) or Gray.
-- **A person's circle is 18 points: purple letters on pale purple, no edge** (`PersonCircle`). The name beside it is a fact: 13 points, regular.
+- **A person's circle is purple letters on pale purple, no edge** (`PersonCircle`). The name beside it is a fact.
 - **Chips come from one family** (`PageChip`, `PersonCircle`, `ChipLine`) in two sizes. `ChipLooks` owns the measures, the web header reads them as `--chip-*` variables, and `ChipLooksTests` checks they agree.
 - **Several values show as two, then a count.**
 - **A type's mark in a row and on the page is its glyph in the plain tone** (`TonedGlyph`); the palette draws marks in one gray. A tile (`TypeTile`) is only for the Settings type page.
@@ -105,5 +105,5 @@ Neutral washes are white at the same strength, hairlines white at 12%, and a ton
 
 - **Buttons and menu items are in title case**, sentences in sentence case. The words follow the Writing section of Apple's Human Interface Guidelines.
 - **A label says what happens to the person's things**, with the names in `docs/model.md`, never a server's term.
-- **A symbol before a label has its size and weight.** Symbols are SF Symbols.
+- **A symbol before a label has its size and weight.**
 - **Every string a person reads is in the String Catalog.**
