@@ -63,6 +63,8 @@ final class PreferencesSync {
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var listening: Task<Void, Never>?
     @ObservationIgnored private var pending: Task<Void, Never>?
+    @ObservationIgnored private var removalCatchUp: Task<Void, Never>?
+    @ObservationIgnored private var removalCaughtUp = false
     @ObservationIgnored private var running = false
     /// Above zero while a removal, or an import, a restore or Reset, is under way: no step runs.
     @ObservationIgnored private var holding = 0
@@ -143,6 +145,7 @@ final class PreferencesSync {
         listening = nil
         pending?.cancel()
         pending = nil
+        stopRemovalCatchUp()
         copy = nil
         item = nil
         standing = .off(.noMarfa)
@@ -179,6 +182,7 @@ final class PreferencesSync {
     func remove(confirmed: Bool = false, sendsOtherChanges: Bool = true) async throws {
         guard let copy else { return }
         let generation = generation
+        stopRemovalCatchUp()
         pending?.cancel()
         pending = nil
         // A step under way ends first, and none starts until the items are in the bin, so none writes to a binned item
@@ -205,6 +209,7 @@ final class PreferencesSync {
                 adopted.removedItems = (adopted.removedItems ?? [adopted.item]).union(held.map(\.id))
                 record.marfas[instance] = adopted
             }
+            record.restarting.remove(instance)
             record.save(defaults)
         }
         if confirmed {
@@ -233,6 +238,28 @@ final class PreferencesSync {
         record.restarting.insert(instance)
         record.save(defaults)
         await run()
+    }
+
+    private func stopRemovalCatchUp() {
+        removalCatchUp?.cancel()
+        removalCatchUp = nil
+        removalCaughtUp = false
+    }
+
+    /// A restart may need the server. Flushing on departure must still be able to finish from this Mac's copy.
+    private func catchUpAfterRemoval(in copy: any PreferencesCopy) {
+        guard removalCatchUp == nil else { return }
+        let generation = generation
+        removalCatchUp = Task { [weak self] in
+            guard self?.generation == generation else { return }
+            let caughtUp = (try? await copy.catchUpAfterRemovals()) == true
+            guard !Task.isCancelled, let self, self.generation == generation else { return }
+            self.removalCatchUp = nil
+            if caughtUp {
+                self.removalCaughtUp = true
+                self.schedule(after: .zero)
+            }
+        }
     }
 
     // MARK: Replacing on purpose
@@ -317,20 +344,26 @@ final class PreferencesSync {
             guard ready.filled else { return standing = .off(.notFilled) }
             guard ready.holdsType else { return standing = .off(.needsPermission) }
             guard ready.tablesWhole, let instance = ready.instance else { return standing = .off(.notFilled) }
-            var items = try await copy.items()
+            let items = try await copy.items()
             answered.merge(await copy.answers()) { _, later in later }
             guard generation == self.generation else { return }
             var record = Record.read(defaults)
-            if let adopted = record.marfas[instance], adopted.removed == true {
+            if var adopted = record.marfas[instance], adopted.removed == true {
                 item = nil
                 standing = .off(.removed)
                 guard record.restarting.contains(instance) else { return }
                 let removedItems = adopted.removedItems ?? [adopted.item]
-                if items.contains(where: { removedItems.contains($0.id) }) {
-                    guard let current = try await copy.itemsAfterRemovalsSettle(), generation == self.generation else { return }
-                    items = current
+                if !removalCaughtUp, items.contains(where: { removedItems.contains($0.id) }) {
+                    catchUpAfterRemoval(in: copy)
+                    return
                 }
-                record.marfas[instance] = nil
+                if items.contains(where: { $0.id == adopted.item }) {
+                    adopted.removed = nil
+                    adopted.removedItems = nil
+                    record.marfas[instance] = adopted
+                } else {
+                    record.marfas[instance] = nil
+                }
             }
             let originals = items.filter { !$0.isConflictedCopy }
             let local = readLocal()
@@ -371,8 +404,8 @@ final class PreferencesSync {
                 }
                 guard let adopted else { return }
                 record.marfas[instance] = adopted
-                record.restarting.remove(instance)
             }
+            if record.restarting.remove(instance) != nil { stopRemovalCatchUp() }
             record.last = instance
             // This step wrote the settings marked to win that it read; a mark made since stays.
             let read = record.winning ?? [:]

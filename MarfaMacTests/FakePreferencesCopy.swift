@@ -32,6 +32,8 @@ actor FakePreferencesCopy: PreferencesCopy {
     private(set) var writesToBinned = 0
     /// The item list still shows the copy's state from before the removal.
     private var visibleBinnedItems: Set<String> = []
+    nonisolated let settlingRemovals = HeldSwitch()
+    private(set) var isSettlingRemovals = false
 
     func showBinnedItems(_ ids: Set<String>) { visibleBinnedItems = ids }
 
@@ -242,9 +244,11 @@ actor FakePreferencesCopy: PreferencesCopy {
 
     func pendingRemovals() async throws -> Set<String> { Set(queuedRemovals.keys) }
 
-    func itemsAfterRemovalsSettle() async throws -> [PreferencesItem]? {
-        guard queuedRemovals.isEmpty, visibleBinnedItems.isEmpty else { return nil }
-        return try await items()
+    func catchUpAfterRemovals() async throws -> Bool {
+        isSettlingRemovals = true
+        defer { isSettlingRemovals = false }
+        await settlingRemovals.wait()
+        return queuedRemovals.isEmpty && visibleBinnedItems.isEmpty
     }
 
     func holdsOtherChanges(besides items: Set<String>) async throws -> Bool { !libraryWrites.isEmpty }

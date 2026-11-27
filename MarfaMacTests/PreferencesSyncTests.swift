@@ -365,6 +365,7 @@ import Testing
     }
 
     @Test func settingsCanBeKeptAgainAfterMarfaRefusesRemoval() async throws {
+        defaults.set("light", forKey: AppearanceKey.theme)
         let copy = FakePreferencesCopy()
         let sync = await sync(copy)
         let item = try #require(await copy.activeIDs.first)
@@ -373,12 +374,36 @@ import Testing
         defaults.set("dark", forKey: AppearanceKey.theme)
         await sync.flush()
         #expect(sync.standing == .off(.removed))
-        #expect(await copy.unitsHeld(item)[theme] == nil)
+        #expect(await copy.unitsHeld(item)[theme] == #""light""#)
 
         try await sync.startAgain()
-        #expect(sync.standing == .syncing)
+        #expect(await eventually { sync.standing == .syncing })
         #expect(await copy.activeIDs == [item])
+        #expect(defaults.string(forKey: AppearanceKey.theme) == "dark")
         #expect(await copy.unitsHeld(item)[theme] == #""dark""#)
+    }
+
+    @Test func flushingSettingsDoesNotWaitForTheServerToSettleRemoval() async throws {
+        let copy = FakePreferencesCopy()
+        let sync = await sync(copy)
+        let item = try #require(await copy.activeIDs.first)
+        try await sync.remove()
+        await copy.refuseRemoval(of: item)
+
+        copy.settlingRemovals.withLock { $0 = true }
+        defer { copy.settlingRemovals.withLock { $0 = false } }
+        let restarting = Task { try await sync.startAgain() }
+        try #require(await eventuallyAsking { await copy.isSettlingRemovals })
+        var flushed = false
+        let handOver = Task {
+            await sync.flush()
+            flushed = true
+        }
+        let flushedBeforeServer = await eventually(within: .seconds(1)) { flushed }
+        copy.settlingRemovals.withLock { $0 = false }
+        try await restarting.value
+        await handOver.value
+        #expect(flushedBeforeServer)
     }
 
     // MARK: Review findings
