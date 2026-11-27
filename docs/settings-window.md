@@ -30,6 +30,7 @@ See `docs/owner-settings.md` for Marfa pages and `docs/settings-sync.md` for sto
 - **A refused input keeps what was typed**, with one line under the title that says why.
 - **Put an add button at the trailing edge of the section title** (`SettingsSection`'s accessory). Use the same slot for header choices or search and a filter when the section needs them. Put a note about the section in its footer.
 - **Row controls use the small size** with secondary values, a plain More menu, and pop-ups at least 120 points wide. Pop-ups and header choices fit their text. Only a disk path has a folder glyph.
+- **A page header has one key action,** a large capsule (28 points), so it reads larger than a row button (`settingsHeaderAction`). Account has Sign Out and General has Check for Updates.
 - **A page link has a colored tile and a chevron.** A locked link dims the tile and shows a lock with a short reason. A row about a thing uses a plain symbol or no symbol.
 - **A section table has no stripes and aligns numbers at the trailing edge.** It shows all rows through 50. For longer lists it previews 20 with the count and Show All, which expands the table or opens the full list. Use text tabs with optional counts for page views.
 - **Use title case for page and section titles, buttons, tabs, column headings, sheet titles, and alert titles.** Use sentence case for row labels, switches, and descriptions. An ellipsis marks a button that needs more from the person first, never one that acts at once.
@@ -44,7 +45,7 @@ See `docs/owner-settings.md` for Marfa pages and `docs/settings-sync.md` for sto
 
 | Page | What to know before a change |
 | --- | --- |
-| General | Reopen windows follows the Mac until changed. Open Marfa links in sets the system default. Error reports and updates require configured destinations. Settings holds Remove, Export, Import, Restore, and Reset |
+| General | Opens with a header: Marfa, its version and Check for Updates, which only a build that updates itself has. Reopen windows follows the Mac until changed. Open Marfa links in sets the system default. Error reports and updates require configured destinations. Settings holds Remove, Export, Import, Restore, and Reset |
 | Appearance | App icon updates the Dock at launch and on change. Sky uses the bundle icon. Alternatives are Cobalt, Sea, Leaf, Marigold, and Adobe. Sidebar color applies to the main window |
 | Keyboard | Search by command or keys. Export and Restore Defaults include menu and global shortcuts. Import updates commands in the file (`docs/commands.md`) |
 | Editor | Fonts load when the page opens. PDF background shares the choice in View › PDF Background. Inkkit replaces `EditorOptions` as a set. Edit pages as applies to items opened next |

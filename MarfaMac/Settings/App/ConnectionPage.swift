@@ -134,7 +134,7 @@ struct ConnectionPage: View {
                     HStack(spacing: SettingsTokens.Metric.buttonGap) {
                         SettingsValue(verbatim: value)
                         if account.offersMore {
-                            SettingsButton(settingsHost.isAllowingMore ? "Waiting…" : "Allow More") {
+                            SettingsButton(settingsHost.isAllowingMore ? "Waiting…" : "Allow More…") {
                                 Task { _ = await settingsHost.allowMore(ConnectionAccount.asked) }
                             }
                             .disabled(model.isWorking || settingsHost.isAllowingMore)

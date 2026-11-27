@@ -19,7 +19,7 @@ import Testing
         let needing = words(.off(.needsPermission))
         #expect(needing.title == "Kept on this Mac only")
         #expect(needing.line == "The app isn’t allowed to keep them in Home yet. Once it is, every Mac that connects uses them.")
-        #expect(needing.action == .allowMore && needing.actionTitle == "Allow More")
+        #expect(needing.action == .allowMore && needing.actionTitle == "Allow More…")
     }
 
     @Test func removedSettingsStayOnThisMacUntilThePersonKeepsThemAgain() {
