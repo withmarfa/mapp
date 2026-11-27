@@ -66,7 +66,7 @@ import Testing
         await libraries.host.refreshGrants()
         #expect(!libraries.host.readsProfile)
         let account = ConnectionAccount(
-            state: .online, grants: adapter.grants, grantsRead: true, readsProfile: libraries.host.readsProfile, waiting: 0, serverName: "X")
+            state: .online, grants: adapter.grants, grantsRead: true, readsProfile: libraries.host.readsProfile, waiting: 0)
         #expect(account.offersName, "Connection offers to allow it")
         bench.signIns.script(browser: [.success("again")])
         #expect(await adapter.allowMore([]) == .allowed)
@@ -88,7 +88,7 @@ import Testing
         func account() -> ConnectionAccount {
             ConnectionAccount(
                 state: .online, grants: adapter.grants, grantsRead: true, readsProfile: libraries.host.readsProfile,
-                lacksAsked: libraries.host.lacksAsked, waiting: 0, serverName: "X")
+                lacksAsked: libraries.host.lacksAsked, waiting: 0)
         }
         #expect(account().offersMore, "Connection offers Allow More…")
         #expect(account().permissionsLine == "The app holds all 14 of the owner’s permissions, but not all the access it asks for.")

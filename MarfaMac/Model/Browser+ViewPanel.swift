@@ -309,7 +309,7 @@ extension Browser {
 
     /// The same, for a view that watches Settings' Open Items itself (`@AppStorage`) and passes it as `settings`.
     func itemOpening(settings: ItemOpening) -> ItemOpening {
-        chosenOpening ?? settings
+        chosenOpening ?? settings.asDefault
     }
 
     /// Changes where the open place opens its items; nil follows Settings. Undo takes it back.

@@ -8,14 +8,11 @@ struct AppsPage: View {
     let host: any MarfaSettingsHost
     let subpage: SettingsSubpage?
     @State private var model: AppsModel
-    /// The page view's, shared with the gate's states.
-    let links: OpenLinksModel
     @Environment(\.settingsNavigation) private var navigation
 
-    init(host: any MarfaSettingsHost, subpage: SettingsSubpage?, links: OpenLinksModel) {
+    init(host: any MarfaSettingsHost, subpage: SettingsSubpage?) {
         self.host = host
         self.subpage = subpage
-        self.links = links
         _model = State(initialValue: AppsModel(context: OwnerContext(host: host), ownVendor: host.ownAppVendor))
     }
 
@@ -49,9 +46,9 @@ struct AppsPage: View {
 
     @ViewBuilder private var content: some View {
         if let failure = model.failure {
-            standing { OwnerFailureState(page: .apps, failure: failure, host: host) { Task { await model.load() } } }
+            OwnerFailureState(page: .apps, failure: failure, host: host) { Task { await model.load() } }
         } else if !model.hasLoaded {
-            standing { OwnerLoading() }
+            OwnerLoading()
         } else if subpage != nil {
             if let app = openApp {
                 if isShowingPermissions {
@@ -69,18 +66,8 @@ struct AppsPage: View {
         }
     }
 
-    /// A state of the list keeps the Mac's own setting above it, which needs no Marfa. An app's page has none.
-    @ViewBuilder private func standing<State: View>(@ViewBuilder _ state: () -> State) -> some View {
-        if subpage == nil {
-            SettingsStandingState { OpenLinksSection(model: links) } state: { state() }
-        } else {
-            state()
-        }
-    }
-
     private var list: some View {
         SettingsPageColumn {
-            OpenLinksSection(model: links)
             SettingsSection("Connected") {
                 if model.apps.isEmpty {
                     SettingsEmptyCard(symbol: "macwindow", title: Text("No Apps"), line: Text("No apps are connected."))

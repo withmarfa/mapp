@@ -26,7 +26,7 @@ See `docs/owner-settings.md` for Marfa pages and `docs/settings-sync.md` for sto
 - **Pages draw with `Parts/`.** Keep app models out of parts.
 - **Every measure, color and font is in `SettingsTokens`.**
 - **A row is a lead, a title, one line and one trailing control** (`SettingsRow`), two lines at most. A problem row may hold two buttons, as may the release row of Updates.
-- **A value that a button acts on goes in the row's line.** A problem's words are told whole.
+- **A value a button acts on goes in the row's line**, except Connection’s permission count and opened-file size. Show problem text in full.
 - **A refused input keeps what was typed**, with one line under the title that says why.
 - **Put an add button at the trailing edge of the section title** (`SettingsSection`'s accessory). Use the same slot for header choices or search and a filter when the section needs them. Put a note about the section in its footer.
 - **Row controls use the small size** with secondary values, a plain More menu, and pop-ups at least 120 points wide. Pop-ups and header choices fit their text. A disk path or web address can have a folder or link glyph.
@@ -44,20 +44,19 @@ See `docs/owner-settings.md` for Marfa pages and `docs/settings-sync.md` for sto
 
 | Page | What to know before a change |
 | --- | --- |
-| General | Reopen Windows follows the Mac until the person changes it, and only then writes `NSQuitAlwaysKeepsWindows`. Send Error Reports and Updates show only in a build that carries a destination or a feed |
+| General | Reopen windows follows the Mac until changed. Open Marfa links in sets the system default. Error reports and updates require configured destinations. Settings holds Remove, Export, Import, Restore, and Reset |
 | Appearance | App icon updates the Dock at launch and on change. Sky uses the bundle icon. Alternatives are Cobalt, Sea, Leaf, Marigold, and Adobe. Sidebar color applies to the main window |
 | Keyboard | Every menu command with its shortcut, and the any-app ones (`docs/commands.md`) |
 | Editor | Fonts load when the page opens. PDF background shares the choice in View › PDF Background. Inkkit replaces `EditorOptions` as a set. Edit pages as applies to items opened next |
 | Lists | The starting density, sort and group of a place, until a view or the place chooses its own |
 | Layouts | How each type looks, through the stores of `docs/type-looks.md`. Only what differs from the type's preset is kept, so a better preset still reaches it. Page pins properties and holds the one Linked From row, which reads and writes the type's stored choice (`PagePlacements.linkedFrom`) |
 | Search | What searches of the whole library leave out (`SearchLeaveOuts`). A search in one place leaves nothing out. A type or source that would pass a query's ten conditions is dimmed, with the reason |
-| On This Mac | Opens from Connection. The copy, downloaded files and exports, below |
-| Connection | Sign-in, other Marfas and Disconnect, which reads the queue in the same step and asks about changes that wait |
+| Connection | Address status, Signed in as linking to Account, permission and queue counts, downloaded files, and exports. Other Marfas shows when other copies exist. Disconnect asks about unsent changes |
 
 - **A choice whose thing is gone keeps its name, marked as missing** (`MissingChoice`), and the app uses the default meanwhile.
 - **Import, restore and reset save a restore point first.** If that fails, nothing changes.
 
-## On This Mac
+## Connection’s downloaded files and local copy
 
 - **An export is saved only when the app has read it back and checked it whole** (`LibraryExport`): plain tar, the manifest first, every count, and each file's bytes against its name. The server writes exactly that, so anything else is refused and told.
 - **It must be the Marfa that the copy names**, by instance id.

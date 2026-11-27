@@ -14,6 +14,9 @@ nonisolated enum ItemOpening: String, Codable, CaseIterable, Identifiable, Hasha
     case newWindow
 
     static let standard = ItemOpening.besideList
+    static let defaultChoices: [ItemOpening] = [.besideList, .modal, .fullPage]
+
+    var asDefault: ItemOpening { self == .newWindow ? Self.standard : self }
 
     var id: Self { self }
 
@@ -57,7 +60,7 @@ nonisolated enum ItemOpening: String, Codable, CaseIterable, Identifiable, Hasha
 
     /// What Settings holds, or the standard where nothing is stored or what is stored is not a way this version has.
     static func stored(in defaults: UserDefaults = .standard) -> ItemOpening {
-        defaults.string(forKey: ListKey.openItemsIn).flatMap(ItemOpening.init(rawValue:)) ?? .standard
+        defaults.string(forKey: ListKey.openItemsIn).flatMap(ItemOpening.init(rawValue:))?.asDefault ?? .standard
     }
 }
 

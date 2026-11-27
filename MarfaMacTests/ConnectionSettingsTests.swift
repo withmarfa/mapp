@@ -3,7 +3,7 @@ import Marfa
 import Testing
 @testable import MarfaMac
 
-/// Connection's "This App’s Settings" section in each state, and Disconnect's choice to remove them first.
+/// General’s settings in each state, and Disconnect’s choice to remove them first.
 @Suite(.hangLimit)
 @MainActor struct ConnectionSettingsTests {
     private let first = try! MarfaConnection(address: "http://first.test:8210")
@@ -16,15 +16,15 @@ import Testing
 
     @Test func withoutAPermissionTheySayTheyStayOnThisMacAndOfferAllowMore() {
         let needing = words(.off(.needsPermission))
-        #expect(needing.title == "Kept on This Mac Only")
-        #expect(needing.line == "The app isn’t allowed to keep them in Home yet. Once it is, every Mac that connects uses them.")
+        #expect(needing.title == "Kept on this Mac only")
+        #expect(needing.line == "The app isn’t allowed to keep them in this Marfa yet. Once it is, every Mac that connects uses them.")
         #expect(needing.action == .allowMore && needing.actionTitle == "Allow More…")
     }
 
     @Test func removedSettingsStayOnThisMacUntilThePersonKeepsThemAgain() {
         let removed = words(.off(.removed))
-        #expect(removed.title == "Kept on This Mac Only")
-        #expect(removed.line == "They were removed from Home. This Mac keeps its own.")
+        #expect(removed.title == "Kept on this Mac only")
+        #expect(removed.line == "They were removed from this Marfa. This Mac keeps its own.")
         #expect(removed.action == .keepAgain && removed.actionTitle == "Keep in Marfa Again")
     }
 
@@ -32,7 +32,8 @@ import Testing
         let syncing = words(.syncing)
         #expect(syncing.removeTitle == "Remove This App’s Settings from Home?")
         #expect(syncing.removeMessage == "Every Mac that connects to Home loses them. This Mac keeps its own, and your items stay.")
-        #expect(ConnectionSettings.footer == "Each Mac keeps its own window sizes and positions, column widths, global shortcuts, and On This Mac settings.")
+        #expect(syncing.title == "Kept in this Marfa")
+        #expect(syncing.actionTitle == "Remove")
     }
 
     /// The section's state is the sync's own, so Allow More… moving it on needs nothing else.
@@ -302,6 +303,21 @@ import Testing
 
         try await sync.remove(confirmed: true)
         #expect(await copy.sends == 1 && sync.standing == .off(.removed))
+    }
+
+    @Test func generalKeepsSettingsWhenTheServerRefusesRemoval() async throws {
+        let copy = FakePreferencesCopy()
+        let (sync, _) = try await syncing(copy)
+        await copy.setDelivers(false)
+        await #expect(throws: MarfaError.self) { try await sync.removeFromMarfa() }
+        #expect(sync.syncs && sync.item != nil)
+        #expect(await copy.removed.isEmpty)
+        #expect(await copy.queuedRemovals.isEmpty)
+
+        await copy.setDelivers(true)
+        try await sync.removeFromMarfa()
+        #expect(sync.standing == .off(.removed))
+        #expect(await copy.removed.count == 1)
     }
 
     @Test func aRemovalTheServerDidNotTakeThrowsSoDisconnectCanSayIt() async throws {

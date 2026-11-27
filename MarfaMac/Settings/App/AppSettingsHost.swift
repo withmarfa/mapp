@@ -24,7 +24,7 @@ enum LibraryDescription {
 @Observable @MainActor final class AppSettingsHost: MarfaSettingsHost {
     private let libraries: Libraries
     private let launcher: SettingsLauncher
-    private(set) var isAllowingMore = false
+    var isAllowingMore: Bool { libraries.marfaSettings.isAllowingMore }
     let instanceSettings: InstanceSettingsModel
     var ownerDrafts: OwnerDrafts { libraries.ownerDrafts }
     /// The main windows open, which `openInApp` shows a place in; without it Settings offers none.
@@ -201,20 +201,7 @@ enum LibraryDescription {
     func holds(_ scope: String) -> Bool { host.heldScopes.contains(scope) }
 
     func allowMore(_ permissions: Set<InstancePermission>) async -> MarfaAllowMoreOutcome {
-        guard !isAllowingMore, host.connection != nil else { return .failed }
-        isAllowingMore = true
-        defer { isAllowingMore = false }
-        let model = libraries.marfaSettings
-        await model.start(.signInAgain(usingCode: false)).value
-        switch model.lastEnding {
-        case .completed?:
-            await host.refreshGrants()
-            return permissions.isSubset(of: host.grants) ? .allowed : .approvedFewer
-        case .canceled?:
-            return .cancelled
-        case .failed?, nil:
-            return .failed
-        }
+        await libraries.marfaSettings.allowMore(permissions)
     }
 
     func tryAgain() { host.refresh() }

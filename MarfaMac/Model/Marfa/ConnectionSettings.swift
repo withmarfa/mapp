@@ -1,6 +1,6 @@
 import Foundation
 
-/// What Connection's "This App’s Settings" section says in each state of `PreferencesSync.Standing`, in the app's words.
+/// What General says about settings kept in the Marfa, and what Disconnect says about removing them.
 nonisolated struct ConnectionSettings: Equatable, Sendable {
     nonisolated enum Action: Equatable, Sendable {
         /// Moves the settings out of the Marfa.
@@ -21,19 +21,19 @@ nonisolated struct ConnectionSettings: Equatable, Sendable {
 
     var title: String {
         switch standing {
-        case .syncing: String(localized: "Kept in \(name)")
-        case .off(.needsPermission), .off(.removed), .off(.noMarfa): String(localized: "Kept on This Mac Only")
-        case .off(.notFilled): String(localized: "Not Ready Yet")
+        case .syncing: String(localized: "Kept in this Marfa")
+        case .off(.needsPermission), .off(.removed), .off(.noMarfa): String(localized: "Kept on this Mac only")
+        case .off(.notFilled): String(localized: "Not ready yet")
         }
     }
 
     var line: String? {
         switch standing {
-        case .syncing: String(localized: "Every Mac that connects to it uses them.")
+        case .syncing: nil
         case .off(.needsPermission):
-            String(localized: "The app isn’t allowed to keep them in \(name) yet. Once it is, every Mac that connects uses them.")
-        case .off(.notFilled): String(localized: "The app keeps them in \(name) once this Mac has finished downloading it.")
-        case .off(.removed): String(localized: "They were removed from \(name). This Mac keeps its own.")
+            String(localized: "The app isn’t allowed to keep them in this Marfa yet. Once it is, every Mac that connects uses them.")
+        case .off(.notFilled): String(localized: "The app keeps them in this Marfa once this Mac has finished downloading it.")
+        case .off(.removed): String(localized: "They were removed from this Marfa. This Mac keeps its own.")
         case .off(.noMarfa): nil
         }
     }
@@ -49,19 +49,14 @@ nonisolated struct ConnectionSettings: Equatable, Sendable {
 
     var actionTitle: String? {
         switch action {
-        case .remove: String(localized: "Remove…")
+        case .remove: String(localized: "Remove")
         case .allowMore: String(localized: "Allow More…")
         case .keepAgain: String(localized: "Keep in Marfa Again")
         case .none: nil
         }
     }
 
-    /// What stays on each Mac, whatever the state.
-    static var footer: String {
-        String(localized: "Each Mac keeps its own window sizes and positions, column widths, global shortcuts, and On This Mac settings.")
-    }
-
-    /// The question before Remove… takes the settings out of the Marfa.
+    /// The question before Remove takes the settings out of the Marfa.
     var removeTitle: String { String(localized: "Remove This App’s Settings from \(name)?") }
     var removeMessage: String {
         String(localized: "Every Mac that connects to \(name) loses them. This Mac keeps its own, and your items stay.")

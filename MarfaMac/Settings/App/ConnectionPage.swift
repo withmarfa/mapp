@@ -1,9 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// The Connection page: the server in use and how it stands, the account (who is signed in, what the owner has allowed
-/// the app, what waits to be sent), each change that needs the person, the other server, and Disconnect. With no server set
-/// it is the address to sign in to. What each step does is `MarfaSettingsModel`'s, unchanged; this draws it from the parts.
+/// The configured Marfa, its sign-in and this Mac’s copy, or the sign-in form before a Marfa is configured.
 struct ConnectionPage: View {
     let settingsHost: AppSettingsHost
     @Environment(Libraries.self) private var libraries
@@ -13,9 +11,6 @@ struct ConnectionPage: View {
     /// The owner's name and the server it was read from, kept while that server does not answer.
     @State private var accountName: String?
     @State private var accountNameServer: MarfaConnection?
-    @State private var isConfirmingRemoval = false
-    @State private var isRemoving = false
-    @State private var settingsProblem: String?
 
     private var host: MarfaHost { libraries.host }
     private var model: MarfaSettingsModel { libraries.marfaSettings }
@@ -27,26 +22,21 @@ struct ConnectionPage: View {
             } else {
                 disconnected
             }
-            if host.configuredConnection != nil { appSettings }
             codeSection
             noticeSection
             if let connection = host.configuredConnection {
-                otherServer
-                disconnect(from: connection)
+                ConnectionCopySections()
+                    .id(connection)
+                let hasOtherMarfas = host.hasOtherMarfas(besides: connection)
+                if hasOtherMarfas || isChoosingOther { otherServer(hasOtherMarfas: hasOtherMarfas) }
+                disconnect
             }
-            thisMac
         }
         .accessibilityIdentifier("ConnectionPage")
         .onChange(of: model.isConfirmingDisconnect) { _, isAsking in
             guard isAsking else { return }
             model.isConfirmingDisconnect = false
             askToDisconnect()
-        }
-        .alert(Text(verbatim: appSettingsWords.removeTitle), isPresented: $isConfirmingRemoval) {
-            Button("Cancel", role: .cancel) {}
-            Button("Remove", role: .destructive) { removeSettings() }
-        } message: {
-            Text(appSettingsWords.removeMessage)
         }
         .alert(
             "Couldn’t Remove This App’s Settings",
@@ -62,17 +52,11 @@ struct ConnectionPage: View {
             if accountNameServer != host.configuredConnection {
                 accountName = nil
                 accountNameServer = host.configuredConnection
+                isChoosingOther = false
             }
             guard let connection = host.configuredConnection, host.state == .online else { return }
-            accountName = host.readsProfile ? await MarfaServerCalls(connection: connection, signIns: host.signIns).ownerName() : nil
-        }
-    }
-
-    // Temporary until Account and Types are rebuilt in session 266c.
-    private var thisMac: some View {
-        SettingsSection("This Mac") {
-            let page = SettingsPage.onThisMac
-            SettingsLinkRow(verbatim: page.title, lead: .tile(page.symbol, page.tone)) { navigation?.show(page) }
+            let name = host.readsProfile ? await MarfaServerCalls(connection: connection, signIns: host.signIns).ownerName() : nil
+            if !Task.isCancelled, host.configuredConnection == connection { accountName = name }
         }
     }
 
@@ -112,31 +96,56 @@ struct ConnectionPage: View {
     // MARK: Connected
 
     @ViewBuilder private func connected(to connection: MarfaConnection) -> some View {
-        // Read again as the clock passes, so "2 minutes ago" turns to "3" on time.
-        SyncStatusReading(host: host) { status in
-            let name = LibraryDescription.name(libraries)
-            let hostName = SettingsWording.hostName(of: connection.address)
-            let standing = ConnectionStanding(
-                state: host.state, status: status, lastSynced: host.lastSynced, now: .now, format: .stored())
-            VStack(alignment: .leading, spacing: SettingsTokens.Metric.cardGap) {
-                SettingsHead(
-                    symbol: "server.rack", tone: .blue, title: Text(verbatim: name),
-                    line: Text(verbatim: [name == hostName || standing.action != .none ? nil : hostName, standing.line].compactMap { $0 }.joined(separator: ". "))
-                ) {
-                    headAction(standing)
-                }
-                .accessibilityIdentifier("LibrarySummary")
-                if let detail = standing.detail {
-                    SettingsNote(verbatim: detail)
-                }
-                if FillWording.shows(library?.syncReport.fill, in: host.state), let fill = library?.syncReport.fill {
-                    SettingsNote(verbatim: String(localized: "Downloading library… \(FillWording.line(fill))"))
-                        .monospacedDigit()
-                        .accessibilityIdentifier("LibraryFillProgress")
+        let account = ConnectionAccount(
+            state: host.state, grants: host.grants, grantsRead: host.grantsRead, readsProfile: host.readsProfile,
+            lacksAsked: host.lacksAsked, waiting: host.waitingChanges)
+        let status = ConnectionAddressStatus(state: host.state, updateReady: settingsHost.overview.updateReady != nil)
+        SettingsSection("Marfa") {
+            SettingsRow("Address") {
+                HStack(spacing: SettingsTokens.Metric.buttonGap) {
+                    SettingsValue(verbatim: SettingsWording.hostName(of: connection.address), glyph: .link)
+                        .help(Text(verbatim: connection.address.absoluteString))
+                    statusMark(status)
                 }
             }
+            .accessibilityIdentifier("LibrarySummary")
+            .contextMenu {
+                Button("Use Another Marfa…") { isChoosingOther = true }
+            }
+            if account.showsName {
+                let page = SettingsPage.account
+                SettingsLinkRow(
+                    verbatim: String(localized: "Signed in as"), line: account.nameLine, lead: .tile(page.symbol, page.tone),
+                    value: (accountNameServer == connection ? accountName : nil) ?? settingsHost.overview.owner, lines: nil
+                ) { navigation?.show(page) }
+                .accessibilityIdentifier("SignedInAs")
+            }
+            if let value = account.permissionsValue {
+                SettingsRow(verbatim: String(localized: "Permissions"), line: account.permissionsLine, lines: nil) {
+                    HStack(spacing: SettingsTokens.Metric.buttonGap) {
+                        SettingsValue(verbatim: value)
+                        if account.offersMore {
+                            SettingsButton(settingsHost.isAllowingMore ? "Waiting…" : "Allow More…") {
+                                Task { _ = await settingsHost.allowMore(ConnectionAccount.asked) }
+                            }
+                            .disabled(model.isWorking || settingsHost.isAllowingMore)
+                            .accessibilityIdentifier("AllowMore")
+                        }
+                    }
+                }
+                .accessibilityIdentifier("ConnectionPermissions")
+            }
+            SettingsRow(title: Text("Unsent changes"), line: account.unsentLine.map { Text(verbatim: $0) }) {
+                SettingsValue(verbatim: account.unsent)
+            }
+            connectionActions
         }
-        account(name: LibraryDescription.name(libraries))
+        .accessibilityIdentifier("ConnectionAccount")
+        if FillWording.shows(library?.syncReport.fill, in: host.state), let fill = library?.syncReport.fill {
+            SettingsNote(verbatim: String(localized: "Downloading library… \(FillWording.line(fill))"))
+                .monospacedDigit()
+                .accessibilityIdentifier("LibraryFillProgress")
+        }
         if library != nil, !host.report.problems.isEmpty {
             SettingsSection("Problems", footer: "Until you decide, these changes stay on this Mac.") {
                 ForEach(host.report.problems) { problem in
@@ -146,76 +155,54 @@ struct ConnectionPage: View {
         }
     }
 
-    @ViewBuilder private func headAction(_ standing: ConnectionStanding) -> some View {
-        switch standing.action {
-        case .signIn:
-            signInButtons(
-                title: "Sign In…", canStart: !model.isWorking, browser: .signInAgain(usingCode: false),
-                code: .signInAgain(usingCode: true), identifier: "MarfaSignInAgain")
-        case .tryAgain:
-            HStack(spacing: SettingsTokens.Metric.buttonGap) {
-                if let word = standing.word { SettingsValue(verbatim: word, dot: color(of: standing.tone)) }
+    private func statusMark(_ status: ConnectionAddressStatus) -> some View {
+        let color = switch status.tone {
+        case .green: SettingsTokens.ok
+        case .orange: SettingsTokens.warning
+        case .red: SettingsTokens.errorRed
+        }
+        let words = Text(verbatim: status.words)
+        return Image(systemName: status.symbol)
+            .font(.system(size: SettingsTokens.Metric.statusMark, weight: .semibold))
+            .symbolRenderingMode(.palette)
+            .foregroundStyle(status.tone == .green ? color : SettingsTokens.tileForeground, color)
+            .fixedSize()
+            .help(words)
+            .accessibilityLabel(words)
+    }
+
+    @ViewBuilder private var connectionActions: some View {
+        switch host.state {
+        case .keyRefused:
+            SettingsRow("Sign in again", line: "This Mac’s copy is kept.") {
+                signInButtons(
+                    title: "Sign In…", canStart: !model.isWorking, browser: .signInAgain(usingCode: false),
+                    code: .signInAgain(usingCode: true), identifier: "MarfaSignInAgain")
+            }
+        case .offline:
+            SettingsRow(title: Text("Not answering"), line: model.status.detail.map { Text(verbatim: $0) }, lines: nil) {
                 SettingsButton("Try Again") { host.refresh() }.accessibilityIdentifier("MarfaTryAgain")
             }
-        case .none:
-            if let word = standing.word { SettingsValue(verbatim: word, dot: color(of: standing.tone)) }
+        case .unavailable, .otherVersion, .inUse:
+            SettingsProblemRow(
+                title: Text(verbatim: model.status.title), line: model.status.detail.map { Text(verbatim: $0) }, actions: [])
+        case .disconnected, .connecting, .online:
+            EmptyView()
         }
     }
 
-    private func color(of tone: ConnectionStanding.Tone) -> Color {
-        switch tone {
-        case .ok: SettingsTokens.ok
-        case .warning: SettingsTokens.warning
-        case .problem: SettingsTokens.Tone.red.color
-        case .quiet: SettingsTokens.secondaryText
-        }
-    }
-
-    private func account(name: String) -> some View {
-        let account = ConnectionAccount(
-            state: host.state, grants: host.grants, grantsRead: host.grantsRead, readsProfile: host.readsProfile, lacksAsked: host.lacksAsked,
-            waiting: host.waitingChanges, serverName: name)
-        return SettingsSection("Account") {
-            if account.showsName {
-                SettingsRow(title: Text("Signed In As"), line: account.nameLine.map { Text(verbatim: $0) }) {
-                    SettingsValue(verbatim: accountName ?? "")
-                }
-                .accessibilityIdentifier("SignedInAs")
-            }
-            if account.showsPermissions {
-                SettingsRow(title: Text("Look After This Marfa"), line: Text(verbatim: account.permissionsLine)) {
-                    // Allow More… asks for everything a sign-in asks for, the read of the owner's name among it.
-                    if account.offersMore {
-                        SettingsButton(settingsHost.isAllowingMore ? "Waiting…" : "Allow More…") {
-                            Task { _ = await settingsHost.allowMore(ConnectionAccount.asked) }
-                        }
-                        .disabled(settingsHost.isAllowingMore)
-                        .accessibilityIdentifier("AllowMore")
-                    } else {
-                        SettingsValue(verbatim: account.permissionsValue)
-                    }
-                }
-                .accessibilityIdentifier("LookAfterThisMarfa")
-            }
-            SettingsRow(title: Text("Unsent Changes"), line: account.unsentLine.map { Text(verbatim: $0) }) {
-                SettingsValue(verbatim: account.unsent)
-            }
-        }
-        .accessibilityIdentifier("ConnectionAccount")
-    }
-
-    private var otherServer: some View {
-        SettingsSection("Other Marfas") {
-            SettingsRow("Use Another Marfa", line: "The app shows one Marfa at a time.") {
+    private func otherServer(hasOtherMarfas: Bool) -> some View {
+        SettingsSection(name: hasOtherMarfas ? Text("Other Marfas") : nil) {
+            SettingsRow("Use another Marfa", line: "The app shows one Marfa at a time.") {
                 SettingsButton(isChoosingOther ? "Hide" : "Choose…") { isChoosingOther.toggle() }
             }
             if isChoosingOther {
-                SettingsRow("Address", line: "Each server has its own copy on this Mac.") {
+                SettingsRow("Address", line: "Each Marfa has its own copy on this Mac.") {
                     SettingsField(title: "Address", text: Bindable(model).otherAddress)
                         .disabled(model.isWorking)
                         .accessibilityIdentifier("MarfaOtherAddress")
                 }
-                SettingsRow("Sign In and Switch") {
+                SettingsRow("Sign in and switch") {
                     SettingsButton("Sign In and Switch…") { model.start(.switchServer(usingCode: false)) }
                         .disabled(!model.canSwitch)
                         .accessibilityIdentifier("MarfaSwitch")
@@ -226,7 +213,8 @@ struct ConnectionPage: View {
         }
     }
 
-    private func disconnect(from connection: MarfaConnection) -> some View {
+    // Disconnect moves to Account’s header in session 266c.
+    private var disconnect: some View {
         SettingsSection("Disconnect") {
             SettingsRow(
                 verbatim: String(localized: "Disconnect from \(LibraryDescription.name(libraries))"),
@@ -242,73 +230,10 @@ struct ConnectionPage: View {
         }
     }
 
-    // MARK: This App's Settings
-
     private var appSettingsWords: ConnectionSettings {
         ConnectionSettings(standing: libraries.preferences.standing, name: LibraryDescription.name(libraries))
     }
 
-    @ViewBuilder private var appSettings: some View {
-        let words = appSettingsWords
-        if words.isShown {
-            SettingsSection(name: Text("This App’s Settings"), footer: Text(ConnectionSettings.footer)) {
-                SettingsRow(
-                    verbatim: words.title, line: words.line, error: settingsProblem
-                ) {
-                    if let title = words.actionTitle {
-                        SettingsButton(
-                            title: Text(verbatim: title), role: words.action == .remove ? .destructive : .normal
-                        ) { act(on: words.action) }
-                        .disabled(isRemoving || settingsHost.isAllowingMore)
-                        .accessibilityIdentifier(identifier(of: words.action))
-                    }
-                }
-                .accessibilityIdentifier("AppSettingsRow")
-            }
-            .accessibilityIdentifier("AppSettings")
-        }
-    }
-
-    private func identifier(of action: ConnectionSettings.Action) -> String {
-        switch action {
-        case .remove: "RemoveAppSettings"
-        case .allowMore: "AllowMoreForAppSettings"
-        case .keepAgain: "KeepAppSettingsAgain"
-        case .none: ""
-        }
-    }
-
-    private func act(on action: ConnectionSettings.Action) {
-        settingsProblem = nil
-        switch action {
-        case .remove:
-            isConfirmingRemoval = true
-        case .allowMore:
-            // The scopes that keep the settings are asked at every sign-in, so nothing more is named; the copy weighs its
-            // slice again with the new sign-in and the section moves on by itself.
-            Task { _ = await settingsHost.allowMore([]) }
-        case .keepAgain:
-            perform { try await libraries.preferences.startAgain() }
-        case .none:
-            break
-        }
-    }
-
-    private func removeSettings() {
-        perform { try await libraries.preferences.remove() }
-    }
-
-    private func perform(_ step: @escaping () async throws -> Void) {
-        isRemoving = true
-        Task {
-            defer { isRemoving = false }
-            do {
-                try await step()
-            } catch {
-                settingsProblem = String(localized: "That didn’t work. Try again in a moment.")
-            }
-        }
-    }
 
     /// The question before Disconnect, with the choice to take this app's settings out of the Marfa too where they are kept there.
     private func askToDisconnect() {

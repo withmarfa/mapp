@@ -1,88 +1,40 @@
 import Foundation
 import Marfa
 
-/// The words of the Connection page's head and of its Account section, as state in, words out, so each state of the page
-/// is tested without a view.
-nonisolated enum ConnectionHeadWording {
-    /// "Up to date 2 minutes ago", or "Up to date" before the first sync has finished.
-    static func upToDate(since synced: Date?, now: Date, locale: Locale = .current) -> String {
-        guard let synced else { return String(localized: "Up to date") }
-        guard let age = SyncFootLine.age(of: synced, now: now, locale: locale) else { return String(localized: "Up to date just now") }
-        return String(localized: "Up to date \(age)")
-    }
-}
+/// The mark on the configured Marfa’s address. A connection problem takes precedence over an available server update.
+nonisolated struct ConnectionAddressStatus: Equatable, Sendable {
+    enum Tone: Equatable, Sendable { case green, orange, red }
 
-/// How the server stands, for the head card: a word at its trailing edge or, where the person has something to do, the
-/// button for it; a line under the server's name; and, for what does not fit one line, a note under the card.
-nonisolated struct ConnectionStanding: Equatable, Sendable {
-    nonisolated enum Tone: Equatable, Sendable { case ok, warning, problem, quiet }
-    nonisolated enum Action: Equatable, Sendable {
-        case none
-        /// The server does not answer: ask again.
-        case tryAgain
-        /// The sign-in ended: sign in again, by the browser or with a code.
-        case signIn
-    }
+    let symbol: String
+    let tone: Tone
+    let words: String
 
-    var word: String?
-    var tone: Tone
-    var line: String?
-    var detail: String?
-    var action: Action
-
-    init(
-        state: MarfaConnectionState, status: SyncStatus, lastSynced: Date?, now: Date, calendar: Calendar = .current,
-        format: DateFormat = .stored()
-    ) {
+    init(state: MarfaConnectionState, updateReady: Bool) {
         let connection = ConnectionStatus(state)
         switch state {
-        case .keyRefused:
-            // The copy is kept and what waits is told in Account, so the head only says it.
-            self.init(word: nil, tone: .problem, line: String(localized: "Signed out. This Mac’s copy is kept."), detail: nil, action: .signIn)
+        case .online where updateReady:
+            self.init("arrow.down.circle.fill", .orange, String(localized: "Update ready"))
+        case .online:
+            self.init("checkmark", .green, connection.title)
+        case .connecting:
+            self.init("ellipsis.circle.fill", .orange, connection.title)
         case .offline:
-            self.init(
-                word: String(localized: "Not Answering"), tone: .warning,
-                line: Self.notAnswering(lastSynced, now: now, calendar: calendar, format: format), detail: nil, action: .tryAgain)
-        case .unavailable, .otherVersion, .inUse:
-            self.init(word: connection.title, tone: .problem, line: nil, detail: connection.detail, action: .none)
-        case .connecting, .online, .disconnected:
-            if let note = status.primary {
-                self.init(word: connection.title, tone: Self.tone(of: note), line: note.line, detail: connection.detail ?? note.detail, action: .none)
-            } else if state == .online {
-                self.init(word: connection.title, tone: .ok, line: ConnectionHeadWording.upToDate(since: lastSynced, now: now), detail: nil, action: .none)
-            } else {
-                self.init(word: connection.title, tone: .quiet, line: nil, detail: connection.detail, action: .none)
-            }
+            self.init("exclamationmark.circle.fill", .orange, String(localized: "Not answering"))
+        case .keyRefused:
+            self.init("xmark.circle.fill", .red, String(localized: "Sign-in expired"))
+        case .disconnected, .unavailable, .otherVersion, .inUse:
+            self.init("xmark.circle.fill", .red, connection.title)
         }
     }
 
-    private init(word: String?, tone: Tone, line: String?, detail: String?, action: Action) {
-        self.word = word
+    private init(_ symbol: String, _ tone: Tone, _ words: String) {
+        self.symbol = symbol
         self.tone = tone
-        self.line = line
-        self.detail = detail
-        self.action = action
-    }
-
-    private static func tone(of note: SyncStatus.Notice) -> Tone {
-        switch note.kind {
-        case .keyRefused, .unavailable: .problem
-        case .needsAttention, .offline: .warning
-        case .catchingUp, .sending: .quiet
-        }
-    }
-
-    /// "Not answering since 09:12. The app keeps trying.": the time of the last answer, as the date and clock are set.
-    static func notAnswering(_ lastAnswered: Date?, now: Date, calendar: Calendar, format: DateFormat) -> String {
-        guard let lastAnswered else { return String(localized: "Not answering. The app keeps trying.") }
-        let time = DateDisplay.timeOfDay(of: lastAnswered, format: format, calendar: calendar)
-        let when = calendar.isDate(lastAnswered, inSameDayAs: now)
-            ? time : DateDisplay.text(of: lastAnswered, place: .value, format: format, now: now, calendar: calendar)
-        return String(localized: "Not answering since \(when). The app keeps trying.")
+        self.words = words
     }
 }
 
-/// What the Account section of Connection holds in each state: who is signed in, what the owner has allowed the app, and
+/// What the Marfa section of Connection holds in each state: who is signed in, what the owner has allowed the app, and
 /// what waits to be sent.
 nonisolated struct ConnectionAccount: Equatable, Sendable {
     /// Every owner permission, as every sign-in and Allow More… asks for them (`SystemSignIns.askedAtSignIn`): what
@@ -93,7 +45,6 @@ nonisolated struct ConnectionAccount: Equatable, Sendable {
     /// the server is not reached, when nothing is said.
     var held: Int?
     var total: Int { Self.asked.count }
-    /// "All 14", or nothing where some are not held.
     var holdsAll: Bool { held == total }
     var unsent: String
     var unsentLine: String?
@@ -101,15 +52,15 @@ nonisolated struct ConnectionAccount: Equatable, Sendable {
     /// Whether Signed In As is shown: whenever the sign-in is held, so also while the server does not answer.
     var showsName: Bool
     /// Signed In As cannot be told because the sign-in may not read the owner's name, as one made before the app asked for it
-    /// cannot; Allow More… gives it, and it is the one Allow More… on the page, beside Look After This Marfa.
+    /// cannot; Allow More… gives it, beside Permissions.
     var offersName: Bool
-    /// Whether Look After This Marfa offers Allow More…: the sign-in lacks something the app asks for at sign-in
+    /// Whether Permissions offers Allow More…: the sign-in lacks something the app asks for at sign-in
     /// (`MarfaHost.lacksAsked`), an owner permission, the read of the name or a scope the app began to ask for later.
     var offersMore: Bool
 
     init(
         state: MarfaConnectionState, grants: Set<InstancePermission>, grantsRead: Bool, readsProfile: Bool = true, lacksAsked: Bool = false,
-        waiting: Int?, serverName: String
+        waiting: Int?
     ) {
         let reached = state == .online || state == .connecting
         showsPermissions = reached && grantsRead
@@ -117,13 +68,14 @@ nonisolated struct ConnectionAccount: Equatable, Sendable {
         case .online, .connecting, .offline: showsName = true
         default: showsName = false
         }
+        let count = grants.intersection(Self.asked).count
+        held = showsPermissions ? count : nil
         offersName = showsPermissions && !readsProfile
-        held = showsPermissions ? grants.intersection(Self.asked).count : nil
-        offersMore = showsPermissions && lacksAsked
+        offersMore = showsPermissions && (count != Self.asked.count || lacksAsked || !readsProfile)
         unsent = waiting.map { $0 > 0 ? Words.changes($0) : String(localized: "None") } ?? String(localized: "Unknown")
         switch state {
         case .keyRefused: unsentLine = (waiting ?? 0) > 0 ? String(localized: "Sent once you sign in again.") : nil
-        case .offline: unsentLine = (waiting ?? 0) > 0 ? String(localized: "Sent when \(serverName) answers.") : nil
+        case .offline: unsentLine = (waiting ?? 0) > 0 ? String(localized: "Sent when this Marfa answers.") : nil
         default: unsentLine = nil
         }
     }
@@ -133,15 +85,14 @@ nonisolated struct ConnectionAccount: Equatable, Sendable {
         offersName ? String(localized: "Allow More… lets the app read the owner’s name.") : nil
     }
 
-    /// "The app holds 5 of the owner’s 14 permissions.", or where it holds them all and still lacks something it asks for,
-    /// says so beside Allow More….
     var permissionsLine: String {
-        guard let held else { return String(localized: "The owner’s permissions the app holds.") }
-        if !holdsAll { return String(localized: "The app holds \(held) of the owner’s \(total) permissions.") }
-        if offersMore { return String(localized: "The app holds all \(total) of the owner’s permissions, but not all the access it asks for.") }
-        return String(localized: "The owner’s permissions the app holds.")
+        if holdsAll && offersMore { return String(localized: "The app holds all \(total) of the owner’s permissions, but not all the access it asks for.") }
+        return String(localized: "The owner’s permissions this app holds.")
     }
 
-    /// "All 14", where every permission is held.
-    var permissionsValue: String { String(localized: "All \(total)") }
+    /// "All 14" or "12 of 14", where the sign-in can be read.
+    var permissionsValue: String? {
+        guard let held else { return nil }
+        return holdsAll ? String(localized: "All \(total)") : String(localized: "\(held) of \(total)")
+    }
 }

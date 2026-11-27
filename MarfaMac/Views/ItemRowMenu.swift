@@ -14,7 +14,7 @@ struct ItemRowMenu<LayoutActions: View>: View {
     @ViewBuilder let layoutActions: LayoutActions
 
     /// Where Open opens the items: the place's Open Items, else Settings.
-    private var way: ItemOpening { browser.chosenOpening ?? opening }
+    private var way: ItemOpening { browser.itemOpening(settings: opening) }
 
     var body: some View {
         Group {

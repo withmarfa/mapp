@@ -10,7 +10,7 @@ nonisolated enum UpdateSettings {
     static let publicKeyKey = "SUPublicEDKey"
     /// Sparkle's own switch for looking by itself, which it keeps in the defaults under this name.
     static let automaticChecksKey = "SUEnableAutomaticChecks"
-    /// Settings > General > Updates > Beta Versions. Stays on this Mac.
+    /// Settings > General > Marfa for Mac > Try beta versions. Stays on this Mac.
     static let betaKey = "betaVersions"
     /// The channel a release candidate's appcast item is in.
     static let betaChannel = "beta"
@@ -30,7 +30,7 @@ nonisolated enum UpdateSettings {
 }
 
 /// The app's updater: Sparkle's standard controller, made once at launch and only for a build that carries a feed and a
-/// key. A build without them has no updater, no Check for Updates… and no Updates section in Settings.
+/// key. A build without them has no updater and no update controls in General.
 @Observable
 final class AppUpdater {
     /// Whether a check may start now, which is not so while one runs.
@@ -38,6 +38,20 @@ final class AppUpdater {
     /// Whether the updater looks by itself, once a day.
     var checksAutomatically: Bool {
         didSet { controller.updater.automaticallyChecksForUpdates = checksAutomatically }
+    }
+    var version: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "" }
+    private var availableVersion: String?
+    private var isUpToDate = false
+
+    var checkSummary: String? {
+        if let availableVersion { return String(localized: "Update available: \(availableVersion).") }
+        guard let checked = controller.updater.lastUpdateCheckDate else { return nil }
+        let format = DateFormat.stored()
+        let when = DateDisplay.timeOfDay(of: checked, format: format)
+        let reading = Calendar.current.isDateInToday(checked)
+            ? String(localized: "Checked today at \(when).")
+            : String(localized: "Checked \(checked.formatted(date: .abbreviated, time: .omitted)) at \(when).")
+        return isUpToDate ? String(localized: "Up to date. \(reading)") : reading
     }
 
     private let controller: SPUStandardUpdaterController
@@ -49,12 +63,13 @@ final class AppUpdater {
         UpdateSettings.isConfigured(in: info) ? AppUpdater(defaults: defaults) : nil
     }
 
-    private init(defaults: UserDefaults) {
+    init(defaults: UserDefaults, startingUpdater: Bool = true) {
         let channels = Channels(defaults: defaults)
-        let controller = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: channels, userDriverDelegate: nil)
+        let controller = SPUStandardUpdaterController(startingUpdater: startingUpdater, updaterDelegate: channels, userDriverDelegate: nil)
         self.channels = channels
         self.controller = controller
         checksAutomatically = controller.updater.automaticallyChecksForUpdates
+        channels.owner = self
         observation = controller.updater.observe(\.canCheckForUpdates, options: [.initial, .new]) { [weak self] updater, _ in
             MainActor.assumeIsolated { self?.canCheckForUpdates = updater.canCheckForUpdates }
         }
@@ -74,6 +89,7 @@ final class AppUpdater {
     /// next check without a restart.
     private final class Channels: NSObject, SPUUpdaterDelegate {
         private let defaults: UserDefaults
+        weak var owner: AppUpdater?
 
         init(defaults: UserDefaults) {
             self.defaults = defaults
@@ -81,6 +97,17 @@ final class AppUpdater {
 
         func allowedChannels(for updater: SPUUpdater) -> Set<String> {
             UpdateSettings.allowedChannels(betaIsOn: defaults.bool(forKey: UpdateSettings.betaKey))
+        }
+
+        func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
+            owner?.availableVersion = item.displayVersionString
+            owner?.isUpToDate = false
+        }
+
+        func updaterDidNotFindUpdate(_ updater: SPUUpdater, error: any Error) {
+            owner?.availableVersion = nil
+            let reason = (error as NSError).userInfo[SPUNoUpdateFoundReasonKey] as? NSNumber
+            owner?.isUpToDate = reason?.int32Value == SPUNoUpdateFoundReason.onLatestVersion.rawValue
         }
     }
 }

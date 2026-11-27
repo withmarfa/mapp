@@ -85,6 +85,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
     var otherAddress = ""
     private(set) var notice: Notice?
     private(set) var isWorking = false
+    private(set) var isAllowingMore = false
 
     /// How the last step ended, for a caller that needs to tell a sign-in the person stopped from one that finished.
     nonisolated enum Ending: Hashable, Sendable { case completed, canceled, failed }
@@ -150,6 +151,22 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
     var canSwitch: Bool { !isWorking && !Self.trimmed(otherAddress).isEmpty }
 
     // MARK: Steps
+
+    func allowMore(_ permissions: Set<InstancePermission>) async -> MarfaAllowMoreOutcome {
+        guard !isAllowingMore, !isWorking, host.connection != nil else { return .failed }
+        isAllowingMore = true
+        defer { isAllowingMore = false }
+        await start(.signInAgain(usingCode: false)).value
+        switch lastEnding {
+        case .completed?:
+            await host.refreshGrants()
+            return permissions.isSubset(of: host.grants) ? .allowed : .approvedFewer
+        case .canceled?:
+            return .cancelled
+        case .failed?, nil:
+            return .failed
+        }
+    }
 
     /// A sign-in step the Cancel button can stop: the browser's page, or the wait for a code.
     enum SignInStep: Hashable, Sendable {
