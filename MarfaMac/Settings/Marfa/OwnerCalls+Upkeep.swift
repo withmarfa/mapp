@@ -129,7 +129,7 @@ extension ClientOwnerCalls {
                     }
                 return HousekeepingJob(
                     name: job.name, intervalSeconds: job.intervalSeconds, lastFinished: Self.date(job.lastFinishedAt),
-                    runningSince: Self.date(job.runningSince), lastFinishedHasTime: Self.hasTime(job.lastFinishedAt), outcome: outcome)
+                    nextRun: Self.date(job.nextRunAt), runningSince: Self.date(job.runningSince), lastFinishedHasTime: Self.hasTime(job.lastFinishedAt), outcome: outcome)
             }
         }
     }

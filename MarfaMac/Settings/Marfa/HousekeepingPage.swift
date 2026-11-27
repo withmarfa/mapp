@@ -48,7 +48,11 @@ struct HousekeepingPage: View {
                     }
                 }
             } else {
-                OwnerProblem(title: "Log Retention", failure: .notPermitted(InstancePermission.configManage.rawValue), page: .housekeeping, host: host)
+                SettingsSection("Keep Records For") {
+                    ForEach(InstanceSetting.logSettings, id: \.self) { setting in
+                        LockedInstanceRow(title: setting.title, permission: .configManage, host: host)
+                    }
+                }
             }
         }
     }
@@ -64,7 +68,9 @@ struct HousekeepingPage: View {
 
     @ViewBuilder private var jobsContent: some View {
         if !host.grants.contains(.instanceRead) {
-            OwnerProblem(title: "Jobs", failure: .notPermitted(InstancePermission.instanceRead.rawValue), page: .housekeeping, host: host)
+            SettingsSection("Jobs") {
+                LockedInstanceRow(title: String(localized: "Scheduled Jobs"), permission: .instanceRead, host: host)
+            }
         } else if let failure = model.failure {
             OwnerFailureState(page: .housekeeping, failure: failure, host: host) { Task { await model.load() } }
         } else if !model.hasLoaded {
@@ -128,8 +134,9 @@ struct HousekeepingPage: View {
                     Text(verbatim: UpkeepWording.jobTitle(job.name))
                 }
             },
-            SettingsTableColumn("Every", width: SettingsTokens.Metric.Column.day) {
-                Text(verbatim: UpkeepWording.every($0.intervalSeconds)).foregroundStyle(SettingsTokens.secondaryText)
+            SettingsTableColumn("Every", width: SettingsTokens.Metric.Column.day) { job in
+                Text(verbatim: UpkeepWording.every(job.intervalSeconds)).foregroundStyle(SettingsTokens.secondaryText)
+                    .help(job.nextRun.map { String(localized: "Next run: \(UpkeepWording.moment($0)).") } ?? "")
             },
             SettingsTableColumn("Last Run", width: SettingsTokens.Metric.Column.label) { job in
                 Text(verbatim: job.lastFinished.map { UpkeepWording.moment($0, hasTime: job.lastFinishedHasTime) } ?? String(localized: "Not Yet"))

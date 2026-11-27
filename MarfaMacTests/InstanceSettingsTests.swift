@@ -221,6 +221,17 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
         #expect(model.hasUnsentEdits)
     }
 
+    @Test func reducingUnusedFileRetentionToZeroNamesTheNextSweep() async throws {
+        let (model, source) = await loaded([.blobCleanupGraceSeconds: .number(86_400)])
+        model.draft[.blobCleanupGraceSeconds] = "0"
+        await model.save([.blobCleanupGraceSeconds], revertsOnFailure: true)
+        let confirmation = try #require(model.pending)
+        #expect(source.sent.isEmpty)
+        #expect(confirmation.shortenings.map(InstanceWording.consequence) == ["The next sweep can permanently remove files already reported as unused."])
+        await model.confirm(confirmation)
+        #expect(source.sent == [.init(values: [.blobCleanupGraceSeconds: .number(0)])])
+    }
+
     @Test func aConfirmedTrashChangeThatFailsRestoresTheServerValueAndExplainsWhy() async throws {
         let (model, source) = await loaded([.trashRetentionDays: .number(0)])
         model.draft[.trashRetentionDays] = "36500"

@@ -371,7 +371,7 @@ nonisolated enum InstanceWording {
     }
 
     static func seconds(_ count: Int) -> String {
-        if count == 0 { return String(localized: "right away") }
+        if count == 0 { return String(localized: "at the next sweep") }
         if count % 86_400 == 0 { return days(count / 86_400) }
         if count % 3_600 == 0 { return count == 3_600 ? String(localized: "1 hour") : String(localized: "\(count / 3_600) hours") }
         return String(localized: "\(count) seconds")
@@ -407,6 +407,10 @@ nonisolated enum InstanceWording {
 
     private static func removal(_ setting: InstanceSetting, keeping limit: Int) -> String {
         switch setting {
+        case .blobCleanupGraceSeconds:
+            limit == 0
+                ? String(localized: "The next sweep can permanently remove files already reported as unused.")
+                : String(localized: "A sweep can permanently remove a file after it has been reported as unused for \(seconds(limit)).")
         case .trashRetentionDays:
             String(localized: "Items deleted more than \(days(limit)) ago will be permanently deleted, with their history, the next time the server tidies up. They can’t be recovered.")
         case .versionMaxVersions:
@@ -423,6 +427,7 @@ nonisolated extension InstanceSetting {
     /// What a shorter setting removes, as the object of a sentence.
     var removes: String {
         switch self {
+        case .blobCleanupGraceSeconds: String(localized: "unused files")
         case .trashRetentionDays: String(localized: "deleted items")
         case .versionRecentDays, .versionDailyDays, .versionWeeklyDays, .versionMaxVersions: String(localized: "versions")
         case .auditRetentionDays: String(localized: "activity and webhook deliveries")

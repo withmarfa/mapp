@@ -114,6 +114,7 @@ nonisolated struct HousekeepingJob: Identifiable, Hashable, Sendable {
     let name: String
     let intervalSeconds: Int
     var lastFinished: Date?
+    var nextRun: Date?
     var runningSince: Date?
     var lastFinishedHasTime = true
     /// Nil until a run has finished.

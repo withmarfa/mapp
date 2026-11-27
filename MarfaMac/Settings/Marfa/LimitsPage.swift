@@ -26,7 +26,7 @@ struct LimitsPage: View {
             if host.grants.contains(.configManage) { content }
             else {
                 SettingsPageColumn {
-                    OwnerProblem(title: "Limits", failure: .notPermitted(InstancePermission.configManage.rawValue), page: .limits, host: host)
+                    limitSections
                     if let readFailure {
                         OwnerProblem(title: "Couldn’t Read Start-Up Settings", failure: readFailure, page: .limits, host: host) { Task { await readStartUp() } }
                     } else if let readOnlyStartUp { StartUpSettings(rows: readOnlyStartUp) }
@@ -57,28 +57,48 @@ struct LimitsPage: View {
         } else if model.isLoaded {
             SettingsPageColumn {
                 if let notice = model.notice { OwnerNotice(title: "Changed Elsewhere", line: notice, close: { model.dismissNotice() }) }
-                SettingsSection("Requests", footer: "A bulk request can be at most 32 MB. Leave a field empty to use its default.") {
-                    LimitField(model: model, limit: .largestRequest)
-                    LimitField(model: model, limit: .largestBulkRequest)
-                }
-                SettingsSection("Rate Limits", footer: "Each app or key gets these in every window.") {
-                    switchRow("Limit Requests", key: LimitSetting.rateLimitSwitch)
-                    LimitField(model: model, limit: .window)
-                    LimitField(model: model, limit: .requestsPerWindow)
-                    LimitField(model: model, limit: .keyRequestsPerWindow)
-                }
-                SettingsSection("Connector Deliveries", footer: "For each inbound address.") {
-                    LimitField(model: model, limit: .largestDelivery)
-                    LimitField(model: model, limit: .deliveriesPerWindow)
-                    LimitField(model: model, limit: .waiting)
-                }
-                SettingsSection("Live Updates", footer: "0 sets no limit.") {
-                    LimitField(model: model, limit: .mostViewers)
-                }
+                limitSections
                 StartUpSettings(rows: model.startUp)
             }
         } else {
             OwnerLoading()
+        }
+    }
+
+    @ViewBuilder private var limitSections: some View {
+        SettingsSection("Requests", footer: "A bulk request can be at most 32 MB. Leave a field empty to use its default.") {
+            field(.largestRequest)
+            field(.largestBulkRequest)
+        }
+        SettingsSection("Rate Limits", footer: "Each app or key gets these in every window.") {
+            rateLimitSwitch
+            field(.window)
+            field(.requestsPerWindow)
+            field(.keyRequestsPerWindow)
+        }
+        SettingsSection("Connector Deliveries", footer: "For each inbound address.") {
+            field(.largestDelivery)
+            field(.deliveriesPerWindow)
+            field(.waiting)
+        }
+        SettingsSection("Live Updates", footer: "0 sets no limit.") {
+            field(.mostViewers)
+        }
+    }
+
+    @ViewBuilder private func field(_ limit: LimitSetting) -> some View {
+        if host.grants.contains(.configManage) {
+            LimitField(model: model, limit: limit)
+        } else {
+            LockedInstanceRow(title: limit.title, permission: .configManage, host: host)
+        }
+    }
+
+    @ViewBuilder private var rateLimitSwitch: some View {
+        if host.grants.contains(.configManage) {
+            switchRow("Limit Requests", key: LimitSetting.rateLimitSwitch)
+        } else {
+            LockedInstanceRow(title: String(localized: "Limit Requests"), permission: .configManage, host: host)
         }
     }
 

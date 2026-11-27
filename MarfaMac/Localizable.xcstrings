@@ -60,6 +60,9 @@
     "%@ (Missing)" : {
 
     },
+    "%@ (running)" : {
+
+    },
     "%@ > %@" : {
       "extractionState" : "manual",
       "generatesSymbol" : false
@@ -170,9 +173,6 @@
     },
     "%@ are no longer where they were, so they were taken out of the new item. Add them again, or add the item without them." : {
       "extractionState" : "manual"
-    },
-    "%@ asks this address on a schedule, so a monitor notices if it stops." : {
-
     },
     "%@ asks you to sign in again first." : {
 
@@ -332,9 +332,6 @@
         }
       }
     },
-    "%@ lists its jobs once it has started them." : {
-
-    },
     "%@ more characters aren’t shown." : {
       "extractionState" : "manual"
     },
@@ -397,9 +394,6 @@
 
     },
     "%@ restarts to finish the update. The app reconnects when it’s back." : {
-
-    },
-    "%@ runs these by itself. Jobs that delete pause while its clock looks wrong." : {
 
     },
     "%@ sends a request to an address you choose." : {
@@ -686,9 +680,6 @@
     "%@. Extending keeps the same key, so nothing using it changes." : {
 
     },
-    "%@’s Disk" : {
-
-    },
     "%@’s Own Data" : {
 
     },
@@ -735,6 +726,9 @@
 
     },
     "%lld Conflicted Copies" : {
+
+    },
+    "%lld Copies" : {
 
     },
     "%lld Days" : {
@@ -1807,6 +1801,9 @@
     "1 Conflicted Copy" : {
 
     },
+    "1 Copy" : {
+
+    },
     "1 Day" : {
 
     },
@@ -1859,6 +1856,9 @@
 
     },
     "1 job" : {
+
+    },
+    "1 minute" : {
 
     },
     "1 more item linked to them may also move to Recently Deleted." : {
@@ -1937,6 +1937,9 @@
 
     },
     "A Webhook" : {
+
+    },
+    "A bulk request can be at most 32 MB. Leave a field empty to use its default." : {
 
     },
     "A change applies to new items. Existing ones change only when you ask." : {
@@ -2136,6 +2139,9 @@
     "A status word starts with a letter." : {
 
     },
+    "A sweep can permanently remove a file after it has been reported as unused for %@." : {
+
+    },
     "A tag can be at most %lld characters." : {
 
     },
@@ -2145,7 +2151,7 @@
     "A to Z" : {
 
     },
-    "A type can keep its own versions." : {
+    "A type can keep its own." : {
 
     },
     "A type needs a name." : {
@@ -2474,9 +2480,6 @@
 
     },
     "Advanced" : {
-
-    },
-    "After" : {
 
     },
     "After the status, in this order. A row shows the first two." : {
@@ -2879,7 +2882,7 @@
     "Asking %@…" : {
 
     },
-    "At Most" : {
+    "Asks the address below on a schedule, so a monitor notices if it stops." : {
 
     },
     "At least %lld more in %@, left out of search." : {
@@ -2889,9 +2892,6 @@
 
     },
     "At least 8 characters." : {
-
-    },
-    "At most 32 MB." : {
 
     },
     "At the Foot of the Page" : {
@@ -3529,6 +3529,9 @@
     "Check Document Now" : {
 
     },
+    "Check Files Are Intact" : {
+
+    },
     "Check a source too. With none, no app or key could add items of these types." : {
 
     },
@@ -3994,9 +3997,6 @@
     "Copy the Signing Secret Now" : {
 
     },
-    "Couldn’t change automatic update settings" : {
-
-    },
     "Couldn’t Check" : {
 
     },
@@ -4004,9 +4004,6 @@
 
     },
     "Couldn’t Check Webhook Keys" : {
-
-    },
-    "Couldn’t check for problems" : {
 
     },
     "Couldn’t Check the Webhook’s Key" : {
@@ -4057,9 +4054,6 @@
     "Couldn’t Read %@" : {
 
     },
-    "Couldn’t read automatic update settings" : {
-
-    },
     "Couldn’t Read Available Types" : {
 
     },
@@ -4070,9 +4064,6 @@
 
     },
     "Couldn’t Read Its Data" : {
-
-    },
-    "Couldn’t read private addresses" : {
 
     },
     "Couldn’t Read Start-Up Settings" : {
@@ -4094,15 +4085,6 @@
 
     },
     "Couldn’t Read the Keys This App Made" : {
-
-    },
-    "Couldn’t read the name" : {
-
-    },
-    "Couldn’t read the profile" : {
-
-    },
-    "Couldn’t read the release" : {
 
     },
     "Couldn’t Read the Rules" : {
@@ -4138,10 +4120,10 @@
     "Couldn’t Sign In" : {
 
     },
-    "Couldn’t update" : {
+    "Couldn’t be downloaded." : {
 
     },
-    "Couldn’t be downloaded." : {
+    "Couldn’t change automatic update settings" : {
 
     },
     "Couldn’t change downloaded files. Check the current limit and try again." : {
@@ -4154,6 +4136,9 @@
 
     },
     "Couldn’t change this" : {
+
+    },
+    "Couldn’t check for problems" : {
 
     },
     "Couldn’t confirm the date" : {
@@ -4198,6 +4183,9 @@
     "Couldn’t read" : {
 
     },
+    "Couldn’t read automatic update settings" : {
+
+    },
     "Couldn’t read backup settings" : {
 
     },
@@ -4207,10 +4195,25 @@
     "Couldn’t read downloaded files. The app will try again." : {
       "extractionState" : "manual"
     },
+    "Couldn’t read private addresses" : {
+
+    },
+    "Couldn’t read the name" : {
+
+    },
+    "Couldn’t read the profile" : {
+
+    },
+    "Couldn’t read the release" : {
+
+    },
     "Couldn’t remove downloaded files. %@" : {
       "extractionState" : "manual"
     },
     "Couldn’t sync" : {
+
+    },
+    "Couldn’t update" : {
 
     },
     "Count on the Card" : {
@@ -4249,10 +4252,10 @@
     "Current" : {
 
     },
-    "Current password" : {
+    "Current Version" : {
 
     },
-    "Current Version" : {
+    "Current password" : {
 
     },
     "Custom" : {
@@ -4277,6 +4280,9 @@
 
     },
     "Data Removed, Still Connected" : {
+
+    },
+    "Database" : {
 
     },
     "Date" : {
@@ -4354,6 +4360,9 @@
     "Delete Items" : {
 
     },
+    "Delete Items Past Their Time in Trash" : {
+
+    },
     "Delete Link Type" : {
 
     },
@@ -4377,6 +4386,9 @@
     },
     "Delete View…" : {
       "extractionState" : "manual"
+    },
+    "Delete from Trash After" : {
+
     },
     "Delete the collection “%@”?" : {
 
@@ -4594,6 +4606,9 @@
     "Each Status" : {
 
     },
+    "Each app or key gets these in every window." : {
+
+    },
     "Each copy stops the next time it syncs. You can’t sync this folder again. Its items stay in Marfa and its files stay on disk. Push any unsent changes from each copy before stopping. Afterward, use marfa folders remove to detach each directory and keep its files as plain files." : {
 
     },
@@ -4709,9 +4724,6 @@
     "Empty" : {
 
     },
-    "Empty Recently Deleted" : {
-
-    },
     "Empty Recently Deleted…" : {
 
     },
@@ -4787,10 +4799,10 @@
     "Entry Not Added" : {
 
     },
-    "Environment" : {
+    "Error Reports" : {
 
     },
-    "Error Reports" : {
+    "Error Reports Address" : {
 
     },
     "Event" : {
@@ -4961,9 +4973,6 @@
     "Failing" : {
 
     },
-    "Faults also appear in Account. Secrets are never shown." : {
-
-    },
     "Favorite" : {
 
     },
@@ -4983,9 +4992,6 @@
 
     },
     "Fetched a file from a web address" : {
-
-    },
-    "Fetching Files" : {
 
     },
     "Fewer Permissions Allowed" : {
@@ -5027,7 +5033,7 @@
     "File Not in the Text" : {
       "extractionState" : "manual"
     },
-    "File Reading" : {
+    "File Storage Details" : {
 
     },
     "File Unavailable" : {
@@ -5038,9 +5044,6 @@
     },
     "Files" : {
       "extractionState" : "manual"
-    },
-    "Files From the Web" : {
-
     },
     "Files Is No Longer in the Sidebar" : {
 
@@ -5058,6 +5061,9 @@
 
     },
     "Files are waiting for a second copy" : {
+
+    },
+    "Files from the Web" : {
 
     },
     "Files is no longer a place in the sidebar. Files are listed under their types." : {
@@ -5171,7 +5177,7 @@
     "For" : {
 
     },
-    "For one item." : {
+    "For each inbound address." : {
 
     },
     "Format" : {
@@ -5235,16 +5241,10 @@
     "From a device already signed in." : {
 
     },
-    "From a key alone." : {
-
-    },
     "From a plugin you’ve installed." : {
 
     },
-    "From a web address, or one a chat attached." : {
-
-    },
-    "From one app or key." : {
+    "From a web address, or a file attached in a chat." : {
 
     },
     "From the %@ Plugin" : {
@@ -5504,9 +5504,6 @@
 
     },
     "How each type shows in rows, on cards and on its own page." : {
-
-    },
-    "How long a file is left alone before it is removed." : {
 
     },
     "Hybrid" : {
@@ -5942,9 +5939,6 @@
     "Items this sign-in can’t see are still of this type, so %@ was kept." : {
 
     },
-    "Items wait here first, so they can come back." : {
-
-    },
     "Items you add show here." : {
 
     },
@@ -6143,6 +6137,9 @@
     "Keep My Edit" : {
       "extractionState" : "manual"
     },
+    "Keep Records For" : {
+
+    },
     "Keep Versions" : {
 
     },
@@ -6218,9 +6215,6 @@
 
     },
     "Key Not Renamed" : {
-
-    },
-    "Key Requests per Window" : {
 
     },
     "Keyboard" : {
@@ -6335,9 +6329,6 @@
     "Leave Them As They Are" : {
 
     },
-    "Leave a field empty to use %@’s own default." : {
-
-    },
     "Leaves the Feed" : {
 
     },
@@ -6350,10 +6341,7 @@
     "Length" : {
 
     },
-    "Let Chats Save Files" : {
-
-    },
-    "Let Tools Fetch Files" : {
+    "Let Agents Fetch Files" : {
 
     },
     "Lets webhooks and the heartbeat reach this network." : {
@@ -6500,9 +6488,6 @@
     "Log" : {
       "extractionState" : "manual"
     },
-    "Log Retention" : {
-
-    },
     "Logs" : {
 
     },
@@ -6516,6 +6501,9 @@
       "extractionState" : "manual"
     },
     "Look After This Marfa" : {
+
+    },
+    "Look for Problems" : {
 
     },
     "Looking After This Marfa" : {
@@ -6743,9 +6731,6 @@
     "Minimize All" : {
 
     },
-    "Minute" : {
-
-    },
     "Monitoring" : {
 
     },
@@ -6782,7 +6767,10 @@
     "Most Text Kept" : {
 
     },
-    "Most Viewers" : {
+    "Most Versions per Item" : {
+
+    },
+    "Most Viewers at Once" : {
 
     },
     "Most connections at once." : {
@@ -6798,6 +6786,9 @@
 
     },
     "Move Down" : {
+
+    },
+    "Move Expired Feed Items to Trash" : {
 
     },
     "Move Feed Items to Recently Deleted After" : {
@@ -6994,9 +6985,6 @@
     "New Link Type…" : {
 
     },
-    "New password" : {
-
-    },
     "New Section" : {
 
     },
@@ -7043,6 +7031,9 @@
     "New items are" : {
 
     },
+    "New password" : {
+
+    },
     "New windows open at these widths." : {
 
     },
@@ -7070,10 +7061,16 @@
     "Next Page" : {
 
     },
+    "Next Sweep" : {
+
+    },
     "Next Week" : {
 
     },
     "Next Week or Month" : {
+
+    },
+    "Next run: %@." : {
 
     },
     "No" : {
@@ -7139,7 +7136,7 @@
     "No Items" : {
       "extractionState" : "manual"
     },
-    "No Jobs Yet" : {
+    "No Jobs" : {
 
     },
     "No Library Open" : {
@@ -7236,6 +7233,9 @@
     "No Types of Your Own" : {
 
     },
+    "No Unused Files" : {
+
+    },
     "No Value" : {
       "extractionState" : "manual"
     },
@@ -7316,9 +7316,6 @@
     },
     "No text" : {
       "extractionState" : "manual"
-    },
-    "No unused files" : {
-
     },
     "None" : {
 
@@ -7494,10 +7491,13 @@
     "Nothing is kept in step with a folder yet." : {
 
     },
+    "Nothing is sent until a destination is set." : {
+
+    },
     "Nothing is sent until an address is set." : {
 
     },
-    "Nothing is sent until the host and token are set." : {
+    "Nothing is sent until the address and token are set." : {
 
     },
     "Nothing is waiting here." : {
@@ -8039,9 +8039,6 @@
     "Permanently Delete" : {
 
     },
-    "Permanently Delete After" : {
-
-    },
     "Permanently Delete…" : {
 
     },
@@ -8130,9 +8127,6 @@
 
     },
     "Position" : {
-
-    },
-    "PostHog Host" : {
 
     },
     "PostHog host" : {
@@ -8315,6 +8309,9 @@
     "Read the Audit Log" : {
 
     },
+    "Read when the server starts. Change them where it runs." : {
+
+    },
     "Reader" : {
 
     },
@@ -8435,6 +8432,9 @@
     "Remove %@?" : {
 
     },
+    "Remove After" : {
+
+    },
     "Remove Choice" : {
 
     },
@@ -8443,6 +8443,12 @@
     },
     "Remove Downloaded Files" : {
       "extractionState" : "manual"
+    },
+    "Remove Expired Connector Deliveries" : {
+
+    },
+    "Remove Expired Sign-Ins, Keys and App Access" : {
+
     },
     "Remove Field" : {
 
@@ -8453,6 +8459,9 @@
     "Remove Filters" : {
 
     },
+    "Remove Finished Bulk Changes" : {
+
+    },
     "Remove Link" : {
 
     },
@@ -8460,6 +8469,12 @@
       "extractionState" : "manual"
     },
     "Remove Old Activity" : {
+
+    },
+    "Remove Old Events" : {
+
+    },
+    "Remove Old Table Changes" : {
 
     },
     "Remove Sort" : {
@@ -8645,6 +8660,12 @@
     "Requests" : {
 
     },
+    "Requests That Manage Keys" : {
+
+    },
+    "Requests from Each App or Key" : {
+
+    },
     "Requests per Window" : {
 
     },
@@ -8778,9 +8799,6 @@
     "Revoke…" : {
 
     },
-    "Right Away" : {
-
-    },
     "Role %@" : {
 
     },
@@ -8818,6 +8836,9 @@
 
     },
     "Running" : {
+
+    },
+    "Running since %@." : {
 
     },
     "Runs" : {
@@ -8889,6 +8910,9 @@
       "extractionState" : "manual"
     },
     "Say today and yesterday" : {
+
+    },
+    "Scheduled Jobs" : {
 
     },
     "Sea" : {
@@ -9039,6 +9063,9 @@
     "Sent once you sign in again." : {
 
     },
+    "Sent only while telemetry is on. Secrets are never shown." : {
+
+    },
     "Sent only while this sign-in may read the server’s status." : {
 
     },
@@ -9057,10 +9084,10 @@
     "Set %@" : {
       "extractionState" : "manual"
     },
-    "Set the %@ again" : {
+    "Set %@ first." : {
 
     },
-    "Set %@ first." : {
+    "Set Where It Runs" : {
 
     },
     "Set a secret again" : {
@@ -9070,6 +9097,9 @@
 
     },
     "Set or Not Set" : {
+
+    },
+    "Set the %@ again" : {
 
     },
     "Set the PostHog host and the project token first." : {
@@ -9082,9 +9112,6 @@
 
     },
     "Set them again if you install it later." : {
-
-    },
-    "Set." : {
 
     },
     "Set. Never shown." : {
@@ -9393,6 +9420,9 @@
     "Sign Out" : {
 
     },
+    "Sign Out “%@”?" : {
+
+    },
     "Sign in again" : {
 
     },
@@ -9404,9 +9434,6 @@
     },
     "Sign in to this server again to see them." : {
       "extractionState" : "manual"
-    },
-    "Sign Out “%@”?" : {
-
     },
     "Sign-In Address" : {
 
@@ -9481,9 +9508,6 @@
 
     },
     "So search finds words in PDFs and documents." : {
-
-    },
-    "So search finds words in pictures." : {
 
     },
     "Solid" : {
@@ -9944,9 +9968,6 @@
 
     },
     "The PostHog host and the project token are removed together, and error reports stop." : {
-
-    },
-    "The server hasn’t come back yet" : {
 
     },
     "The Server Refused This Copy’s Sign-In" : {
@@ -10555,6 +10576,9 @@
     "The new value is never shown again." : {
 
     },
+    "The next sweep can permanently remove files already reported as unused." : {
+
+    },
     "The oldest Marfa this version works with." : {
 
     },
@@ -10645,6 +10669,9 @@
     "The server didn’t answer this check, so its state is unknown." : {
 
     },
+    "The server doesn’t list this setting." : {
+
+    },
     "The server ended the app’s sign-in. Sign in again in Connection." : {
 
     },
@@ -10666,6 +10693,9 @@
     "The server has no history to show for this item. It may be new and not sent yet, deleted, or of a kind the app isn’t approved to read." : {
       "extractionState" : "manual"
     },
+    "The server hasn’t come back yet" : {
+
+    },
     "The server is back on %@. Nothing was lost." : {
 
     },
@@ -10676,9 +10706,6 @@
 
     },
     "The server met a fault lately." : {
-
-    },
-    "The server reads these settings when it starts. Change them where it runs." : {
 
     },
     "The server refused it." : {
@@ -10694,6 +10721,9 @@
       "extractionState" : "manual"
     },
     "The server reports its backups aren’t working." : {
+
+    },
+    "The server reports no scheduled jobs." : {
 
     },
     "The server reports the newest backup isn’t whole." : {
@@ -10936,6 +10966,9 @@
     "These items have no file." : {
 
     },
+    "These run by themselves. Jobs that delete pause while the clock looks wrong." : {
+
+    },
     "They keep the old mapping until you apply this one." : {
 
     },
@@ -10964,9 +10997,6 @@
 
     },
     "Thinned old versions" : {
-
-    },
-    "This app can’t manage sign-ins" : {
 
     },
     "This App Isn’t Connected" : {
@@ -11050,6 +11080,9 @@
     "This Marfa takes guidance only from the command line for now. Your text is kept here." : {
 
     },
+    "This Marfa’s Disk" : {
+
+    },
     "This Month" : {
 
     },
@@ -11093,6 +11126,9 @@
 
     },
     "This app can’t change it: another app or key made it, or this app isn’t allowed to. Change or remove it in Webhooks first." : {
+
+    },
+    "This app can’t manage sign-ins" : {
 
     },
     "This app isn’t allowed to change it. Allow more, or change it where it was made, first." : {
@@ -11447,9 +11483,6 @@
     "To" : {
       "extractionState" : "manual"
     },
-    "To PostHog’s error tracking." : {
-
-    },
     "To keep what you wrote, copy it before you discard this change." : {
       "extractionState" : "manual"
     },
@@ -11489,7 +11522,7 @@
     "Top right." : {
 
     },
-    "Traces, logs and metrics. Off keeps the settings." : {
+    "Traces, logs, metrics and error reports. Off sends none of them." : {
 
     },
     "Translucent" : {
@@ -11696,9 +11729,6 @@
 
     },
     "Untitled" : {
-
-    },
-    "Unused Files" : {
 
     },
     "Up to %@ now. %@" : {
@@ -12142,12 +12172,6 @@
     "When Two Edits Meet" : {
 
     },
-    "When a chat asks %@ to save a link." : {
-
-    },
-    "Where Files Are" : {
-
-    },
     "Where I Left Off" : {
 
     },
@@ -12546,6 +12570,9 @@
     "as a" : {
 
     },
+    "at the next sweep" : {
+
+    },
     "before" : {
       "comment" : "Typed in the list's search: a date field is before a day"
     },
@@ -12805,9 +12832,6 @@
     "requests" : {
 
     },
-    "right away" : {
-
-    },
     "seconds" : {
 
     },
@@ -12887,6 +12911,9 @@
 
     },
     "today, %@" : {
+
+    },
+    "unused files" : {
 
     },
     "update the server and run its housekeeping" : {

@@ -79,9 +79,6 @@ nonisolated enum InstanceSetting: String, CaseIterable, Hashable, Sendable {
         }
     }
 
-    /// What a switch is while the setting is unset: the documented default, which is on for every switch.
-    var documentedFlag: Bool { true }
-
     /// The settings each page shows, in the order it shows them.
     static let versionSettings: [InstanceSetting] = [.versionRecentDays, .versionDailyDays, .versionWeeklyDays, .versionMaxVersions]
     static let logSettings: [InstanceSetting] = [
@@ -146,7 +143,7 @@ nonisolated enum InstanceSetting: String, CaseIterable, Hashable, Sendable {
     /// Whether a shorter value removes something that cannot be recovered, so the person agrees to it first.
     var isRetention: Bool {
         switch self {
-        case .trashRetentionDays, .versionRecentDays, .versionDailyDays, .versionWeeklyDays, .versionMaxVersions, .auditRetentionDays,
+        case .blobCleanupGraceSeconds, .trashRetentionDays, .versionRecentDays, .versionDailyDays, .versionWeeklyDays, .versionMaxVersions, .auditRetentionDays,
             .eventLogRetentionDays, .rowLogRetentionDays, .inboundHandledRetentionDays, .inboundPendingRetentionDays:
             true
         default: false

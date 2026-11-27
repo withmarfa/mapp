@@ -59,7 +59,7 @@ struct FileStoragePage: View {
     private func files(_ catalog: LimitsModel) -> some View {
         SettingsSection("Files") {
             if !host.grants.contains(.instanceRead) {
-                OwnerProblemRow(title: "File Storage Details", failure: .notPermitted(InstancePermission.instanceRead.rawValue), page: .fileStorage, host: host)
+                LockedInstanceRow(title: String(localized: "File Storage Details"), permission: .instanceRead, host: host)
             } else if let failure = storage.failure {
                 OwnerProblemRow(
                     title: "Couldn’t Read Where Files Are", failure: failure, page: .fileStorage, host: host,

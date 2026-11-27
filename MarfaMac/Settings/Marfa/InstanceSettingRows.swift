@@ -39,7 +39,7 @@ nonisolated enum InstanceChoices {
         case .versionMaxVersions: return value == 1 ? String(localized: "1 Version") : String(localized: "\(value) Versions")
         case .blobMinCopies: return value == 1 ? String(localized: "1 Copy") : String(localized: "\(value) Copies")
         case .blobCleanupGraceSeconds:
-            if value == 0 { return String(localized: "Right Away") }
+            if value == 0 { return String(localized: "Next Sweep") }
             if value % 86_400 == 0 { return dayTitle(value / 86_400) }
             if value % 3_600 == 0 { return value == 3_600 ? String(localized: "1 Hour") : String(localized: "\(value / 3_600) Hours") }
             return String(localized: "\(value) Seconds")
@@ -79,7 +79,7 @@ nonisolated enum InstanceChoices {
 }
 
 /// A number the server holds, chosen from a pop-up and sent at once. A shorter retention asks first
-/// (`instanceSettingsQuestion`), and a refusal keeps the choice with the red ring and one line.
+/// through the confirmation shared by the retention settings.
 struct InstanceChoiceRow: View {
     let model: InstanceSettingsModel
     let setting: InstanceSetting
@@ -118,7 +118,7 @@ struct InstanceChoiceRow: View {
     }
 }
 
-/// A switch the server holds, sent at once. Where the server holds none, it shows what the server documents as its default.
+/// A stored switch, with the default reported by the connected server.
 struct InstanceToggleRow: View {
     let model: InstanceSettingsModel
     let setting: InstanceSetting
@@ -266,5 +266,18 @@ struct InstanceSettingsGate<Content: View>: View {
             if failure == .notPermitted { Task { await host.refreshGrants() } }
         }
         .instanceSettingsQuestion(model)
+    }
+}
+
+struct LockedInstanceRow: View {
+    let title: String
+    let permission: InstancePermission
+    let host: any MarfaSettingsHost
+
+    var body: some View {
+        SettingsLinkRow(verbatim: title, lock: String(localized: "Not allowed")) {
+            host.askForMore(naming: permission.rawValue)
+        }
+        .disabled(host.isAllowingMore)
     }
 }

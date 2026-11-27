@@ -241,7 +241,7 @@ nonisolated struct LimitSetting: Identifiable, Hashable, Sendable {
 
     private static func name(_ key: String) -> String {
         if key == LimitSetting.rateLimitSwitch { return String(localized: "Limit Requests") }
-        if key == LimitSetting.fetchSwitch { return String(localized: "Let Tools Fetch Files") }
+        if key == LimitSetting.fetchSwitch { return InstanceSetting.mcpFetchEnabled.title }
         return LimitSetting.all.first { $0.key == key }?.title ?? key
     }
 
