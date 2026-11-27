@@ -24,6 +24,17 @@ import Testing
         return (adapter, libraries, source)
     }
 
+    @Test func signingOutFromAccountOpensTheExistingDisconnectConfirmation() async throws {
+        let (_, libraries, _) = try await connected(HostBench())
+        let launcher = SettingsLauncher()
+        launcher.show(.account)
+        let settings = AppSettingsHost(libraries: libraries, launcher: launcher)
+        settings.requestSignOut()
+        #expect(launcher.navigation.page == .connection)
+        #expect(libraries.marfaSettings.isConfirmingDisconnect)
+        #expect(libraries.host.configuredConnection != nil)
+    }
+
     @Test func withNoServerSetThePagesHaveNoCopyOpen() throws {
         let bench = HostBench()
         let defaults = ThrowawayDefaults.make("MarfaSettingsHostTests")
