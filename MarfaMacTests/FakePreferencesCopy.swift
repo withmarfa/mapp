@@ -31,9 +31,9 @@ actor FakePreferencesCopy: PreferencesCopy {
     /// Writes made to an item already in the bin.
     private(set) var writesToBinned = 0
     /// The item list still shows the copy's state from before the removal.
-    private var showsBinnedItems = false
+    private var visibleBinnedItems: Set<String> = []
 
-    func showBinnedItems(_ show: Bool) { showsBinnedItems = show }
+    func showBinnedItems(_ ids: Set<String>) { visibleBinnedItems = ids }
 
     private var pausedItems: CheckedContinuation<Void, Never>?
     private var pausesNextItems = false
@@ -158,7 +158,7 @@ actor FakePreferencesCopy: PreferencesCopy {
             isPaused = true
             await withCheckedContinuation { pausedItems = $0 }
         }
-        return held.filter { showsBinnedItems || !$0.value.trashed }
+        return held.filter { visibleBinnedItems.contains($0.key) || !$0.value.trashed }
             .map { PreferencesItem(id: $0.key, version: $0.value.version, createdAt: $0.value.createdAt, isConflictedCopy: $0.value.conflicted) }
             .sorted { ($0.createdAt, $0.id) < ($1.createdAt, $1.id) }
     }

@@ -64,7 +64,7 @@ paths:
 
 ## Removing and disconnecting
 
-- **Remove… in General queues removal and stops sync**, even offline. Sync stays off while the copy still shows the removed item. Keep in Marfa Again resumes sync. Local settings stay.
+- **Remove… in General queues removal and stops sync**, even offline. Keep in Marfa Again resumes sync once the copy stops listing the removed items as active. Local settings stay.
 - **Disconnect can remove them too, and only with Keep Copy.** A removal sends the whole queue, which must not carry a discarded change.
 - **The app signs out only after the server has taken the removal.** If that fails, it stays connected.
 

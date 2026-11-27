@@ -200,7 +200,11 @@ final class PreferencesSync {
         standing = .off(.removed)
         if let instance = try await copy.readiness().instance {
             var record = Record.read(defaults)
-            record.marfas[instance]?.removed = true
+            if var adopted = record.marfas[instance] {
+                adopted.removed = true
+                adopted.removedItems = (adopted.removedItems ?? [adopted.item]).union(held.map(\.id))
+                record.marfas[instance] = adopted
+            }
             record.save(defaults)
         }
         if confirmed {
@@ -226,7 +230,6 @@ final class PreferencesSync {
         await run()
         guard generation == self.generation, standing == .off(.removed) else { return }
         var record = Record.read(defaults)
-        record.marfas[instance] = nil
         record.restarting.insert(instance)
         record.save(defaults)
         await run()
@@ -317,14 +320,19 @@ final class PreferencesSync {
             let items = try await copy.items()
             answered.merge(await copy.answers()) { _, later in later }
             guard generation == self.generation else { return }
-            let originals = items.filter { !$0.isConflictedCopy }
             var record = Record.read(defaults)
-            let local = readLocal()
-            if let adopted = record.marfas[instance] {
-                if adopted.removed == true {
+            if let adopted = record.marfas[instance], adopted.removed == true {
+                let removedItems = adopted.removedItems ?? [adopted.item]
+                guard record.restarting.contains(instance), !items.contains(where: { removedItems.contains($0.id) }) else {
                     item = nil
                     return standing = .off(.removed)
-                } else if let chosen = originals.first, chosen.id == adopted.item {
+                }
+                record.marfas[instance] = nil
+            }
+            let originals = items.filter { !$0.isConflictedCopy }
+            let local = readLocal()
+            if let adopted = record.marfas[instance] {
+                if let chosen = originals.first, chosen.id == adopted.item {
                     guard let followed = try await follow(
                         chosen, from: adopted, of: instance, local: local, switched: record.last != instance,
                         winning: record.winning ?? [:], siblings: items.filter(\.isConflictedCopy), in: copy,

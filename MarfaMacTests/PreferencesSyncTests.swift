@@ -333,9 +333,10 @@ import Testing
         let copy = FakePreferencesCopy()
         let sync = await sync(copy)
         let removed = try #require(await copy.activeIDs.first)
-        await copy.showBinnedItems(true)
+        let sibling = await copy.add([:])
+        await copy.showBinnedItems([removed, sibling])
         try await sync.remove(confirmed: confirmed)
-        #expect(try await copy.items().map(\.id) == [removed])
+        #expect(Set(try await copy.items().map(\.id)) == [removed, sibling])
 
         defaults.set("dark", forKey: AppearanceKey.theme)
         await sync.flush()
@@ -347,12 +348,20 @@ import Testing
         #expect(sync.standing == .off(.removed))
         #expect(await copy.writesToBinned == 0)
 
-        await copy.showBinnedItems(false)
         try await sync.startAgain()
+        #expect(sync.standing == .off(.removed))
+        #expect(await copy.writesToBinned == 0)
+        await copy.showBinnedItems([sibling])
+        await sync.flush()
+        #expect(sync.standing == .off(.removed))
+        #expect(await copy.writesToBinned == 0)
+        await copy.showBinnedItems([])
+        await sync.flush()
         #expect(sync.standing == .syncing)
         let made = try #require(await copy.activeIDs.first)
         #expect(made != removed)
         #expect(await copy.unitsHeld(made)[theme] == #""dark""#)
+        #expect(await copy.writesToBinned == 0)
     }
 
     // MARK: Review findings
