@@ -83,6 +83,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
     let host: MarfaHost
     var address = ""
     var otherAddress = ""
+    var showsConnectSheet = false
     private(set) var notice: Notice?
     private(set) var isWorking = false
     private(set) var isAllowingMore = false
@@ -201,6 +202,13 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
     func cancelSignIn() {
         guard canCancelSignIn else { return }
         signingIn?.cancel()
+    }
+
+    /// Leaving Connection withdraws its pending approval. Once the copy is opening, the approved sign-in continues.
+    func closeConnectSheet() {
+        guard showsConnectSheet else { return }
+        showsConnectSheet = false
+        if !isWorking || host.isPreparingInitialSignIn { signingIn?.cancel() }
     }
 
     private func method(usingCode: Bool) -> MarfaHost.SignInMethod {

@@ -176,6 +176,35 @@ import Testing
         #expect(model.canConnect)
     }
 
+    @Test func leavingConnectionEndsAJustApprovedCodeWithoutOpeningTheLibrary() async throws {
+        let bench = HostBench()
+        let (model, _) = model(bench)
+        let (approval, approve) = AsyncStream<Void>.makeStream()
+        defer { approve.finish() }
+        let signIns = bench.signIns
+        let address = first.address
+        signIns.script(code: [.success(CodeSignIn(
+            code: "ABCD-1234", address: URL(string: "http://first.test:8210/device")!, completeAddress: nil,
+            expiresAt: .distantFuture, finish: {
+                for await _ in approval {}
+                signIns.save("approved", for: address)
+                return SignedIn()
+            }))])
+        model.address = "http://first.test:8210"
+        model.showsConnectSheet = true
+        let task = model.start(.connect(usingCode: true))
+        try #require(await eventually { model.code != nil })
+        model.closeConnectSheet()
+        await task.value
+        #expect(!model.showsConnectSheet)
+        #expect(model.code == nil)
+        #expect(model.notice == nil)
+        #expect(!model.isConnected)
+        #expect(try signIns.key(for: address) == nil)
+        #expect(signIns.calls.contains("signOut http://first.test:8210"))
+        #expect(bench.servers.opened.isEmpty)
+    }
+
     @Test func aCopyThatCannotOpenAfterSigningInAgainIsToldAsSuch() async throws {
         let bench = HostBench()
         let (model, _) = model(bench)

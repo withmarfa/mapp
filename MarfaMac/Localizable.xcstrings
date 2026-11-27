@@ -3937,6 +3937,9 @@
     "Contents" : {
       "extractionState" : "manual"
     },
+    "Continue" : {
+
+    },
     "Continue lists on Return" : {
 
     },
@@ -4211,6 +4214,9 @@
       "extractionState" : "manual"
     },
     "Couldn’t sync" : {
+
+    },
+    "Couldn’t tell whether this Marfa is set up." : {
 
     },
     "Count on the Card" : {
@@ -5187,6 +5193,9 @@
 
     },
     "Forward 15 Seconds" : {
+
+    },
+    "Found" : {
 
     },
     "Found %@" : {
@@ -6692,6 +6701,9 @@
     "Marfa for Mac couldn’t check this link in time. Try opening it again." : {
 
     },
+    "Marfa isn’t answering." : {
+
+    },
     "Marfa keeps this link itself." : {
 
     },
@@ -7076,6 +7088,9 @@
     "Next Week or Month" : {
 
     },
+    "Next, you sign in on its own page." : {
+
+    },
     "No" : {
       "extractionState" : "manual"
     },
@@ -7395,6 +7410,9 @@
     "Not Set" : {
       "extractionState" : "manual"
     },
+    "Not Signed In" : {
+
+    },
     "Not Started" : {
       "extractionState" : "manual"
     },
@@ -7415,6 +7433,9 @@
     },
     "Not connected yet" : {
       "extractionState" : "manual"
+    },
+    "Not found" : {
+
     },
     "Not heard from" : {
 
@@ -9387,6 +9408,9 @@
     "Sign In to %@" : {
 
     },
+    "Sign In with a Code…" : {
+
+    },
     "Sign In…" : {
 
     },
@@ -9404,6 +9428,9 @@
     },
     "Sign in to this server again to see them." : {
       "extractionState" : "manual"
+    },
+    "Sign in to your Marfa to open your library." : {
+
     },
     "Sign Out “%@”?" : {
 
@@ -11036,6 +11063,9 @@
       "extractionState" : "manual"
     },
     "This Marfa answers on these too." : {
+
+    },
+    "This Marfa isn’t set up yet." : {
 
     },
     "This Marfa must be reachable." : {

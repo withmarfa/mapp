@@ -30,6 +30,20 @@ actor FakePreferencesCopy: PreferencesCopy {
     private(set) var queuedRemovals: [String: String] = [:]
     /// Writes made to an item already in the bin.
     private(set) var writesToBinned = 0
+    /// The item list still shows the copy's state from before the removal.
+    private var visibleBinnedItems: Set<String> = []
+    nonisolated let settlingRemovals = HeldSwitch()
+    private(set) var isSettlingRemovals = false
+    nonisolated let readingAnswers = HeldSwitch()
+    private(set) var isReadingAnswers = false
+
+    func showBinnedItems(_ ids: Set<String>) { visibleBinnedItems = ids }
+
+    func refuseRemoval(of item: String) {
+        queuedRemovals = queuedRemovals.filter { $0.value != item }
+        held[item]?.trashed = false
+    }
+
     private var pausedItems: CheckedContinuation<Void, Never>?
     private var pausesNextItems = false
     private var isPaused = false
@@ -153,7 +167,7 @@ actor FakePreferencesCopy: PreferencesCopy {
             isPaused = true
             await withCheckedContinuation { pausedItems = $0 }
         }
-        return held.filter { !$0.value.trashed }
+        return held.filter { visibleBinnedItems.contains($0.key) || !$0.value.trashed }
             .map { PreferencesItem(id: $0.key, version: $0.value.version, createdAt: $0.value.createdAt, isConflictedCopy: $0.value.conflicted) }
             .sorted { ($0.createdAt, $0.id) < ($1.createdAt, $1.id) }
     }
@@ -167,6 +181,9 @@ actor FakePreferencesCopy: PreferencesCopy {
     func queued() async throws -> Set<String> { unanswered }
 
     func answers() async -> [String: PreferenceAnswer] {
+        isReadingAnswers = true
+        await readingAnswers.wait()
+        isReadingAnswers = false
         defer { answersHeld = [:] }
         return answersHeld
     }
@@ -176,7 +193,7 @@ actor FakePreferencesCopy: PreferencesCopy {
             duringRead = nil
             await change()
         }
-        return unitsHeld(item)
+        return held[item]?.trashed == true ? [:] : unitsHeld(item)
     }
 
     func create(fields: [PreferencesField: JSONObject]) async throws -> String {
@@ -231,6 +248,13 @@ actor FakePreferencesCopy: PreferencesCopy {
     }
 
     func pendingRemovals() async throws -> Set<String> { Set(queuedRemovals.keys) }
+
+    func catchUpAfterRemovals() async throws -> Bool {
+        isSettlingRemovals = true
+        defer { isSettlingRemovals = false }
+        await settlingRemovals.wait()
+        return queuedRemovals.isEmpty && visibleBinnedItems.isEmpty
+    }
 
     func holdsOtherChanges(besides items: Set<String>) async throws -> Bool { !libraryWrites.isEmpty }
 
