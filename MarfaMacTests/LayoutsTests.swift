@@ -1,4 +1,5 @@
 import Foundation
+import Marfa
 import Testing
 @testable import MarfaMac
 
@@ -60,6 +61,16 @@ struct LayoutsTests {
     }
 
     // MARK: The page
+
+    @Test func onlyKnownOwnerTypesAreGroupedUnderYours() {
+        let owner = MarfaMapping.itemType(ItemType(id: "user.recipe", origin: .registered))
+        let unknown = MarfaMapping.itemType(ItemType(id: "user.unknown"))
+        let registered = MarfaMapping.itemType(ItemType(id: "studio.recipe", origin: .registered))
+
+        #expect(LayoutsGroup(owner) == .yours)
+        #expect(LayoutsGroup(unknown) == .builtIn)
+        #expect(LayoutsGroup(registered) == .registered)
+    }
 
     @Test(arguments: [false, true])
     func editingNotesChangesOnlyItsSyncedRow(reset: Bool) throws {

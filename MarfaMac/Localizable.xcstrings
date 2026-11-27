@@ -562,6 +562,16 @@
         }
       }
     },
+    "%@%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@%2$@"
+          }
+        }
+      }
+    },
     "%@%@ files nothing uses" : {
 
     },
@@ -8455,6 +8465,9 @@
 
     },
     "Refused a reused token" : {
+
+    },
+    "Registered Types" : {
 
     },
     "Registered a connector" : {

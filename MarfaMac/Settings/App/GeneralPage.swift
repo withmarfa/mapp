@@ -233,11 +233,9 @@ struct GeneralPage: View {
                 SettingsButton("Import…") { files.chooseFileToImport() }
                     .accessibilityIdentifier("ImportSettings")
             }
-            SettingsRow(
-                "Restore earlier settings", line: files.restorePoints.isEmpty ? "None saved yet." : nil,
-                look: files.restorePoints.isEmpty ? .off : .normal
-            ) {
+            SettingsRow("Restore earlier settings", line: files.restorePoints.isEmpty ? "None saved yet." : nil) {
                 SettingsButton("Restore…") { files.chooseRestorePoint() }
+                    .disabled(files.restorePoints.isEmpty)
                     .accessibilityIdentifier("RestoreSettings")
             }
             SettingsRow("Reset settings", line: libraries.preferences.syncs ? "On every Mac that connects to this Marfa. Your items stay." : "Every setting on this Mac. Your items stay.") {

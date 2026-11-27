@@ -14,6 +14,8 @@ struct AppearancePage: View {
     @AppStorage(InterfaceKey.showsSidebarHistory) private var showsHistory = true
     @AppStorage(SidebarTypeRow.subtypeIconsKey) private var showsSubtypeIcons = true
     @AppStorage(SidebarColor.key) private var sidebarColor = SidebarColor.gray
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.displayScale) private var displayScale
     private var registry = ColumnWidthRegistry.shared
 
     /// Gray is the default, so choosing it stores nothing.
@@ -115,18 +117,16 @@ struct AppearancePage: View {
                     selection: Binding { appIcon } set: { $0.store() },
                     title: "App icon"
                 )
+                .frame(minHeight: SettingsTokens.Metric.dockIconChoiceMinHeight)
                 .accessibilityIdentifier("AppIcon")
             }
             SettingsRow("Highlight color") {
-                SettingsPopUp(title: "Highlight color", selection: $highlight) {
-                    Text("Yellow").tag(HighlightChoice.yellow)
-                    Text("Orange").tag(HighlightChoice.orange)
-                    Text("Green").tag(HighlightChoice.green)
-                    Text("Blue").tag(HighlightChoice.blue)
-                    Text("Pink").tag(HighlightChoice.pink)
-                    Text("Purple").tag(HighlightChoice.purple)
+                SettingsPopUp(title: "Highlight color", selection: $highlight, currentValueLabel: highlightValue) {
+                    ForEach(HighlightChoice.allCases.filter { $0 != .accent }) { choice in
+                        highlightName(choice).tag(choice)
+                    }
                     Divider()
-                    Text("Accent").tag(HighlightChoice.accent)
+                    highlightName(.accent).tag(HighlightChoice.accent)
                 }
                 .accessibilityIdentifier("Highlights")
             }
@@ -137,6 +137,47 @@ struct AppearancePage: View {
                 }
                 .accessibilityIdentifier("TypeChipTint")
             }
+        }
+    }
+
+    private var highlightValue: Text {
+        let title = highlightName(highlight)
+        let side = SettingsTokens.Metric.highlightDot
+        let width = side + SettingsTokens.Metric.highlightDotGap
+        let swatch = Circle()
+            .fill(highlightColor)
+            .frame(width: side, height: side)
+            .frame(width: width, alignment: .leading)
+            .environment(\.colorScheme, colorScheme)
+        let renderer = ImageRenderer(content: swatch)
+        renderer.scale = displayScale
+        guard let dot = renderer.cgImage else { return title }
+        return Text("\(Image(decorative: dot, scale: displayScale))\(title)")
+    }
+
+    private var highlightColor: Color {
+        let color: Color
+        switch highlight {
+        case .yellow: return SettingsTokens.highlightYellow
+        case .orange: color = Color(nsColor: .systemOrange)
+        case .green: color = Color(nsColor: .systemGreen)
+        case .blue: color = Color(nsColor: .systemBlue)
+        case .pink: color = Color(nsColor: .systemPink)
+        case .purple: color = Color(nsColor: .systemPurple)
+        case .accent: color = accent.color ?? SettingsTokens.systemAccent
+        }
+        return Color.white.mix(with: color, by: SettingsTokens.highlightTint)
+    }
+
+    private func highlightName(_ choice: HighlightChoice) -> Text {
+        switch choice {
+        case .yellow: Text("Yellow")
+        case .orange: Text("Orange")
+        case .green: Text("Green")
+        case .blue: Text("Blue")
+        case .pink: Text("Pink")
+        case .purple: Text("Purple")
+        case .accent: Text("Accent")
         }
     }
 
@@ -177,6 +218,17 @@ struct AppearancePage: View {
             }
         }
     }
+}
+
+private extension SettingsTokens {
+    static let highlightYellow = Color(red: 1, green: 240 / 255, blue: 168 / 255)
+    static let highlightTint = 0.38
+}
+
+private extension SettingsTokens.Metric {
+    static let dockIconChoiceMinHeight: CGFloat = 50
+    static let highlightDot: CGFloat = 12
+    static let highlightDotGap: CGFloat = 7
 }
 
 /// One column's default width, clamped to the range it allows.

@@ -18,11 +18,7 @@ struct ListsPage: View {
     var body: some View {
         SettingsPageColumn {
             SettingsSection("Density") {
-                ChoiceTiles(
-                    choices: Density.allCases.map { option in
-                        .init(value: option, title: Text(verbatim: option.title), picture: AnyView(DensityPicture(density: option)))
-                    },
-                    selection: $density)
+                DensityChoices(selection: $density)
                     .accessibilityIdentifier("ListsDensity")
             }
             SettingsSection("Defaults", footer: "A view or a place can set its own.") {
@@ -52,10 +48,53 @@ struct ListsPage: View {
     }
 }
 
-/// A density's tile: the real list row, as the list draws it at that density, over a few sample items of different
-/// types. Standard shows a picture on its first row, drawn for the tile; nothing is read from the library or the network.
+private struct DensityChoices: View {
+    @Binding var selection: Density
+    private typealias Metric = SettingsTokens.Metric
+
+    var body: some View {
+        HStack(alignment: .top, spacing: Metric.densityTileGap) {
+            ForEach(Density.allCases, id: \.self) { density in
+                let isSelected = selection == density
+                Button { selection = density } label: {
+                    VStack(spacing: Metric.densityTitleGap) {
+                        picture(density, isSelected: isSelected)
+                        Text(verbatim: density.title)
+                            .settingsFont(.small)
+                            .fontWeight(isSelected ? .semibold : .regular)
+                    }
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+            }
+        }
+        .padding([.top, .horizontal], Metric.inset)
+        .padding(.bottom, Metric.densityBottomInset)
+    }
+
+    private func picture(_ density: Density, isSelected: Bool) -> some View {
+        let shape = RoundedRectangle(cornerRadius: Metric.densityTileRadius)
+        return Color.clear
+            .aspectRatio(Metric.densityPictureWidth / Metric.densityPictureHeight, contentMode: .fit)
+            .frame(maxWidth: .infinity)
+            .overlay { DensityPicture(density: density).accessibilityHidden(true) }
+            .clipShape(shape)
+            .overlay { shape.strokeBorder(SettingsTokens.hairline, lineWidth: Metric.tileEdgeWidth) }
+            .overlay {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: Metric.densityTileRadius + Metric.densityRingOutset)
+                        .strokeBorder(SettingsTokens.primaryText.opacity(SettingsTokens.densityRingOpacity), lineWidth: Metric.densityRingWidth)
+                        .padding(-Metric.densityRingOutset)
+                }
+            }
+    }
+}
+
+/// The sample list content laid out in miniature.
 private struct DensityPicture: View {
     let density: Density
+    private typealias Metric = SettingsTokens.Metric
 
     private static let note = "lucide:sticky-note"
     private static let task = "lucide:square-check-big"
@@ -76,19 +115,18 @@ private struct DensityPicture: View {
         ]
     }
 
-    /// What the list makes of an item of a type: the type's chip first, then its status.
     private func row(_ icon: String, _ type: String, _ title: String, _ line: String?, _ date: String, status: String? = nil) -> RowContent {
         var content = RowContent(title: title, date: date, secondary: line, typeIcon: icon, typeLabel: type, mixesTypes: true)
-        content.chips = [.type(icon: icon, label: type)] + (status.map { [.status(.notStarted, label: $0)] } ?? [])
+        content.chips = status.map { [.status(.notStarted, label: $0)] } ?? []
         return content
     }
 
     var body: some View {
         GeometryReader { geometry in
-            let width = max(geometry.size.width, SettingsTokens.Metric.column / 2)
+            let scale = geometry.size.width / Metric.densityPictureWidth * Metric.densityRowScale
             rows
-                .frame(width: width, height: width / SettingsTokens.Metric.choiceAspect, alignment: .topLeading)
-                .scaleEffect(geometry.size.width / width, anchor: .topLeading)
+                .frame(width: Metric.densityPictureWidth / Metric.densityRowScale)
+                .scaleEffect(scale, anchor: .topLeading)
         }
         .background(SettingsTokens.card)
         .allowsHitTesting(false)
@@ -97,20 +135,81 @@ private struct DensityPicture: View {
     private var rows: some View {
         let isCompact = density == .compact
         return VStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(samples.prefix(isCompact ? 6 : 2).enumerated()), id: \.offset) { index, content in
-                ItemRow(content: content, density: density, showsSample: !isCompact && index == 0)
+            ForEach(Array(samples.prefix(isCompact ? 6 : 3).enumerated()), id: \.offset) { index, content in
+                previewRow(content, showsPicture: !isCompact && index == 0)
+                    .frame(height: isCompact ? Metric.densityCompactRowHeight : nil)
                     .overlay(alignment: .top) {
                         if index > 0 {
                             Rectangle()
                                 .fill(SettingsTokens.rule)
-                                .frame(height: SettingsTokens.Metric.ruleThickness)
+                                .frame(height: Metric.ruleThickness)
                         }
                     }
             }
-            Spacer(minLength: 0)
         }
-        .padding(.horizontal, SettingsTokens.Metric.previewRowSide)
-        .padding(.top, SettingsTokens.Metric.previewCardInset)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(.horizontal, Metric.densityPreviewInset)
     }
+
+    private func previewRow(_ content: RowContent, showsPicture: Bool) -> some View {
+        VStack(alignment: .leading, spacing: Metric.densityLineGap) {
+            HStack(spacing: Metric.buttonGap) {
+                TonedGlyph(id: content.typeIcon, size: Metric.densityTypeMark)
+                Text(verbatim: content.title)
+                    .fontWeight(density == .standard ? .semibold : .regular)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if let date = content.date {
+                    Text(verbatim: date)
+                        .font(SettingsTokens.font(.line))
+                        .foregroundStyle(SettingsTokens.secondaryText)
+                        .fixedSize()
+                }
+            }
+            if density == .standard, let preview = content.secondary {
+                Text(verbatim: preview)
+                    .font(SettingsTokens.font(.line))
+                    .foregroundStyle(SettingsTokens.secondaryText)
+                    .lineLimit(2)
+                    .padding(.trailing, showsPicture ? Metric.densitySamplePictureClearance : 0)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if density == .standard, !content.chips.isEmpty {
+                ChipLine(content: content, statusItem: nil, typeFont: InterfaceStyle.captionFont)
+            }
+        }
+        .font(SettingsTokens.font(.title))
+        .padding(.vertical, density == .standard ? Metric.densityStandardRowPadding : 0)
+        .padding(.horizontal, Metric.densityRowInset)
+        .overlay(alignment: .topTrailing) {
+            if showsPicture {
+                RowPictureFrame { SamplePicture() }
+                    .padding(.top, Metric.densitySamplePictureTop)
+                    .padding(.trailing, Metric.densityRowInset)
+            }
+        }
+    }
+}
+
+private extension SettingsTokens {
+    static let densityRingOpacity = 0.40
+}
+
+private extension SettingsTokens.Metric {
+    static let densityPictureWidth: CGFloat = 287
+    static let densityPictureHeight: CGFloat = 172
+    static let densityTileGap: CGFloat = 14
+    static let densityTitleGap: CGFloat = 7
+    static let densityBottomInset: CGFloat = 12
+    static let densityTileRadius: CGFloat = 8
+    static let densityRingOutset: CGFloat = 4.5
+    static let densityRingWidth: CGFloat = 2.5
+    static let densityRowScale: CGFloat = 0.8
+    static let densityPreviewInset: CGFloat = 4
+    static let densityRowInset: CGFloat = 10
+    static let densityTypeMark: CGFloat = 16
+    static let densityLineGap: CGFloat = 2
+    static let densityStandardRowPadding: CGFloat = 10
+    static let densityCompactRowHeight: CGFloat = 28 / densityRowScale
+    static let densitySamplePictureClearance: CGFloat = 52
+    static let densitySamplePictureTop: CGFloat = 31
 }

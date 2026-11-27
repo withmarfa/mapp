@@ -49,7 +49,7 @@ See `docs/owner-settings.md` for Marfa pages and `docs/settings-sync.md` for sto
 | Keyboard | Search by command or keys. Export and Restore Defaults include menu and global shortcuts. Import updates commands in the file (`docs/commands.md`) |
 | Editor | Fonts load when the page opens. PDF background shares the choice in View › PDF Background. Inkkit replaces `EditorOptions` as a set. Edit pages as applies to items opened next |
 | Lists | Density, From (All Items or Library), sort, and grouping. A view or place can override these defaults |
-| Layouts | Types are grouped by origin. Export and Import transfer the date, secondary line, and facts (`docs/type-looks.md`). `PagePlacements` stores pins and Linked From. Restore Defaults resets both stores for one type |
+| Layouts | Types are grouped by origin and namespace. Export and Import transfer the date, secondary line, and facts (`docs/type-looks.md`). `PagePlacements` stores pins and Linked From. Restore Defaults resets both stores for one type |
 | Search | Excluded types and sources keep their names if missing (`SearchLeaveOuts`). Add explains the ten-condition limit. Included controls archived and Feed items. Results controls order and snippets. Searches within a place omit nothing |
 | Connection | Sign-in, address status, Account link, permission and queue counts, downloads, space used, and exports. Other Marfas shows when other copies exist. Disconnect reads the queue and asks about unsent changes |
 

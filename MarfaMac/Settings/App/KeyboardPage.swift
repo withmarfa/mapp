@@ -28,7 +28,9 @@ struct KeyboardPage: View {
                 ) { event in
                     if let shortcut = Shortcut(event: event) { model.pressed = shortcut }
                 }
+                .appButton(model.searchesByKeys ? .secondary : .plain, icon: true)
             }
+            .padding(.bottom, SettingsTokens.Metric.shortcutSearchGap - SettingsTokens.Metric.pageSpacing)
             if !model.hasResults {
                 SettingsEmptyCard(
                     symbol: "magnifyingglass", title: Text("No Shortcuts Found"),
@@ -96,4 +98,8 @@ struct KeyboardPage: View {
                 clear: { model.clear(target) })
         }
     }
+}
+
+private extension SettingsTokens.Metric {
+    static let shortcutSearchGap: CGFloat = 12
 }

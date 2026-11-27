@@ -34,7 +34,7 @@ enum ItemPreviewFixtures {
     private static var rows: [Marfa.Item] {
         [
             SampleLibrary.row(
-                projectID.rawValue, type: "sample.project",
+                projectID.rawValue, type: SampleLibrary.projectType,
                 properties: ["title": .string("Field Research"), "body": .string("A project with connected work.")],
                 created: date, edited: date),
             SampleLibrary.row(
@@ -115,7 +115,7 @@ private struct WhenLoaded<Content: View>: View {
 }
 
 #Preview("Unsaved Property Input") {
-    ItemPropertyRow(definition: .init(key: "description", label: "Description", kind: .text, declaredBy: TypeID("sample.project")),
+    ItemPropertyRow(definition: .init(key: "description", label: "Description", kind: .text, declaredBy: TypeID(SampleLibrary.projectType)),
                     value: .string("Edit this value and press Return to see the save error."),
                     isEditable: true, onChange: { _ in false })
         .padding(16)
