@@ -39,6 +39,8 @@ import Observation
 
     private(set) var apps: [AppAccess] = []
     private(set) var typeNames: [String: String] = [:]
+    private(set) var currentKeyID: String?
+    private var currentAppClientID: String?
     /// The keys each app made, by the app's client ID, where the app may list keys.
     private(set) var keysMade: [String: [KeyInfo]] = [:]
     private let loader = OwnerLoader()
@@ -68,6 +70,11 @@ import Observation
 
     func app(_ id: String) -> AppAccess? { apps.first { $0.id == id } }
 
+    var canReadApps: Bool { context.grants().contains(.grantsManage) }
+    var canRemoveData: Bool { context.grants().contains(.itemsPurge) }
+
+    func isCurrent(_ app: AppAccess) -> Bool { app.clientID == currentAppClientID }
+
     static func name(of app: AppAccess) -> String {
         if let name = app.name, !name.isEmpty { return name }
         switch app.kind {
@@ -76,13 +83,14 @@ import Observation
         }
     }
 
-    func load() async {
+    func load(includeKeys: Bool = true) async {
         await loader.load(in: context, primary: { () throws(OwnerFailure) in
             apps = try await context.calls.apps()
         }, secondary: [
+            .quiet { [self] () throws(OwnerFailure) in try await readIdentity() },
             .quiet { [self] () throws(OwnerFailure) in typeNames = try await context.calls.typeNames() },
             .required(keysRead) { [self] () throws(OwnerFailure) in
-                guard context.grants().contains(.keysManage) else {
+                guard includeKeys, !context.grants().isDisjoint(with: [.keysManage, .keysMint]) else {
                     keysMade = [:]
                     return
                 }
@@ -90,6 +98,16 @@ import Observation
                 keysMade = Dictionary(grouping: keys.filter { $0.appClientID != nil }, by: { $0.appClientID ?? "" })
             },
         ])
+    }
+
+    private func readIdentity() async throws(OwnerFailure) {
+        currentKeyID = nil
+        currentAppClientID = nil
+        let identity = try await context.calls.identity()
+        currentKeyID = identity.keyID
+        guard identity.keyID == nil, let ownVendor, apps.contains(where: { $0.vendors.contains(ownVendor) }) else { return }
+        // An OAuth caller can read app data only from namespaces held by its own registration.
+        currentAppClientID = try await context.calls.appData(vendor: ownVendor).clientID
     }
 
     // MARK: Narrowing
@@ -120,8 +138,14 @@ import Observation
 
     func askToDisconnect(_ app: AppAccess) {
         let name = Self.name(of: app)
-        let offersData = !removableVendors(of: app).isEmpty && !app.vendors.contains { isOwn($0) }
+        let hasRemovableData = !removableVendors(of: app).isEmpty && !app.vendors.contains { isOwn($0) }
+        let offersData = canRemoveData && hasRemovableData
         var message = String(localized: "\(name) stops working at once and must be approved again. Its webhooks are deleted. The keys it made keep working.")
+        if isCurrent(app) {
+            message += " " + String(localized: "Disconnecting this app also signs this Mac out.")
+        } else if currentAppClientID == nil, currentKeyID == nil {
+            message += " " + String(localized: "If this Mac uses this app sign-in, disconnecting it signs this Mac out.")
+        }
         if offersData {
             message += " " + String(localized: "Its data stays unless you also remove it. Removing it deletes it permanently, and only a backup brings it back.")
         }

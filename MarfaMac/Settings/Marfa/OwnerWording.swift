@@ -202,6 +202,8 @@ nonisolated enum AccessScopes {
         case "content": return String(localized: "Your Content")
         case "edge.*": return String(localized: "All Links")
         case "metadata": return String(localized: "Types and Links")
+        case "metadata.types": return String(localized: "Type Definitions")
+        case "metadata.edge_types": return String(localized: "Link Definitions")
         case "profile": return String(localized: "Your Profile")
         default: break
         }

@@ -83,6 +83,7 @@ nonisolated struct AppData: Hashable, Sendable {
 
     let vendor: String
     var types: [Kind]
+    var clientID: String?
 
     var active: Int { types.reduce(0) { $0 + $1.active } }
     var archived: Int { types.reduce(0) { $0 + $1.archived } }

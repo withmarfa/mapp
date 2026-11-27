@@ -123,6 +123,10 @@ import Observation
     /// Whether the app may give a key more time, which `keys.manage` allows for any key.
     var canExtend: Bool { context.grants().contains(.keysManage) }
 
+    var canReadKeys: Bool { canExtend || canMake }
+
+    func isCurrent(_ key: KeyInfo) -> Bool { identity?.keyID == key.id }
+
     /// What a key can be extended to now: only a later day than it ends on, and none past the day the key the app is signed in
     /// with ends, which the server holds it to. A key that never ends has nothing to extend, and never is offered only where
     /// the app's own sign-in does not end. Nothing is offered while the app's own sign-in is not known.
@@ -334,9 +338,13 @@ import Observation
     }
 
     func askToRevoke(_ key: KeyInfo) {
+        var message = String(localized: "Anything using it stops at once. This can’t be undone.")
+        if isCurrent(key) {
+            message += " " + String(localized: "Revoking this key also signs this Mac out.")
+        }
         question = Question(
             action: .revoke(key.id), title: String(localized: "Revoke “\(key.label)”?"),
-            message: String(localized: "Anything using it stops at once. This can’t be undone."), confirm: String(localized: "Revoke"))
+            message: message, confirm: String(localized: "Revoke"))
     }
 
     func cancelQuestion() { question = nil }

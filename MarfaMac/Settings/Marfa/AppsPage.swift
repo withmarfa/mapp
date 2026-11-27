@@ -2,15 +2,14 @@ import AppKit
 import Marfa
 import SwiftUI
 
-/// The Apps page: the apps the owner approved, each opening a page of its own with what it may reach, which can only be
-/// narrowed, the keys it made, the data it keeps and Disconnect. Narrowing, removing data and disconnecting ask first.
+/// One app's access, keys and data, reached from Apps and Keys.
 struct AppsPage: View {
     let host: any MarfaSettingsHost
-    let subpage: SettingsSubpage?
+    let subpage: SettingsSubpage
     @State private var model: AppsModel
     @Environment(\.settingsNavigation) private var navigation
 
-    init(host: any MarfaSettingsHost, subpage: SettingsSubpage?) {
+    init(host: any MarfaSettingsHost, subpage: SettingsSubpage) {
         self.host = host
         self.subpage = subpage
         _model = State(initialValue: AppsModel(context: OwnerContext(host: host), ownVendor: host.ownAppVendor))
@@ -21,15 +20,16 @@ struct AppsPage: View {
     }
 
     private var openApp: AppAccess? {
-        guard let id = subpage?.id, id.hasPrefix("app:") else { return nil }
+        let id = subpage.id
+        guard id.hasPrefix("app:") else { return nil }
         return model.app(OwnerPermissions.owner(of: String(id.dropFirst(4))).base)
     }
 
-    private var isShowingPermissions: Bool { subpage.map { OwnerPermissions.owner(of: $0.id).isList } ?? false }
+    private var isShowingPermissions: Bool { OwnerPermissions.owner(of: subpage.id).isList }
 
     var body: some View {
         content
-            .task(id: host.serverAddress) { await model.load() }
+            .task(id: host.grants.intersection([.keysManage, .keysMint])) { await model.load() }
             .onChange(of: model.question) { _, asked in
                 guard let asked else { return }
                 // SwiftUI's alert has no checkbox, which Disconnect's "Also remove its data" is.
@@ -49,7 +49,7 @@ struct AppsPage: View {
             OwnerFailureState(page: .apps, failure: failure, host: host) { Task { await model.load() } }
         } else if !model.hasLoaded {
             OwnerLoading()
-        } else if subpage != nil {
+        } else {
             if let app = openApp {
                 if isShowingPermissions {
                     AppPermissions(model: model, app: app, host: host)
@@ -61,25 +61,20 @@ struct AppsPage: View {
                     symbol: "macwindow", title: Text("This App Isn’t Connected"),
                     line: Text("It was disconnected, here or somewhere else."), action: ("Back", { navigation?.back() }))
             }
-        } else {
-            list
         }
     }
 
-    private var list: some View {
-        SettingsPageColumn {
-            SettingsSection("Connected") {
-                if model.apps.isEmpty {
-                    SettingsEmptyCard(symbol: "macwindow", title: Text("No Apps"), line: Text("No apps are connected."))
-                }
-                ForEach(model.apps) { app in
-                    SettingsLinkRow(
-                        verbatim: AppsModel.name(of: app),
-                        line: AccessScopes.summary(AccessScopes.parse(app.scopes), names: model.typeNames),
-                        lead: .well(symbol: Self.symbol(app.kind)), value: OwnerWording.used(app.lastUsed)
-                    ) { navigation?.push(Self.subpage(for: app)) }
-                }
-            }
+    static func accessLine(_ parsed: AccessScopes.Parsed, names: [String: String]) -> String {
+        let reach = AccessScopes.summary(parsed, names: names)
+        let count = Set(parsed.permissions).intersection(InstancePermission.allCases.map(\.rawValue)).count
+        switch count {
+        case 0: return reach
+        case InstancePermission.allCases.count:
+            return reach + " " + String(localized: "Holds all \(count) owner permissions.")
+        case 1 where parsed.permissions.contains(InstancePermission.webhooksManage.rawValue):
+            return reach + " " + String(localized: "Manages webhooks.")
+        case 1: return reach + " " + String(localized: "Holds one owner permission.")
+        default: return reach + " " + String(localized: "Holds \(count) owner permissions.")
         }
     }
 
@@ -89,6 +84,45 @@ struct AppsPage: View {
         case .web: "safari"
         case .commandLine: "terminal"
         }
+    }
+}
+
+struct SignedInAppsSection: View {
+    let model: AppsModel
+    let host: any MarfaSettingsHost
+
+    var body: some View {
+        SettingsSection("Apps") {
+            if !model.canReadApps {
+                OwnerProblemRow(title: "Manage Apps", failure: .notPermitted(InstancePermission.grantsManage.rawValue), page: .apps, host: host)
+            } else if let failure = model.failure {
+                OwnerProblemRow(title: "Couldn’t Read Apps", failure: failure, page: .apps, host: host) {
+                    Task { await model.load(includeKeys: false) }
+                }
+            } else if !model.hasLoaded {
+                OwnerLoading()
+            } else if model.apps.isEmpty {
+                SettingsEmptyCard(symbol: "macwindow", title: Text("No Apps"), line: Text("No apps are connected."))
+            } else {
+                ForEach(model.apps) { app in
+                    SettingsLinkRow(
+                        verbatim: AppsModel.name(of: app),
+                        line: line(for: app),
+                        lead: .symbol(AppsPage.symbol(app.kind)), value: OwnerWording.used(app.lastUsed)
+                    ) { host.show(.apps, subpage: AppsPage.subpage(for: app)) }
+                        .help(Text(verbatim: AppsModel.name(of: app)))
+                        .accessibilityIdentifier("SettingsApp-\(app.id)")
+                }
+            }
+        }
+        .task(id: model.canReadApps) {
+            if model.canReadApps { await model.load(includeKeys: false) }
+        }
+    }
+
+    private func line(for app: AppAccess) -> String {
+        let reach = AppsPage.accessLine(AccessScopes.parse(app.scopes), names: model.typeNames)
+        return model.isCurrent(app) ? String(localized: "Used to sign in on this Mac.") + " " + reach : reach
     }
 }
 
@@ -125,7 +159,8 @@ private struct AppDetail: View {
             case .commandLine: String(localized: "The command line.")
             case .web: String(localized: "A web page at \(app.origins.map(AddressesModel.display).formatted(.list(type: .and))).")
             }
-        return [kind, approved, used].compactMap { $0 }.joined(separator: " ")
+        let identity = model.isCurrent(app) ? String(localized: "Used to sign in on this Mac.") : nil
+        return [identity, kind, approved, used].compactMap { $0 }.joined(separator: " ")
     }
 
     var body: some View {
@@ -138,7 +173,14 @@ private struct AppDetail: View {
         SettingsPageColumn {
             SettingsHead(
                 symbol: AppsPage.symbol(app.kind), tone: .purple, title: Text(verbatim: name), line: Text(verbatim: kindLine))
-            if let failure = model.rowErrors[app.id] { OwnerProblem(title: "Not Changed", failure: failure, page: .apps, host: host) }
+            if let failure = model.rowErrors[app.id] {
+                let line = failure == .unreachable
+                    ? String(localized: "The app can’t reach the server to confirm the result.")
+                    : OwnerWording.line(failure, on: .apps)
+                SettingsSection(name: nil) {
+                    OwnerProblemRow(title: "Couldn’t Change Access", failure: failure, line: line, page: .apps, host: host)
+                }
+            }
             SettingsSection(
                 name: Text("Access"), line: Text("What \(name) may read and change."),
                 footer: Text("You can only narrow it. \(name) asks you for more.")
@@ -157,16 +199,26 @@ private struct AppDetail: View {
                     navigation?.push(OwnerPermissions.subpage(of: AppsPage.subpage(for: app)))
                 }
             }
-            let keys = host.grants.contains(.keysManage) ? model.keysMade[app.clientID] ?? [] : []
-            if !keys.isEmpty || model.keysFailure != nil {
-                SettingsSection(name: Text("Keys It Made"), line: Text("They keep working when \(name) is disconnected.")) {
-                    if let failure = model.keysFailure {
-                        OwnerProblemRow(
-                            title: "Couldn’t Read the Keys This App Made", failure: failure, page: .apps, host: host,
-                            retry: { Task { await model.load() } })
+            let canReadKeys = host.grants.contains(.keysManage) || host.grants.contains(.keysMint)
+            SettingsSection(name: Text("Keys It Made"), line: Text("They keep working when \(name) is disconnected.")) {
+                if !canReadKeys {
+                    OwnerProblemRow(
+                        title: "Manage Keys", failure: .notPermitted(InstancePermission.keysManage.rawValue), page: .keys, host: host)
+                } else if let failure = model.keysFailure {
+                    OwnerProblemRow(
+                        title: "Couldn’t Read the Keys This App Made", failure: failure, page: .keys, host: host,
+                        retry: { Task { await model.load() } })
+                } else {
+                    let keys = model.keysMade[app.clientID] ?? []
+                    if keys.isEmpty {
+                        SettingsEmptyCard(symbol: "key", title: Text("No Keys"), line: Text("This app has made no keys this sign-in can see."))
                     }
                     ForEach(keys.sorted { ($0.lastUsed ?? .distantPast) > ($1.lastUsed ?? .distantPast) }) { key in
-                        SettingsRow(verbatim: key.label, line: OwnerWording.used(key.lastUsed) + ".", lead: .tile("key.fill", .amber))
+                        SettingsLinkRow(
+                            verbatim: key.label, line: KeysPage.line(key, names: model.typeNames, isCurrent: key.id == model.currentKeyID),
+                            lead: .symbol("key"),
+                            value: OwnerWording.used(key.lastUsed)
+                        ) { host.show(.keys, subpage: KeysPage.subpage(for: key)) }
                     }
                 }
             }
@@ -174,7 +226,7 @@ private struct AppDetail: View {
             SettingsSection("Disconnect") {
                 SettingsRow(
                     verbatim: String(localized: "Disconnect \(name)"),
-                    line: String(localized: "Its webhooks are deleted, its keys keep working, and it asks about its data.")
+                    line: String(localized: "Its webhooks are deleted. The keys it made keep working.")
                 ) {
                     SettingsButton("Disconnect…", role: .destructive) { model.askToDisconnect(app) }
                 }
@@ -210,6 +262,10 @@ private struct AppDataSection: View {
                         SettingsRow(verbatim: String(localized: "\(name) Keeps No Data"), look: .off)
                     }
                     ForEach(kept, id: \.vendor) { held in row(held, among: kept.count) }
+                    if !model.canRemoveData, kept.contains(where: { !model.isOwn($0.vendor) && !$0.types.isEmpty }) {
+                        OwnerProblemRow(
+                            title: "Remove App Data", failure: .notPermitted(InstancePermission.itemsPurge.rawValue), page: .apps, host: host)
+                    }
                     removalNote
                 }
             }
@@ -228,7 +284,7 @@ private struct AppDataSection: View {
         return SettingsRow(
             verbatim: title, line: AppDataWording.line(held, appName: name, keptByApp: model.isOwn(held.vendor)), lines: nil
         ) {
-            if !model.isOwn(held.vendor), !held.types.isEmpty {
+            if model.canRemoveData, !model.isOwn(held.vendor), !held.types.isEmpty {
                 SettingsButton("Remove…", role: .destructive) { model.askToRemoveData(app, vendor: held.vendor) }
                     .disabled(model.removing.contains(app.id))
             }

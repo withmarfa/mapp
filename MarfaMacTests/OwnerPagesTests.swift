@@ -1186,11 +1186,44 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
 
     private func bench(_ app: AppAccess) -> OwnerBench {
         let bench = OwnerBench()
+        bench.grants.insert(.itemsPurge)
         bench.calls.state.withLock {
             $0.apps = [app]
             $0.names = ["core.note": "Note"]
         }
         return bench
+    }
+
+    @Test func disconnectWithoutPurgePermissionKeepsTheAppsData() async throws {
+        var app = app()
+        app.vendors = ["app.raycast"]
+        let bench = bench(app)
+        bench.grants.remove(.itemsPurge)
+        let model = AppsModel(context: bench.context)
+        await model.load()
+        model.askToDisconnect(app)
+        let question = try #require(model.question)
+        #expect(question.checkbox == nil)
+        await model.confirm(question)
+        #expect(bench.calls.state.withLock { $0.disconnects.first?.removingData } == false)
+    }
+
+    @Test func anOAuthSignInUsesTheServerVerifiedClientID() async {
+        var current = app()
+        current.vendors = ["app.raycast"]
+        let bench = bench(current)
+        bench.calls.state.withLock {
+            $0.appData["app.raycast"] = AppData(vendor: "app.raycast", types: [], clientID: current.clientID)
+        }
+        let model = AppsModel(context: bench.context, ownVendor: "app.raycast")
+        await model.load()
+        #expect(model.isCurrent(current))
+        model.askToDisconnect(current)
+        #expect(model.question?.message.contains("Disconnecting this app also signs this Mac out.") == true)
+
+        bench.calls.state.withLock { $0.identity = OwnIdentity(keyID: "key-1", expires: nil) }
+        await model.load()
+        #expect(!model.isCurrent(current), "a key can read the namespace without using the app's grant to sign in")
     }
 
     @Test func narrowingAsksFirstAndSendsTheAccessItWasReadAs() async throws {
@@ -1562,6 +1595,58 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
 
 @MainActor
 @Suite(.hangLimit) struct KeysModelTests {
+    @Test(arguments: [OwnerFailure.notPermitted("keys.manage"), .unreachable])
+    func aFailedRevokeKeepsTheKeyAndExplainsWhy(_ failure: OwnerFailure) async throws {
+        let bench = bench([key()])
+        let model = KeysModel(context: bench.context)
+        await model.load()
+        model.askToRevoke(try #require(model.key("k1")))
+        bench.calls.fail("revoke", with: failure)
+        await model.confirm(try #require(model.question))
+        #expect(model.keys.map(\.id) == ["k1"])
+        #expect(model.revoked == nil)
+        #expect(model.rowErrors["k1"] == failure)
+    }
+
+    @Test func revokingTheCurrentKeySaysItSignsThisMacOut() async throws {
+        let bench = bench([key()])
+        bench.calls.state.withLock { $0.identity = OwnIdentity(keyID: "k1", expires: nil) }
+        let model = KeysModel(context: bench.context)
+        await model.load()
+        let current = try #require(model.key("k1"))
+        #expect(model.isCurrent(current))
+        model.askToRevoke(current)
+        #expect(model.question?.message.contains("signs this Mac out") == true)
+    }
+
+    @Test func anExpiredKeyIsDescribedInThePastTense() {
+        let now = Date.now
+        #expect(KeysPage.expiryLine(key(expires: now.addingTimeInterval(-60)), now: now).hasPrefix("Expired "))
+    }
+
+    @Test func anExpiringKeyRemainsListedOnTheAccountProblemsDestination() async {
+        let soon = key(expires: .now.addingTimeInterval(86_400))
+        let bench = bench([soon])
+        let model = KeysModel(context: bench.context)
+        await model.load()
+        #expect(model.ownersKeys == [soon])
+        #expect(KeysPage.expiryLine(soon).hasPrefix("Expires "))
+        let concern = AttentionConcern(kind: .key, reference: soon.id, title: "A key expires tomorrow")
+        #expect(concern.repair == .page(.keys))
+    }
+
+    @Test func mintGrantsScopedKeyAccessAndManageGrantsExtension() {
+        let bench = bench([])
+        let model = KeysModel(context: bench.context)
+        bench.grants = [.grantsManage]
+        #expect(!model.canReadKeys)
+        bench.grants.insert(.keysMint)
+        #expect(model.canReadKeys)
+        #expect(!model.canExtend)
+        bench.grants.insert(.keysManage)
+        #expect(model.canExtend)
+    }
+
     private func key(_ id: String = "k1", expires: Date? = nil, types: [String: AccessLevel] = ["*": .write, "core.note": .read]) -> KeyInfo {
         KeyInfo(id: id, label: "Importer", source: "importer", permissions: ["items.purge"], tier: .feed, types: types, expires: expires, appClientID: nil)
     }

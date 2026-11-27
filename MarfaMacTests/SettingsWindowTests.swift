@@ -99,7 +99,7 @@ struct SettingsWindowTests {
         #expect(MarfaSettingsPage.trash.permission == .itemsPurge)
         #expect(MarfaSettingsPage.account.permission == nil, "Account opens without one and asks for sign_ins.manage from Change Password")
         #expect(MarfaSettingsPage.apps.permission == .grantsManage)
-        #expect(MarfaSettingsPage.keys.permission == .keysManage)
+        #expect(MarfaSettingsPage.keys.permission == nil, "Apps and Keys checks each section’s permission")
         #expect(MarfaSettingsPage.network.permission == .configManage)
         #expect(MarfaSettingsPage.types.permission == .schemaWrite)
         #expect(MarfaSettingsPage.plugins.permission == .schemaWrite)

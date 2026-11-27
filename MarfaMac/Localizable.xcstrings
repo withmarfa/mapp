@@ -2242,6 +2242,9 @@
     "Actions" : {
 
     },
+    "Actions for %@" : {
+
+    },
     "Activity" : {
 
     },
@@ -3922,9 +3925,6 @@
     "Connected" : {
       "extractionState" : "manual"
     },
-    "Connected Apps" : {
-
-    },
     "Connecting…" : {
       "extractionState" : "manual"
     },
@@ -4043,6 +4043,9 @@
     "Copy the command, run it in Terminal, then enter the secret key when prompted." : {
 
     },
+    "Couldn’t Change Access" : {
+
+    },
     "Couldn’t Check" : {
 
     },
@@ -4100,6 +4103,9 @@
     "Couldn’t Read %@" : {
 
     },
+    "Couldn’t Read Apps" : {
+
+    },
     "Couldn’t Read Available Types" : {
 
     },
@@ -4110,6 +4116,9 @@
 
     },
     "Couldn’t Read Its Data" : {
+
+    },
+    "Couldn’t Read Keys" : {
 
     },
     "Couldn’t Read This Folder" : {
@@ -4137,6 +4146,9 @@
 
     },
     "Couldn’t Restore Settings" : {
+
+    },
+    "Couldn’t Revoke Key" : {
 
     },
     "Couldn’t Save Item" : {
@@ -4580,6 +4592,9 @@
     "Disconnected, but the Copy Was Kept" : {
       "extractionState" : "manual"
     },
+    "Disconnecting this app also signs this Mac out." : {
+
+    },
     "Disconnect…" : {
 
     },
@@ -4955,6 +4970,9 @@
     },
     "Expands the section" : {
       "extractionState" : "manual"
+    },
+    "Expired %@." : {
+
     },
     "Expires" : {
 
@@ -5528,6 +5546,15 @@
     "Holds" : {
 
     },
+    "Holds %lld owner permissions." : {
+
+    },
+    "Holds all %lld owner permissions." : {
+
+    },
+    "Holds one owner permission." : {
+
+    },
     "Home" : {
 
     },
@@ -5565,6 +5592,9 @@
       "extractionState" : "manual"
     },
     "If the old address stops working, update your scripts." : {
+
+    },
+    "If this Mac uses this app sign-in, disconnecting it signs this Mac out." : {
 
     },
     "Ignore" : {
@@ -6126,7 +6156,7 @@
     "Its types and items stay." : {
 
     },
-    "Its webhooks are deleted, its keys keep working, and it asks about its data." : {
+    "Its webhooks are deleted. The keys it made keep working." : {
 
     },
     "Its words and fields come from here." : {
@@ -6282,6 +6312,9 @@
 
     },
     "Keys keep working" : {
+
+    },
+    "Keys made by connected apps are on those apps’ pages." : {
 
     },
     "Kiln log, firing 14" : {
@@ -6448,6 +6481,9 @@
 
     },
     "Link Actions" : {
+
+    },
+    "Link Definitions" : {
 
     },
     "Link Not Saved" : {
@@ -6651,6 +6687,9 @@
     "Make this version the item’s text and title" : {
 
     },
+    "Manage All Keys" : {
+
+    },
     "Manage Apps" : {
 
     },
@@ -6670,6 +6709,9 @@
 
     },
     "Manage Webhooks" : {
+
+    },
+    "Manages webhooks." : {
 
     },
     "Many to Many" : {
@@ -7198,6 +7240,9 @@
       "extractionState" : "manual"
     },
     "No Jobs" : {
+
+    },
+    "No Keys" : {
 
     },
     "No Library Open" : {
@@ -7814,6 +7859,9 @@
 
     },
     "Open Items" : {
+
+    },
+    "Open Key Settings" : {
 
     },
     "Open Link" : {
@@ -8493,6 +8541,9 @@
     "Remove %@?" : {
 
     },
+    "Remove App Data" : {
+
+    },
     "Remove Choice" : {
 
     },
@@ -8858,6 +8909,9 @@
 
     },
     "Revoke…" : {
+
+    },
+    "Revoking this key also signs this Mac out." : {
 
     },
     "Role %@" : {
@@ -10103,6 +10157,12 @@
     "The app can’t open the copy of your library on this Mac. Open Settings to see what to do." : {
       "extractionState" : "manual"
     },
+    "The app can’t reach the server to confirm the result." : {
+
+    },
+    "The app can’t reach the server to confirm whether this key was revoked." : {
+
+    },
     "The app can’t reach the server. Changing a field changes the type for every item, so it needs the server. Try again once it’s back." : {
 
     },
@@ -10287,9 +10347,6 @@
 
     },
     "The app isn’t allowed to list, make, change or remove webhooks." : {
-
-    },
-    "The app isn’t allowed to list, make, extend or revoke keys." : {
 
     },
     "The app isn’t allowed to list, narrow or disconnect apps." : {
@@ -11252,6 +11309,9 @@
     "This app can’t manage sign-ins" : {
 
     },
+    "This app has made no keys this sign-in can see." : {
+
+    },
     "This app isn’t allowed to change it. Allow more, or change it where it was made, first." : {
 
     },
@@ -11490,6 +11550,9 @@
     "This sign-in doesn’t have permission to empty Trash." : {
 
     },
+    "This sign-in doesn’t have permission to manage all keys." : {
+
+    },
     "This sign-in holds %lld webhooks, the most the server allows." : {
 
     },
@@ -11709,6 +11772,9 @@
     "Type" : {
       "extractionState" : "manual",
       "generatesSymbol" : false
+    },
+    "Type Definitions" : {
+
     },
     "Type Description Not Kept" : {
 
@@ -12016,6 +12082,9 @@
 
     },
     "Used a setup code" : {
+
+    },
+    "Used to sign in on this Mac." : {
 
     },
     "Username" : {
@@ -12471,6 +12540,9 @@
     "You closed Settings before this was saved." : {
 
     },
+    "You haven’t made any keys this sign-in can see." : {
+
+    },
     "You quit the app before saving the changes to this Marfa’s settings." : {
       "extractionState" : "manual"
     },
@@ -12481,6 +12553,9 @@
 
     },
     "Your Content" : {
+
+    },
+    "Your Keys" : {
 
     },
     "Your Marfa library can’t be opened right now. Check the connection in Settings, then open the link again." : {
