@@ -16,7 +16,6 @@ nonisolated enum SettingsPage: CaseIterable, Hashable, Sendable {
     static let sources = SettingsPage.marfa(.sources)
     static let trash = SettingsPage.marfa(.trash)
     static let links = SettingsPage.marfa(.links)
-    static let history = SettingsPage.marfa(.history)
     static let fileStorage = SettingsPage.marfa(.fileStorage)
     static let connectors = SettingsPage.marfa(.connectors)
     static let webhooks = SettingsPage.marfa(.webhooks)
@@ -26,7 +25,6 @@ nonisolated enum SettingsPage: CaseIterable, Hashable, Sendable {
     static let activity = SettingsPage.marfa(.activity)
     static let monitoring = SettingsPage.marfa(.monitoring)
     static let limits = SettingsPage.marfa(.limits)
-    static let startUp = SettingsPage.marfa(.startUp)
 
     /// The app's pages as the sidebar lists them, in groups split by space.
     static let appGroups: [[SettingsPage]] = [[.general, .connection, .appearance, .keyboard], [.editor, .lists, .layouts, .search]]
