@@ -235,7 +235,8 @@ import Testing
 
     @Test func aReadRefusedForThePagesOwnPermissionSaysTheSameAsItsGateAndAnotherOneSaysItsOwn() {
         #expect(OwnerWording.permissionLine("keys.manage", on: .sources) == MarfaSettingsPage.sources.permissionLine)
-        #expect(OwnerWording.permissionLine(nil, on: .keys) == MarfaSettingsPage.keys.permissionLine)
+        #expect(MarfaSettingsPage.keys.missingPermission(in: []) == nil)
+        #expect(OwnerWording.permissionLine(nil, on: .keys) == OwnerWording.permissionLine(nil))
         #expect(OwnerWording.permissionLine("backups.manage", on: .sources) == OwnerWording.permissionLine("backups.manage"))
         #expect(OwnerWording.permissionLine("config.manage", on: .account) == OwnerWording.permissionLine("config.manage"))
     }

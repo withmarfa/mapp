@@ -286,9 +286,9 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .passkeys, .browsers: .signInsManage
         case .backups: .backupsManage
         case .network, .fileStorage, .monitoring, .limits: .configManage
-        case .account: nil
+        case .account, .keys: nil
         case .apps: .grantsManage
-        case .keys, .sources: .keysManage
+        case .sources: .keysManage
         case .types, .links: .schemaWrite
         case .plugins: .schemaWrite
         case .trash: .itemsPurge
@@ -312,7 +312,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .browsers: String(localized: "The app isn’t allowed to manage your browser sign-ins.")
         case .account: ""
         case .apps: String(localized: "The app isn’t allowed to list, narrow or disconnect apps.")
-        case .keys: String(localized: "The app isn’t allowed to list, make, extend or revoke keys.")
+        case .keys: String(localized: "This sign-in doesn’t have permission to manage all keys.")
         case .types: String(localized: "The app isn’t allowed to change types, their icons, words or fields.")
         case .plugins: String(localized: "The app isn’t allowed to install, update or remove plugins.")
         case .sources: String(localized: "The app isn’t allowed to rename, mark or limit sources.")
@@ -345,10 +345,10 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
             ]
         case .apps:
             [
-                String(localized: "Connected"), String(localized: "Disconnect"), String(localized: "Access"), String(localized: "Narrow"),
+                String(localized: "Disconnect"), String(localized: "Access"), String(localized: "Narrow"),
             ]
         case .keys:
-            [String(localized: "New Key"), String(localized: "Revoke"), String(localized: "Expires"), String(localized: "Source")]
+            [String(localized: "Your Keys"), String(localized: "New Key"), String(localized: "Revoke"), String(localized: "Expires"), String(localized: "Source")]
         case .network:
             [
                 String(localized: "Sign-In Address"), String(localized: "Other Addresses"), String(localized: "Websites"),

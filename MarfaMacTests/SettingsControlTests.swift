@@ -102,9 +102,11 @@ struct SettingsControlTests {
         let settings = StubMarfaHost(settings: InstanceSettingsModel { nil })
         let calls = FakeOwnerCalls()
         settings.ownerCalls = calls
+        let app = AppAccess(id: "studio", clientID: "studio", kind: .app, name: "Studio", origins: [], scopes: [], granted: nil, lastUsed: nil)
+        calls.state.withLock { $0.apps = [app] }
         let read = page == .account ? "profile" : "keys"
         let destination: MarfaSettingsPage = page == .account ? .network : .apps
-        let link = "SettingsLink-\(destination.rawValue)"
+        let link = page == .account ? "SettingsLink-\(destination.rawValue)" : "SettingsApp-\(app.id)"
         let pending = calls.hold(read)
         let window = host(MarfaSettingsPageView(page: page, host: settings))
         defer { pending.open(); window.contentView = nil; window.close() }
@@ -126,6 +128,7 @@ struct SettingsControlTests {
         } else {
             try await press(in: window, matching: link, attribute: "accessibilityIdentifier")
             #expect(settings.shown == [destination, destination])
+            #expect(settings.shownSubpages == [AppsPage.subpage(for: app), AppsPage.subpage(for: app)])
         }
     }
 

@@ -46,12 +46,12 @@ extension ClientOwnerCalls {
 
     func appData(vendor: String) async throws(OwnerFailure) -> AppData {
         try await run { client in
-            let page = try await client.appData(vendor: vendor)
+            let page = try await client.appData(vendor: vendor, limit: 1)
             return AppData(
                 vendor: page.vendor,
                 types: page.types.map {
                     AppData.Kind(type: $0._type, active: $0.active, archived: $0.archived, trashed: $0.trashed)
-                })
+                }, clientID: page.clientId)
         }
     }
 
