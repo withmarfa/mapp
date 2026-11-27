@@ -67,7 +67,7 @@ Neutral washes are white at the same strength, hairlines white at 12%, and a ton
 
 ## Selection
 
-- **A chosen row is soft gray and a row under the pointer is lighter**, in every list (`SoftSelection`), neither blue, with no line beside either or under a heading.
+- **A chosen row is soft gray and a row under the pointer is lighter**, in every list (`SoftSelection`). Neither is blue. No line runs beside either, or under a heading.
 - **A chosen card uses a ring**, 13% black in light and 26% white in dark.
 - **A heading, a date line and a group's header get no hover mark**, because they cannot be clicked. Only a group's chevron reacts.
 - **A cell that can be edited keeps its own tint** over the row's.
@@ -90,7 +90,7 @@ Neutral washes are white at the same strength, hairlines white at 12%, and a ton
 
 ## Messages
 
-- **A toast says what happened** (`ToastView`). Show opens matches for skipped files. Undo reverses the action. The 40-point bar has a symbol and no close button. Each window shows one for five seconds and pauses while hovered.
+- **A toast says what happened** (`ToastView`). Show opens matches for skipped files. Undo reverses the action. The 40-point bar has a symbol and no close button. Each window shows one for five seconds and pauses while hovered. Toasts report moves to Recently Deleted, the Feed, the Library and the archive.
 - **Undo in a toast takes back that step alone** (`StepUndo`). Any later step, undo or redo removes the toast, so it never takes back something else.
 - **What cannot be undone asks first**, in the system's alert.
 - **A window's toast belongs to that window** (`ToastPresenter`), and another workspace in it does not drop the toast.
