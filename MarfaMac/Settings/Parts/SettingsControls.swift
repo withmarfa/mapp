@@ -104,8 +104,7 @@ struct SettingsMoreMenu<Content: View>: View {
     }
 }
 
-/// A pop-up of choices, as the system draws it, at the one width every pop-up of Settings has, so those of a page line
-/// up in a column at the rows' trailing edge. `isError` puts the red ring round it.
+/// A system pop-up at the row's trailing edge, with room for its choices. `isError` puts the red ring round it.
 struct SettingsPopUp<Value: Hashable, Content: View>: View {
     private let title: Text
     @Binding var selection: Value
@@ -136,7 +135,8 @@ struct SettingsPopUp<Value: Hashable, Content: View>: View {
             .pickerStyle(.menu)
             .settingsControlSize()
             .buttonSizing(.flexible)
-            .frame(width: compact ? SettingsTokens.Metric.popUpWidth * max(1, scale) : SettingsTokens.Metric.controlWidth)
+            .frame(minWidth: compact ? SettingsTokens.Metric.popUpMinimumWidth * max(1, scale) : SettingsTokens.Metric.controlWidth)
+            .fixedSize(horizontal: true, vertical: false)
             .settingsErrorRing(isError)
     }
 }

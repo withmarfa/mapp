@@ -190,6 +190,18 @@ struct RenderedWindow<Detail: View>: View {
             RenderedWindow(selection: .general, detail: GeneralPage(libraries: libraries)), size: Self.size, named: "General")
     }
 
+    @Test(arguments: [11, 24])
+    func generalAtTheTextSizeLimits(textSize: Int) async throws {
+        let (libraries, _) = try await connected()
+        let defaults = ThrowawayDefaults.make("SettingsRenderTextSize")
+        defaults.set(textSize, forKey: InterfaceKey.textSize)
+        try await SettingsRender.png(
+            RenderedWindow(selection: .general, detail: GeneralPage(libraries: libraries))
+                .environment(\.settingsTextScale, InterfaceStyle.scale(for: textSize))
+                .defaultAppStorage(defaults),
+            size: Self.size, named: "General, text size \(textSize)")
+    }
+
     @Test func appearance() async throws {
         try await SettingsRender.png(
             RenderedWindow(selection: .appearance, detail: AppearancePage()), size: Self.size, named: "Appearance")

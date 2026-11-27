@@ -12,7 +12,7 @@ These pages show and change what the server holds for its owner. Every call goes
 
 ## Pages
 
-A page opens with the permission here (`MarfaSettingsPage.permission`). A part that needs another permission says so in its place. Account opens the server settings pages, and Apps and Keys opens Apps.
+A page opens with the permission here (`MarfaSettingsPage.permission`). A part that needs another permission says so in its place. Account links to the server settings pages, and Apps and Keys links to Apps. These links stay available while the page loads or shows a problem.
 
 | Page | Opens with | Its job |
 | --- | --- | --- |

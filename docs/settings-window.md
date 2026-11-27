@@ -16,7 +16,7 @@ See `docs/owner-settings.md` for Marfa pages and `docs/settings-sync.md` for sto
 
 - **Settings is a `Window` scene** with its own toolbar and a remembered frame.
 - **There is one instance, and every route names a page in it** (`SettingsLauncher`, `SettingsNavigation`).
-- **The sidebar always has both halves.** App: General, Connection, Appearance, Keyboard, then Editor, Lists, Layouts, and Search. Marfa: Account, Activity, Apps and Keys, Sources, Webhooks, then Types, Plugins, Connectors, Folders, Backups, and Trash. Account badges the number of problems and any ready server update.
+- **The sidebar always has both halves.** App: General, Connection, Appearance, Keyboard, then Editor, Lists, Layouts, and Search. Marfa: Account, Activity, Apps and Keys, Sources, Webhooks, then Types, Plugins, Connectors, Folders, Backups, and Trash. Account badges the number of problems.
 - **Every route has a sidebar entry** (`SettingsPage.sidebarEntry`, `MarfaSettingsPage.sidebarEntry`). Search includes the words of pages opened through that entry. The Docs link opens Marfa's documentation.
 - **A page is one column of sections.** Push a new page for a thing's own settings.
 - **Back and Forward are at the top of the sidebar.** The current page's title is above the detail. The View menu's Back and Forward commands use the same history.
@@ -29,7 +29,7 @@ See `docs/owner-settings.md` for Marfa pages and `docs/settings-sync.md` for sto
 - **A value that a button acts on goes in the row's line.** A problem's words are told whole.
 - **A refused input keeps what was typed**, with one line under the title that says why.
 - **Put an add button at the trailing edge of the section title** (`SettingsSection`'s accessory). Use the same slot for header choices or search and a filter when the section needs them. Put a note about the section in its footer.
-- **Row controls use the small size** with 120-point pop-ups, secondary values, and a plain More menu. Header choices fit their text. A disk path or web address can take a small folder or link glyph next to its text.
+- **Row controls use the small size** with secondary values, a plain More menu, and pop-ups at least 120 points wide. Pop-ups and header choices fit their text. A disk path or web address can have a folder or link glyph.
 - **A page link has a colored tile and a chevron.** A locked link dims the tile and shows a lock with a short reason. A row about a thing uses a plain symbol or no symbol.
 - **A section table has no stripes and aligns numbers at the trailing edge.** It shows all rows through 50. For longer lists it previews 20 with the count and Show All, which expands the table or opens the full list. Use text tabs with optional counts for page views.
 - **Use title case for page and section titles, buttons, tabs, column headings, sheet titles, and alert titles.** Use sentence case for row labels, switches, and descriptions. An ellipsis marks a button that opens a window to type or choose in.

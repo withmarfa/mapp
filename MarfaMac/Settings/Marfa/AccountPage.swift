@@ -49,13 +49,16 @@ struct AccountPage: View {
     }
 
     @ViewBuilder private var content: some View {
-        if let failure = model.failure {
-            VStack(spacing: 0) {
-                OwnerFailureState(page: .account, failure: failure, host: host) { Task { await model.load() } }
-                SettingsPageColumn { serverSettings }
+        if model.failure != nil || !model.hasLoaded {
+            SettingsStandingState(scrolls: true) {
+                AccountServerSettingsSection(host: host)
+            } state: {
+                if let failure = model.failure {
+                    OwnerFailureState(page: .account, failure: failure, host: host) { Task { await model.load() } }
+                } else {
+                    OwnerLoading()
+                }
             }
-        } else if !model.hasLoaded {
-            OwnerLoading()
         } else {
             SettingsPageColumn {
                 if let profile = model.profile { profileSection(profile) }
@@ -80,17 +83,7 @@ struct AccountPage: View {
                         .disabled(host.isAllowingMore)
                     }
                 }
-                serverSettings
-            }
-        }
-    }
-
-    // Temporary until Account and Types are rebuilt in session 266c.
-    private var serverSettings: some View {
-        let pages: [MarfaSettingsPage] = [.overview, .updates, .addresses, .fileStorage, .history, .housekeeping, .limits, .monitoring, .startUp]
-        return SettingsSection("Server Settings") {
-            ForEach(pages, id: \.self) { page in
-                MarfaSettingsPageRow(page: page, host: host)
+                AccountServerSettingsSection(host: host)
             }
         }
     }
@@ -232,6 +225,20 @@ struct AccountPage: View {
         }
         parts.append(OwnerWording.used(used, now: now, calendar: calendar) + ".")
         return parts.joined(separator: " ")
+    }
+}
+
+/// Links to the server settings pages, including when the Account read is unavailable.
+struct AccountServerSettingsSection: View {
+    let host: any MarfaSettingsHost
+
+    var body: some View {
+        let pages: [MarfaSettingsPage] = [.overview, .updates, .addresses, .fileStorage, .history, .housekeeping, .limits, .monitoring, .startUp]
+        SettingsSection("Server Settings") {
+            ForEach(pages, id: \.self) { page in
+                MarfaSettingsPageRow(page: page, host: host)
+            }
+        }
     }
 }
 

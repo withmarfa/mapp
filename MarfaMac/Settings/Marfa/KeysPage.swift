@@ -42,18 +42,21 @@ struct KeysPage: View {
                 Text(verbatim: asked.message)
             }
             .onChange(of: model.revoked) { if $1 != nil { navigation?.back() } }
+            .accessibilityElement(children: .contain)
             .accessibilityIdentifier("KeysPage")
     }
 
     @ViewBuilder private var content: some View {
-        if let failure = model.failure {
-            SettingsStandingState {
-                AppsSettingsSection(host: host)
-            } state: {
-                OwnerFailureState(page: .keys, failure: failure, host: host) { Task { await model.load() } }
+        if model.failure != nil || !model.hasLoaded {
+            if openKeyID == nil {
+                SettingsStandingState {
+                    AppsSettingsSection(host: host)
+                } state: {
+                    loadState
+                }
+            } else {
+                loadState
             }
-        } else if !model.hasLoaded {
-            OwnerLoading()
         } else if let id = openKeyID {
             if let key = model.key(id) {
                 if isShowingPermissions {
@@ -68,6 +71,14 @@ struct KeysPage: View {
             }
         } else {
             list
+        }
+    }
+
+    @ViewBuilder private var loadState: some View {
+        if let failure = model.failure {
+            OwnerFailureState(page: .keys, failure: failure, host: host) { Task { await model.load() } }
+        } else {
+            OwnerLoading()
         }
     }
 

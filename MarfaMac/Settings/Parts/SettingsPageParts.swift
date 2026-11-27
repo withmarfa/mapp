@@ -37,12 +37,13 @@ struct SettingsPageColumn<Content: View>: View {
 /// A state that fills the page (`SettingsPageState`, a read in progress) under sections that keep their place, for
 /// what holds whatever the state.
 struct SettingsStandingState<Above: View, State: View>: View {
+    var scrolls = false
     @ViewBuilder let above: Above
     @ViewBuilder let state: State
 
     var body: some View {
         VStack(spacing: 0) {
-            SettingsPageColumn(scrolls: false) { above }
+            SettingsPageColumn(scrolls: scrolls) { above }
             state
         }
     }

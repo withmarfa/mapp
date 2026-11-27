@@ -67,7 +67,10 @@ struct SettingsSidebar: View {
                 SettingsTile(symbol: page.symbol, tone: page.tone, size: SettingsTokens.Metric.sidebarTile, rich: true)
 
                 // The system bolds a chosen row's label; the boards and System Settings keep it regular.
-                Text(page.title).settingsFont(.sidebar).fontWeight(.regular)
+                Text(page.title)
+                    .settingsFont(.sidebar)
+                    .fontWeight(.regular)
+                    .environment(\.backgroundProminence, selection.sidebarEntry == page ? .increased : .standard)
                 Spacer(minLength: 0)
                 if let badge = badges(page), badge > 0 { problemBadge(badge) }
             }

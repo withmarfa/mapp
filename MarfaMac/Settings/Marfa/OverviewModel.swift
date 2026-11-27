@@ -36,7 +36,7 @@ import Observation
         healthReader = health ?? ServerHealthModel(context: context)
     }
 
-    var attentionCount: Int { concerns.count }
+    var attentionBadge: Int? { concerns.isEmpty ? nil : concerns.count }
 
     /// The release the server runs, left out for a development build: it carries version 0.0.0, which is no version.
     var releaseVersion: String? {

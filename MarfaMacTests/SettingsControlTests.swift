@@ -8,6 +8,32 @@ import Testing
 struct SettingsControlTests {
     enum Finish: CaseIterable { case escape, submit, blur }
 
+    @Test(arguments: [MarfaSettingsPage.account, .keys])
+    func movedPagesOpenDuringAndAfterAFailedRead(page: MarfaSettingsPage) async throws {
+        let settings = StubMarfaHost(settings: InstanceSettingsModel { nil })
+        let calls = FakeOwnerCalls()
+        settings.ownerCalls = calls
+        let read = page == .account ? "profile" : "keys"
+        let destination: MarfaSettingsPage = page == .account ? .addresses : .apps
+        let link = "SettingsLink-\(destination.rawValue)"
+        let pending = calls.hold(read)
+        let window = host(MarfaSettingsPageView(page: page, host: settings))
+        defer { pending.open(); window.contentView = nil; window.close() }
+
+        try #require(await eventually { calls.state.withLock { $0.waiting[read] == 1 } })
+        try await press(in: window, matching: link, attribute: "accessibilityIdentifier")
+        #expect(settings.shown == [destination])
+
+        calls.fail(read, with: .unreachable)
+        pending.open()
+        try #require(await eventually {
+            window.contentView?.layoutSubtreeIfNeeded()
+            return !elements(window.contentView, matching: "Try Again", attribute: "accessibilityLabel").isEmpty
+        })
+        try await press(in: window, matching: link, attribute: "accessibilityIdentifier")
+        #expect(settings.shown == [destination, destination])
+    }
+
     @Test(arguments: [0, 1], Finish.allCases)
     func finishFolderPattern(section: Int, finish: Finish) async throws {
         let folder = OwnerFolder(id: "folder", title: "Sample Folder")

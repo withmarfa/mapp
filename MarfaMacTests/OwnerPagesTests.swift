@@ -191,6 +191,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     }
 
     func profile() async throws(OwnerFailure) -> OwnerProfile {
+        await held("profile")
         try enter("profile")
         return state.withLock { $0.profile }
     }
@@ -314,6 +315,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     }
 
     func keys() async throws(OwnerFailure) -> [KeyInfo] {
+        await held("keys")
         try enter("keys")
         return state.withLock { $0.keys }
     }

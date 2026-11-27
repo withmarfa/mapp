@@ -53,7 +53,7 @@ struct MarfaPageGate<Content: View>: View {
     /// A state, under `above` where the page has something to offer in any state.
     @ViewBuilder private func standing<State: View>(@ViewBuilder _ state: () -> State) -> some View {
         if let above {
-            SettingsStandingState { above } state: { state() }
+            SettingsStandingState(scrolls: page == .account) { above } state: { state() }
         } else {
             state()
         }
@@ -111,6 +111,7 @@ struct MarfaSettingsPageView: View {
     private var standingContent: AnyView? {
         guard subpage == nil else { return nil }
         switch page {
+        case .account: return AnyView(AccountServerSettingsSection(host: host))
         case .apps: return AnyView(OpenLinksSection(model: links))
         case .keys: return AnyView(AppsSettingsSection(host: host))
         default: return nil

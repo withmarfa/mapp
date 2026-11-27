@@ -154,7 +154,7 @@ enum SettingsTokens {
         /// A field's height, which the system draws and a read-only value is as tall as.
         static let controlHeight: CGFloat = 28
         static let smallControlHeight: CGFloat = 24
-        static let popUpWidth: CGFloat = 120
+        static let popUpMinimumWidth: CGFloat = 120
         static let smallNumberWidth: CGFloat = 64
         static let controlScaleForLarge: CGFloat = 1.3
         static let headerChoicePadding: CGFloat = 4
@@ -202,9 +202,6 @@ enum SettingsTokens {
         /// The sidebar's tile.
         static let sidebarTile: CGFloat = 24
         static let sidebarRow: CGFloat = 32
-        static let sidebarHistoryHeight: CGFloat = 30
-        static let sidebarHistoryButtonWidth: CGFloat = 28
-        static let sidebarHistoryPadding: CGFloat = 3
         static let sidebarGroupGap: CGFloat = 13
         static let sidebarHalfGap: CGFloat = 32
         static let sidebarFooterInset: CGFloat = 18

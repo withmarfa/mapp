@@ -31,9 +31,7 @@ struct SettingsWindowView: View {
                 selection: Binding { navigation.page } set: { navigation.show($0) }, search: $search,
                 badges: { page in
                     guard page == .account, badgeAddress != nil else { return nil }
-                    let updateCount = host.overview.releaseFailure == nil && host.overview.updateReady != nil ? 1 : 0
-                    let count = host.overview.attentionCount + updateCount
-                    return count > 0 ? count : nil
+                    return host.overview.attentionBadge
                 }
             )
             .frame(minWidth: SettingsTokens.Metric.sidebarWidth, maxWidth: SettingsTokens.Metric.sidebarWidth)
@@ -41,25 +39,18 @@ struct SettingsWindowView: View {
             .toolbar(removing: .sidebarToggle)
             .toolbar {
                 ToolbarSpacer(.flexible)
-                ToolbarItem {
-                    HStack(spacing: 0) {
-                        Button("Back", systemImage: "chevron.backward") { navigation.back() }
-                            .disabled(!navigation.canGoBack)
-                            .help("Back")
-                            .accessibilityIdentifier("SettingsBack")
-                        Button("Forward", systemImage: "chevron.forward") { navigation.forward() }
-                            .disabled(!navigation.canGoForward)
-                            .help("Forward")
-                            .accessibilityIdentifier("SettingsForward")
-                    }
-                    .labelStyle(.iconOnly)
-                    .frame(minWidth: SettingsTokens.Metric.sidebarHistoryButtonWidth * 2,
-                           minHeight: SettingsTokens.Metric.sidebarHistoryHeight)
-
-                    .padding(.horizontal, SettingsTokens.Metric.sidebarHistoryPadding)
-                    .glassEffect(.regular.interactive(), in: .capsule)
+                ToolbarItemGroup {
+                    Button("Back", systemImage: "chevron.backward") { navigation.back() }
+                        .labelStyle(.iconOnly)
+                        .disabled(!navigation.canGoBack)
+                        .help("Back")
+                        .accessibilityIdentifier("SettingsBack")
+                    Button("Forward", systemImage: "chevron.forward") { navigation.forward() }
+                        .labelStyle(.iconOnly)
+                        .disabled(!navigation.canGoForward)
+                        .help("Forward")
+                        .accessibilityIdentifier("SettingsForward")
                 }
-                .sharedBackgroundVisibility(.hidden)
             }
         } detail: {
             SettingsDetail(navigation: navigation, host: host, libraries: libraries)
