@@ -63,7 +63,7 @@ struct SourcesPage: View {
 
     private var list: some View {
         SettingsPageColumn {
-            if let failure = model.listFailure { OwnerProblem(title: "Not Changed", failure: failure, page: .sources, host: host) }
+            if let failure = model.listFailure { OwnerProblem(title: "Not changed", failure: failure, page: .sources, host: host) }
             let rows = model.rows
             let preview = SettingsTablePreview(total: rows.count, expanded: showsAll)
             SettingsSection(name: nil) {
@@ -87,23 +87,31 @@ struct SourcesPage: View {
 
     private func sourceRow(_ row: MarfaSourceRow) -> some View {
         SettingsRow(
-            title: Text(verbatim: row.name), line: row.hasChosenName ? Text("Custom name.") : nil,
+            title: Text(verbatim: row.name), line: sourceLine(row),
             lead: .custom(AnyView(host.markGlyph(row.mark ?? "").accessibilityHidden(true)))
         ) {
-            HStack(spacing: SettingsTokens.Metric.buttonGap) {
-                if let count = row.count {
-                    SettingsValue(verbatim: count == 1 ? String(localized: "1 item") : String(localized: "\(count.formatted()) items"))
-                }
-                SettingsMoreMenu {
-                    Button("Rename…") { model.beginRename(row.code) }
-                    Button("Change Mark…") { model.beginMark(row.code) }
-                    Button("Use Default Name") { Task { await model.useDefaultName(row.code) } }.disabled(!row.hasChosenName)
-                    Button("Remove Mark") { Task { await model.removeMark(row.code) } }.disabled(row.mark == nil)
-                }
-                .disabled(!host.canChangeSources || model.isWorking)
+            SettingsMoreMenu {
+                Button("Rename…") { model.beginRename(row.code) }
+                Button("Change Mark…") { model.beginMark(row.code) }
+                Button("Use Default Name") { Task { await model.useDefaultName(row.code) } }.disabled(!row.hasChosenName)
+                Button("Remove Mark") { Task { await model.removeMark(row.code) } }.disabled(row.mark == nil)
             }
+            .disabled(!host.canChangeSources || model.isWorking)
         }
         .help(Text(verbatim: row.name))
+    }
+
+    /// The count belongs on the line, with the custom-name note when the source has one. More is the only trailing control.
+    private func sourceLine(_ row: MarfaSourceRow) -> Text? {
+        let count = row.count.map { count in
+            count == 1 ? String(localized: "1 item") : String(localized: "\(count.formatted()) items")
+        }
+        switch (row.hasChosenName, count) {
+        case (true, let count?): return Text(verbatim: String(localized: "Custom name. \(count)"))
+        case (true, nil): return Text("Custom name.")
+        case (false, let count?): return Text(verbatim: count)
+        case (false, nil): return nil
+        }
     }
 
     private var rules: some View {
@@ -111,7 +119,7 @@ struct SourcesPage: View {
         let lock = allowed ? nil : String(localized: "Not allowed")
         return SettingsSection("Rules for Every App and Key", footer: "A key can set its own instead.") {
             if allowed, let failure = limit.failure {
-                OwnerProblemRow(title: "Couldn’t Read the Rules", failure: failure, page: .sources, host: host) {
+                OwnerProblemRow(title: "Couldn’t read the rules", failure: failure, page: .sources, host: host) {
                     Task { await limit.load(choices: false) }
                 }
             }

@@ -38,7 +38,7 @@ struct OwnerFailureState: View {
         case .notPermitted(let scope):
             SettingsPageState(
                 symbol: "lock", title: Text("Needs a Permission"), line: Text(verbatim: OwnerWording.permissionLine(scope, on: page)),
-                action: (host.isAllowingMore ? "Waiting…" : "Allow More…", { host.askForMore(naming: scope) }))
+                action: (host.isAllowingMore ? "Waiting…" : "Allow More", { host.askForMore(naming: scope) }))
             .disabled(host.isAllowingMore)
         case .unreachable:
             SettingsPageState(
@@ -116,7 +116,7 @@ struct OwnerProblemRow: View {
     private var actions: [SettingsProblemAction] {
         let offered: [SettingsProblemAction] = switch offer {
         case .allowMore(let scope):
-            [SettingsProblemAction(host.isAllowingMore ? "Waiting…" : "Allow More…") { host.askForMore(naming: scope) }]
+            [SettingsProblemAction(host.isAllowingMore ? "Waiting…" : "Allow More") { host.askForMore(naming: scope) }]
         case .tryAgain:
             retry.map { retry in [SettingsProblemAction("Try Again", perform: retry)] } ?? []
         case .nothing:

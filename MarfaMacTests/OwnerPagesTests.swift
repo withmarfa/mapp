@@ -1675,11 +1675,19 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     @Test func aPatternIsNamedByTheTypeOrByWhatItReaches() {
         let names = ["core.note": "Note"]
         #expect(AccessScopes.title(of: "core.note", names: names) == "Note")
-        #expect(AccessScopes.title(of: "*", names: names) == "All Data")
+        #expect(AccessScopes.title(of: "*", names: names) == "All data")
         #expect(AccessScopes.title(of: "core.*", names: names) == "Core Types")
         #expect(AccessScopes.title(of: "aic.ticket.*", names: names) == "Ticket Types")
-        #expect(AccessScopes.title(of: "edge.*", names: names) == "All Links")
+        #expect(AccessScopes.title(of: "edge.*", names: names) == "All links")
         #expect(AccessScopes.title(of: "app.mine", names: names) == "app.mine")
+        #expect(AccessScopes.title(of: "metadata.types", names: names) == "Type definitions")
+        #expect(AccessScopes.title(of: "metadata.edge_types", names: names) == "Link definitions")
+        let open = AccessScopes.parse(["*:write", "edge.*:write", "metadata.types:read"])
+        #expect(AccessScopes.summary(open, names: names) == "Reads and edits all data and links. Reads type definitions.")
+        #expect(AccessScopes.summary(AccessScopes.parse(["core.note:read"]), names: names) == "Reads Note.")
+        #expect(AppsPage.brandIcon(clientID: "oauth:raycast", name: nil) == "simple-icons:raycast")
+        #expect(AppsPage.brandIcon(clientID: "other", name: "Claude") == "simple-icons:claude")
+        #expect(AppsPage.brandIcon(clientID: "oauth:other", name: "Notes") == nil)
     }
 }
 
@@ -1816,7 +1824,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         model.askToNarrow(model.keys[0], pattern: "*", to: .read)
         let question = try #require(model.question)
         #expect(question.title == "Narrow “Importer”?")
-        #expect(question.message.contains("All Data goes from Read and Edit to Read Only."))
+        #expect(question.message.contains("All data goes from Read and Edit to Read Only."))
         #expect(question.message.contains("can’t be undone"))
         #expect(bench.calls.state.withLock { $0.changes.isEmpty }, "nothing is sent before the owner agrees")
         model.cancelQuestion()

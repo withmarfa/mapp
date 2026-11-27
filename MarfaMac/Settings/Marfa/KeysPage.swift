@@ -92,12 +92,12 @@ struct KeysPage: View {
             } content: {
                 if !model.canExtend {
                     OwnerProblemRow(
-                        title: "Manage All Keys", failure: .notPermitted(InstancePermission.keysManage.rawValue),
+                        title: "Manage all keys", failure: .notPermitted(InstancePermission.keysManage.rawValue),
                         line: MarfaSettingsPage.keys.permissionLine, page: .keys, host: host)
                 }
                 if model.canReadKeys {
                     if let failure = model.failure {
-                        OwnerProblemRow(title: "Couldn’t Read Keys", failure: failure, page: .keys, host: host) {
+                        OwnerProblemRow(title: "Couldn’t read keys", failure: failure, page: .keys, host: host) {
                             Task { await model.load() }
                         }
                     } else if !model.hasLoaded {
@@ -111,7 +111,7 @@ struct KeysPage: View {
                 if !model.canMake {
                     SettingsAddRow(
                         off: "New Key…", line: "The app isn’t allowed to make keys.",
-                        remedy: (host.isAllowingMore ? "Waiting…" : "Allow More…", {
+                        remedy: (host.isAllowingMore ? "Waiting…" : "Allow More", {
                             Task { _ = await host.allowMore([.keysMint]) }
                         }))
                 }
@@ -133,16 +133,15 @@ struct KeysPage: View {
     @ViewBuilder
     private func row(_ key: KeyInfo) -> some View {
         SettingsRow(
-            verbatim: key.label, line: Self.line(key, names: model.typeNames, isCurrent: model.isCurrent(key)), lead: .symbol("key")
+            verbatim: key.label,
+            line: Self.line(key, names: model.typeNames, isCurrent: model.isCurrent(key)) + " " + OwnerWording.used(key.lastUsed) + ".",
+            lead: .symbol("key")
         ) {
-            HStack(spacing: SettingsTokens.Metric.buttonGap) {
-                SettingsValue(verbatim: OwnerWording.used(key.lastUsed)).fixedSize()
-                SettingsMoreMenu {
-                    Button("Open Key Settings") { navigation?.push(Self.subpage(for: key)) }
-                    Button("Revoke", role: .destructive) { model.askToRevoke(key) }
-                }
-                .accessibilityLabel(Text("Actions for \(key.label)"))
+            SettingsMoreMenu {
+                Button("Open Key Settings") { navigation?.push(Self.subpage(for: key)) }
+                Button("Revoke", role: .destructive) { model.askToRevoke(key) }
             }
+            .accessibilityLabel(Text("Actions for \(key.label)"))
         }
         .help(Text(verbatim: key.label))
         if let failure = model.rowErrors[key.id] {
@@ -151,7 +150,7 @@ struct KeysPage: View {
             case .notFound: Self.unconfirmedRevocation
             default: nil as String?
             }
-            OwnerProblemRow(title: "Couldn’t Revoke Key", failure: failure, line: line, page: .keys, host: host)
+            OwnerProblemRow(title: "Couldn’t revoke key", failure: failure, line: line, page: .keys, host: host)
         }
     }
 
