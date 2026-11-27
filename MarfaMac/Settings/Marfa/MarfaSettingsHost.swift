@@ -403,7 +403,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
             ]
         case .backups:
             [
-                String(localized: "Keep Backups In"), String(localized: "Back Up Every"), String(localized: "Last Backup"), String(localized: "Back Up Now"),
+                String(localized: "Keep backups in"), String(localized: "Back up every"), String(localized: "Last backup"), String(localized: "Back Up Now"),
                 String(localized: "Restore"), String(localized: "Folder"),
             ]
         case .housekeeping:
