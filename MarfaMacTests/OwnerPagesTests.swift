@@ -55,6 +55,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         var concerns: [AttentionConcern] = []
         var metrics = InstanceMetricsReading(version: "0.0.84", databaseBytes: nil, fileBytes: 0)
         var fileStores = FileStores(stores: [], orphanCount: 0, orphanBytes: 0, firstFound: nil, orphansComplete: true)
+        var storageUsage = StorageUsageReading.empty
         var sources: [OwnerSource] = []
         var sourceLimit = SourceLimit(instanceID: "instance-1", isOn: false, types: [], sources: [], strictTypes: nil, allowlist: nil)
         /// The levers each enforcement write sent.
@@ -427,6 +428,12 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     func fileStores() async throws(OwnerFailure) -> FileStores {
         try enter("fileStores")
         return state.withLock { $0.fileStores }
+    }
+
+    func storageUsage() async throws(OwnerFailure) -> StorageUsageReading {
+        await held("storageUsage")
+        try enter("storageUsage")
+        return state.withLock { $0.storageUsage }
     }
 
     func sources() async throws(OwnerFailure) -> [OwnerSource] {

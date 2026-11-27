@@ -565,7 +565,8 @@ struct RenderedWindow<Detail: View>: View {
         let settings = InstanceSettingsModel { .init(id: "https://marfa.castell.studio", source: source) }
         await settings.load()
         try await SettingsRender.png(
-            windowed(.fileStorage, host: StubMarfaHost(settings: settings)), size: Self.size, named: "Storage, versions")
+            windowed(.fileStorage, host: StubMarfaHost(settings: settings)), size: CGSize(width: Self.size.width, height: 1100),
+            named: "Storage, versions")
     }
 
     @Test(arguments: [ColorScheme.light, .dark]) func serverPages(appearance: ColorScheme) async throws {
@@ -583,6 +584,12 @@ struct RenderedWindow<Detail: View>: View {
                     FileStoreRow(id: "b", kind: .folder, locator: "/Volumes/Studio Backup", error: nil),
                 ], orphanCount: 3, orphanBytes: 12_000_000, firstFound: .now, orphansComplete: true)
             $0.metrics = InstanceMetricsReading(version: "1", databaseBytes: 214_000_000, fileBytes: 3_400_000_000)
+            $0.storageUsage = StorageUsageReading(
+                kinds: [
+                    .init(kind: .pictures, bytes: 2_100_000_000), .init(kind: .pdfs, bytes: 980_000_000),
+                    .init(kind: .audioAndVideo, bytes: 180_000_000), .init(kind: .other, bytes: 140_000_000),
+                ],
+                databaseBytes: 214_000_000, writeAheadLogBytes: nil, freeBytes: 6_400_000_000, diskSizeBytes: 10_000_000_000)
             $0.jobs = [
                 HousekeepingJob(name: "backup", intervalSeconds: 3600, lastFinished: .now, outcome: .succeeded),
                 HousekeepingJob(name: "blob-integrity", intervalSeconds: 3600, lastFinished: .now, outcome: .failed),
@@ -593,12 +600,12 @@ struct RenderedWindow<Detail: View>: View {
         calls.changeElsewhere("telemetry_enabled", to: .bool(false))
         calls.state.withLock { $0.settings["heartbeat_url"]?.isSet = true }
         host.bindOverview()
-        for (page, height) in [(MarfaSettingsPage.fileStorage, 1460), (.monitoring, 900), (.limits, 1030), (.housekeeping, 900)] {
+        for (page, height) in [(MarfaSettingsPage.fileStorage, 1680), (.monitoring, 900), (.limits, 1030), (.housekeeping, 900)] {
             try await SettingsRender.png(windowed(page, host: host), size: CGSize(width: Self.size.width, height: CGFloat(height)),
                 named: "\(page.title), \(appearance)", appearance: appearance, settle: .milliseconds(900))
         }
         host.grants = [.instanceRead]
-        try await SettingsRender.png(windowed(.fileStorage, host: host), size: CGSize(width: Self.size.width, height: 1460),
+        try await SettingsRender.png(windowed(.fileStorage, host: host), size: CGSize(width: Self.size.width, height: 1680),
             named: "Storage, read only, \(appearance)", appearance: appearance, settle: .milliseconds(900))
     }
 

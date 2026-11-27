@@ -22,6 +22,30 @@ extension ClientOwnerCalls {
         }
     }
 
+    func storageUsage() async throws(OwnerFailure) -> StorageUsageReading {
+        guard let server else { throw .failed(String(localized: "There is no server to ask.")) }
+        do {
+            let usage = try await server().storageUsage()
+            return StorageUsageReading(
+                kinds: StorageUsage.Kind.allCases.map { kind in
+                    .init(kind: Self.kind(kind), bytes: usage.filesByKind[kind].bytes)
+                },
+                databaseBytes: usage.databaseBytes, writeAheadLogBytes: usage.writeAheadLogBytes, freeBytes: usage.freeBytes,
+                diskSizeBytes: usage.diskSizeBytes)
+        } catch {
+            throw Self.failure(error)
+        }
+    }
+
+    private static func kind(_ kind: StorageUsage.Kind) -> StorageBar.Kind {
+        switch kind {
+        case .pictures: .pictures
+        case .pdfs: .pdfs
+        case .audioAndVideo: .audioAndVideo
+        case .other: .other
+        }
+    }
+
     func fileStores() async throws(OwnerFailure) -> FileStores {
         try await run { client in
             let page = try await client.listBlobStores().ok.body.json

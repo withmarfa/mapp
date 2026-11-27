@@ -27,7 +27,7 @@ The page gate checks connection and permissions. A configured Marfa keeps its Ac
 | Links | `schema.write` | Link types. Opens from Types |
 | Sources | `keys.manage` | Names and marks of sources. Both source rules need `config.manage` |
 | Trash | Read access to items | Search and filter the working copy’s deleted items. Restore items of types the sign-in can write. Deleting items permanently and emptying Trash also need `items.purge`. Retention is in Storage |
-| Storage | `instance.read` or `config.manage` | File locations, sizes, and unused files need `instance.read`. Each configuration control needs `config.manage` |
+| Storage | `instance.read` or `config.manage` | Usage, locations, sizes, and unused files need `instance.read`. Each configuration control needs `config.manage` |
 | Connectors | `connectors.manage` | Each connector's health, machine, sign-in, settings and mapping |
 | Webhooks | `webhooks.manage` | Webhooks by maker, their events and deliveries |
 | Folders | type access to `system.folder` | Synced folders: patterns, limits, copies, Stop Syncing |

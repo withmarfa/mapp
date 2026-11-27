@@ -381,7 +381,12 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
                 String(localized: "Empty Trash"), String(localized: "Recently Deleted"),
             ]
         case .fileStorage:
-            [String(localized: "Files"), String(localized: "Reading Files"), String(localized: "Files from the Web"), String(localized: "Trash")]
+            [
+                String(localized: "Files"), String(localized: "Reading Files"), String(localized: "Files from the Web"), String(localized: "Trash"),
+                String(localized: "Storage usage"), String(localized: "Pictures"), String(localized: "PDFs"),
+                String(localized: "Audio and video"), String(localized: "Other files"), String(localized: "Free on disk"),
+                String(localized: "Write-ahead log"),
+            ]
                 + (InstanceSetting.fileSettings + InstanceSetting.versionSettings + [.trashRetentionDays]).map(\.title)
                 + LimitSetting.storageFields.map(\.title) + [String(localized: "Versions")]
         case .connectors:
