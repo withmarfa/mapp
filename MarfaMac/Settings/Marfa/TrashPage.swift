@@ -52,7 +52,7 @@ struct TrashPage: View {
         if !host.canReadTrash {
             SettingsPageState(
                 symbol: "lock", title: Text("Needs a Permission"), line: Text(verbatim: MarfaSettingsPage.trash.permissionLine),
-                action: (host.isAllowingMore ? "Waiting…" : "Allow More", { host.askForMore(naming: "*:read") }))
+                action: (host.isAllowingMore ? "Waiting…" : "Allow More…", { host.askForMore(naming: "*:read") }))
                 .disabled(host.isAllowingMore)
         } else if isEmpty {
             SettingsPageState(symbol: "trash", title: Text("Trash Is Empty"), line: retention)
@@ -74,7 +74,7 @@ struct TrashPage: View {
             ) {
                 if let purgePermission {
                     SettingsLockedValue(text: String(localized: "Empty Trash"))
-                    SettingsButton("Allow More") { host.askForMore(naming: purgePermission.rawValue) }
+                    SettingsButton("Allow More…") { host.askForMore(naming: purgePermission.rawValue) }
                         .disabled(host.isAllowingMore)
                 } else {
                     SettingsButton("Empty Trash", role: .destructive) { host.emptyDeleted() }

@@ -56,7 +56,7 @@ struct SourcesPage: View {
         } else {
             SettingsPageState(
                 symbol: "lock", title: Text("Needs a Permission"), line: Text(verbatim: model.rule.permissionLine),
-                action: (host.isAllowingMore ? "Waiting…" : "Allow More", { host.askForMore(naming: InstancePermission.configManage.rawValue) }))
+                action: (host.isAllowingMore ? "Waiting…" : "Allow More…", { host.askForMore(naming: InstancePermission.configManage.rawValue) }))
             .disabled(host.isAllowingMore)
         }
     }

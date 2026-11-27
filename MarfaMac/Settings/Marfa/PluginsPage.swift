@@ -218,7 +218,7 @@ private struct ConnectorPermissionButton: View {
     let host: any MarfaSettingsHost
 
     var body: some View {
-        SettingsButton(host.isAllowingMore ? "Waiting…" : "Allow More") {
+        SettingsButton(host.isAllowingMore ? "Waiting…" : "Allow More…") {
             host.askForMore(naming: InstancePermission.connectorsManage.rawValue)
         }
         .disabled(host.isAllowingMore)

@@ -93,7 +93,7 @@ struct SettingsControlTests {
             window.contentView = nil
             window.close()
         }
-        try await press(in: window, matching: "Allow More", attribute: "accessibilityLabel")
+        try await press(in: window, matching: "Allow More…", attribute: "accessibilityLabel")
         #expect(await eventually(within: .seconds(3)) { settings.allowed == [[.instanceRead]] })
     }
 

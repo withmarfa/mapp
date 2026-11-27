@@ -53,7 +53,7 @@ struct KeysPage: View {
             if !model.canReadKeys {
                 SettingsPageState(
                     symbol: "lock", title: Text("Needs a Permission"), line: Text(verbatim: MarfaSettingsPage.keys.permissionLine),
-                    action: ("Allow More", { host.askForMore(naming: InstancePermission.keysManage.rawValue) }))
+                    action: ("Allow More…", { host.askForMore(naming: InstancePermission.keysManage.rawValue) }))
             } else if model.failure != nil || !model.hasLoaded {
                 loadState
             } else {
@@ -111,7 +111,7 @@ struct KeysPage: View {
                 if !model.canMake {
                     SettingsAddRow(
                         off: "New Key…", line: "The app isn’t allowed to make keys.",
-                        remedy: (host.isAllowingMore ? "Waiting…" : "Allow More", {
+                        remedy: (host.isAllowingMore ? "Waiting…" : "Allow More…", {
                             Task { _ = await host.allowMore([.keysMint]) }
                         }))
                 }

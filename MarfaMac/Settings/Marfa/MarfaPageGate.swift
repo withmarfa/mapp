@@ -41,7 +41,7 @@ struct MarfaPageGate<Content: View>: View {
                 standing {
                     SettingsPageState(
                         symbol: "lock", title: Text("Needs a Permission"), line: Text(verbatim: page.permissionLine),
-                        action: (host.isAllowingMore ? "Waiting…" : "Allow More", { host.askForMore(naming: permission.rawValue) }))
+                        action: (host.isAllowingMore ? "Waiting…" : "Allow More…", { host.askForMore(naming: permission.rawValue) }))
                     .disabled(host.isAllowingMore)
                 }
             } else {

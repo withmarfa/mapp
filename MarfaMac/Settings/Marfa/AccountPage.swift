@@ -64,7 +64,7 @@ struct AccountPage: View {
                 SettingsSection("Permissions") {
                     SettingsProblemRow(
                         title: Text("This app can’t manage sign-ins"), line: Text("Your password, passkeys and browsers need this permission."),
-                        symbol: "lock", actions: [SettingsProblemAction("Allow More") { Task { await model.allowSignIns() } }]
+                        symbol: "lock", actions: [SettingsProblemAction("Allow More…") { Task { await model.allowSignIns() } }]
                     ).disabled(host.isAllowingMore)
                 }
             }
@@ -118,7 +118,7 @@ struct AccountPage: View {
                     title: Text("This app can’t check for problems"), line: Text("Allow this app to read the server’s status."),
                     symbol: "lock", tone: nil,
                     actions: [
-                        SettingsProblemAction("Allow More") {
+                        SettingsProblemAction("Allow More…") {
                             host.askForMore(naming: InstancePermission.instanceRead.rawValue)
                         }
                     ]
