@@ -21,7 +21,7 @@ Keep SwiftUI out. `ItemLibrary` is the app's whole view of the working copy; `Ma
 
 - **`PreferencesMap` places each new setting** or keeps it on the Mac, and a store holding one rereads it in `reload()`.
 - **An unreadable stored setting is set aside** under its store's `setAsideKey`, never removed: a later version may read it.
-- **Call `PreferenceHolds.willWrite` before writing a synced setting,** naming what the store dropped and what the person reset.
+- **A store calls `PreferenceHolds.willWrite` before writing a synced setting,** naming what it dropped and what the person reset.
 
 ## Commands and writes
 
