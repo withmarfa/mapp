@@ -59,7 +59,8 @@ nonisolated struct ConnectionSettings: Equatable, Sendable {
     /// The question before Remove… takes the settings out of the Marfa.
     var removeTitle: String { String(localized: "Remove This App’s Settings from \(name)?") }
     var removeMessage: String {
-        String(localized: "Every Mac that connects to \(name) loses them. This Mac keeps its own, and your items stay.")
+        let consequence = String(localized: "Every Mac that connects to \(name) loses them. This Mac keeps its own.")
+        return "\(consequence) \(Self.removalRisk)"
     }
 
     /// The checkbox on the Sign Out alert.

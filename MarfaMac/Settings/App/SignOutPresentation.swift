@@ -14,7 +14,8 @@ struct SignOutPresentation: ViewModifier {
     private var message: String {
         if model.offersSettingsRemoval {
             let signOut = String(localized: "Marfa for Mac removes its copy from this Mac and deletes the webhooks it made.")
-            return "\(signOut) \(ConnectionSettings.removalRisk)"
+            let itemsStay = String(localized: "Your items stay when the box is unchecked.")
+            return "\(signOut) \(itemsStay) \(ConnectionSettings.removalRisk)"
         }
         return String(localized: "Marfa for Mac removes its copy from this Mac and deletes the webhooks it made. Your items stay.")
     }

@@ -254,7 +254,7 @@ private struct ProfilePictureMark: View {
     let name: String?
 
     private var initials: String {
-        String((name ?? "").split(separator: " ").prefix(2).compactMap(\.first)).uppercased()
+        String((name ?? "").uppercased().split(separator: " ").prefix(2).compactMap(\.first))
     }
 
     var body: some View {
@@ -266,7 +266,10 @@ private struct ProfilePictureMark: View {
                     if initials.isEmpty {
                         SettingsTileGlyph(symbol: "person.fill", tileSize: SettingsTokens.Metric.tile)
                     } else {
-                        Text(verbatim: initials).settingsFont(.small)
+                        Text(verbatim: initials)
+                            .settingsFont(.small)
+                            .lineLimit(1)
+                            .minimumScaleFactor(SettingsTokens.Metric.avatarInitialsMinimumScale)
                     }
                 }
                 .foregroundStyle(SettingsTokens.tileForeground)

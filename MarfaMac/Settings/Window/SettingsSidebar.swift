@@ -34,6 +34,15 @@ struct SettingsSidebar: View {
 
     var body: some View {
         let groups = groups
+        VStack(spacing: 0) {
+            sidebarList(groups)
+            docsLink
+        }
+        .searchable(text: $search, placement: .sidebar, prompt: Text("Search"))
+        .accessibilityIdentifier("SettingsSidebar")
+    }
+
+    private func sidebarList(_ groups: [Group]) -> some View {
         List(selection: Binding<SettingsPage?> { selection.sidebarEntry } set: {
             if let page = $0, canSelect(page) { selection = page }
         }) {
@@ -50,14 +59,11 @@ struct SettingsSidebar: View {
         .environment(\.sidebarRowSize, .small)
         .environment(\.defaultMinListRowHeight, 0)
         .softSelection(rows: groups.map(\.pages), selection: { selection.sidebarEntry })
-        .searchable(text: $search, placement: .sidebar, prompt: Text("Search"))
         .overlay {
             if groups.isEmpty {
                 ContentUnavailableView.search(text: search).accessibilityIdentifier("SettingsSearchEmpty")
             }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) { docsLink }
-        .accessibilityIdentifier("SettingsSidebar")
     }
 
     private func groupHeading(_ name: LocalizedStringKey, gap: CGFloat) -> some View {
