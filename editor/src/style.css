@@ -423,8 +423,9 @@ body[data-lead='on'] #item-footer > .item-rows + .item-foot-lists {
 }
 
 /* On a narrow page the words would wrap to four short lines beside the button, so the action stands under them, at the
-   words' edge, and the close button stays at the top right. */
-@container (max-width: 340px) {
+   words' edge, and the close button stays at the top right. The width is in the container's own em, 340 points at the
+   default text size, so a larger text size folds sooner. */
+@container (max-width: 26.2em) {
   .page-notice {
     display: grid;
     grid-template-columns: auto 1fr auto;
