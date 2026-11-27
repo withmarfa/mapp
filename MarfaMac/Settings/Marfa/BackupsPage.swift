@@ -164,7 +164,7 @@ struct BackupsPage: View {
                 keepIn
                 if host.grants.contains(.configManage), model.place == .folder, let folder = model.settings?.folder {
                     SettingsRow(
-                        title: Text("Folder"), line: Text("\(folder), on the machine that runs this Marfa."),
+                        title: Text("Folder"), line: Text("\(folder), on the machine this Marfa runs on."),
                         lineGlyph: .folder
                     ) {
                         SettingsButton("Change…") { model.beginFolder() }
@@ -240,7 +240,7 @@ struct BackupsPage: View {
         switch backups?.destination {
         case .folder?: String(localized: "A Folder")
         case .objectStore?: String(localized: "An Object Store")
-        case nil: backups?.reason == .noDestination ? String(localized: "Nowhere") : String(localized: "Couldn’t Check")
+        case nil: backups?.reason == .noDestination ? String(localized: "Nowhere") : String(localized: "Couldn’t check")
         }
     }
 
@@ -251,11 +251,11 @@ struct BackupsPage: View {
 
     private var lastBackup: some View {
         let hasFailedRun = backupsHealth.flatMap(Self.failedRun) != nil
-        return SettingsRow("Last backup", error: hasFailedRun ? nil : model.backUpError) {
-            HStack(spacing: SettingsTokens.Metric.buttonGap) {
-                SettingsValue(verbatim: model.lastBackupLine(health: backupsHealth))
-                if !hasFailedRun { backUpButton }
-            }
+        return SettingsRow(
+            title: Text("Last backup"), line: Text(verbatim: model.lastBackupLine(health: backupsHealth)),
+            error: hasFailedRun ? nil : model.backUpError
+        ) {
+            if !hasFailedRun { backUpButton }
         }
     }
 
@@ -272,7 +272,7 @@ struct BackupsPage: View {
         let preview = SettingsTablePreview(total: model.backups.count)
         return SettingsSection("Backups") {
             if let failure = model.listFailure {
-                OwnerProblemRow(title: "Couldn’t Read Backups", failure: failure, page: .backups, host: host) {
+                OwnerProblemRow(title: "Couldn’t read backups", failure: failure, page: .backups, host: host) {
                     Task { await load() }
                 }
             } else if model.backups.isEmpty {

@@ -2288,9 +2288,26 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         #expect(AddressesModel.origin(from: "") == nil)
         #expect(AddressesModel.display("https://marfa.test") == "marfa.test")
         #expect(AddressesModel.display("http://marfa.test:8210") == "http://marfa.test:8210")
-        #expect(AddressesModel.kind(of: "https://100.84.12.7") == "An IP address.")
+        #expect(AddressesModel.kind(of: "https://100.84.12.7") == nil)
         #expect(AddressesModel.kind(of: "http://castell-studio.local") == "On the local network.")
         #expect(AddressesModel.kind(of: "https://studio.castell.design") == nil)
+    }
+
+    @Test func aBrowserGlyphFollowsWhatTheSessionShows() {
+        #expect(AccountSignInsPage.symbolName(for: BrowserSignIn(id: "1", name: "Safari on macOS")) == "safari")
+        #expect(AccountSignInsPage.symbolName(for: BrowserSignIn(id: "2", name: "Firefox on Windows")) == "globe")
+        #expect(AccountSignInsPage.symbolName(for: BrowserSignIn(id: "3", name: "Safari on iPhone")) == "iphone")
+        #expect(AccountSignInsPage.symbolName(for: BrowserSignIn(id: "4", name: "Chrome", userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)")) == "iphone")
+        #expect(AccountSignInsPage.symbolName(for: BrowserSignIn(id: "5", name: "Chrome", userAgent: "Mozilla/5.0 Safari/605.1.15")) == "globe")
+    }
+
+    @Test func aRecentUnusedFileSaysWhenItWasFound() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+        let now = Date(timeIntervalSince1970: 1_763_000_000)
+        #expect(FileStoragePage.found(now, now: now, calendar: calendar) == "Found today")
+        let yesterday = calendar.date(byAdding: .day, value: -1, to: now)
+        #expect(FileStoragePage.found(yesterday, now: now, calendar: calendar) == "Found yesterday")
     }
 
     @Test func theSignInAddressIsLeftOutOfTheOthers() async {

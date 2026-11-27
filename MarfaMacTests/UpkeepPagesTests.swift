@@ -483,6 +483,7 @@ nonisolated private func record(_ name: String, hoursAgo: Int = 0) -> BackupReco
         await model.load()
         #expect(model.listed == [failed])
         #expect(UpkeepWording.result(model.listed.first?.outcome) == "Failed")
+        #expect(UpkeepWording.result(nil) == "Not yet")
     }
 
     @Test func confirmingAsksFirstAndSendsNothingUntilTheOwnerAgrees() async {
