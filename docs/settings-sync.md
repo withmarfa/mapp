@@ -43,7 +43,7 @@ With a group off, edits, removals, imports and restores stay local. Other Macs c
 
 Turning a group on saves a restore point. A failed save leaves it off. The whole group neither sends nor takes changes until the copy is complete, earlier names have settled and every setting is unprotected.
 
-The Mac drops the group's sync record and reads original items oldest first, taking the first value or the default. It sends nothing for the group. Only values its readers accept and keep count as shared. Unreadable values stay in the Marfa.
+Resume drops the group's sync record and reads original items oldest first. Missing settings take their defaults. An unreadable first value stays in the Marfa, and the Mac keeps any readable local choice. Only values the Mac accepts and keeps count as shared. Resume sends nothing.
 
 A conflicted copy containing an off or resuming group's settings stays for the Mac that made it, including after resume.
 
