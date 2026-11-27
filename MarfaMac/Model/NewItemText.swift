@@ -168,7 +168,15 @@ nonisolated enum NewItemText {
                 return detected
             }
         }
-        return detectedDay(in: text, calendar: calendar)
+        guard let detected = detectedDay(in: text, calendar: calendar) else { return nil }
+        // A weekday recognized by the system still follows this calendar's today.
+        let detectedStart = text.index(text.startIndex, offsetBy: detected.range.lowerBound)
+        if let start = words.firstIndex(where: { $0.range.lowerBound == detectedStart }),
+           let weekday = namedDay(words, from: start, in: text, now: now, calendar: calendar, allowUncapitalizedWeekday: true),
+           weekday.range == detected.range {
+            return weekday
+        }
+        return detected
     }
 
     /// The value a day is written as in `field`: an instant where the field and the words hold a time, else the day.
@@ -231,7 +239,9 @@ nonisolated enum NewItemText {
     }
 
     /// The locale's names: a weekday, a day and a month in either order, with a year after them, or a weekday alone.
-    private static func namedDay(_ words: [Word], from start: Int, in text: String, now: Date, calendar: Calendar) -> FoundDay? {
+    private static func namedDay(
+        _ words: [Word], from start: Int, in text: String, now: Date, calendar: Calendar, allowUncapitalizedWeekday: Bool = false
+    ) -> FoundDay? {
         var index = start
         let weekday = weekdayNumber(words[index], calendar: calendar, alone: false)
         if weekday != nil { index += 1 }
@@ -252,7 +262,8 @@ nonisolated enum NewItemText {
             }
             return found(day: day, month: month, year: year, words: words, span: start...(index - 1), in: text, now: now, calendar: calendar)
         }
-        guard weekdayNumber(words[start], calendar: calendar, alone: true) != nil, let weekday else { return nil }
+        guard let weekday, allowUncapitalizedWeekday || weekdayNumber(words[start], calendar: calendar, alone: true) != nil
+        else { return nil }
         let today = calendar.startOfDay(for: now)
         guard let date = calendar.nextDate(after: today, matching: DateComponents(weekday: weekday), matchingPolicy: .nextTime, direction: .forward)
         else { return nil }

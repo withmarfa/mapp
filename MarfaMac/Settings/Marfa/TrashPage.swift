@@ -1,11 +1,9 @@
 import Marfa
 import SwiftUI
 
-/// The Recently Deleted page: what the server holds in its bin, with Restore on every row, Permanently Delete and Empty.
-/// A section shows the latest page of it, and Show All opens the whole list as a page of its own.
-struct RecentlyDeletedPage: View {
+/// Trash opens the selection page through Select Items or Show All so individual items can be permanently deleted.
+struct TrashPage: View {
     static let allDeleted = SettingsSubpage(id: "all-deleted", title: String(localized: "All Deleted Items"))
-    private static let pageSize = 8
 
     let host: any MarfaSettingsHost
     let showsAll: Bool
@@ -68,36 +66,41 @@ struct RecentlyDeletedPage: View {
         SettingsPageColumn {
             SettingsSection(
                 "Cleanup",
-                footer: canChangeRetention ? nil : host.deletedRetentionDays.map { LocalizedStringKey("Deleted items are kept for \($0) days.") }) {
+                footer: canChangeRetention ? nil : host.deletedRetentionDays.map { LocalizedStringKey("Deleted items are kept for \($0) days.") },
+                accessory: {
+                    if !items.isEmpty && items.count <= SettingsTokens.Metric.tablePreviewThreshold {
+                        SettingsButton("Select Items") { navigation?.push(Self.allDeleted) }
+                    }
+                }
+            ) {
                 if canChangeRetention {
                     InstanceChoiceRow(
                         model: settings, setting: .trashRetentionDays, among: [.trashRetentionDays],
                         line: "Items wait here first, so they can come back.")
                 }
                 SettingsRow(
-                    "Empty Recently Deleted",
+                    "Trash",
                     line: host.deletedCount == 0 ? "Nothing is waiting here." : "Permanently deletes \(host.deletedCount.formatted()) items."
                 ) {
-                    SettingsButton("Empty…", role: .destructive) { host.emptyDeleted() }
+                    SettingsButton("Empty Trash", role: .destructive) { host.emptyDeleted() }
                         .disabled(host.deletedCount == 0 || !host.canDeletePermanently)
-                        .accessibilityIdentifier("RecentlyDeletedEmpty")
+                        .accessibilityIdentifier("TrashEmpty")
                 }
             }
             if canChangeRetention { InstanceStatusLine(model: settings, settings: [.trashRetentionDays]) }
             SettingsSection(name: Text("Deleted Items"), accessory: { filter }) {
                 if host.deletedCount == 0 {
                     SettingsEmptyCard(
-                        symbol: "trash", title: Text("Nothing Is in Recently Deleted"),
+                        symbol: "trash", title: Text("Trash Is Empty"),
                         line: Text("Items you delete wait here before they are permanently deleted."))
                 } else {
                     SettingsSectionTable(
-                        rows: Array(items.prefix(Self.pageSize)), columns: columns(withType: false), action: restore,
-                        total: isFiltered ? items.count : host.deletedCount,
+                        rows: items, columns: columns(withType: false), action: restore,
                         showAll: { navigation?.push(Self.allDeleted) })
                 }
             }
         }
-        .accessibilityIdentifier("RecentlyDeletedPage")
+        .accessibilityIdentifier("TrashPage")
     }
 
     private var allPage: some View {
@@ -105,7 +108,7 @@ struct RecentlyDeletedPage: View {
             rows: items, columns: columns(withType: true), count: Text("\((isFiltered ? items.count : host.deletedCount).formatted()) items"), selection: $selection,
             filter: { filter },
             foot: {
-                SettingsButton("Permanently Delete…", role: .destructive, small: true) { host.deleteDeletedPermanently(selection) }
+                SettingsButton("Permanently Delete", role: .destructive, small: true) { host.deleteDeletedPermanently(selection) }
                     .disabled(selection.isEmpty || !host.canDeletePermanently)
                 SettingsButton("Restore", small: true) {
                     host.restoreDeleted(selection)
@@ -115,7 +118,7 @@ struct RecentlyDeletedPage: View {
             }
         )
         .onChange(of: host.deletedItems.map(\.id)) { selection.formIntersection(host.deletedItems.map(\.id)) }
-        .accessibilityIdentifier("RecentlyDeletedAllPage")
+        .accessibilityIdentifier("TrashAllPage")
     }
 
     /// When an item was deleted, as a table says a day (`DateDisplay`).

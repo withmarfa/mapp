@@ -37,7 +37,7 @@ nonisolated final class SettingsTests: XCTestCase {
         XCTAssertTrue(element("SettingsDetail").exists)
         XCTAssertTrue(element("SettingsPage-appearance").exists)
         XCTAssertTrue(element("SettingsPage-connection").exists)
-        XCTAssertTrue(element("SettingsPage-overview").exists)
+        XCTAssertTrue(element("SettingsPage-account").exists)
         XCTAssertFalse(element("SettingsPage-sidebar").exists, "Settings > Sidebar is gone")
         attachScreenshot("SettingsWindow")
     }

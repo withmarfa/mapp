@@ -42,7 +42,7 @@ struct StartUpPage: View {
                     if snapshot.startUp.isEmpty {
                         SettingsEmptyCard(symbol: "power", title: Text("Nothing listed"), line: Text("\(host.serverName) lists no start-up settings."))
                     } else {
-                        SettingsSectionTable(rows: snapshot.startUp, columns: columns, showsCount: false)
+                        SettingsSectionTable(rows: snapshot.startUp, columns: columns)
                     }
                 }
             }

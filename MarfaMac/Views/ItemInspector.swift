@@ -43,11 +43,11 @@ struct ItemInspectorHost: View {
 
     /// Follows a link as Settings > Open Items says, as a link in the page does (`EditorController.follow`), so a window
     /// of its own opens it as that window does. With no page beside the panel, the item opens in another window. A
-    /// deleted item opens in Recently Deleted where a main window has the panel, and as any link in a window of its own,
+    /// deleted item opens in Settings > Trash where a main window has the panel, and as any link in a window of its own,
     /// whose page shows its deleted notice.
     private func open(_ id: ItemID) {
         if let browser, library.item(id)?.state == .trashed {
-            browser.showSettings(.recentlyDeleted)
+            browser.showSettings(.trash)
             return
         }
         guard library.item(id) != nil else { return }

@@ -169,13 +169,36 @@ struct NewItemLineTests {
     @Test func theChipsStandInTheOrderTheirWordsWereTyped() throws {
         let library = Self.library()
         let browser = Self.line(in: library)
-        Self.typeWords("Send the second proofs to Calverts fri #print @lis", into: browser, in: library)
+        Self.typeWords("Send the second proofs to Calverts Fri #print @lis", into: browser, in: library)
         let draft = try #require(browser.quickAdd.draft)
-        #expect(draft.title == "Send the second proofs to Calverts fri #print @lis")
+        #expect(draft.title == "Send the second proofs to Calverts Fri #print @lis")
         #expect(Self.chips(browser, in: library) == [.field(MarfaMapping.dueField), .tag("print")])
         let read = QuickAdd.withReads(draft, Self.reads(browser, in: library))
         #expect(read.properties[MarfaMapping.dueField] == .string("2026-11-27"))
         #expect(read.tags == ["print"])
+    }
+
+    @Test(arguments: ["Fri", "fri"])
+    func aWeekdayUsesTheLocalDayNearMidnight(_ weekday: String) async throws {
+        var calendar = Self.calendar
+        calendar.timeZone = try #require(TimeZone(identifier: "America/Los_Angeles"))
+        // Late Friday here is already Saturday in UTC.
+        let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 11, day: 27, hour: 23, minute: 55)))
+        let library = Self.library()
+        let browser = Self.line(in: library)
+        Self.typeWords("Send proofs \(weekday) #print ", into: browser, in: library)
+        let draft = try #require(browser.quickAdd.draft)
+        let reads = QuickAdd.lineReads(draft, finishing: false, in: library, now: now, calendar: calendar, locale: Self.british)
+        let read = QuickAdd.withReads(draft, reads)
+        let day = QuickAdd.lineChipWords(
+            .field(MarfaMapping.dueField), in: read, library: library, calendar: calendar, locale: Self.british)
+        #expect(day.value == "Fri 27 Nov")
+
+        let id = try #require(await browser.saveQuickAdd(
+            in: library, undoManager: nil, opening: false, now: now, calendar: calendar, locale: Self.british))
+        let item = try #require(library.item(id))
+        #expect(item.title == "Send proofs")
+        #expect(item.properties.first { $0.key == MarfaMapping.dueField }?.value == .string("2026-11-27"))
     }
 
     @Test func noTypedWordLeavesTheTitleWhileTyping() throws {
@@ -259,7 +282,7 @@ struct NewItemLineTests {
     @Test func emptyingTheTitleLeavesNoChipReadFromIt() throws {
         let library = Self.library()
         let browser = Self.line(in: library)
-        Self.typeWords("Call fri #zine about ", into: browser, in: library)
+        Self.typeWords("Call Fri #zine about ", into: browser, in: library)
         #expect(Self.chips(browser, in: library).count == 2)
         Self.replace(with: "", in: browser, in: library)
         #expect(Self.chips(browser, in: library).isEmpty, "nothing is rebuilt from chips")
@@ -306,7 +329,7 @@ struct NewItemLineTests {
     @Test func aChipSaysWhatItSetsThenItsValueAndADayInShort() throws {
         let library = Self.library()
         let browser = Self.line(in: library)
-        Self.typeWords("Send proofs fri #print ", into: browser, in: library)
+        Self.typeWords("Send proofs Fri #print ", into: browser, in: library)
         let draft = QuickAdd.withReads(try #require(browser.quickAdd.draft), Self.reads(browser, in: library))
         let day = QuickAdd.lineChipWords(
             .field(MarfaMapping.dueField), in: draft, library: library, calendar: Self.calendar, locale: Self.british)

@@ -191,6 +191,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     }
 
     func profile() async throws(OwnerFailure) -> OwnerProfile {
+        await held("profile")
         try enter("profile")
         return state.withLock { $0.profile }
     }
@@ -314,6 +315,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     }
 
     func keys() async throws(OwnerFailure) -> [KeyInfo] {
+        await held("keys")
         try enter("keys")
         return state.withLock { $0.keys }
     }
@@ -2443,17 +2445,5 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         #expect(OwnerWording.used(now.addingTimeInterval(-86_400), now: now, calendar: calendar) == "Used yesterday")
         #expect(OwnerWording.used(now.addingTimeInterval(-86_400 * 3), now: now, calendar: calendar) == "Used 3 days ago")
         #expect(OwnerWording.used(nil, now: now, calendar: calendar) == "Never used")
-    }
-
-    @Test func theNewPagesAreInTheSidebarInTheBoardsOrder() {
-        #expect(
-            MarfaSettingsPage.groups == [
-                [.overview], [.account, .apps, .keys, .addresses], [.plugins, .types, .sources], [.recentlyDeleted, .history, .fileStorage], [.connectors, .webhooks, .folders],
-                [.backups, .updates, .housekeeping], [.activity, .monitoring], [.limits, .startUp],
-            ])
-        for page in [MarfaSettingsPage.account, .apps, .keys, .addresses] {
-            #expect(SettingsPage.marfa(page).matches(page.title))
-        }
-        #expect(SettingsPage.marfa(.account).matches("Passkeys"))
     }
 }

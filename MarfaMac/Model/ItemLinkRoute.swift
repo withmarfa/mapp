@@ -22,8 +22,8 @@ nonisolated enum ItemLinkRoute: Equatable, Sendable {
             guard instanceID.lowercased() == link.instanceID else { return .refuse(.otherMarfa) }
             switch held {
             case nil: return .refuse(.notFound)
-            // Showing it would open Settings at Recently Deleted, which reads the server; the person chooses that.
-            case .trashed: return .refuse(.inRecentlyDeleted)
+            // Showing it would open Settings at Trash, which reads the server; the person chooses that.
+            case .trashed: return .refuse(.inTrash)
             case .active, .archived: return .open(link.item)
             }
         }
@@ -46,8 +46,8 @@ nonisolated enum ItemLinkRefusal: Equatable, Sendable, CaseIterable {
     case notFound
     /// The copy doesn't yet know which Marfa it is, so the link can't be checked.
     case instanceUnknown
-    /// The item is in Recently Deleted.
-    case inRecentlyDeleted
+    /// The item is in Trash.
+    case inTrash
 
     var title: String { String(localized: "Can’t Open Link") }
 
@@ -60,16 +60,16 @@ nonisolated enum ItemLinkRefusal: Equatable, Sendable, CaseIterable {
         case .stillOpening: String(localized: "Marfa for Mac couldn’t check this link in time. Try opening it again.")
         case .notFound: String(localized: "This item can’t be found in this Mac’s copy of your Marfa. It may have been deleted, or it may not have synced to this Mac yet.")
         case .instanceUnknown: String(localized: "Marfa for Mac can’t check this link yet. Try again once your Marfa has finished syncing.")
-        case .inRecentlyDeleted: String(localized: "This item is in Recently Deleted.")
+        case .inTrash: String(localized: "This item is in Trash.")
         }
     }
 
-    /// The Settings page where the person can go on: Connection to connect, Recently Deleted to find the item. The
+    /// The Settings page where the person can go on: Connection to connect, Trash to find the item. The
     /// person opens it; the link never does.
     var action: Notices.Action? {
         switch self {
         case .notConnected, .unavailable: .openSettings(.connection)
-        case .inRecentlyDeleted: .openSettings(.recentlyDeleted)
+        case .inTrash: .openSettings(.trash)
         case .malformed, .otherMarfa, .stillOpening, .notFound, .instanceUnknown: nil
         }
     }

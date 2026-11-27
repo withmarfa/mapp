@@ -10,29 +10,34 @@ paths:
 
 # The Settings window
 
-One window holds the app's pages and, under them, the Marfa's, which `docs/owner-settings.md` covers. `docs/settings-sync.md` says where each setting is kept.
+See `docs/owner-settings.md` for Marfa pages and `docs/settings-sync.md` for storage.
 
 ## The window
 
-- **Settings is a `Window` scene, not the system's `Settings` scene**, because that one is sized to its content, with no toolbar of ours and no frame the person keeps.
+- **Settings is a `Window` scene** with its own toolbar and a remembered frame.
 - **There is one instance, and every route names a page in it** (`SettingsLauncher`, `SettingsNavigation`).
-- **A page is listed once it exists** (`SettingsPage`, `MarfaSettingsPage`): a case, its group, its search words and its view in `SettingsDetail`.
-- **A page is one column of sections, and what has settings of its own is a page pushed on it**, so Back returns.
-- **Back and Forward are the View menu's commands** while the window is key.
+- **The sidebar always has both halves.** App: General, Connection, Appearance, Keyboard, then Editor, Lists, Layouts, and Search. Marfa: Account, Activity, Apps and Keys, Sources, Webhooks, then Types, Plugins, Connectors, Folders, Backups, and Trash. Account badges the number of problems.
+- **Every route has a sidebar entry** (`SettingsPage.sidebarEntry`, `MarfaSettingsPage.sidebarEntry`). Search includes the words of pages opened through that entry. The Docs link opens Marfa's documentation.
+- **A page is one column of sections.** Push a new page for a thing's own settings.
+- **Back and Forward are at the top of the sidebar.** The current page's title is above the detail. The View menu's Back and Forward commands use the same history.
 
 ## Parts
 
-- **A page draws with the parts in `Parts/`** and never its own row, button, section or sheet. The parts know nothing of the app's model.
+- **Pages draw with `Parts/`.** Keep app models out of parts.
 - **Every measure, color and font is in `SettingsTokens`.**
 - **A row is a lead, a title, one line and one trailing control** (`SettingsRow`), two lines at most. A problem row may hold two buttons, as may the release row of Updates.
 - **A value that a button acts on goes in the row's line.** A problem's words are told whole.
 - **A refused input keeps what was typed**, with one line under the title that says why.
-- **Adding is the last row of the card it adds to** (`SettingsAddRow`).
+- **Put an add button at the trailing edge of the section title** (`SettingsSection`'s accessory). Use the same slot for header choices or search and a filter when the section needs them. Put a note about the section in its footer.
+- **Row controls use the small size** with secondary values, a plain More menu, and pop-ups at least 120 points wide. Pop-ups and header choices fit their text. A disk path or web address can have a folder or link glyph.
+- **A page link has a colored tile and a chevron.** A locked link dims the tile and shows a lock with a short reason. A row about a thing uses a plain symbol or no symbol.
+- **A section table has no stripes and aligns numbers at the trailing edge.** It shows all rows through 50. For longer lists it previews 20 with the count and Show All, which expands the table or opens the full list. Use text tabs with optional counts for page views.
+- **Use title case for page and section titles, buttons, tabs, column headings, sheet titles, and alert titles.** Use sentence case for row labels, switches, and descriptions. An ellipsis marks a button that opens a window to type or choose in.
 - **Something new with several fields is a `SettingsSheet`** in the middle of the window, shown with `settingsSheet`, never `.sheet`, which drops from under the toolbar. What it shows is read from an `@Observable` model, because the window draws it.
 - **A sheet's confirm button is `SettingsButton` with `role: .confirm`**, which also takes Return. A sheet's destructive button is alone at the leading edge, and reads Remove or Delete.
 - **Buttons that act on one setting sit in its row.** Buttons that act on the page are a `SettingsBar` at its end.
 - **A page that cannot be shown is a `SettingsPageState`**, never a row.
-- **The button that asks for more permission is Allow More…**, never Try Again, because trying again cannot help.
+- **Use Allow More for a missing permission.** Use Try Again when a failed read can be retried.
 - **What is typed and not saved is handed over** when the window closes or the app quits (`AppSettingsHost.handOverDrafts`).
 
 ## The app's pages
@@ -46,7 +51,7 @@ One window holds the app's pages and, under them, the Marfa's, which `docs/owner
 | Lists | The starting density, sort and group of a place, until a view or the place chooses its own |
 | Layouts | How each type looks, through the stores of `docs/type-looks.md`. Only what differs from the type's preset is kept, so a better preset still reaches it. Page pins properties and holds the one Linked From row, which reads and writes the type's stored choice (`PagePlacements.linkedFrom`) |
 | Search | What searches of the whole library leave out (`SearchLeaveOuts`). A search in one place leaves nothing out. A type or source that would pass a query's ten conditions is dimmed, with the reason |
-| On This Mac | The copy, downloaded files and exports, below |
+| On This Mac | Opens from Connection. The copy, downloaded files and exports, below |
 | Connection | Sign-in, other Marfas and Disconnect, which reads the queue in the same step and asks about changes that wait |
 
 - **A choice whose thing is gone keeps its name, marked as missing** (`MissingChoice`), and the app uses the default meanwhile.

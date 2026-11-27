@@ -23,6 +23,22 @@ enum SettingsTokens {
             case .red: Color(nsColor: .systemRed)
             }
         }
+
+        var sidebarColor: Color {
+            let rgb: UInt32 = switch self {
+            case .gray: 0x8e8e93
+            case .blue: 0x2f83f5
+            case .indigo: 0x5e5ce6
+            case .amber: 0xeaa910
+            case .orange: 0xf78b12
+            case .purple: 0xa55adb
+            case .teal: 0x18a8c4
+            case .green: 0x2fb24f
+            case .pink: 0xec4a7f
+            case .red: 0xee4b44
+            }
+            return Color(red: Double((rgb >> 16) & 255) / 255, green: Double((rgb >> 8) & 255) / 255, blue: Double(rgb & 255) / 255)
+        }
     }
 
     /// A card: white with a hairline, never gray.
@@ -34,8 +50,6 @@ enum SettingsTokens {
     static let buttonFill = adaptive(light: NSColor(white: 0, alpha: 0.06), dark: NSColor(white: 1, alpha: 0.12))
     /// A chosen row, card or table row: a soft gray, never blue.
     static let selection = adaptive(light: NSColor(white: 0, alpha: 0.07), dark: NSColor(white: 1, alpha: 0.1))
-    /// Every other row of a section's table, a shade off the card's white.
-    static let band = adaptive(light: NSColor(white: 0, alpha: 0.024), dark: NSColor(white: 1, alpha: 0.04))
     /// Where a row is under the pointer.
     static let hover = adaptive(light: NSColor(white: 0, alpha: 0.04), dark: NSColor(white: 1, alpha: 0.06))
     /// A value that can't be changed, in a field's place.
@@ -46,6 +60,10 @@ enum SettingsTokens {
     static let tertiaryText = Color(nsColor: .tertiaryLabelColor)
     static let primaryText = Color(nsColor: .labelColor)
     static let tileForeground = Color.white
+    static let tileHighlight = Color.white.opacity(0.35)
+    static let tileEdge = Color.black.opacity(0.1)
+    static let tileShadow = Color.black.opacity(0.18)
+    static let tileGlyphShadow = Color.black.opacity(0.22)
     /// The swatch of a color the person makes, before they have made one.
     static let rainbow = AngularGradient(colors: [.red, .orange, .yellow, .green, .blue, .purple, .red], center: .center)
     /// The accent the Mac is set to, which the first swatch of a color choice shows.
@@ -74,12 +92,20 @@ enum SettingsTokens {
 
     /// The interface fonts of Settings. A page asks for these by role.
     enum Role: Hashable, Sendable {
-        case title, line, sectionName, sectionLine, footer, small, mono, stateTitle, headTitle, sidebar, largeGlyph, tableHeader
+        case title, line, sectionName, sectionLine, footer, small, mono, stateTitle, headTitle, pageHeader, sidebar, sidebarHeading, sidebarBadge, largeGlyph, tableHeader, linkGlyph, pathGlyph, chartAxis, chartTick
     }
 
     static func font(_ role: Role, scale: CGFloat = 1) -> Font {
         switch role {
-        case .title, .sidebar: .system(size: 13 * scale)
+        case .title: .system(size: 13 * scale)
+        case .sidebar: .system(size: 15 * scale)
+        case .sidebarBadge: .system(size: 11 * scale, weight: .semibold)
+        case .sidebarHeading: .system(size: 12 * scale, weight: .semibold)
+        case .pageHeader: .system(size: 17 * scale, weight: .semibold)
+        case .linkGlyph: .system(size: 9 * scale, weight: .medium)
+        case .pathGlyph: .system(size: 12 * scale)
+        case .chartAxis: .system(size: 11 * scale)
+        case .chartTick: .system(size: 10.5 * scale)
         case .line, .sectionLine, .footer: .system(size: 12 * scale)
         case .sectionName: .system(size: 13 * scale, weight: .semibold)
         case .small: .system(size: 12 * scale)
@@ -87,7 +113,7 @@ enum SettingsTokens {
         case .stateTitle: .system(size: 13 * scale, weight: .semibold)
         case .largeGlyph: .system(size: 15 * scale)
         case .headTitle: .system(size: 15 * scale, weight: .semibold)
-        case .tableHeader: .system(size: 12 * scale, weight: .medium)
+        case .tableHeader: .system(size: 11.5 * scale, weight: .semibold)
         }
     }
 
@@ -127,6 +153,11 @@ enum SettingsTokens {
         static let numberWidth: CGFloat = 72
         /// A field's height, which the system draws and a read-only value is as tall as.
         static let controlHeight: CGFloat = 28
+        static let smallControlHeight: CGFloat = 24
+        static let popUpMinimumWidth: CGFloat = 120
+        static let smallNumberWidth: CGFloat = 64
+        static let controlScaleForLarge: CGFloat = 1.3
+        static let headerChoicePadding: CGFloat = 4
         /// A table that is a page: its side margin, and the height of the bar above its columns and of the foot below them.
         static let pageTableInset: CGFloat = 24
         static let pageTableBar: CGFloat = 48
@@ -147,6 +178,11 @@ enum SettingsTokens {
         static let tableHeader: CGFloat = 30
         /// A table row's height: in a section, and on a page of its own, which draws them closer.
         static let tableRow: CGFloat = 34
+        static let tablePreviewThreshold = 50
+        static let tablePreviewCount = 20
+        static let tableFooterHeight: CGFloat = 40
+        static let sectionTableInset: CGFloat = 12
+        static let sectionTableColumnGap: CGFloat = 10
         static let pageTableRow: CGFloat = 30
         /// The space above and below a table row's cells, which a cell that wraps keeps by growing the row.
         static let tableCellPadding: CGFloat = 7
@@ -164,10 +200,23 @@ enum SettingsTokens {
         static let searchWidth: CGFloat = 200
         static let searchSpacing: CGFloat = 8
         /// The sidebar's tile.
-        static let sidebarTile: CGFloat = 20
-        /// How far a sidebar section's name is moved in so that it starts where the tiles below it do; the system sets the
-        /// name a little to the left of them.
-        static let sidebarHeaderInset: CGFloat = 2.5
+        static let sidebarTile: CGFloat = 24
+        static let sidebarRow: CGFloat = 32
+        static let sidebarGroupGap: CGFloat = 13
+        static let sidebarHalfGap: CGFloat = 32
+        static let sidebarFooterInset: CGFloat = 18
+        static let sidebarFooterPadding: CGFloat = 10
+        static let sidebarFooterGap: CGFloat = 4
+        static let sidebarBadgeSize: CGFloat = 18
+        static let sidebarBadgePadding: CGFloat = 5
+        static let richTileHighlightOpacity = 0.18
+        static let richTileShadeOpacity = 0.07
+        static let tileEdgeWidth: CGFloat = 0.5
+        static let tileShadowRadius: CGFloat = 1.5
+        static let tileShadowDrop: CGFloat = 0.5
+        static let tileGlyphShadowRadius: CGFloat = 0.5
+        static let sidebarHeadingTop: CGFloat = 12
+        static let sidebarHeadingBottom: CGFloat = 5
         /// A color swatch and the dot that marks the chosen one, and the space between swatches.
         static let swatch: CGFloat = 18
         static let swatchDot: CGFloat = 6
@@ -203,6 +252,32 @@ enum SettingsTokens {
         static let statusDot: CGFloat = 7
         static let dotGap: CGFloat = 6
         static let lockGlyph: CGFloat = 10
+        static let lockGap: CGFloat = 5
+        static let lockedTileOpacity = 0.45
+        static let pathGlyphGap: CGFloat = 4
+        static let pageHeaderTop: CGFloat = 4
+        static let pageHeaderNameHeight: CGFloat = 22
+        static let pageHeaderAddressHeight: CGFloat = 18
+        static let tabGap: CGFloat = 2
+        static let tabPadding: CGFloat = 11
+        static let tabHeight: CGFloat = 28
+
+        enum Usage {
+            static let plotHeight: CGFloat = 150
+            static let maxBarWidth: CGFloat = 44
+            static let barWidthRatio: CGFloat = 0.46
+            static let bottomPadding: CGFloat = 14
+            static let chartTop: CGFloat = 6
+            static let chartGap: CGFloat = 8
+            static let legendColumnGap: CGFloat = 16
+            static let legendRowGap: CGFloat = 6
+            static let legendTop: CGFloat = 6
+            static let swatchSize: CGFloat = 8
+            static let swatchRadius: CGFloat = 2
+            static let storageHeight: CGFloat = 12
+            static let storageGap: CGFloat = 2
+            static let storageLegendGap: CGFloat = 12
+        }
         /// The mark before a status group.
         static let statusMark: CGFloat = 14
         /// A word chip (a status word): its height, corner, side padding, the space between chips and the small add button.

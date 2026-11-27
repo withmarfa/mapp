@@ -367,9 +367,9 @@ final class Browser {
     var offersViewOptions: Bool { !isCollectionItemPresented }
 
     /// Shows the place that lists an item no place on screen does: the Archive for an archived item, the Feed or the
-    /// Library by its tier, or for a deleted item Settings > Recently Deleted, the only list that holds it.
+    /// Library by its tier, or Settings > Trash for a deleted item.
     private func showListing(_ item: Item, in library: any ItemLibrary, order: ItemOrder) {
-        guard let place = Self.listing(of: item) else { return showSettings(.recentlyDeleted) }
+        guard let place = Self.listing(of: item) else { return showSettings(.trash) }
         show(PlaceView(place), in: library, order: order)
     }
 
