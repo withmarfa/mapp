@@ -25,7 +25,7 @@ nonisolated enum OwnerDraft: Equatable, Sendable {
     private var holders: [Holder] = []
     private var departed: [OwnerDraft] = []
 
-    /// Where a draft goes that a page hands over after Settings has closed, which the app sets.
+    /// The app supplies the destination for a save that fails after draft handover.
     var arrival: ((OwnerDraft) -> Void)?
 
     /// Takes a draft from a page whose work ended after its hand-over, so the person is told it all the same.

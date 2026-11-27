@@ -5,7 +5,7 @@ import Observation
 /// The release controls on Account show the release the server runs, whether a newer one is ready, Check for Updates and Update, the steps an
 /// update goes through while it runs, and how the last one ended. Starting an update needs `instance.maintain`; the server
 /// restarts to take it, so the page follows it, treating a server that does not answer for a while as restarting. An update
-/// the server put back is told with its own words and offers Try Again, never a second Update.
+/// the server put back offers Try Again when the sign-in can start another update.
 @Observable @MainActor final class UpdatesModel {
     private let context: OwnerContext
     /// How long to wait between reads while an update runs, and how many unanswered reads to wait through before giving up.
