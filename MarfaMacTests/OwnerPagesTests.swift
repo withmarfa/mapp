@@ -508,10 +508,14 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     }
 
     func deliveries(of webhook: String, limit: Int) async throws(OwnerFailure) -> [WebhookDeliveryInfo] {
-        try enter("deliveries")
+        let answer = state.withLock { state -> Result<[WebhookDeliveryInfo], OwnerFailure> in
+            state.calls.append("deliveries")
+            if let failure = state.failures["deliveries"] { return .failure(failure) }
+            return .success(Array((state.deliveries[webhook] ?? []).prefix(limit)))
+        }
         await held("deliveries")
         await counted()
-        return state.withLock { Array(($0.deliveries[webhook] ?? []).prefix(limit)) }
+        return try answer.get()
     }
 
     func redeliver(_ delivery: String, of webhook: String) async throws(OwnerFailure) -> WebhookDeliveryInfo {

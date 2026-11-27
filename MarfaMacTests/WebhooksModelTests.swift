@@ -228,6 +228,88 @@ import Testing
         #expect(model.isSending(hook) == .sending)
     }
 
+    @Test func changingTheAddressShowsTheCanceledDelivery() async {
+        let bench = OwnerBench()
+        let hook = Self.hook("a")
+        let model = model(bench, hooks: [hook])
+        var retrying = Self.delivery("d", .pending, code: 503)
+        retrying.error = "The receiver answered 503."
+        bench.calls.state.withLock { $0.deliveries[hook.id] = [retrying] }
+        await model.load()
+        await model.loadDeliveries(of: hook.id)
+        #expect(model.isSending(hook) == .failing)
+        model.beginChangeAddress(hook)
+        model.addressDraft = "https://hooks.example.app/new"
+        // The server cancels the pending delivery when it accepts the new address.
+        bench.calls.state.withLock { $0.deliveries[hook.id]?[0].status = .canceled }
+        await model.saveAddress()
+        #expect(bench.calls.calls.suffix(2) == ["changeWebhook", "deliveries"])
+        #expect(model.webhook(hook.id)?.url == "https://hooks.example.app/new")
+        #expect(model.deliveries[hook.id]?.first?.status == .canceled)
+        #expect(model.isSending(hook) == .sending)
+    }
+
+    @Test(arguments: [false, true], [false, true])
+    func aLateListResponseKeepsTheNewerDetailStatus(listFails: Bool, detailFails: Bool) async throws {
+        let bench = OwnerBench()
+        let hook = Self.hook("a")
+        let model = model(bench, hooks: [hook])
+        let gate = bench.calls.hold("deliveries")
+        bench.calls.state.withLock {
+            $0.deliveries[hook.id] = [Self.delivery("d", .failed)]
+            if listFails { $0.failures["deliveries"] = .notPermitted("webhooks.manage") }
+        }
+        let listing = Task { await model.load() }
+        defer { gate.open() }
+        try #require(await eventually { bench.calls.state.withLock { $0.waiting["deliveries"] == 1 } })
+        bench.calls.state.withLock {
+            $0.gates["deliveries"] = nil
+            $0.failures["deliveries"] = detailFails ? .unreachable : nil
+            $0.deliveries[hook.id] = [Self.delivery("d", .succeeded)]
+        }
+        await model.loadDeliveries(of: hook.id)
+        gate.open()
+        await listing.value
+        #expect(model.isSending(hook) == (detailFails ? .unread : .sending))
+        #expect(model.sendingFailures[hook.id] == (detailFails ? .unreachable : nil))
+        #expect(model.deliveriesFailure[hook.id] == (detailFails ? .unreachable : nil))
+        #expect(bench.refreshed == 0)
+    }
+
+    @Test(arguments: [false, true])
+    func aNewerReadKeepsTheFullHistoryAnOpenDetailPageRequested(refreshList: Bool) async throws {
+        let bench = OwnerBench()
+        let hook = Self.hook("a")
+        let model = model(bench, hooks: [hook])
+        await model.load()
+        let gate = bench.calls.hold("deliveries")
+        let detail = Task { await model.loadDeliveries(of: hook.id) }
+        defer { gate.open() }
+        try #require(await eventually { bench.calls.state.withLock { $0.waiting["deliveries"] == 1 } })
+        let latest = [Self.delivery("d2", .failed), Self.delivery("d1", .succeeded)]
+        bench.calls.state.withLock {
+            $0.gates["deliveries"] = nil
+            $0.deliveries[hook.id] = latest
+        }
+        if refreshList { await model.load() } else { await model.loadDeliveries(of: hook.id) }
+        gate.open()
+        await detail.value
+        #expect(model.isSending(hook) == .failing)
+        #expect(model.deliveries[hook.id] == latest)
+    }
+
+    @Test func anActiveWebhookWithAnExpiredOrRevokedMakerIsOff() async throws {
+        let bench = OwnerBench()
+        let model = everyMaker(bench)
+        await model.load()
+        for id in ["expired", "revoked"] {
+            let hook = try #require(model.webhook(id))
+            #expect(hook.active)
+            #expect(model.isSending(hook) == .off)
+        }
+        #expect(model.isSending(try #require(model.webhook("live"))) == .sending)
+    }
+
     @Test func aRefusedReadNamesThePermissionAndReadsTheGrantsAgain() async {
         let bench = OwnerBench()
         bench.calls.fail("webhooks", with: .notPermitted("webhooks.manage"))
