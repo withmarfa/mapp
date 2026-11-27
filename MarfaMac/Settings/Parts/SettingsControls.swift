@@ -260,7 +260,7 @@ extension View {
     }
 }
 
-/// A text field, 160 wide. The system draws the field, at its own height; `isError` puts the red ring round it.
+/// A text field with optional accessories. `isError` draws a red ring around it.
 struct SettingsField: View {
     private let title: Text
     private let leadingGlyph: SettingsTextGlyph?
@@ -378,7 +378,7 @@ struct SettingsField: View {
             ? SettingsTokens.Metric.smallControlHeight : SettingsTokens.Metric.controlHeight
         return HStack(spacing: SettingsTokens.Metric.pathGlyphGap) {
             leadingGlyph?.icon
-            input.textFieldStyle(.plain).frame(maxWidth: .infinity)
+            input.textFieldStyle(.plain).accessibilityLabel(title).frame(maxWidth: .infinity)
             trailingAccessory?.fixedSize()
         }
         .padding(.horizontal, SettingsTokens.Metric.fieldAccessoryInset)

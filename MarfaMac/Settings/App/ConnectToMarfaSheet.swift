@@ -101,7 +101,10 @@ struct ConnectToMarfaSheet: View {
                 }
             }
         }
-        .task(id: model.address) { [address = model.address] in await checkAddress(address) }
+        .padding(.bottom, ChipLooks.defaults.focusRingWidth)
+        .task(id: model.isWorking ? nil : model.address) { [address = model.isWorking ? nil : model.address] in
+            if let address { await checkAddress(address) }
+        }
     }
 
     private var statusMark: some View {

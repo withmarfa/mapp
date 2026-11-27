@@ -204,6 +204,13 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         signingIn?.cancel()
     }
 
+    /// Leaving Connection withdraws its pending approval. Once the copy is opening, the approved sign-in continues.
+    func closeConnectSheet() {
+        guard showsConnectSheet else { return }
+        showsConnectSheet = false
+        if !isWorking || host.isPreparingInitialSignIn { signingIn?.cancel() }
+    }
+
     private func method(usingCode: Bool) -> MarfaHost.SignInMethod {
         usingCode ? .code(shown: { [weak self] in self?.code = $0 }) : .browser
     }

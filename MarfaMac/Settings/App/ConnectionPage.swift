@@ -38,7 +38,7 @@ struct ConnectionPage: View {
         .settingsSheet(presenting: model.showsConnectSheet && host.configuredConnection == nil, dismiss: dismissConnect) {
             ConnectToMarfaSheet(model: model, dismiss: dismissConnect)
         }
-        .onDisappear { model.showsConnectSheet = false }
+        .onDisappear { model.closeConnectSheet() }
         .onChange(of: model.isConfirmingDisconnect) { _, isAsking in
             guard isAsking else { return }
             model.isConfirmingDisconnect = false
@@ -91,14 +91,18 @@ struct ConnectionPage: View {
                     if !model.showsConnectSheet { noticeSection }
                 }
             }
-            VStack(spacing: SettingsTokens.Metric.State.spacing) {
-                Text("Not Signed In").settingsFont(.stateTitle).accessibilityAddTraits(.isHeader)
-                Text("Sign in to your Marfa to open your library.")
-                    .settingsFont(.small)
-                    .foregroundStyle(SettingsTokens.secondaryText)
-                SettingsButton("Sign In", role: .confirm) { model.showsConnectSheet = true }
-                    .padding(.top, SettingsTokens.Metric.State.actionGap)
-                    .accessibilityIdentifier("MarfaOpenConnect")
+            Group {
+                if !model.showsConnectSheet {
+                    VStack(spacing: SettingsTokens.Metric.State.spacing) {
+                        Text("Not Signed In").settingsFont(.stateTitle).accessibilityAddTraits(.isHeader)
+                        Text("Sign in to your Marfa to open your library.")
+                            .settingsFont(.small)
+                            .foregroundStyle(SettingsTokens.secondaryText)
+                        SettingsButton("Sign In", role: .confirm) { model.showsConnectSheet = true }
+                            .padding(.top, SettingsTokens.Metric.State.actionGap)
+                            .accessibilityIdentifier("MarfaOpenConnect")
+                    }
+                }
             }
             .multilineTextAlignment(.center)
             .padding(.horizontal, SettingsTokens.Metric.pageSide)
@@ -109,7 +113,7 @@ struct ConnectionPage: View {
 
     private func dismissConnect() {
         if model.isWorking { model.cancelSignIn() }
-        else { model.showsConnectSheet = false }
+        else { model.closeConnectSheet() }
     }
 
     // MARK: Connected

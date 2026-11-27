@@ -1,8 +1,6 @@
 import XCTest
 
-/// The Marfa server section of Settings > Connection, starting as a first launch does. The sample's app has a host of its own, with
-/// sign-ins held in memory, so nothing here reaches the person's saved server or sign-in; the steps used need no server and open no browser,
-/// since an address that is no server is refused before anything is asked of the network.
+/// Exercises first-time connection using in-memory sign-ins. Typing a valid address can start an unauthenticated health check.
 nonisolated final class MarfaSettingsTests: XCTestCase {
     @MainActor private var app: XCUIApplication!
     @MainActor private var window: XCUIElement { app.windows.firstMatch }
@@ -51,7 +49,7 @@ nonisolated final class MarfaSettingsTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Connect to a Marfa"].waitForExistence(timeout: 3))
         attachScreenshot("SettingsConnectToMarfa")
         app.buttons["MarfaConnectCancel"].click()
-        XCTAssertFalse(address.exists)
+        XCTAssertTrue(address.waitForNonExistence(timeout: 3))
         XCTAssertTrue(openConnect.exists)
     }
 
