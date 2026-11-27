@@ -21,7 +21,7 @@ extension EditorController {
                 notPlaced = embeds.map(\.name)
             }
             Self.reportUnplaced(
-                skipped: skipped, failed: report.failed, attached: embeds.count,
+                skipped: skipped, failed: report.failed, kept: report.kept, attached: embeds.count,
                 unplaced: placed ? [] : embeds.map(\.name), refused: notPlaced,
                 in: library.item(pageItemID)?.title ?? "", to: library
             )
@@ -56,13 +56,20 @@ extension EditorController {
     }
 
     private static func reportUnplaced(
-        skipped: [String], failed: [(name: String, reason: String)], attached: Int, unplaced: [String], refused: [String] = [],
+        skipped: [String], failed: [(name: String, reason: String)], kept: [(name: String, place: KeptFile)] = [],
+        attached: Int, unplaced: [String], refused: [String] = [],
         in title: String, to library: any ItemLibrary
     ) {
-        guard !skipped.isEmpty || !failed.isEmpty || !unplaced.isEmpty || !refused.isEmpty else { return }
+        guard !skipped.isEmpty || !failed.isEmpty || !kept.isEmpty || !unplaced.isEmpty || !refused.isEmpty else { return }
         let largest = Int64(PastedImages.largestImage).formatted(.byteCount(style: .memory))
         let lines = skipped.map { String(localized: "“\($0)” is larger than \(largest) or can’t be read.") }
             + failed.map { String(localized: "“\($0.name)” couldn’t be attached. \($0.reason)") }
+            + kept.map { file in
+                switch file.place {
+                case .library: String(localized: "“\(file.name)” was added to your Library instead.")
+                case .clipboard: String(localized: "“\(file.name)” is on the clipboard, so you can paste it back.")
+                }
+            }
             + unplaced.map { String(localized: "“\($0)” was attached to “\(title)” but isn’t in its text, because the item was no longer open for editing.") }
             + refused.map { String(localized: "“\($0)” was attached to “\(title)” but isn’t in its text. It was meant for a folded section or text not yet shown.") }
         let title = if skipped.isEmpty && failed.isEmpty {

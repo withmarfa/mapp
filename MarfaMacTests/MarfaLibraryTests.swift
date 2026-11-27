@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 import Synchronization
@@ -1033,14 +1034,100 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(source.attaching.attached.withLock { $0.map(\.data) } == [Data([1]), Data([2])])
     }
 
-    @Test func aFileThatFailsLeavesTheOthersAttachedAndIsNamed() async throws {
+    @Test func aFileThatCannotBeAttachedIsAddedToTheLibraryAndTheOthersStayAttached() async throws {
         let (library, source) = try await loaded()
         source.attaching.failures.withLock { $0["b.png"] = SourceFailure(kind: .failed, message: "The server is out of space.") }
         let report = await library.attach(
             [(name: "a.png", data: Data([1])), (name: "b.png", data: Data([2])), (name: "c.png", data: Data([3]))], to: F.n1)
         #expect(report.embeds.map(\.name) == ["a.png", "c.png"])
-        #expect(report.failed.map(\.name) == ["b.png"])
-        #expect(report.failed.map(\.reason) == ["The server is out of space."])
+        #expect(report.failed.isEmpty)
+        #expect(report.kept.map(\.name) == ["b.png"])
+        #expect(report.kept.map(\.place) == [.library])
+        let added = source.attaching.added.withLock { $0 }
+        #expect(added.map(\.file) == ["b.png"])
+        #expect(added.first?.data == Data([2]))
+        #expect(added.first?.title == nil)
+        #expect(added.first?.tier == .library)
+        #expect(added.first?.parent == nil)
+        #expect(library.notices.waiting.isEmpty)
+    }
+
+    @Test func aRefusedImageIsAddedToTheLibraryInsteadOfBeingDropped() async throws {
+        let (library, source) = try await loaded()
+        source.attaching.failures.withLock { $0["Shot.png"] = SourceFailure(kind: .missing, message: "This item isn’t in the library.") }
+        let bytes = Data([1, 2, 3])
+        let report = await library.attach([(name: "Shot.png", data: bytes)], to: F.n1)
+        let added = source.attaching.added.withLock { $0 }
+        let kept = try #require(added.first)
+        #expect(added.count == 1)
+        #expect(kept.data == bytes)
+        #expect(kept.file == "Shot.png")
+        #expect(kept.title == nil)
+        #expect(kept.tier == .library)
+        #expect(kept.parent == nil)
+        #expect(kept.tags.isEmpty)
+        #expect(report.embeds.isEmpty)
+        #expect(report.failed.isEmpty)
+        #expect(report.kept.map(\.name) == ["Shot.png"])
+        #expect(report.kept.map(\.place) == [.library])
+        #expect(library.notices.waiting.isEmpty, "adding the file item tells nothing of its own")
+    }
+
+    @Test func aRefusedImageGoesToTheClipboardWhenItCannotBeAdded() async throws {
+        let (library, source) = try await loaded()
+        source.attaching.failures.withLock { $0["Shot.png"] = SourceFailure(kind: .missing, message: "This item isn’t in the library.") }
+        source.attaching.failure.withLock { $0 = SourceFailure(kind: .failed, message: "No room.") }
+        let bytes = SamplePicture.png()
+        let pasteboard = NSPasteboard.general
+        let saved = pasteboard.string(forType: .string)
+        defer {
+            pasteboard.clearContents()
+            if let saved { pasteboard.setString(saved, forType: .string) }
+        }
+        pasteboard.clearContents()
+        pasteboard.setString("marker-before-keep", forType: .string)
+        let report = await library.attach([(name: "Shot.png", data: bytes)], to: F.n1)
+        #expect(NSImage(pasteboard: pasteboard) != nil)
+        #expect(source.attaching.added.withLock { $0.isEmpty })
+        #expect(report.embeds.isEmpty)
+        #expect(report.failed.isEmpty)
+        #expect(report.kept.map(\.name) == ["Shot.png"])
+        #expect(report.kept.map(\.place) == [.clipboard])
+        #expect(library.notices.waiting.isEmpty)
+    }
+
+    @Test func aRefusedImageStaysOnDiskWhenItCannotBeKept() async throws {
+        let (library, source) = try await loaded()
+        let name = "Kept-\(UUID().uuidString).png"
+        source.attaching.failures.withLock { $0[name] = SourceFailure(kind: .missing, message: "This item isn’t in the library.") }
+        source.attaching.failure.withLock { $0 = SourceFailure(kind: .failed, message: "No room.") }
+        defer { library.hooks.copyingToClipboard.set(nil) }
+        library.hooks.copyingToClipboard.set { false }
+        let report = await library.attach([(name: name, data: Data([9, 9, 9]))], to: F.n1)
+        let left = stagedCopy(named: name)
+        #expect(left != nil, "the staged image is deleted only after it is kept")
+        let reason = try #require(report.failed.first?.reason)
+        #expect(reason.contains("clipboard"))
+        if let left {
+            #expect(reason.contains(left.resolvingSymlinksInPath().path))
+            try? FileManager.default.removeItem(at: left.deletingLastPathComponent().deletingLastPathComponent())
+        }
+        #expect(report.kept.isEmpty)
+        #expect(source.attaching.added.withLock { $0.isEmpty })
+    }
+
+    /// The staged file `name` still under a paste directory, if the attach left it there.
+    private func stagedCopy(named name: String) -> URL? {
+        let root = URL.temporaryDirectory
+        guard let folders = try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil) else { return nil }
+        for folder in folders where folder.lastPathComponent.hasPrefix("marfa-mac-attach-") {
+            guard let indexes = try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil) else { continue }
+            for index in indexes {
+                let file = index.appending(path: name)
+                if FileManager.default.fileExists(atPath: file.path) { return file }
+            }
+        }
+        return nil
     }
 
     @Test func filesGoToTheSourceFromWhereTheyAre() async throws {

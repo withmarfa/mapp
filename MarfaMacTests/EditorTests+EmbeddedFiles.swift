@@ -316,6 +316,28 @@ extension EditorTests {
         #expect(library.notices.waiting.last?.message == "“Photo” was attached to “Plan” but isn’t in its text, because the item was no longer open for editing.")
     }
 
+    @Test func aRefusedImageKeptInTheLibraryIsSaidToBeThere() async throws {
+        let library = FakeItemLibrary(items: [FakeItemLibrary.note("Plan", modified: .now)])
+        library.attaching = { AttachReport(kept: [(name: "Photo.png", place: .library)]) }
+        let editor = try await attachingEditor(library)
+        #expect(editor.insertImages(Self.pasted))
+        #expect(await eventually { library.notices.waiting.last != nil })
+        #expect(try await markdown(editor) == nil, "nothing is inserted")
+        #expect(library.notices.waiting.last?.title == "Images Weren’t Added to the Item")
+        #expect(library.notices.waiting.last?.message == "“Photo.png” was added to your Library instead.")
+    }
+
+    @Test func aRefusedImageKeptOnTheClipboardIsSaidToBeThere() async throws {
+        let library = FakeItemLibrary(items: [FakeItemLibrary.note("Plan", modified: .now)])
+        library.attaching = { AttachReport(kept: [(name: "Photo.png", place: .clipboard)]) }
+        let editor = try await attachingEditor(library)
+        #expect(editor.insertImages(Self.pasted))
+        #expect(await eventually { library.notices.waiting.last != nil })
+        #expect(try await markdown(editor) == nil, "nothing is inserted")
+        #expect(library.notices.waiting.last?.title == "Images Weren’t Added to the Item")
+        #expect(library.notices.waiting.last?.message == "“Photo.png” is on the clipboard, so you can paste it back.")
+    }
+
     @Test func filesQuickAddAttachedGoAtTheEndOfTheNewItemOnceThePageShowsIt() async throws {
         let shown = FakeItemLibrary.note("Plan", modified: .now)
         let new = FakeItemLibrary.note("Trip", modified: .now)

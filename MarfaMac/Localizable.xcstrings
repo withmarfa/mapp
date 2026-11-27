@@ -5771,6 +5771,9 @@
     "It changed somewhere else, so the app read it again. Nothing was changed." : {
 
     },
+    "It couldn’t be copied to the clipboard. The copy is still at %@." : {
+
+    },
     "It couldn’t be put in place." : {
 
     },
@@ -13119,6 +13122,9 @@
     "“%@” is not a shortcuts file that the app can read. No shortcuts were changed." : {
 
     },
+    "“%@” is on the clipboard, so you can paste it back." : {
+
+    },
     "“%@” isn’t a date and time, so the date wasn’t changed." : {
 
     },
@@ -13162,6 +13168,9 @@
           }
         }
       }
+    },
+    "“%@” was added to your Library instead." : {
+
     },
     "“%@” was attached to “%@” but isn’t in its text, because the item was no longer open for editing." : {
       "extractionState" : "manual"

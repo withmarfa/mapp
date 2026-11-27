@@ -72,10 +72,19 @@ extension MarfaEngine {
             mimeType: Self.mimeType(of: file), title: title.map(Self.embeddable), tier: tier.map(MarfaMapping.marfaTier))
         let token = UUID()
         hub.activity.setAside()
+        #if DEBUG
+        let replacement = hooks.adding.current
+        let parentID = parent?.rawValue
+        #endif
         besideTheLane[token] = Task { [copy, tell] in
             let result: Result<Marfa.Added, SourceFailure>
             do {
-                result = .success(try await Self.asking { try await copy.items.addFile(file, attachment, tags: tags) })
+                result = .success(try await Self.asking {
+                    #if DEBUG
+                    if let replacement { return try await replacement(file, attachment.title, attachment.tier, parentID) }
+                    #endif
+                    return try await copy.items.addFile(file, attachment, tags: tags)
+                })
             } catch {
                 result = .failure(Self.failure(error))
             }
