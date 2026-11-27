@@ -591,6 +591,34 @@ struct RenderedWindow<Detail: View>: View {
             named: "Storage, read only, \(appearance)", appearance: appearance, settle: .milliseconds(900))
     }
 
+    @Test(arguments: [ColorScheme.light, .dark]) func backups(appearance: ColorScheme) async throws {
+        try await renderBackups(failed: false, appearance: appearance)
+    }
+
+    @Test func backupsFailed() async throws {
+        try await renderBackups(failed: true, appearance: .light)
+    }
+
+    private func renderBackups(failed: Bool, appearance: ColorScheme) async throws {
+        let host = await stub()
+        let latest = Calendar.current.startOfDay(for: .now).addingTimeInterval(14 * 3600)
+        fake(host).state.withLock { state in
+            state.upkeep.intervalSeconds = 3600
+            state.backups = (failed ? 1..<8 : 0..<8).map { hour in
+                BackupRecord(instanceID: "instance-1", name: "backup-\(hour)", taken: latest.addingTimeInterval(-Double(hour) * 3600), bytes: 212_000_000)
+            }
+            state.health?.backups = BackupsHealth(
+                state: failed ? .failing : .ok, lastBackup: state.backups.first?.taken,
+                reason: failed ? .destinationUnusable : nil, destination: .folder,
+                faults: failed ? [.runFailed(count: 1), .destinationRefusing] : [], lastFailedAt: failed ? latest : nil)
+        }
+        host.bindOverview()
+        await host.health.load()
+        try await SettingsRender.png(
+            windowed(.backups, host: host, badge: failed ? 2 : 1), size: CGSize(width: Self.size.width, height: 1000),
+            named: failed ? "Backups, Failed" : "Backups, \(appearance)", appearance: appearance)
+    }
+
     @Test func trash() async throws {
         let titles = [
             "Order oak for the Harbour Joinery worktops", "Lisbon zine: first cover ideas", "Kiln hire in East Sussex",

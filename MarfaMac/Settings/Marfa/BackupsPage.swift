@@ -23,10 +23,7 @@ struct BackupsPage: View {
 
     var body: some View {
         content
-            .task(id: host.serverAddress) {
-                await model.load()
-                await host.health.load()
-            }
+            .task(id: host.grants.contains(.configManage)) { await load() }
             .onAppear { host.ownerDrafts.register(model) }
             .settingsSheet(presenting: model.sheet != nil, dismiss: { model.close() }) {
                 BackupSheet(model: model, serverName: host.serverName)
@@ -36,11 +33,15 @@ struct BackupsPage: View {
 
     @ViewBuilder private var content: some View {
         if let failure = model.failure {
-            OwnerFailureState(page: .backups, failure: failure, host: host) { Task { await model.load() } }
+            OwnerFailureState(page: .backups, failure: failure, host: host) { Task { await load() } }
         } else if !model.hasLoaded {
             OwnerLoading()
         } else if showsAll {
-            allPage
+            if let failure = model.listFailure {
+                OwnerFailureState(page: .backups, failure: failure, host: host) { Task { await load() } }
+            } else {
+                allPage
+            }
         } else {
             SettingsPageColumn {
                 restored
@@ -48,6 +49,20 @@ struct BackupsPage: View {
                 whereAndWhen
                 list
             }
+        }
+    }
+
+    private func load() async {
+        let reader = host.health
+        async let backups: Void = model.load()
+        async let health: Void = reader.load()
+        _ = await (backups, health)
+    }
+
+    private func backUp() {
+        Task {
+            await model.backUpNow(reason: backupsHealth?.reason)
+            await host.health.load()
         }
     }
 
@@ -76,17 +91,64 @@ struct BackupsPage: View {
     // MARK: Needs attention
 
     @ViewBuilder private var attention: some View {
-        let problems = backupsHealth.map(UpkeepWording.problems) ?? []
-        if !problems.isEmpty {
-            SettingsSection("Needs Attention") {
-                ForEach(Array(problems.enumerated()), id: \.offset) { _, problem in
-                    SettingsProblemRow(
-                        title: Text(verbatim: problem.title), line: Text(verbatim: problem.line),
-                        actions: backupsHealth?.reason == .noDestination && model.settings != nil
-                            ? [SettingsProblemAction("Choose Folder…") { model.beginFolder() }] : [])
+        if let health = backupsHealth {
+            let failedRun = Self.failedRun(health)
+            let problems = Self.otherProblems(health, showingFailedRun: failedRun != nil)
+            if failedRun != nil || !problems.isEmpty {
+                SettingsSection("Problems") {
+                    if let failedRun {
+                        SettingsRow(
+                            title: Text("The Last Backup Failed"), line: Text(verbatim: failedRun),
+                            error: model.backUpError, lead: .tint("exclamationmark.triangle", .orange), lines: nil
+                        ) {
+                            backUpButton
+                        }
+                    }
+                    ForEach(Array(problems.enumerated()), id: \.offset) { _, problem in
+                        SettingsProblemRow(
+                            title: Text(verbatim: problem.title), line: Text(verbatim: problem.line),
+                            actions: health.reason == .noDestination && model.settings != nil
+                                ? [SettingsProblemAction("Choose Folder…") { model.beginFolder() }] : [])
+                    }
                 }
             }
         }
+    }
+
+    private static func otherProblems(_ health: BackupsHealth, showingFailedRun: Bool) -> [(title: String, line: String)] {
+        guard showingFailedRun else { return UpkeepWording.problems(health) }
+        var remaining = health
+        remaining.state = .ok
+        if remaining.reason == .destinationUnusable { remaining.reason = nil }
+        remaining.faults.removeAll { fault in
+            switch fault {
+            case .runFailed, .destinationRefusing: true
+            case .damagedParts, .filesWaiting: false
+            }
+        }
+        return UpkeepWording.problems(remaining)
+    }
+
+    static func failedRun(_ health: BackupsHealth) -> String? {
+        guard health.faults.contains(where: {
+            if case .runFailed = $0 { return true }
+            return false
+        }) else { return nil }
+        let reason: String
+        switch (health.faults.contains(.destinationRefusing), health.destination) {
+        case (true, .folder?):
+            reason = String(localized: "Can’t reach the backup folder. Connect its disk, then back up.")
+        case (true, .objectStore?):
+            reason = String(localized: "The object store isn’t accepting backups. Check the store, then back up.")
+        case (true, nil):
+            reason = String(localized: "The backup destination isn’t available. Check where backups are kept, then back up.")
+        default:
+            reason = String(localized: "The server couldn’t finish the backup. Try backing up again.")
+        }
+        if let failedAt = health.lastFailedAt {
+            return String(localized: "\(UpkeepWording.moment(failedAt)). \(reason)")
+        }
+        return reason
     }
 
     // MARK: Where and when
@@ -99,18 +161,19 @@ struct BackupsPage: View {
                 if let failure = model.settingsFailure {
                     OwnerProblemRow(
                         title: "Couldn’t read backup settings", failure: failure, page: .backups, host: host,
-                        retry: { Task { await model.load() } })
+                        retry: { Task { await load() } })
                 }
                 keepIn
-                if model.place == .folder, let folder = model.settings?.folder {
+                if host.grants.contains(.configManage), model.place == .folder, let folder = model.settings?.folder {
                     SettingsRow(
-                        verbatim: String(localized: "Folder"), line: String(localized: "\(folder), on the machine \(host.serverName) runs on."),
-                        lead: .symbol("folder")
+                        title: Text("Folder"), line: Text("\(folder), on the machine that runs this Marfa."),
+                        lineGlyph: .folder
                     ) {
                         SettingsButton("Change…") { model.beginFolder() }
+                            .disabled(model.isChanging || model.settingsFailure != nil)
                     }
                 }
-                if let settings = model.settings {
+                if host.grants.contains(.configManage), let settings = model.settings {
                     SettingsRow("Back Up Every", line: "Only when something changed.") {
                         SettingsPopUp(
                             title: "Back Up Every",
@@ -125,8 +188,10 @@ struct BackupsPage: View {
                         }
                         .disabled(model.isChanging || model.settingsFailure != nil)
                     }
+                } else if !host.grants.contains(.configManage) {
+                    LockedInstanceRow(title: String(localized: "Back Up Every"), permission: .configManage, host: host)
                 }
-                if hasDestination { lastBackup }
+                lastBackup
             }
             if let failure = model.rowError {
                 OwnerProblem(title: "Couldn’t change this", failure: failure, page: .backups, host: host)
@@ -140,8 +205,14 @@ struct BackupsPage: View {
     }
 
     @ViewBuilder private var keepIn: some View {
-        if model.place == .objectStore {
-            SettingsRow("Keep Backups In", line: "Set on the machine \(host.serverName) runs on.") { SettingsLockedValue(text: String(localized: "An Object Store")) }
+        if !host.grants.contains(.configManage) {
+            SettingsLinkRow(
+                verbatim: String(localized: "Keep Backups In"), line: Self.destination(backupsHealth),
+                lock: String(localized: "Not allowed")
+            ) { host.askForMore(naming: InstancePermission.configManage.rawValue) }
+            .disabled(host.isAllowingMore)
+        } else if model.place == .objectStore {
+            SettingsRow("Keep Backups In", line: "Set on the machine that runs this Marfa.") { SettingsLockedValue(text: String(localized: "An Object Store")) }
         } else if let place = model.place {
             SettingsRow("Keep Backups In") {
                 SettingsPopUp(
@@ -175,16 +246,18 @@ struct BackupsPage: View {
         }
     }
 
+    private var backUpButton: some View {
+        SettingsButton(verbatim: model.backUpButtonTitle, action: backUp)
+            .disabled(model.isBackingUp || !hasDestination)
+    }
+
     private var lastBackup: some View {
-        let taken = model.latest?.taken ?? backupsHealth?.lastBackup
-        return SettingsRow(
-            verbatim: String(localized: "Last Backup"), line: taken.map { UpkeepWording.moment($0) + "." } ?? String(localized: "None yet."),
-            error: model.backUpError
-        ) {
-            SettingsButton(model.isBackingUp ? "Backing Up…" : "Back Up Now", reserving: "Backing Up…") {
-                Task { await model.backUpNow(reason: backupsHealth?.reason) }
+        let hasFailedRun = backupsHealth.flatMap(Self.failedRun) != nil
+        return SettingsRow("Last Backup", error: hasFailedRun ? nil : model.backUpError) {
+            HStack(spacing: SettingsTokens.Metric.buttonGap) {
+                SettingsValue(verbatim: model.lastBackupLine(health: backupsHealth))
+                if !hasFailedRun { backUpButton }
             }
-            .disabled(model.isBackingUp)
         }
     }
 
@@ -197,17 +270,28 @@ struct BackupsPage: View {
         ]
     }
 
-    @ViewBuilder private var list: some View {
-        SettingsSection(name: Text("Backups of \(host.serverName)")) {
-            if model.backups.isEmpty {
+    private var list: some View {
+        let preview = SettingsTablePreview(total: model.backups.count)
+        return SettingsSection("Backups") {
+            if let failure = model.listFailure {
+                OwnerProblemRow(title: "Couldn’t Read Backups", failure: failure, page: .backups, host: host) {
+                    Task { await load() }
+                }
+            } else if model.backups.isEmpty {
                 SettingsEmptyCard(
                     symbol: "externaldrive.badge.timemachine", title: Text("No Backups Yet"),
-                    line: Text(hasDestination ? "Back Up Now takes the first." : "The first is taken once there is somewhere to keep it."))
+                    line: Text(hasDestination ? "Back Up Now takes the first." : "Choose where to keep backups first."))
             } else {
-                SettingsSectionTable(
-                    rows: model.backups, columns: columns,
-                    action: SettingsRowAction(title: "Restore…") { model.beginRestore($0) },
-                    showAll: { navigation?.push(Self.allBackups) })
+                ForEach(model.backups.prefix(preview.visibleCount)) { backup in
+                    SettingsRow(verbatim: UpkeepWording.moment(backup.taken), line: UpkeepWording.size(backup.bytes)) {
+                        SettingsButton("Restore…") { model.beginRestore(backup) }
+                    }
+                }
+                if let count = preview.countLabel {
+                    SettingsRow(verbatim: count, size: .compact) {
+                        SettingsShowAllButton { navigation?.push(Self.allBackups) }
+                    }
+                }
             }
         }
     }

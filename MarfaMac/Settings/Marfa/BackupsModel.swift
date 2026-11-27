@@ -19,6 +19,7 @@ import Observation
     /// Why the backups could not be read: the page says so in place of itself.
     private let loader = OwnerLoader()
     var failure: OwnerFailure? { loader.failure }
+    private(set) var listFailure: OwnerFailure?
     private let settingsRead = OwnerLoader.ReadStatus()
     var settingsFailure: OwnerFailure? { settingsRead.failure }
     var hasLoaded: Bool { loader.hasLoaded }
@@ -44,9 +45,13 @@ import Observation
     // MARK: Reading
 
     func load() async {
-        await loader.load(in: context, primary: { () throws(OwnerFailure) in
+        await loader.load(in: context, waitForPrevious: true, primary: { () throws(OwnerFailure) in
             do throws(OwnerFailure) {
                 backups = try await context.calls.backups()
+                listFailure = nil
+            } catch .refused {
+                backups = []
+                listFailure = .failed(String(localized: "The backups couldn’t be read from their destination."))
             } catch {
                 throw UpkeepWording.owned(error)
             }
@@ -67,6 +72,20 @@ import Observation
 
     /// The newest backup, which Last Backup tells.
     var latest: BackupRecord? { backups.first }
+
+    func lastBackupLine(health: BackupsHealth?) -> String {
+        let taken: Date?
+        if let settings {
+            taken = backups.first(where: { $0.instanceID == settings.instanceID })?.taken ?? health?.lastBackup
+        } else {
+            taken = health?.lastBackup ?? latest?.taken
+        }
+        return taken.map { UpkeepWording.moment($0) } ?? String(localized: "None yet.")
+    }
+
+    var backUpButtonTitle: String {
+        isBackingUp ? String(localized: "Backing Up…") : String(localized: "Back Up Now")
+    }
 
     /// Whether the server has nowhere to keep a backup, from the settings where they are read and from `reason` (the server's
     /// own health) where they are not.
@@ -130,6 +149,7 @@ import Observation
     /// Sends one change and reads the answer in. Whether it was kept. A change made in the folder sheet says why it was refused
     /// there (`line`) and leaves the page clear; one made from the page's own pop-ups stands on the page (`rowError`).
     private func change(_ held: UpkeepSettings, _ change: UpkeepSettingsChange, refused: String?, line: ((String) -> Void)?) async -> Bool {
+        guard !isChanging, context.grants().contains(.configManage) else { return false }
         isChanging = true
         defer { isChanging = false }
         do {
@@ -160,7 +180,7 @@ import Observation
         do {
             let taken = try await context.calls.backUpNow()
             if taken.filesLost > 0 { backUpError = String(localized: "It was taken, but some files weren’t in it.") }
-            backups = (try? await context.calls.backups()) ?? backups
+            await load()
         } catch {
             let error = UpkeepWording.owned(error)
             backUpError = OwnerWording.line(error, on: .backups)
