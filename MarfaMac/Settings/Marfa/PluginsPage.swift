@@ -80,15 +80,16 @@ struct PluginsPage: View {
     }
 
     private var installedSection: some View {
-        SettingsSection(
-            name: Text("Installed"), line: Text("What you added to \(host.serverName). Browse \(host.pluginCalls.releaseName) under Available.")
-        ) {
+        SettingsSection("Installed") {
             if model.installed.isEmpty {
-                SettingsRow("No Plugins Installed", look: .off)
+                SettingsEmptyCard(
+                    symbol: "puzzlepiece.extension", title: Text("No Plugins"),
+                    line: Text("Install one from the list below, or from a file."))
             }
             ForEach(model.installed) { plugin in
                 SettingsLinkRow(
-                    verbatim: plugin.title, line: plugin.description, lead: .well(host.markGlyph(plugin.mark)), value: plugin.version
+                    verbatim: plugin.title, line: model.catalogueLine(of: plugin), lead: .well(host.markGlyph(plugin.mark)),
+                    value: plugin.version
                 ) { navigation?.push(Self.subpage(named: plugin.name, title: plugin.title)) }
             }
         }
@@ -97,7 +98,7 @@ struct PluginsPage: View {
     @ViewBuilder private var updatesSection: some View {
         let updates = model.updates
         if !updates.isEmpty {
-            SettingsSection("Plugin Updates") {
+            SettingsSection("Updates") {
                 ForEach(updates) { update in
                     PluginUpdateRow(model: model, update: update, host: host) {
                         navigation?.push(Self.subpage(named: update.id, title: update.installed.title))
@@ -108,22 +109,25 @@ struct PluginsPage: View {
     }
 
     private var availableSection: some View {
-        SettingsSection(name: Text("Available"), line: Text("Nothing is installed until you choose it.")) {
+        SettingsSection("Available", footer: "Nothing is installed until you choose it.") {
+            SettingsButton("Install from a File…") { Task { await model.installFile() } }
+                .disabled(model.isInstallingFile)
+        } content: {
             switch model.release {
             case .reading:
-                SettingsRow("Reading the Plugins Release…") { ProgressView().controlSize(.small) }
+                SettingsRow("Reading the plugins release…") { ProgressView().controlSize(.small) }
             case .notRead:
-                SettingsRow("The Plugins Release Wasn’t Read") {
+                SettingsRow("The plugins release wasn’t read") {
                     SettingsButton("Try Again") { Task { await model.readRelease() } }
                 }
             case .unreadable(let failure):
                 SettingsProblemRow(
-                    title: Text("The Plugins Release Couldn’t Be Read"), line: Text(verbatim: PluginWording.line(failure)),
+                    title: Text("The plugins release couldn’t be read"), line: Text(verbatim: PluginWording.line(failure)),
                     symbol: "exclamationmark.triangle", tone: .orange,
                     actions: [SettingsProblemAction("Try Again") { Task { await model.readRelease() } }])
             case .read:
                 if model.available.isEmpty {
-                    SettingsRow("Nothing More Is Available", look: .off)
+                    SettingsRow("Nothing more is available", look: .off)
                 }
                 ForEach(model.available) { entry in
                     SettingsLinkRow(
@@ -132,8 +136,6 @@ struct PluginsPage: View {
                     ) { navigation?.push(Self.subpage(named: entry.name, title: entry.title)) }
                 }
             }
-            SettingsAddRow("Install From a File…") { Task { await model.installFile() } }
-                .disabled(model.isInstallingFile)
         }
     }
 }
@@ -206,7 +208,19 @@ private struct PluginCommandSection: View {
     }
 }
 
-/// One row of Plugin Updates: what the newer version adds, and Update, or the command where it carries guidance.
+/// Update and Remove of a connector plugin, locked until the sign-in holds `connectors.manage`.
+private struct ConnectorPermissionButton: View {
+    let host: any MarfaSettingsHost
+
+    var body: some View {
+        SettingsButton(host.isAllowingMore ? "Waiting…" : "Allow More…") {
+            host.askForMore(naming: InstancePermission.connectorsManage.rawValue)
+        }
+        .disabled(host.isAllowingMore)
+    }
+}
+
+/// An update that carries guidance offers the command to run instead.
 private struct PluginUpdateRow: View {
     let model: PluginsModel
     let update: PluginsModel.Update
@@ -231,6 +245,8 @@ private struct PluginUpdateRow: View {
                 SettingsButton(model.copied == command ? "Copied" : "Copy Command") { model.copyCommand(command) }
             } else if case .failed? = model.bundles[update.id] {
                 SettingsButton("Try Again") { Task { await model.readAgain(update.id) } }
+            } else if !model.mayChange(update.installed) {
+                ConnectorPermissionButton(host: host)
             } else {
                 SettingsButton("Update", role: .update) { Task { await model.install(update.entry, asUpdate: true) } }
             }
@@ -265,8 +281,12 @@ private struct PluginDetail: View {
                 if model.isWorking(plugin.name) {
                     ProgressView().controlSize(.small)
                 } else if let update, model.heldCommand(plugin.name) == nil {
-                    SettingsButton(verbatim: String(localized: "Update to \(update.entry.version.description)"), role: .update) {
-                        Task { await model.install(update.entry, asUpdate: true) }
+                    if model.mayChange(plugin) {
+                        SettingsButton(verbatim: String(localized: "Update to \(update.entry.version.description)"), role: .update) {
+                            Task { await model.install(update.entry, asUpdate: true) }
+                        }
+                    } else {
+                        ConnectorPermissionButton(host: host)
                     }
                 }
             }
@@ -285,8 +305,12 @@ private struct PluginDetail: View {
                     line: plugin.connector == nil
                         ? String(localized: "Its types and items stay.") : String(localized: "Its connector stops. Its types and items stay.")
                 ) {
-                    SettingsButton("Remove…", role: .destructive) { model.askToRemove(plugin) }
-                        .disabled(model.isWorking(plugin.name))
+                    if model.mayChange(plugin) {
+                        SettingsButton("Remove…", role: .destructive) { model.askToRemove(plugin) }
+                            .disabled(model.isWorking(plugin.name))
+                    } else {
+                        ConnectorPermissionButton(host: host)
+                    }
                 }
             }
         }
@@ -328,7 +352,11 @@ private struct PluginDetail: View {
         } else {
             line = String(localized: "Connects \(connector.sourceName). It runs on no machine yet.")
         }
-        return SettingsLinkRow(verbatim: String(localized: "Connector"), line: line, lead: .well(symbol: "arrow.triangle.2.circlepath")) {
+        let allowed = host.grants.contains(.connectorsManage)
+        return SettingsLinkRow(
+            verbatim: String(localized: "Connector"), line: line, lead: .well(symbol: "arrow.triangle.2.circlepath"),
+            lock: allowed ? nil : String(localized: "Not allowed")
+        ) {
             host.show(.connectors, subpage: ConnectorsPage.subpage(plugin: plugin.name, title: plugin.title))
         }
     }

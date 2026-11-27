@@ -359,14 +359,16 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
             ]
         case .types:
             [
-                String(localized: "Yours"), String(localized: "From Plugins"), String(localized: "Built In"), String(localized: "New Type"),
+                String(localized: "All"), String(localized: "Yours"), String(localized: "From Plugins"), String(localized: "From Apps"),
+                String(localized: "Built In"), String(localized: "New Type"), String(localized: "Links Between Items"), String(localized: "Links"),
                 String(localized: "New Child Type"), String(localized: "Statuses"), String(localized: "Guidance"), String(localized: "Icon"),
                 String(localized: "Based On"), String(localized: "Plural"), String(localized: "Description"),
             ]
         case .plugins:
             [
-                String(localized: "Installed"), String(localized: "Plugin Updates"), String(localized: "Available"), String(localized: "Install"),
-                String(localized: "Install From a File"), String(localized: "Update"), String(localized: "Remove"), String(localized: "Connector"),
+                String(localized: "Installed"), String(localized: "Updates"), String(localized: "Plugin Updates"), String(localized: "Available"),
+                String(localized: "Install"), String(localized: "Install from a File"), String(localized: "Update"), String(localized: "Remove"),
+                String(localized: "Connector"),
             ]
         case .sources:
             [String(localized: "Rename"), String(localized: "Change Mark"), String(localized: "Limit Sources"), String(localized: "Rules for Every App and Key")]
@@ -391,6 +393,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
             ]
         case .folders:
             [
+                String(localized: "Folders"),
                 String(localized: "Copies"), String(localized: "Needs Attention"), String(localized: "Synced Folders"), String(localized: "Rename"),
                 String(localized: "Ignore"), String(localized: "Include"), String(localized: "Safety"), String(localized: "Pause Removals Over"),
                 String(localized: "Pause Additions Over"), String(localized: "Stop Syncing"),

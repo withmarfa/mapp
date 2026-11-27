@@ -201,7 +201,6 @@ struct NewLinkTypeSheet: View {
     }
 }
 
-// Temporary until Account and Types are rebuilt in session 266c.
 struct LinksSection: View {
     @State private var model: LinksModel
     let host: any MarfaSettingsHost

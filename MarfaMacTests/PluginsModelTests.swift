@@ -276,7 +276,7 @@ private func bundle(_ plugin: ReleasePlugin, types: [String] = [], connector: Bo
                 name: "github", version: "0.0.13", removedConnector: true, keptTypes: ["common.issue", "common.pull"], keptEdgeTypes: [],
                 keptConnector: .init(source: "github", state: true, agreements: 3))
         }
-        let model = model(calls, items: ["common.issue": 1_840, "common.pull": 212])
+        let model = model(calls, items: ["common.issue": 1_840, "common.pull": 212], grants: [.schemaWrite, .connectorsManage])
         await model.load()
         model.askToRemove(model.installed[0])
         #expect(model.removal?.types.map(\.title) == ["Issues", "common.pull"])
@@ -295,13 +295,55 @@ private func bundle(_ plugin: ReleasePlugin, types: [String] = [], connector: Bo
             $0.installed = [installed("github", "GitHub", version: "0.0.13", connector: true)]
             $0.removeRefusal = .notPermitted("connectors.manage")
         }
-        let model = model(calls)
+        let model = model(calls, grants: [.schemaWrite, .connectorsManage])
         await model.load()
         model.askToRemove(model.installed[0])
         await model.confirmRemoval()
         #expect(model.removal == nil)
         #expect(model.problem?.failure == .owner(.notPermitted("connectors.manage")))
         #expect(model.installed.count == 1, "nothing is shown removed that was not")
+    }
+
+    @Test func aConnectorPluginIsNotUpdatedOrRemovedWithoutConnectorsManage() async throws {
+        let calls = FakePluginCalls()
+        let entry = listed("github", "GitHub", version: "0.0.14")
+        let released = bundle(entry, connector: true)
+        calls.state.withLock {
+            $0.installed = [installed("github", "GitHub", version: "0.0.13", connector: true)]
+            $0.release = [entry]
+            $0.bundles["github"] = released
+        }
+        let blocked = model(calls)
+        await blocked.load()
+        let held = try #require(blocked.plugin("github"))
+        #expect(!blocked.mayChange(held))
+        await blocked.install(entry, asUpdate: true)
+        #expect(calls.state.withLock { $0.sent }.isEmpty)
+        #expect(blocked.problem?.failure == .owner(.notPermitted(InstancePermission.connectorsManage.rawValue)))
+        blocked.askToRemove(held)
+        #expect(blocked.removal == nil)
+        #expect(calls.state.withLock { $0.removals }.isEmpty)
+
+        let allowed = model(calls, grants: [.schemaWrite, .connectorsManage])
+        await allowed.load()
+        let plugin = try #require(allowed.plugin("github"))
+        #expect(allowed.mayChange(plugin))
+        allowed.askToRemove(plugin)
+        #expect(allowed.removal?.plugin.name == "github")
+
+        let plainCalls = FakePluginCalls()
+        let plainEntry = listed("tickets", "Tickets", version: "0.0.14")
+        let plainBundle = bundle(plainEntry)
+        plainCalls.state.withLock {
+            $0.installed = [installed("tickets", "Tickets", version: "0.0.13")]
+            $0.release = [plainEntry]
+            $0.bundles["tickets"] = plainBundle
+        }
+        let plain = model(plainCalls)
+        await plain.load()
+        #expect(plain.mayChange(try #require(plain.plugin("tickets"))))
+        await plain.install(plainEntry, asUpdate: true)
+        #expect(plainCalls.state.withLock { $0.sent } == [plainBundle.bytes])
     }
 
     @Test func aConnectorsHostIsNamedOnlyWhereTheSignInMayRead() async {
@@ -319,6 +361,50 @@ private func bundle(_ plugin: ReleasePlugin, types: [String] = [], connector: Bo
         await with.load()
         await with.open("rss")
         #expect(with.hostName(of: with.installed[0]) == "Castell Studio")
+    }
+
+    @Test func noPluginInstalledLeavesTheListEmpty() async {
+        let model = model(FakePluginCalls())
+        await model.load()
+        #expect(model.installed.isEmpty)
+        #expect(model.hasLoaded)
+        #expect(model.failure == nil)
+    }
+
+    @Test func aPluginStaysListedWhenTheReleaseCannotBeRead() async {
+        let calls = FakePluginCalls()
+        calls.state.withLock {
+            $0.installed = [installed("github", "GitHub", version: "2.4", types: ["common.issue"], connector: true)]
+            $0.typeInfo = ["common.issue": PluginTypeInfo(label: "Issue", plural: "GitHub Issues", parent: nil)]
+            $0.releaseFailure = .releaseUnreadable("offline")
+        }
+        let model = model(calls)
+        await model.load()
+        #expect(model.failure == nil)
+        #expect(model.installed.map(\.title) == ["GitHub"])
+        guard case .unreadable = model.release else {
+            Issue.record("The release should be unreadable and the installed plugin kept.")
+            return
+        }
+        #expect(model.catalogueLine(of: model.installed[0]) == "A connector, and GitHub Issues.")
+    }
+
+    @Test func theCatalogueLineNamesAFewTypesAndCountsTheRest() {
+        #expect(PluginWording.catalogueLine(hasConnector: true, typeTitles: []) == "A connector.")
+        #expect(PluginWording.catalogueLine(hasConnector: false, typeTitles: []) == "Nothing else.")
+        #expect(PluginWording.catalogueLine(hasConnector: true, typeTitles: ["Readwise Highlights"]) == "A connector, and Readwise Highlights.")
+        #expect(PluginWording.catalogueLine(hasConnector: false, typeTitles: ["Notes", "Files"]) == "Notes and Files.")
+        let many = PluginWording.catalogueLine(hasConnector: true, typeTitles: Array(repeating: "GitHub Issues", count: 10))
+        #expect(many == "A connector, and 10 types such as GitHub Issues.")
+    }
+
+    @Test func aServerThatDoesNotAnswerLeavesPluginsUnread() async {
+        let calls = FakePluginCalls()
+        calls.state.withLock { $0.installedFailure = .unreachable }
+        let model = model(calls)
+        await model.load()
+        #expect(model.failure == .unreachable)
+        #expect(model.installed.isEmpty)
     }
 
     @Test func readingTheReleaseAgainDropsEveryBundleReadBefore() async {

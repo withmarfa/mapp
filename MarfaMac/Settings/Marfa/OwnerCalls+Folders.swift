@@ -40,6 +40,8 @@ nonisolated struct FolderCopy: Identifiable, Hashable, Sendable {
     let id: String
     /// The key or app that keeps the copy, which is how a copy is named.
     var signIn: String
+    /// The sign-in's id, when the report names one. A fixture that only has a name leaves it nil.
+    var signInID: String? = nil
     var pendingUploads: Int
     var pendingDownloads: Int
     var pausedRemovals: Int
@@ -73,7 +75,7 @@ extension ClientOwnerCalls {
             let copies = status.signIns.filter(\.current).flatMap { group in
                 group.copies.map { copy in
                     FolderCopy(
-                        id: copy.folderStoreId, signIn: group.signIn.name, pendingUploads: copy.pendingUploads,
+                        id: copy.folderStoreId, signIn: group.signIn.name, signInID: group.signIn.id, pendingUploads: copy.pendingUploads,
                         pendingDownloads: copy.pendingDownloads, pausedRemovals: copy.pausedRemovals,
                         firstSyncWaiting: copy.firstSyncWaiting,
                         problems: copy.problems.compactMap { problem in
