@@ -1,9 +1,10 @@
 import Foundation
 import Marfa
+import Synchronization
 import Testing
 @testable import MarfaMac
 
-/// General’s settings in each state, and Disconnect’s choice to remove them first.
+/// General’s settings in each state, and Sign Out’s choice to remove them first.
 @Suite(.hangLimit)
 @MainActor struct ConnectionSettingsTests {
     private let first = try! MarfaConnection(address: "http://first.test:8210")
