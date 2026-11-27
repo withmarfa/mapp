@@ -406,6 +406,34 @@ import Testing
         #expect(flushedBeforeServer)
     }
 
+    @Test func catchingUpDoesNotValidateAnOlderSettingsItemList() async throws {
+        defaults.set("light", forKey: AppearanceKey.theme)
+        let copy = FakePreferencesCopy()
+        let sync = await sync(copy)
+        let item = try #require(await copy.activeIDs.first)
+        await copy.showBinnedItems([item])
+        try await sync.remove(confirmed: true)
+        copy.settlingRemovals.withLock { $0 = true }
+        defer { copy.settlingRemovals.withLock { $0 = false } }
+        try await sync.startAgain()
+        try #require(await eventuallyAsking { await copy.isSettlingRemovals })
+
+        copy.readingAnswers.withLock { $0 = true }
+        defer { copy.readingAnswers.withLock { $0 = false } }
+        let flushing = Task { await sync.flush() }
+        try #require(await eventuallyAsking { await copy.isReadingAnswers })
+        await copy.showBinnedItems([])
+        copy.settlingRemovals.withLock { $0 = false }
+        try #require(await eventuallyAsking { await !copy.isSettlingRemovals })
+        copy.readingAnswers.withLock { $0 = false }
+        await flushing.value
+        #expect(await eventually { sync.standing == .syncing })
+        let newItem = try #require(await copy.activeIDs.first)
+        #expect(newItem != item)
+        #expect(defaults.string(forKey: AppearanceKey.theme) == "light")
+        #expect(await copy.unitsHeld(newItem)[theme] == #""light""#)
+    }
+
     // MARK: Review findings
 
     /// A value a later version of the app wrote, which a store here sets aside, stays in the Marfa for the Macs that read it: the

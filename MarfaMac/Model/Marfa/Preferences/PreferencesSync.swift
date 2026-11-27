@@ -338,6 +338,8 @@ final class PreferencesSync {
     private func step() async {
         guard let copy, holding == 0 else { return }
         let generation = generation
+        // A catch-up completed during a read cannot make the list that read returned current.
+        let removalWasCaughtUp = removalCaughtUp
         do {
             let ready = try await copy.readiness()
             guard generation == self.generation else { return }
@@ -353,8 +355,8 @@ final class PreferencesSync {
                 standing = .off(.removed)
                 guard record.restarting.contains(instance) else { return }
                 let removedItems = adopted.removedItems ?? [adopted.item]
-                if !removalCaughtUp, items.contains(where: { removedItems.contains($0.id) }) {
-                    catchUpAfterRemoval(in: copy)
+                if !removalWasCaughtUp, items.contains(where: { removedItems.contains($0.id) }) {
+                    if removalCaughtUp { again = true } else { catchUpAfterRemoval(in: copy) }
                     return
                 }
                 if items.contains(where: { $0.id == adopted.item }) {

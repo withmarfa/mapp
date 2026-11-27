@@ -34,6 +34,8 @@ actor FakePreferencesCopy: PreferencesCopy {
     private var visibleBinnedItems: Set<String> = []
     nonisolated let settlingRemovals = HeldSwitch()
     private(set) var isSettlingRemovals = false
+    nonisolated let readingAnswers = HeldSwitch()
+    private(set) var isReadingAnswers = false
 
     func showBinnedItems(_ ids: Set<String>) { visibleBinnedItems = ids }
 
@@ -179,6 +181,9 @@ actor FakePreferencesCopy: PreferencesCopy {
     func queued() async throws -> Set<String> { unanswered }
 
     func answers() async -> [String: PreferenceAnswer] {
+        isReadingAnswers = true
+        await readingAnswers.wait()
+        isReadingAnswers = false
         defer { answersHeld = [:] }
         return answersHeld
     }
@@ -188,7 +193,7 @@ actor FakePreferencesCopy: PreferencesCopy {
             duringRead = nil
             await change()
         }
-        return unitsHeld(item)
+        return held[item]?.trashed == true ? [:] : unitsHeld(item)
     }
 
     func create(fields: [PreferencesField: JSONObject]) async throws -> String {
