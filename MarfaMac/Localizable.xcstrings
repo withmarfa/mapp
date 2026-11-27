@@ -3519,6 +3519,9 @@
     "Changed the settings" : {
 
     },
+    "Changes and sign-ins are recorded here." : {
+
+    },
     "Changes Are Waiting" : {
 
     },
@@ -4236,7 +4239,7 @@
     "Couldn’t read downloaded files. The app will try again." : {
       "extractionState" : "manual"
     },
-    "Couldn’t read versions, files and the database." : {
+    "Couldn’t read the version count or storage sizes." : {
 
     },
     "Couldn’t remove downloaded files. %@" : {
@@ -7225,7 +7228,7 @@
     "No Items" : {
       "extractionState" : "manual"
     },
-    "No Items Yet" : {
+    "No items yet" : {
 
     },
     "No Jobs Yet" : {
@@ -12264,9 +12267,6 @@
 
     },
     "What apps catch up on after being away." : {
-
-    },
-    "What happens in %@ is recorded here." : {
 
     },
     "What it may read and change. It can only be narrowed." : {

@@ -127,7 +127,7 @@ struct ActivityPage: View {
     }
 
     private var stored: some View {
-        SettingsSection("Stored", footer: usage.metricsFailure == nil ? nil : "Couldn’t read versions, files and the database.") {
+        SettingsSection("Stored", footer: usage.metricsFailure == nil ? nil : "Couldn’t read the version count or storage sizes.") {
             SettingsCard {
                 HStack(alignment: .firstTextBaseline, spacing: SettingsTokens.Metric.tableColumnGap) {
                     figure(usage.storedItems.map { $0.formatted() }, "Items")
@@ -191,7 +191,7 @@ struct ActivityPage: View {
         SettingsSection(title) {
             if rows.isEmpty {
                 SettingsCard {
-                    Text("No Items Yet")
+                    Text("No items yet")
                         .settingsFont(.line)
                         .foregroundStyle(SettingsTokens.secondaryText)
                         .padding(SettingsTokens.Metric.inset)
@@ -306,7 +306,7 @@ struct ActivityPage: View {
                 } else {
                     SettingsStateContent(
                         symbol: "list.bullet.rectangle", title: Text("No Activity Yet"),
-                        line: Text("What happens in \(host.serverName) is recorded here."), action: nil)
+                        line: Text("Changes and sign-ins are recorded here."), action: nil)
                 }
             },
             sort: SettingsColumnSort(column: model.order.column.rawValue, ascending: model.order.ascending),

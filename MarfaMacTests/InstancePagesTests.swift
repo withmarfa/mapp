@@ -4,8 +4,7 @@ import Synchronization
 import Testing
 @testable import MarfaMac
 
-/// Holds `itemStats` so a test can change the period while a read is in flight. A continuation cannot be sent, so the lock is
-/// the only way to the waiters, and each is resumed once.
+/// Holds `itemStats` so a test can change the period while a read is in flight.
 private nonisolated final class StatsPause: @unchecked Sendable {
     private let lock = NSLock()
     private var holding = false
@@ -120,7 +119,6 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
     }()
 
     let state = Mutex(State())
-    /// Continuations are not sendable, so the pause lives beside the mutex. A waiter is resumed once.
     private let statsPause = StatsPause()
 
     /// Holds later `itemStats` calls until `releaseStats`.

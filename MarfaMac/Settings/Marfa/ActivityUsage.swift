@@ -13,7 +13,7 @@ nonisolated enum UsageGrouping: String, CaseIterable, Hashable, Sendable {
     case type, source
 }
 
-/// One `GET /items/stats`. No dates counts every item. A day is half-open: `updatedAfter` inclusive, `updatedBefore` exclusive.
+/// Without dates, the server counts every item the sign-in can read. The lower bound is inclusive and the upper bound is exclusive.
 nonisolated struct UsageStatsQuery: Hashable, Sendable {
     var grouping: UsageGrouping
     var updatedAfter: Date?
