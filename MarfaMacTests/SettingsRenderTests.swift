@@ -878,16 +878,17 @@ struct RenderedWindow<Detail: View>: View {
             named: "New Key, in a short window")
     }
 
-    @Test func newKeyRefused() async throws {
+    @Test(arguments: [true, false]) func newKeyRefused(sourceHeld: Bool) async throws {
         let host = owner()
-        (host.ownerCalls as? FakeOwnerCalls)?.fail("create", with: .sourceHeld("That source is taken by another key."))
+        if sourceHeld { (host.ownerCalls as? FakeOwnerCalls)?.fail("create", with: .sourceHeld("That source is taken by another key.")) }
         let model = KeysModel(context: context(host))
         await model.load()
         model.beginNewKey()
         model.draft.name = "Lisbon zine importer"
-        model.draft.source = "lisbon-zine"
+        model.draft.source = sourceHeld ? "lisbon-zine" : "."
         await model.make()
-        try await page(.keys, host, sheet: AnyView(KeySheet(model: model)), named: "New Key, refused")
+        try await page(.keys, host, sheet: AnyView(KeySheet(model: model)),
+                       named: sourceHeld ? "New Key, source held" : "New Key, invalid source")
     }
 
     @Test func theKeyShownOnce() async throws {

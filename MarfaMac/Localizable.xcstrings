@@ -2118,6 +2118,9 @@
     "A source appears here once an app or key has written an item." : {
 
     },
+    "A source can’t be “.” or “..”." : {
+
+    },
     "A source." : {
 
     },
@@ -10666,6 +10669,9 @@
     "The port it listens on." : {
 
     },
+    "The prefixes oauth:, restored:, and connector-host: are reserved. Use a different source." : {
+
+    },
     "The preview expired before %@ answered." : {
 
     },
@@ -11899,6 +11905,9 @@
     },
     "Use a number from %lld to %lld." : {
       "extractionState" : "manual"
+    },
+    "Use a source with at most 200 characters." : {
+
     },
     "Use a whole number." : {
 

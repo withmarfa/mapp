@@ -237,7 +237,10 @@ private struct ShownKeySheet: View {
     var body: some View {
         SettingsSheet(title: Text("Copy the Key Now"), line: Text("It is shown only once. Keep it where the script can read it.")) {
             if let created = model.created {
-                SettingsSheetField(verbatim: created.label) { SettingsReadOnlyValue(text: created.secret) }
+                SettingsSheetField(verbatim: created.label) {
+                    SettingsReadOnlyValue(text: created.secret, isSelectable: false)
+                        .accessibilityHidden(true)
+                }
             }
         } buttons: {
             SettingsButton(copied ? "Copied" : "Copy") {
