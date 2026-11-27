@@ -332,7 +332,7 @@ struct BackupSheet: View {
             }
         } buttons: {
             SettingsButton("Cancel") { model.close() }
-            SettingsButton("Use Folder…", role: .confirm) { Task { await model.saveFolder() } }
+            SettingsButton("Use Folder", role: .confirm) { Task { await model.saveFolder() } }
                 .disabled(!model.canSaveFolder)
         }
     }
@@ -354,7 +354,7 @@ struct BackupSheet: View {
             }
         } buttons: {
             SettingsButton("Cancel") { model.close() }.disabled(model.isRestoring)
-            SettingsButton(model.isRestoring ? "Restoring…" : "Restore…", role: .confirm, reserving: "Restoring…") { Task { await model.restore() } }
+            SettingsButton(model.isRestoring ? "Restoring…" : "Restore", role: .confirm, reserving: "Restoring…") { Task { await model.restore() } }
                 .disabled(model.isRestoring)
         }
     }

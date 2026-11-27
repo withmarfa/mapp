@@ -79,7 +79,7 @@ Neutral washes are white at the same strength, hairlines white at 12%, and a ton
 - **A text action has a fill:** pale gray, or the accent for the main action, and a page notice's too. Destructive is pale red with red text, never the default.
 - **A symbol on its own is a gray circle.** On a header row, and for a close button inside a notice or chip, it is plain until the pointer is over it.
 - **Two arrows choose a value and one arrow opens a menu of commands** (`appMenu`, with `.value` or `.commands`).
-- **A label ends in an ellipsis when the button opens** a sheet, dialog, chooser, confirmation or browser page. A button that acts at once, or is a menu, has none.
+- **A label ends in an ellipsis when the button needs more from the person**: a sheet, chooser, confirmation or sign-in. A button that acts at once, or is a menu, has none.
 - **Keyboard focus is the app's own 3 point gray ring** in the control's shape, on every control that takes the keyboard: `appFocusRing` on a field, `AppButtonStyle` on a button.
 - **In a sheet, a destructive action stands alone at the leading edge**, and Cancel and the main action are at the trailing edge. The button says Delete, not Delete Collection.
 - **A field, a chip and a token keep soft corners**, so a value never reads as a button.

@@ -16,7 +16,7 @@ enum MarfaSettingsConnection: Equatable {
     case notAnswering(lastAnswered: Date?)
 }
 
-/// What came of Allow More…, for the page that asked. Only `allowed` changes what the page shows; every other outcome
+/// What came of Allow More, for the page that asked. Only `allowed` changes what the page shows; every other outcome
 /// leaves things as they were.
 enum MarfaAllowMoreOutcome: Equatable {
     case allowed
@@ -99,7 +99,7 @@ struct MarfaMarkSet: Identifiable, Hashable {
     var instanceCalls: any InstanceCalls { get }
     /// What Folders asks of the open working copy, which reads, changes and stops a folder.
     var folderCalls: any FolderCalls { get }
-    /// Whether an Allow More… is waiting on the owner.
+    /// Whether an Allow More is waiting on the owner.
     var isAllowingMore: Bool { get }
     /// Asks the server again, for a server that did not answer.
     func tryAgain()

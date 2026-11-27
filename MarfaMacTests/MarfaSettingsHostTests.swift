@@ -5,7 +5,7 @@ import Synchronization
 import Testing
 @testable import MarfaMac
 
-/// What the app lends the Marfa's pages: how the connection reads, what the sign-in holds, Allow More…, and what closing
+/// What the app lends the Marfa's pages: how the connection reads, what the sign-in holds, Allow More, and what closing
 /// Settings does with a draft. The sign-in is `ScriptedSignIns`, never the Keychain.
 @Suite(.hangLimit)
 @MainActor struct MarfaSettingsHostTests {
@@ -101,8 +101,8 @@ import Testing
                 state: .online, grants: adapter.grants, grantsRead: true, readsProfile: libraries.host.readsProfile,
                 lacksAsked: libraries.host.lacksAsked, waiting: 0)
         }
-        #expect(account().offersMore, "Connection offers Allow More…")
-        #expect(account().permissionsLine == "The app holds all 14 of the owner’s permissions, but not all the access it asks for.")
+        #expect(account().offersMore, "Connection offers Allow More")
+        #expect(account().permissionsLine == "Every permission is allowed. Allow More asks for other access the app needs.")
 
         bench.signIns.script(browser: [.success("again")])
         #expect(await adapter.allowMore(Set(InstancePermission.allCases)) == .allowed)
@@ -154,7 +154,7 @@ import Testing
         #expect(told.isEmpty, "a sign-in the person stopped needs no telling")
     }
 
-    /// One page's Allow More… asks for everything the sign-in lacks, so one approval opens every page.
+    /// One page's Allow More asks for everything the sign-in lacks, so one approval opens every page.
     @Test func aPagesAllowMoreAsksForEveryPermissionTheSignInLacks() async throws {
         let bench = HostBench()
         let (adapter, libraries, _) = try await connected(bench)
@@ -191,7 +191,7 @@ import Testing
         bench.signIns.script(approving: [])
         bench.signIns.script(browser: [.success("full")])
         #expect(await adapter.allowMore([.backupsManage]) == .allowed)
-        #expect(bench.signIns.asked.last == SystemSignIns.askedAtSignIn, "the next Allow More… asks for the rest again")
+        #expect(bench.signIns.asked.last == SystemSignIns.askedAtSignIn, "the next Allow More asks for the rest again")
     }
 
     @Test func signingInAgainWithACodeAsksForWhatTheBrowserAsksFor() async throws {

@@ -189,7 +189,7 @@ struct FileStoragePage: View {
             }
         return SettingsRow(
             title: Text(verbatim: title), line: store.error == nil ? Text(verbatim: store.locator) : nil,
-            lineGlyph: store.kind == .objectStore ? .link : .folder, error: store.error
+            lineGlyph: store.kind == .objectStore ? nil : .folder, error: store.error
         ) {
             if store.kind == .disk {
                 if let bytes = storage.fileBytes, storage.fileBytesFailure == nil { SettingsValue(verbatim: Int64(bytes).formatted(.byteCount(style: .file))) }

@@ -266,7 +266,7 @@ struct ActivityPage: View {
                 let naming = scope == InstancePermission.instanceRead.rawValue ? nil : scope
                 SettingsPageState(
                     symbol: "lock", title: Text("Needs a Permission"), line: Text(verbatim: ActivityTab.itemsLine),
-                    action: (host.isAllowingMore ? "Waiting…" : "Allow More", { host.askForMore(naming: naming) }))
+                    action: (host.isAllowingMore ? "Waiting…" : "Allow More…", { host.askForMore(naming: naming) }))
                 .disabled(host.isAllowingMore)
             } else {
                 OwnerFailureState(page: .activity, failure: failure, host: host) { Task { await usage.reload() } }
@@ -278,7 +278,7 @@ struct ActivityPage: View {
     private var itemsGate: some View {
         SettingsPageState(
             symbol: "lock", title: Text("Needs a Permission"), line: Text(verbatim: ActivityTab.itemsLine),
-            action: (host.isAllowingMore ? "Waiting…" : "Allow More", { host.askForMore(naming: nil) }))
+            action: (host.isAllowingMore ? "Waiting…" : "Allow More…", { host.askForMore(naming: nil) }))
         .disabled(host.isAllowingMore)
         .accessibilityIdentifier("ActivityUsageGate")
     }
@@ -396,7 +396,7 @@ struct ActivityPage: View {
     private func gate(_ tab: ActivityTab) -> some View {
         SettingsPageState(
             symbol: "lock", title: Text("Needs a Permission"), line: Text(verbatim: tab.permissionLine),
-            action: (host.isAllowingMore ? "Waiting…" : "Allow More", { host.askForMore(naming: tab.permission?.rawValue) }))
+            action: (host.isAllowingMore ? "Waiting…" : "Allow More…", { host.askForMore(naming: tab.permission?.rawValue) }))
         .disabled(host.isAllowingMore)
         .accessibilityIdentifier(tab == .usage ? "ActivityUsageGate" : "ActivityLogGate")
     }

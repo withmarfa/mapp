@@ -238,11 +238,11 @@ import Observation
             return String(localized: "The link types couldn’t be read again to choose an unused ID, so nothing was sent. \(OwnerWording.line(makeFailure, on: .types))")
         }
         if approvedWithoutRegistering {
-            return String(localized: "The new sign-in still isn’t allowed to add link types. Choose Allow More… and approve Full Access.")
+            return String(localized: "The new sign-in still isn’t allowed to add link types. Choose Allow More and approve Full Access.")
         }
         switch makeFailure {
         case .notPermitted(let scope) where scope == ClientOwnerCalls.registeringLinkTypes:
-            return String(localized: "The app isn’t allowed to add link types. Choose Allow More… to ask for it.")
+            return String(localized: "The app isn’t allowed to add link types. Choose Allow More to ask for it.")
         case .refused(let reason): return reason
         default: return OwnerWording.line(makeFailure, on: .types)
         }
@@ -252,7 +252,7 @@ import Observation
         if case .notPermitted = makeFailure, !makeFailedUnsent { true } else { false }
     }
 
-    /// Allow More… from the sheet's refusal: an approval whose sign-in holds `ClientOwnerCalls.registeringLinkTypes` drops
+    /// Allow More from the sheet's refusal: an approval whose sign-in holds `ClientOwnerCalls.registeringLinkTypes` drops
     /// the refusal, and Create Link Type asks the server again; one without it keeps the refusal and says so.
     func allowMore() async {
         guard makeNeedsPermission else { return }

@@ -8,16 +8,14 @@ struct SettingsLinkRow: View {
     private let lead: SettingsLead
     private let value: Text?
     private let dot: Color?
-    private let titleGlyph: SettingsTextGlyph?
     private let lineGlyph: SettingsTextGlyph?
-    private let valueGlyph: SettingsTextGlyph?
     private let lock: String?
     private let lines: Int?
     private let action: () -> Void
 
     init(
         verbatim title: String, line: String? = nil, lead: SettingsLead = .none, value: String? = nil, dot: Color? = nil,
-        lines: Int? = 2, titleGlyph: SettingsTextGlyph? = nil, lineGlyph: SettingsTextGlyph? = nil, valueGlyph: SettingsTextGlyph? = nil, lock: String? = nil,
+        lines: Int? = 2, lineGlyph: SettingsTextGlyph? = nil, lock: String? = nil,
         action: @escaping () -> Void
     ) {
         self.title = Text(verbatim: title)
@@ -26,16 +24,14 @@ struct SettingsLinkRow: View {
         self.value = value.map { Text(verbatim: $0) }
         self.dot = dot
         self.lines = lines
-        self.titleGlyph = titleGlyph
         self.lineGlyph = lineGlyph
-        self.valueGlyph = valueGlyph
         self.lock = lock
         self.action = action
     }
 
     var body: some View {
         Button(action: action) {
-            SettingsRow(title: title, line: line, titleGlyph: titleGlyph, lineGlyph: lineGlyph, lead: rowLead, lines: lines) {
+            SettingsRow(title: title, line: line, lineGlyph: lineGlyph, lead: rowLead, lines: lines) {
                 if let lock {
                     SettingsLockedValue(text: lock)
                 } else {
@@ -43,7 +39,7 @@ struct SettingsLinkRow: View {
                         if let value {
                             HStack(spacing: SettingsTokens.Metric.dotGap) {
                                 if let dot { SettingsStatusDot(color: dot) }
-                                value.withSettingsGlyph(valueGlyph)
+                                value
                                     .settingsFont(.title)
                                     .foregroundStyle(SettingsTokens.secondaryText)
                                     .lineLimit(1)

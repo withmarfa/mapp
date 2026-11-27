@@ -1,9 +1,8 @@
 import SwiftUI
 
-/// The symbol next to a path or address, wherever its text appears in a row.
+/// The symbol next to a disk path, wherever its text appears in a row. Settings draws no symbol before an address.
 enum SettingsTextGlyph: String {
     case folder
-    case link
 
     var icon: some View {
         Image(systemName: rawValue)

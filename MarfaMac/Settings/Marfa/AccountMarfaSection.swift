@@ -147,7 +147,7 @@ struct AccountMarfaSection: View {
 
     private func retryActions(_ status: UpdateStatus) -> [SettingsProblemAction] {
         if model.needsMaintain, status.available, status.updatesItself {
-            return [SettingsProblemAction("Allow More") { host.askForMore(naming: InstancePermission.instanceMaintain.rawValue) }]
+            return [SettingsProblemAction("Allow More…") { host.askForMore(naming: InstancePermission.instanceMaintain.rawValue) }]
         }
         return model.canUpdate ? [SettingsProblemAction("Try Again") { asksToUpdate = true }] : []
     }
@@ -157,7 +157,7 @@ struct AccountMarfaSection: View {
             SettingsRow(title: title(status), line: Text(verbatim: line(status))) {
                 HStack(spacing: SettingsTokens.Metric.buttonGap) {
                     if model.needsMaintain {
-                        SettingsButton("Allow More") { host.askForMore(naming: InstancePermission.instanceMaintain.rawValue) }
+                        SettingsButton("Allow More…") { host.askForMore(naming: InstancePermission.instanceMaintain.rawValue) }
                     } else {
                         SettingsButton(model.isChecking ? "Checking…" : "Check for Updates", reserving: "Check for Updates") {
                             Task { await model.checkForUpdates() }

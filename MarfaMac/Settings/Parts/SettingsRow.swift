@@ -86,7 +86,6 @@ struct SettingsRow<Trailing: View>: View {
 
     private let title: Text
     private let line: Text?
-    private let titleGlyph: SettingsTextGlyph?
     private let lineGlyph: SettingsTextGlyph?
     private let error: String?
     private let lead: SettingsLead
@@ -98,13 +97,12 @@ struct SettingsRow<Trailing: View>: View {
     @Environment(\.settingsUsesSheetControls) private var usesSheetControls
 
     init(
-        title: Text, line: Text? = nil, titleGlyph: SettingsTextGlyph? = nil, lineGlyph: SettingsTextGlyph? = nil,
+        title: Text, line: Text? = nil, lineGlyph: SettingsTextGlyph? = nil,
         error: String? = nil, lead: SettingsLead = .none, size: Size = .standard,
         look: Look = .normal, lines: Int? = 2, @ViewBuilder trailing: () -> Trailing
     ) {
         self.title = title
         self.line = line
-        self.titleGlyph = titleGlyph
         self.lineGlyph = lineGlyph
         self.error = error
         self.lead = lead
@@ -131,7 +129,7 @@ struct SettingsRow<Trailing: View>: View {
             }
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
-                    title.withSettingsGlyph(titleGlyph)
+                    title
                         .settingsFont(.title)
                         .lineLimit(scale < SettingsTokens.Metric.controlScaleForLarge ? 1 : nil)
                         .fixedSize(horizontal: false, vertical: true)
@@ -190,8 +188,8 @@ struct SettingsRow<Trailing: View>: View {
 }
 
 extension SettingsRow where Trailing == EmptyView {
-    init(title: Text, line: Text? = nil, titleGlyph: SettingsTextGlyph? = nil, lineGlyph: SettingsTextGlyph? = nil, error: String? = nil, lead: SettingsLead = .none, size: Size = .standard, look: Look = .normal, lines: Int? = 2) {
-        self.init(title: title, line: line, titleGlyph: titleGlyph, lineGlyph: lineGlyph, error: error, lead: lead, size: size, look: look, lines: lines, trailing: { EmptyView() })
+    init(title: Text, line: Text? = nil, lineGlyph: SettingsTextGlyph? = nil, error: String? = nil, lead: SettingsLead = .none, size: Size = .standard, look: Look = .normal, lines: Int? = 2) {
+        self.init(title: title, line: line, lineGlyph: lineGlyph, error: error, lead: lead, size: size, look: look, lines: lines, trailing: { EmptyView() })
     }
 }
 

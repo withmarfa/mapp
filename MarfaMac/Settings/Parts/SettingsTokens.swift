@@ -140,7 +140,7 @@ enum SettingsTokens {
 
     /// The interface fonts of Settings. A page asks for these by role.
     enum Role: Hashable, Sendable {
-        case title, line, sectionName, sectionLine, footer, small, mono, stateTitle, headTitle, pageHeader, usageFigure, sidebarBadge, largeGlyph, tableHeader, linkGlyph, pathGlyph, chartAxis, chartTick
+        case title, line, sectionName, sectionLine, footer, small, mono, stateTitle, headTitle, pageHeader, usageFigure, sidebarBadge, largeGlyph, tableHeader, pathGlyph, chartAxis, chartTick
     }
 
     static func font(_ role: Role, scale: CGFloat = 1) -> Font {
@@ -149,7 +149,6 @@ enum SettingsTokens {
         case .sidebarBadge: .system(size: 11 * scale, weight: .semibold)
         case .pageHeader: .system(size: 17 * scale, weight: .semibold)
         case .usageFigure: .system(size: 20 * scale, weight: .semibold)
-        case .linkGlyph: .system(size: 9 * scale, weight: .medium)
         case .pathGlyph: .system(size: 12 * scale)
         case .chartAxis: .system(size: 11 * scale)
         case .chartTick: .system(size: 10.5 * scale)

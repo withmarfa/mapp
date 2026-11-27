@@ -169,7 +169,7 @@ struct ConnectionCodeSection: View {
             .textSelection(.enabled)
             .accessibilityIdentifier("MarfaSignInCode")
             SettingsRow(title: Text("Approve in a Browser"), line: Text(verbatim: code.address.absoluteString)) {
-                SettingsButton("Open Page…") { NSWorkspace.shared.open(code.completeAddress ?? code.address) }
+                SettingsButton("Open Page") { NSWorkspace.shared.open(code.completeAddress ?? code.address) }
             }
         }
     }

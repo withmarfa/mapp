@@ -3,7 +3,7 @@ import SwiftUI
 
 extension MarfaSettingsHost {
     /// Asks the owner for everything the sign-in lacks, judging the answer by the permission the server named, where it
-    /// named one. Every page's Allow More… for a refusal goes through here.
+    /// named one. Every page's Allow More for a refusal goes through here.
     func askForMore(naming scope: String?) {
         let asked = scope.flatMap { InstancePermission(rawValue: $0) }
         Task { _ = await allowMore(asked.map { [$0] } ?? []) }
@@ -38,7 +38,7 @@ struct OwnerFailureState: View {
         case .notPermitted(let scope):
             SettingsPageState(
                 symbol: "lock", title: Text("Needs a Permission"), line: Text(verbatim: OwnerWording.permissionLine(scope, on: page)),
-                action: (host.isAllowingMore ? "Waiting…" : "Allow More", { host.askForMore(naming: scope) }))
+                action: (host.isAllowingMore ? "Waiting…" : "Allow More…", { host.askForMore(naming: scope) }))
             .disabled(host.isAllowingMore)
         case .unreachable:
             SettingsPageState(
@@ -47,7 +47,7 @@ struct OwnerFailureState: View {
         case .signedOut:
             SettingsPageState(
                 symbol: "person.crop.circle.badge.exclamationmark", title: Text("Signed Out"), line: Text(verbatim: OwnerWording.line(failure)),
-                action: ("Open Connection…", { host.showConnection() }))
+                action: ("Open Connection", { host.showConnection() }))
         case .instanceChanged:
             SettingsPageState(
                 symbol: "exclamationmark.triangle", title: Text("Another Marfa Answers"), line: Text(verbatim: OwnerWording.line(failure)),
@@ -70,7 +70,7 @@ struct OwnerLoading: View {
     }
 }
 
-/// A problem row in the page's words. A missing permission offers Allow More…, and a failed read with a retry offers Try Again.
+/// A problem row in the page's words. A missing permission offers Allow More, and a failed read with a retry offers Try Again.
 struct OwnerProblemRow: View {
     let title: LocalizedStringKey
     let failure: OwnerFailure
@@ -89,7 +89,7 @@ struct OwnerProblemRow: View {
         .disabled(isWaiting)
     }
 
-    /// What a problem row offers for a failure: Allow More… for a refusal for want of a permission, Try Again for any
+    /// What a problem row offers for a failure: Allow More for a refusal for want of a permission, Try Again for any
     /// other where the page can read again, and nothing where it cannot.
     enum Offer: Equatable {
         case allowMore(scope: String?)
@@ -116,7 +116,7 @@ struct OwnerProblemRow: View {
     private var actions: [SettingsProblemAction] {
         let offered: [SettingsProblemAction] = switch offer {
         case .allowMore(let scope):
-            [SettingsProblemAction(host.isAllowingMore ? "Waiting…" : "Allow More") { host.askForMore(naming: scope) }]
+            [SettingsProblemAction(host.isAllowingMore ? "Waiting…" : "Allow More…") { host.askForMore(naming: scope) }]
         case .tryAgain:
             retry.map { retry in [SettingsProblemAction("Try Again", perform: retry)] } ?? []
         case .nothing:

@@ -54,7 +54,7 @@ struct ConnectionPage: View {
     private struct NameRequest: Hashable {
         let connection: MarfaConnection?
         let isOnline: Bool
-        /// Read again once Allow More… or a new sign-in gives the read of the name.
+        /// Read again once Allow More or a new sign-in gives the read of the name.
         let readsProfile: Bool
     }
 
@@ -107,25 +107,27 @@ struct ConnectionPage: View {
             state: host.state, grants: host.grants, grantsRead: host.grantsRead, readsProfile: host.readsProfile,
             lacksAsked: host.lacksAsked, waiting: host.waitingChanges)
         let status = ConnectionAddressStatus(state: host.state, updateReady: settingsHost.overview.updateReady != nil)
+        if account.showsName {
+            let page = SettingsPage.account
+            SettingsSection(name: nil) {
+                SettingsLinkRow(
+                    verbatim: String(localized: "Signed in as"), line: account.nameLine, lead: accountTile(symbol: page.symbol),
+                    value: (accountNameServer == connection ? accountName : nil) ?? settingsHost.overview.owner, lines: nil
+                ) { navigation?.show(page) }
+                .accessibilityIdentifier("SignedInAs")
+            }
+        }
         SettingsSection("Marfa") {
             SettingsRow("Address") {
                 HStack(spacing: SettingsTokens.Metric.buttonGap) {
-                    SettingsValue(verbatim: SettingsWording.hostName(of: connection.address), glyph: .link)
+                    SettingsValue(verbatim: SettingsWording.hostName(of: connection.address))
                         .help(Text(verbatim: connection.address.absoluteString))
                     statusMark(status)
                 }
             }
             .accessibilityIdentifier("LibrarySummary")
             .contextMenu {
-                Button("Use Another Marfa…") { isChoosingOther = true }
-            }
-            if account.showsName {
-                let page = SettingsPage.account
-                SettingsLinkRow(
-                    verbatim: String(localized: "Signed in as"), line: account.nameLine, lead: accountTile(symbol: page.symbol),
-                    value: (accountNameServer == connection ? accountName : nil) ?? settingsHost.overview.owner, lines: nil
-                ) { navigation?.show(page) }
-                .accessibilityIdentifier("SignedInAs")
+                Button("Use Another Marfa") { isChoosingOther = true }
             }
             if let value = account.permissionsValue {
                 SettingsRow(verbatim: String(localized: "Permissions"), line: account.permissionsLine, lines: nil) {
@@ -183,7 +185,7 @@ struct ConnectionPage: View {
         return Image(systemName: status.symbol)
             .font(.system(size: SettingsTokens.Metric.statusMark, weight: .semibold))
             .symbolRenderingMode(.palette)
-            .foregroundStyle(status.tone == .green ? color : SettingsTokens.tileForeground, color)
+            .foregroundStyle(SettingsTokens.tileForeground, color)
             .fixedSize()
             .help(words)
             .accessibilityLabel(words)
@@ -212,7 +214,7 @@ struct ConnectionPage: View {
     private func otherServer(hasOtherMarfas: Bool) -> some View {
         SettingsSection(name: hasOtherMarfas ? Text("Other Marfas") : nil) {
             SettingsRow("Use another Marfa", line: "The app shows one Marfa at a time.") {
-                SettingsButton(isChoosingOther ? "Hide" : "Choose…") { isChoosingOther.toggle() }
+                SettingsButton(isChoosingOther ? "Hide" : "Choose") { isChoosingOther.toggle() }
             }
             if isChoosingOther {
                 SettingsRow("Address", line: "Each Marfa has its own copy on this Mac.") {

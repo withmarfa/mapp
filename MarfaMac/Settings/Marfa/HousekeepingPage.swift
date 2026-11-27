@@ -121,7 +121,7 @@ struct HousekeepingPage: View {
         if host.grants.contains(.instanceMaintain) {
             SettingsProblemAction("Confirm Date") { Task { await model.askToConfirm(health: host.health) } }
         } else {
-            SettingsProblemAction("Allow More") { host.askForMore(naming: InstancePermission.instanceMaintain.rawValue) }
+            SettingsProblemAction("Allow More…") { host.askForMore(naming: InstancePermission.instanceMaintain.rawValue) }
         }
     }
 

@@ -282,7 +282,7 @@ struct ConnectorMappingPage: View {
 
     // MARK: Existing items
 
-    /// A missing permission uses the page's own line, so Allow More… fits it. Anything else says the request was made.
+    /// A missing permission uses the page's own line, so Allow More fits it. Anything else says the request was made.
     private func readBackLine(_ failure: OwnerFailure) -> String? {
         if case .notPermitted = failure { return nil }
         return String(localized: "The request was made. The app couldn’t read it back to show it here.")

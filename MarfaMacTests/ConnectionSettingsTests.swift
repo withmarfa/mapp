@@ -38,7 +38,7 @@ import Testing
         #expect(syncing.actionTitle == "Remove…")
     }
 
-    /// The section's state is the sync's own, so Allow More… moving it on needs nothing else.
+    /// The section's state is the sync's own, so Allow More moving it on needs nothing else.
     @Test func theSectionFollowsTheSyncsStanding() async throws {
         let defaults = ThrowawayDefaults.make("ConnectionSettingsTests")
         let copy = FakePreferencesCopy()

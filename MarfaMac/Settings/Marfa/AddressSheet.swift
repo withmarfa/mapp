@@ -42,7 +42,6 @@ struct AddressSheet: View {
                 SettingsSheetField(label: label, error: error) {
                     SettingsField(
                         title: label, text: $model.input, prompt: "https://", isError: error != nil, width: nil,
-                        leadingGlyph: changingSignIn ? .link : nil,
                         onSubmit: { Task { await model.confirm() } })
                     .disabled(changingSignIn && model.isWriting)
                 }

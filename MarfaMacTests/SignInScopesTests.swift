@@ -34,7 +34,7 @@ struct SignInScopesTests {
         #expect(SystemSignIns.askedAtSignIn.isSuperset(of: MarfaSettingsPage.allCases.compactMap(\.permission)))
     }
 
-    /// A browser sign-in, a code sign-in, Sign In Again and Allow More… all ask through the same list.
+    /// A browser sign-in, a code sign-in, Sign In Again and Allow More all ask through the same list.
     @Test func aSignInHandsThePackageTheSameList() throws {
         let signIns = SystemSignIns(bundleIdentifier: "com.withmarfa.marfa.debug", anchor: { nil })
         let connection = try MarfaConnection(address: "https://marfa.example")

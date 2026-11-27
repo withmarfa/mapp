@@ -2621,13 +2621,10 @@
     "Allow" : {
 
     },
-    "Allow More" : {
-
-    },
     "Allow More…" : {
 
     },
-    "Allow More… lets the app read the owner’s name." : {
+    "Allow More lets the app read the owner’s name." : {
 
     },
     "Allow Private Addresses?" : {
@@ -4130,9 +4127,6 @@
     "Couldn’t Change Key" : {
 
     },
-    "Couldn’t Check" : {
-
-    },
     "Couldn’t Check the Webhook’s Key" : {
 
     },
@@ -5035,6 +5029,9 @@
 
     },
     "Every group with items is hidden. Show a group in the View panel to see its items." : {
+
+    },
+    "Every permission is allowed. Allow More asks for other access the app needs." : {
 
     },
     "Every setting on this Mac starts over. Your items and sign-in stay. A restore point is saved first, and Restore Earlier Settings brings it back." : {
@@ -6928,9 +6925,6 @@
     "Marfa for Mac" : {
 
     },
-    "Marfa for Mac %@" : {
-
-    },
     "Marfa for Mac can’t check this link yet. Try again once your Marfa has finished syncing." : {
 
     },
@@ -8030,9 +8024,6 @@
     "Open Connection" : {
 
     },
-    "Open Connection…" : {
-
-    },
     "Open Copy" : {
       "extractionState" : "manual"
     },
@@ -8056,9 +8047,6 @@
     },
     "Open Page" : {
       "extractionState" : "manual"
-    },
-    "Open Page…" : {
-
     },
     "Open Settings…" : {
       "extractionState" : "manual"
@@ -10500,9 +10488,6 @@
     "The app forgot its sign-in on this Mac, but couldn’t confirm that %@ ended the approval." : {
       "extractionState" : "manual"
     },
-    "The app holds all %lld of the owner’s permissions, but not all the access it asks for." : {
-
-    },
     "The app is no longer allowed to %@. Allow it again from the page that needs it." : {
       "extractionState" : "manual"
     },
@@ -10515,7 +10500,7 @@
     "The app isn’t allowed to %@." : {
 
     },
-    "The app isn’t allowed to add link types. Choose Allow More… to ask for it." : {
+    "The app isn’t allowed to add link types. Choose Allow More to ask for it." : {
 
     },
     "The app isn’t allowed to change link types." : {
@@ -10947,7 +10932,7 @@
     "The new kind of item doesn’t have this property." : {
       "extractionState" : "manual"
     },
-    "The new sign-in still isn’t allowed to add link types. Choose Allow More… and approve Full Access." : {
+    "The new sign-in still isn’t allowed to add link types. Choose Allow More and approve Full Access." : {
 
     },
     "The new value is never shown again." : {
@@ -10960,9 +10945,6 @@
 
     },
     "The oldest Marfa this version works with." : {
-
-    },
-    "The owner’s permissions this app holds." : {
 
     },
     "The owner’s permissions. A key can only lose them." : {
@@ -12256,9 +12238,6 @@
     "Use Another Marfa" : {
 
     },
-    "Use Another Marfa…" : {
-
-    },
     "Use Current Name" : {
       "extractionState" : "manual"
     },
@@ -12277,7 +12256,7 @@
     "Use Defaults" : {
       "extractionState" : "manual"
     },
-    "Use Folder…" : {
+    "Use Folder" : {
 
     },
     "Use Layouts" : {
@@ -12351,6 +12330,9 @@
 
     },
     "Version" : {
+
+    },
+    "Version %@" : {
 
     },
     "Version %@, made by %@. Needs Marfa %@ or later." : {
@@ -12625,6 +12607,12 @@
       "extractionState" : "manual"
     },
     "What your apps send." : {
+
+    },
+    "What you’ve allowed this app to manage." : {
+
+    },
+    "What you’ve allowed this app to manage. Allow More asks for the rest." : {
 
     },
     "What’s New in Marfa" : {

@@ -211,26 +211,24 @@ struct SettingsToggle: View {
 struct SettingsValue: View {
     private let text: Text
     private let dot: Color?
-    private let glyph: SettingsTextGlyph?
 
-    init(_ text: LocalizedStringKey, dot: Color? = nil, glyph: SettingsTextGlyph? = nil) {
-        self.init(text: Text(text), dot: dot, glyph: glyph)
+    init(_ text: LocalizedStringKey, dot: Color? = nil) {
+        self.init(text: Text(text), dot: dot)
     }
 
-    init(verbatim text: String, dot: Color? = nil, glyph: SettingsTextGlyph? = nil) {
-        self.init(text: Text(verbatim: text), dot: dot, glyph: glyph)
+    init(verbatim text: String, dot: Color? = nil) {
+        self.init(text: Text(verbatim: text), dot: dot)
     }
 
-    init(text: Text, dot: Color? = nil, glyph: SettingsTextGlyph? = nil) {
+    init(text: Text, dot: Color? = nil) {
         self.text = text
         self.dot = dot
-        self.glyph = glyph
     }
 
     var body: some View {
         HStack(spacing: SettingsTokens.Metric.lockGap) {
             if let dot { SettingsStatusDot(color: dot) }
-            text.withSettingsGlyph(glyph)
+            text
                 .settingsFont(.title)
                 .foregroundStyle(SettingsTokens.secondaryText)
                 .lineLimit(1)
@@ -288,7 +286,6 @@ extension View {
 /// A text field with optional accessories. `isError` draws a red ring around it.
 struct SettingsField: View {
     private let title: Text
-    private let leadingGlyph: SettingsTextGlyph?
     private let trailingAccessory: AnyView?
     @Binding var text: String
     /// A hint that says something the label does not. With none, the field is empty: the label is never repeated in it.
@@ -309,12 +306,12 @@ struct SettingsField: View {
     init(
         title: LocalizedStringKey, text: Binding<String>, prompt: String? = nil, isError: Bool = false, isSecure: Bool = false,
         isMonospaced: Bool = false, width: CGFloat? = SettingsTokens.Metric.controlWidth,
-        leadingGlyph: SettingsTextGlyph? = nil, trailingAccessory: AnyView? = nil, onSubmit: @escaping () -> Void = {},
+        trailingAccessory: AnyView? = nil, onSubmit: @escaping () -> Void = {},
         onEndEditing: (() -> Void)? = nil, onCancel: (() -> Void)? = nil
     ) {
         self.init(
             label: Text(title), text: text, prompt: prompt, isError: isError, isSecure: isSecure, isMonospaced: isMonospaced, width: width,
-            leadingGlyph: leadingGlyph, trailingAccessory: trailingAccessory,
+            trailingAccessory: trailingAccessory,
             onSubmit: onSubmit, onEndEditing: onEndEditing, onCancel: onCancel)
     }
 
@@ -322,22 +319,21 @@ struct SettingsField: View {
     init(
         verbatim title: String, text: Binding<String>, prompt: String? = nil, isError: Bool = false, isSecure: Bool = false,
         isMonospaced: Bool = false, width: CGFloat? = SettingsTokens.Metric.controlWidth,
-        leadingGlyph: SettingsTextGlyph? = nil, trailingAccessory: AnyView? = nil, onSubmit: @escaping () -> Void = {},
+        trailingAccessory: AnyView? = nil, onSubmit: @escaping () -> Void = {},
         onEndEditing: (() -> Void)? = nil
     ) {
         self.init(
             label: Text(verbatim: title), text: text, prompt: prompt, isError: isError, isSecure: isSecure, isMonospaced: isMonospaced,
-            width: width, leadingGlyph: leadingGlyph, trailingAccessory: trailingAccessory,
+            width: width, trailingAccessory: trailingAccessory,
             onSubmit: onSubmit, onEndEditing: onEndEditing)
     }
 
     private init(
         label: Text, text: Binding<String>, prompt: String?, isError: Bool, isSecure: Bool, isMonospaced: Bool, width: CGFloat?,
-        leadingGlyph: SettingsTextGlyph?, trailingAccessory: AnyView?,
+        trailingAccessory: AnyView?,
         onSubmit: @escaping () -> Void, onEndEditing: (() -> Void)?, onCancel: (() -> Void)? = nil
     ) {
         title = label
-        self.leadingGlyph = leadingGlyph
         self.trailingAccessory = trailingAccessory
         _text = text
         self.prompt = prompt
@@ -352,7 +348,7 @@ struct SettingsField: View {
 
     var body: some View {
         Group {
-            if leadingGlyph == nil, trailingAccessory == nil {
+            if trailingAccessory == nil {
                 input
                     .textFieldStyle(.roundedBorder)
                     .settingsControlSize()
@@ -402,7 +398,6 @@ struct SettingsField: View {
         let height = scale < SettingsTokens.Metric.controlScaleForLarge
             ? SettingsTokens.Metric.smallControlHeight : SettingsTokens.Metric.controlHeight
         return HStack(spacing: SettingsTokens.Metric.pathGlyphGap) {
-            leadingGlyph?.icon
             input.textFieldStyle(.plain).accessibilityLabel(title).frame(maxWidth: .infinity)
             trailingAccessory?.fixedSize()
         }

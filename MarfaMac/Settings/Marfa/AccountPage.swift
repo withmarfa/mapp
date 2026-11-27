@@ -64,7 +64,7 @@ struct AccountPage: View {
                 SettingsSection("Permissions") {
                     SettingsProblemRow(
                         title: Text("This app can’t manage sign-ins"), line: Text("Your password, passkeys and browsers need this permission."),
-                        symbol: "lock", actions: [SettingsProblemAction("Allow More") { Task { await model.allowSignIns() } }]
+                        symbol: "lock", actions: [SettingsProblemAction("Allow More…") { Task { await model.allowSignIns() } }]
                     ).disabled(host.isAllowingMore)
                 }
             }
@@ -118,7 +118,7 @@ struct AccountPage: View {
                     title: Text("This app can’t check for problems"), line: Text("Allow this app to read the server’s status."),
                     symbol: "lock", tone: nil,
                     actions: [
-                        SettingsProblemAction("Allow More") {
+                        SettingsProblemAction("Allow More…") {
                             host.askForMore(naming: InstancePermission.instanceRead.rawValue)
                         }
                     ]
@@ -240,7 +240,7 @@ struct AccountPage: View {
         let locked = page.missingPermission(in: host.grants) != nil
         return SettingsLinkRow(
             verbatim: page.title, lead: .tile(page.symbol, page.tone),
-            value: locked ? nil : value, valueGlyph: page == .network ? .link : nil,
+            value: locked ? nil : value,
             lock: locked ? String(localized: "Not allowed") : nil
         ) { host.show(page) }
             .accessibilityIdentifier("SettingsLink-\(page.rawValue)")
@@ -253,11 +253,11 @@ struct AccountHeader: View {
 
     var body: some View {
         if let address = host.serverAddress {
-            SettingsPageHeader(name: host.serverName, address: AddressesModel.display(address)) {
+            SettingsPageHeader(name: host.serverName, line: AddressesModel.display(address)) {
                 HStack(spacing: SettingsTokens.Metric.buttonGap) {
                     if host.isSignInBusy { ProgressView().controlSize(.small).accessibilityLabel("Working…") }
                     Button("Sign Out", action: host.requestSignOut)
-                        .buttonStyle(.bordered).buttonBorderShape(.capsule).controlSize(.regular)
+                        .settingsHeaderAction()
                         .disabled(host.isSignInBusy)
                         .accessibilityIdentifier("AccountSignOut")
                 }

@@ -288,7 +288,7 @@ import Testing
         bench.allowing = .allowed
         await model.allowMore()
         #expect(model.makeNeedsPermission, "the new sign-in still lacks the scope")
-        #expect(model.makeFailureLine == "The new sign-in still isn’t allowed to add link types. Choose Allow More… and approve Full Access.")
+        #expect(model.makeFailureLine == "The new sign-in still isn’t allowed to add link types. Choose Allow More and approve Full Access.")
 
         bench.scopesApproved = [ClientOwnerCalls.registeringLinkTypes]
         await model.allowMore()

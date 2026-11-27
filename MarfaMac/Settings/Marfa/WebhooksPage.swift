@@ -113,7 +113,7 @@ struct WebhooksPage: View {
                         let state = model.isSending(webhook)
                         SettingsLinkRow(
                             verbatim: WebhooksModel.display(webhook.url), line: model.summary(of: webhook),
-                            value: Self.title(state), dot: Self.dot(state), titleGlyph: .link
+                            value: Self.title(state), dot: Self.dot(state)
                         ) { navigation?.push(Self.subpage(for: webhook)) }
                         .help(Text(verbatim: webhook.url))
                     }
