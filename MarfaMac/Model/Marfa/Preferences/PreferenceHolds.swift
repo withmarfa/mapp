@@ -11,6 +11,10 @@ import Foundation
 nonisolated enum PreferenceHolds {
     static let key = "preferencesHolds"
 
+    #if DEBUG
+    static let hooks = TestHooks()
+    #endif
+
     /// What a person's write drops of the stored value because its store could not read it.
     enum Dropped: Sendable, Equatable {
         case nothing
@@ -118,6 +122,9 @@ nonisolated enum PreferenceHolds {
         var list = read(defaults)
         let stored = defaults.object(forKey: key)
         if writer == .person, !list.watched.contains(key), isOwnKind(stored, of: setting) { return }
+        #if DEBUG
+        hooks.readings.update { $0 += 1 }
+        #endif
         let before = list
         for scope in scopes(of: setting, stored: stored, value: value) {
             report(scope, of: setting, by: writer, in: &list)

@@ -542,6 +542,20 @@ import Testing
         #expect(defaults.object(forKey: PreferenceHolds.key) == nil)
     }
 
+    /// A write over a stored value the store read whole drops nothing, so it is not read in full.
+    @Test func aCleanDensityWriteTakesTheFastPath() throws {
+        PlaceDensities.update(in: defaults) { $0.set(.standard, for: .library) }
+        defaults.set(json([PlaceView.feed.storageKey: [String: Any]()]), forKey: PlaceDefaults.key)
+        try #require(PlaceDefaults.stored(in: defaults).places.count == 1)
+        ViewOrders.update(in: defaults) { $0.set([.favorites, .own], in: .library) }
+        let before = PreferenceHolds.hooks.readings.current
+        PlaceDensities.update(in: defaults) { $0.set(.compact, for: .library) }
+        PlaceDefaults.update(in: defaults) { $0.set(nil, for: .library) }
+        ViewOrders.update(in: defaults) { $0.set([.own, .favorites], in: .library) }
+        #expect(PreferenceHolds.hooks.readings.current == before)
+        #expect(defaults.object(forKey: PreferenceHolds.key) == nil)
+    }
+
     @Test func aSidebarWriteNeverTakesTheFastPath() throws {
         defaults.set(json([library: ["hidden": ["feed"]]]), forKey: SidebarLayouts.defaultsKey)
         sidebar.reload()

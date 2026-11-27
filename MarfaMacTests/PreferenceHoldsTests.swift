@@ -854,4 +854,233 @@ import Testing
         #expect(await copy.unitsHeld(item)[look(task)] == edited)
         #expect(local()[look(task)] == edited)
     }
+
+    // MARK: G. After code review
+
+    private let standard = #""standard""#
+    private let compact = #""compact""#
+
+    /// Feed Compact synced; then Feed's stored word is one this build does not know, so a change to the Library's density
+    /// drops it, and a step holds the Marfa's row.
+    private func feedSetAside(flushing: Bool = true) async throws -> (FakePreferencesCopy, String, PreferencesSync) {
+        let copy = FakePreferencesCopy()
+        let item = await copy.add([density(.library): standard, density(.feed): compact])
+        let sync = await sync(copy)
+        defaults.set(json([PlaceView.library.storageKey: "standard", PlaceView.feed.storageKey: "spacious"]), forKey: PlaceDensities.key)
+        PlaceDensities.update(in: defaults) { $0.set(.compact, for: .library) }
+        guard flushing else { return (copy, item, sync) }
+        await flush(sync)
+        try #require(frozen(density(.feed))?.reported == true)
+        try #require(await copy.unitsHeld(item)[density(.feed)] == compact)
+        return (copy, item, sync)
+    }
+
+    @Test func aChoiceMadeAfterAHeldDensityIsSentOverAnotherMacsLaterChoice() async throws {
+        let (copy, item, sync) = try await feedSetAside()
+        await copy.change(item, [density(.feed): standard])
+        browser(showing: .feed).changeDensity(.compact)
+        await flush(sync)
+        #expect(await copy.unitsHeld(item)[density(.feed)] == compact)
+        #expect(local()[density(.feed)] == compact)
+    }
+
+    @Test func aHeldDensitySetAndClearedTakesAnotherMacsLaterChoice() async throws {
+        let (copy, item, sync) = try await feedSetAside()
+        await copy.change(item, [density(.feed): standard])
+        let browser = browser(showing: .feed)
+        browser.changeDensity(.compact)
+        browser.changeDensity(nil)
+        await flush(sync)
+        #expect(await copy.unitsHeld(item)[density(.feed)] == standard)
+        #expect(local()[density(.feed)] == standard)
+    }
+
+    @Test func aHeldDensitySetAndClearedWithNoOtherChangeIsDeleted() async throws {
+        let (copy, item, sync) = try await feedSetAside()
+        let browser = browser(showing: .feed)
+        browser.changeDensity(.compact)
+        browser.changeDensity(nil)
+        await flush(sync)
+        #expect(await copy.unitsHeld(item)[density(.feed)] == nil)
+        #expect(local()[density(.feed)] == nil)
+    }
+
+    /// The JSON a shortcut's row holds.
+    private func shortcutText(_ keys: Shortcut, for command: ShortcutCommand) -> String? {
+        let other = ThrowawayDefaults.make("MarfaMacTests.PreferenceHolds.shortcut")
+        ShortcutBindings(defaults: other).set(keys, for: command)
+        return local(other)[shortcut(command)]
+    }
+
+    @Test func keyboardRestoreDefaultsDuringAStepsReadIsSent() async throws {
+        bindings.set(Shortcut(key: "n", modifiers: [.command, .control]), for: .newItem)
+        let copy = FakePreferencesCopy()
+        let sync = await sync(copy)
+        let item = try #require(await copy.activeIDs.first)
+        try #require(await copy.unitsHeld(item)[shortcut(.newItem)] != nil)
+        let bytes = try #require(defaults.data(forKey: ShortcutBindings.defaultsKey))
+        var stored = try #require(PreferenceJSON.value(String(decoding: bytes, as: UTF8.self)) as? [String: Any])
+        var shortcuts = try #require(stored["shortcuts"] as? [String: Any])
+        shortcuts["later.command"] = 42
+        stored["shortcuts"] = shortcuts
+        defaults.set(json(stored), forKey: ShortcutBindings.defaultsKey)
+        bindings.reload()
+        try #require(local()[shortcut(.newItem)] == nil)
+        let theirs = try #require(shortcutText(Shortcut(key: "m", modifiers: [.command, .option]), for: .newItem))
+        await copy.change(item, [shortcut(.newItem): theirs])
+        let bindings = bindings
+        await copy.whileReading { bindings.restoreDefaults() }
+        await flush(sync)
+        #expect(await copy.unitsHeld(item)[shortcut(.newItem)] == nil)
+        #expect(local()[shortcut(.newItem)] == nil)
+    }
+
+    @Test func anImportedLookEqualToTheBaseThatAReloadReencodesIsSent() async throws {
+        let later = #"{"date":"created","glow":true}"#
+        let copy = FakePreferencesCopy()
+        let item = await copy.add([look(note): later])
+        let sync = await sync(copy)
+        await copy.change(item, [look(note): edited])
+        let file = SettingsFile(units: [look(note): later, look(task): #"{"date":"bogus"}"#], build: "", date: .now)
+        try await sync.importSettings(file, sections: [SettingsFile.Section(look(note))])
+        await flush(sync)
+        #expect(await copy.unitsHeld(item)[look(note)] == created)
+    }
+
+    @Test func aRemovalBeforeTheDocumentBecameUnreadableIsSent() async throws {
+        let copy = FakePreferencesCopy()
+        let item = await copy.add([density(.library): standard, density(.feed): compact])
+        let sync = await sync(copy)
+        browser(showing: .feed).changeDensity(nil)
+        try #require(local()[density(.feed)] == nil)
+        defaults.set(Data(#"{"\#(PlaceView.library.storageKey)":"stan"#.utf8), forKey: PlaceDensities.key)
+        PlaceDensities.update(in: defaults) { $0.set(.compact, for: .library) }
+        await flush(sync)
+        #expect(await copy.unitsHeld(item)[density(.feed)] == nil)
+        #expect(await copy.unitsHeld(item)[density(.library)] == compact)
+    }
+
+    @Test func aLookChosenOverAValueOfAnotherKindIsSentDespiteAnEarlierRewrite() async throws {
+        let later = #"{"date":"created","glow":true}"#
+        let copy = FakePreferencesCopy()
+        let item = await copy.add([look(note): later, look(task): edited])
+        let sync = await sync(copy)
+        defaults.set(json([library: [note: ["date": "created", "glow": true], task: ["date": "bogus"]]]), forKey: TypeLooks.defaultsKey)
+        looks.reload()
+        let rewritten = try #require(defaults.data(forKey: TypeLooks.defaultsKey))
+        defaults.set(String(decoding: rewritten, as: UTF8.self), forKey: TypeLooks.defaultsKey)
+        looks.reload()
+        looks.change(TypeID(note), in: library, catalogue: LookFixture.catalogue()) { $0.date = .created }
+        try #require(defaults.data(forKey: TypeLooks.defaultsKey) != nil)
+        try #require(local()[look(note)] == created)
+        await copy.change(item, [look(note): edited])
+        await flush(sync)
+        #expect(await copy.unitsHeld(item)[look(note)] == created)
+    }
+
+    @Test func aResetInterruptedBeforeItsMarksStillDeletesASetAsideLook() async throws {
+        let copy = FakePreferencesCopy()
+        let item = await copy.add([look(note): created, look(task): edited])
+        let sync = await sync(copy)
+        defaults.set(json([library: [note: ["date": "created"], task: ["date": "bogus"]]]), forKey: TypeLooks.defaultsKey)
+        _ = TypeLooks(defaults: defaults)
+        sync.detach()
+        // Reset's steps, as `Libraries.resetMacSettings` takes them, up to the point a crash stops it before `replaced`.
+        try sync.saveRestorePoint(.reset)
+        bindings.restoreDefaults()
+        MacSettings.reset(in: defaults)
+        sync.attach(copy, library: library, name: { nil })
+        await flush(sync)
+        #expect(await copy.unitsHeld(item)[look(task)] == nil)
+    }
+
+    /// A looks file with Tasks at the look it shows with no choice, and with `notes`' look when given.
+    private func looksFile(notes: LookDate?) throws -> LooksFile {
+        let catalogue = LookFixture.catalogue()
+        let resolved = looks.looks(in: catalogue, library: library)
+        var file = [TypeID(task): try #require(resolved[TypeID(task)])]
+        if let notes {
+            var look = try #require(resolved[TypeID(note)])
+            look.date = notes
+            file[TypeID(note)] = look
+        }
+        return LooksFile(looks: file)
+    }
+
+    @Test func aLooksImportThatSetsAHeldTypeToItsBaselineDeletesIt() async throws {
+        let (copy, item, sync) = await lookSetAside()
+        try #require(frozen(look(task))?.reported == true)
+        looks.importLooks(try looksFile(notes: .occurred), into: library, in: LookFixture.catalogue())
+        await flush(sync)
+        #expect(await copy.unitsHeld(item)[look(task)] == nil)
+        sync.detach()
+        let next = await self.sync(copy, build: "2")
+        await flush(next)
+        #expect(local()[look(task)] == nil)
+    }
+
+    @Test func aLooksImportThatChangesNothingHereStillReleases() async throws {
+        let (copy, item, sync) = await lookSetAside()
+        try #require(frozen(look(task))?.reported == true)
+        let stored = defaults.data(forKey: TypeLooks.defaultsKey)
+        looks.importLooks(try looksFile(notes: nil), into: library, in: LookFixture.catalogue())
+        try #require(defaults.data(forKey: TypeLooks.defaultsKey) == stored)
+        await flush(sync)
+        #expect(await copy.unitsHeld(item)[look(task)] == nil)
+        sync.detach()
+        let next = await self.sync(copy, build: "2")
+        await flush(next)
+        #expect(local()[look(task)] == nil)
+    }
+
+    /// Row 27: a held unit is never sent again for a write of this Mac's that lost, since it stands as the base.
+    @Test func aHeldSearchExclusionIsNeverReclaimed() async throws {
+        let value = #"{"sources":[],"types":["core.note"]}"#
+        let copy = FakePreferencesCopy()
+        let item = await copy.add([search: value])
+        let sync = await sync(copy)
+        await copy.holdNextAnswer()
+        leaveOuts.update(library) { $0.types = [TypeID(task)] }
+        await flush(sync)
+        let write = try #require(await copy.writeIDs.last)
+        let mine = try #require(await copy.unitsHeld(item)[search])
+        await copy.change(item, [:], removing: [search])
+        _ = await copy.add([search: mine], conflicted: true)
+        await copy.answer(write, .lost)
+        defaults.set(json([library: ["types": 5]]), forKey: SearchLeaveOuts.defaultsKey)
+        leaveOuts.reload()
+        let writes = await copy.writeIDs.count
+        await flush(sync)
+        #expect(await copy.unitsHeld(item)[search] == nil)
+        #expect(await copy.writeIDs.count == writes)
+    }
+
+    /// Codex 7, not worse than main: a held Inbox takes another Mac's choice, and the earlier place is carried as it would
+    /// be when that choice reached this Mac after main sent its deletion.
+    @Test func aHeldInboxTakesAnotherMacsChoiceAndCarriesItAsMainWould() async throws {
+        let inbox = PreferenceUnit.row(.places, setting: "placeDensity", key: #"{"inbox":{}}"#)
+        let copy = FakePreferencesCopy()
+        let item = await copy.add([inbox: #""spacious""#, density(.library): standard])
+        let sync = await sync(copy)
+        PlaceDensities.update(in: defaults) { $0.set(.compact, for: .library) }
+        await copy.change(item, [inbox: compact])
+        await flush(sync, times: 3)
+        #expect(local()[inbox] == compact)
+        #expect(local()[density(.feed)] == compact)
+    }
+
+    /// Codex 8, not worse than main: adoption fills a second Marfa from what this Mac holds, here another Mac's choice the
+    /// hold let this Mac take.
+    @Test func aHeldFeedTakenFromOneMarfaFillsASecondAsAdoptionDoes() async throws {
+        let (copy, item, sync) = try await feedSetAside(flushing: false)
+        await copy.change(item, [density(.feed): standard])
+        await flush(sync)
+        try #require(local()[density(.feed)] == standard)
+        let two = FakePreferencesCopy()
+        await two.set(PreferencesReadiness(filled: true, holdsType: true, tablesWhole: true, instance: "instance-2"))
+        let second = await two.add([theme: #""dark""#])
+        sync.attach(two, library: library, name: { nil })
+        await flush(sync)
+        #expect(await two.unitsHeld(second)[density(.feed)] == standard)
+    }
 }

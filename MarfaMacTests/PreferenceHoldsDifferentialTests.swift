@@ -35,6 +35,13 @@ import Testing
         case anotherBuild
         case importLook(String, LookDate)
         case reset
+        /// The person resets a place's view while a step reads the Marfa.
+        case resetViewDuringRead(PlaceView)
+        /// The person sets a place's density and follows Settings again before a step.
+        case setAndClearDensity(PlaceView, Density)
+        /// Import of a look as the Marfa of the run with reports holds it, beside a look this build cannot read, so the
+        /// store's reading rewrites it.
+        case importMarfasLook(String)
 
         var description: String {
             switch self {
@@ -49,14 +56,18 @@ import Testing
             case .anotherBuild: "anotherBuild"
             case .importLook(let type, let date): "importLook(\(type), \(date))"
             case .reset: "reset"
+            case .resetViewDuringRead(let place): "resetViewDuringRead(\(place.storageKey))"
+            case .setAndClearDensity(let place, let density): "setAndClearDensity(\(place.storageKey), \(density.rawValue))"
+            case .importMarfasLook(let type): "importMarfasLook(\(type))"
             }
         }
 
         /// Whether the step is the person's own change through a store.
         var unitThePersonSets: PreferenceUnit? {
             switch self {
-            case .changeLook(let type, _), .restoreLook(let type): PreferenceHoldsDifferentialTests.look(type)
-            case .changeDensity(let place, _), .resetView(let place): PreferenceHoldsDifferentialTests.density(place)
+            case .changeLook(let type, _), .restoreLook(let type), .importMarfasLook(let type): PreferenceHoldsDifferentialTests.look(type)
+            case .changeDensity(let place, _), .resetView(let place), .resetViewDuringRead(let place), .setAndClearDensity(let place, _):
+                PreferenceHoldsDifferentialTests.density(place)
             default: nil
             }
         }
@@ -83,7 +94,7 @@ import Testing
         var fresh = 0
         return (0..<length).map { _ in
             fresh += 1
-            switch generator.next() % 14 {
+            switch generator.next() % 17 {
             case 0, 1: return .damageLook(generator.pick(types))
             case 2: return .extendLook(generator.pick(types))
             case 3, 4: return .changeLook(generator.pick(types), generator.pick(dates))
@@ -97,6 +108,9 @@ import Testing
             case 11:
                 return .otherMac(density(generator.pick(places)), generator.pick([#""later\#(fresh)""#, nil]))
             case 12: return generator.next().isMultiple(of: 2) ? .anotherBuild : .reset
+            case 13: return .resetViewDuringRead(generator.pick(places))
+            case 14: return .setAndClearDensity(generator.pick(places), generator.pick([Density.standard, .compact]))
+            case 15: return .importMarfasLook(generator.pick(types))
             default: return .importLook(generator.pick(types), generator.pick(dates))
             }
         }
@@ -177,7 +191,8 @@ import Testing
             defaults.set(try? JSONSerialization.data(withJSONObject: libraries, options: .sortedKeys), forKey: TypeLooks.defaultsKey)
         }
 
-        func take(_ step: Step) async throws {
+        /// `marfa` is what the Marfa of the run with reports holds, which an import of the Marfa's look takes in both runs.
+        func take(_ step: Step, marfa: PreferenceUnits) async throws {
             switch step {
             case .damageLook(let type):
                 setLook(type, ["date": "bogus"])
@@ -213,6 +228,20 @@ import Testing
                 MacSettings.reset(in: defaults)
                 sync?.replaced(PreferencesMap.synced)
                 looks.reload()
+            case .resetViewDuringRead(let place):
+                await copy.whileReading { [defaults, holds] in
+                    PlaceDensities.update(in: defaults, addressing: [place.storageKey]) { $0.set(nil, for: place) }
+                    if !holds { defaults.removeObject(forKey: PreferenceHolds.key) }
+                }
+            case .setAndClearDensity(let place, let density):
+                PlaceDensities.update(in: defaults) { $0.set(density, for: place) }
+                PlaceDensities.update(in: defaults) { $0.set(nil, for: place) }
+            case .importMarfasLook(let type):
+                let unit = PreferenceHoldsDifferentialTests.look(type)
+                let sibling = PreferenceHoldsDifferentialTests.look(PreferenceHoldsDifferentialTests.types.first { $0 != type } ?? type)
+                let units = [unit: marfa[unit] ?? #"{"date":"created"}"#, sibling: #"{"date":"bogus"}"#]
+                _ = try await sync?.importSettings(SettingsFile(units: units, build: "", date: .now), sections: [SettingsFile.Section(unit)])
+                looks.reload()
             }
             dropReports()
         }
@@ -228,9 +257,10 @@ import Testing
         for (index, step) in steps.enumerated() {
             let context = "seed \(seed), step \(index): \(step), trace \(steps)"
             var expected = await held.marfa
+            let marfa = expected
             if case .otherMac(let unit, let value) = step { expected[unit] = value }
-            try await held.take(step)
-            try await plain.take(step)
+            try await held.take(step, marfa: marfa)
+            try await plain.take(step, marfa: marfa)
             await held.flush()
             await plain.flush()
             let heldMarfa = await held.marfa
@@ -256,8 +286,9 @@ import Testing
             await held.start()
             await plain.start()
             for step in steps {
-                try await held.take(step)
-                try await plain.take(step)
+                let marfa = await held.marfa
+                try await held.take(step, marfa: marfa)
+                try await plain.take(step, marfa: marfa)
                 await held.flush()
                 await plain.flush()
                 if await held.marfa != plain.marfa {
