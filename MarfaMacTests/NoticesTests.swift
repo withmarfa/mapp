@@ -194,7 +194,8 @@ extension Notices {
         let notice = try #require(notices.waiting.first)
         #expect(notice.action == .openSettings(.connection))
         #expect(notice.message == MarfaSync.keyRefused)
-        #expect(notice.message.contains("disconnect"), "the words say Settings can start again")
+        #expect(notice.message.contains("Sign in again in Connection"))
+        #expect(notice.message.contains("Sign Out in Account"))
         _ = library
     }
 
