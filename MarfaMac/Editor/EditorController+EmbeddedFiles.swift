@@ -4,11 +4,8 @@ import WebKit
 
 /// Images put into the item, and the files it embeds opened or shown.
 extension EditorController {
-    /// Attaches images to the item and links them where they were dropped, given in the page's own coordinates, or
-    /// at the caret. Whether there were images to take. They are attached to the item that was open even if the page
-    /// moves on while they are read, and placed in its text only while it is still the page. Each image that couldn't
-    /// be taken is named, and the rest are still placed, so trying again adds only those named. Images attached after
-    /// the item left the page are named too, since they are in the item's attachments but not in its text.
+    /// Takes images for the item that is open now and tries to place their links at the drop point or caret.
+    /// Reports each image that could not be attached or placed in the text.
     @discardableResult
     func insertImages(_ sources: [PastedImages.Source], at point: CGPoint? = nil) -> Bool {
         guard isEditable, let pageItemID, let library, !sources.isEmpty else { return false }
@@ -16,7 +13,6 @@ extension EditorController {
         Task {
             let (files, skipped) = await PastedImages.read(sources)
             let report = files.isEmpty ? AttachReport() : await library.attach(files, to: pageItemID)
-            // The images are kept either way; they go into the item only if it is still the one on the page.
             let placed = self.pageItemID == pageItemID && isEditable
             let embeds = report.embeds
             var notPlaced: [String] = []

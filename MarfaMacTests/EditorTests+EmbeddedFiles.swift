@@ -307,8 +307,7 @@ extension EditorTests {
         open.yield()
         open.finish()
         try #require(await eventually { library.attachedBatches.contains { $0.item == first.id } })
-        // Time for an insertion made from the late answer to reach the page, which nothing signals when none is made.
-        try await Task.sleep(for: .milliseconds(300))
+        try #require(await eventually { library.notices.waiting.last != nil })
         #expect(try await markdown(editor) == nil, "the item now on the page takes nothing")
         #expect(editor.pageItemID == second.id)
         #expect(library.attachedBatches.map(\.item) == [first.id])
