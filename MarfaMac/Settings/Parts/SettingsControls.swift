@@ -263,6 +263,8 @@ extension View {
 /// A text field, 160 wide. The system draws the field, at its own height; `isError` puts the red ring round it.
 struct SettingsField: View {
     private let title: Text
+    private let leadingGlyph: SettingsTextGlyph?
+    private let trailingAccessory: AnyView?
     @Binding var text: String
     /// A hint that says something the label does not. With none, the field is empty: the label is never repeated in it.
     var prompt: String?
@@ -281,30 +283,37 @@ struct SettingsField: View {
 
     init(
         title: LocalizedStringKey, text: Binding<String>, prompt: String? = nil, isError: Bool = false, isSecure: Bool = false,
-        isMonospaced: Bool = false, width: CGFloat? = SettingsTokens.Metric.controlWidth, onSubmit: @escaping () -> Void = {},
+        isMonospaced: Bool = false, width: CGFloat? = SettingsTokens.Metric.controlWidth,
+        leadingGlyph: SettingsTextGlyph? = nil, trailingAccessory: AnyView? = nil, onSubmit: @escaping () -> Void = {},
         onEndEditing: (() -> Void)? = nil, onCancel: (() -> Void)? = nil
     ) {
         self.init(
             label: Text(title), text: text, prompt: prompt, isError: isError, isSecure: isSecure, isMonospaced: isMonospaced, width: width,
+            leadingGlyph: leadingGlyph, trailingAccessory: trailingAccessory,
             onSubmit: onSubmit, onEndEditing: onEndEditing, onCancel: onCancel)
     }
 
     /// For a title the server or a plugin wrote, which is never looked up as a key.
     init(
         verbatim title: String, text: Binding<String>, prompt: String? = nil, isError: Bool = false, isSecure: Bool = false,
-        isMonospaced: Bool = false, width: CGFloat? = SettingsTokens.Metric.controlWidth, onSubmit: @escaping () -> Void = {},
+        isMonospaced: Bool = false, width: CGFloat? = SettingsTokens.Metric.controlWidth,
+        leadingGlyph: SettingsTextGlyph? = nil, trailingAccessory: AnyView? = nil, onSubmit: @escaping () -> Void = {},
         onEndEditing: (() -> Void)? = nil
     ) {
         self.init(
             label: Text(verbatim: title), text: text, prompt: prompt, isError: isError, isSecure: isSecure, isMonospaced: isMonospaced,
-            width: width, onSubmit: onSubmit, onEndEditing: onEndEditing)
+            width: width, leadingGlyph: leadingGlyph, trailingAccessory: trailingAccessory,
+            onSubmit: onSubmit, onEndEditing: onEndEditing)
     }
 
     private init(
         label: Text, text: Binding<String>, prompt: String?, isError: Bool, isSecure: Bool, isMonospaced: Bool, width: CGFloat?,
+        leadingGlyph: SettingsTextGlyph?, trailingAccessory: AnyView?,
         onSubmit: @escaping () -> Void, onEndEditing: (() -> Void)?, onCancel: (() -> Void)? = nil
     ) {
         title = label
+        self.leadingGlyph = leadingGlyph
+        self.trailingAccessory = trailingAccessory
         _text = text
         self.prompt = prompt
         self.isError = isError
@@ -318,20 +327,15 @@ struct SettingsField: View {
 
     var body: some View {
         Group {
-            if isSecure {
-                SecureField(text: $text, prompt: Text(verbatim: prompt ?? "")) { title }
+            if leadingGlyph == nil, trailingAccessory == nil {
+                input
+                    .textFieldStyle(.roundedBorder)
+                    .settingsControlSize()
             } else {
-                TextField(text: $text, prompt: Text(verbatim: prompt ?? "")) { title }
+                fieldWithAccessories
             }
         }
-        .labelsHidden()
-        .textFieldStyle(.roundedBorder)
-        .settingsControlSize()
-        .font(isMonospaced ? SettingsTokens.font(.mono, scale: scale) : nil)
-        .autocorrectionDisabled()
-        .focused($isFocused)
         .appFocusRing(isFocused: isFocused)
-        .onSubmit(onSubmit)
         .onChange(of: isFocused) { _, focused in
             if focused, let onCancel {
                 let anchor = cancelAnchor
@@ -351,6 +355,36 @@ struct SettingsField: View {
         }
         .frame(width: width)
         .settingsErrorRing(isError)
+    }
+
+    private var input: some View {
+        Group {
+            if isSecure {
+                SecureField(text: $text, prompt: Text(verbatim: prompt ?? "")) { title }
+            } else {
+                TextField(text: $text, prompt: Text(verbatim: prompt ?? "")) { title }
+            }
+        }
+        .labelsHidden()
+        .font(isMonospaced ? SettingsTokens.font(.mono, scale: scale) : nil)
+        .autocorrectionDisabled()
+        .focused($isFocused)
+        .onSubmit(onSubmit)
+    }
+
+    private var fieldWithAccessories: some View {
+        let shape = RoundedRectangle(cornerRadius: SettingsTokens.Metric.controlRadius, style: .continuous)
+        let height = scale < SettingsTokens.Metric.controlScaleForLarge
+            ? SettingsTokens.Metric.smallControlHeight : SettingsTokens.Metric.controlHeight
+        return HStack(spacing: SettingsTokens.Metric.pathGlyphGap) {
+            leadingGlyph?.icon
+            input.textFieldStyle(.plain).frame(maxWidth: .infinity)
+            trailingAccessory?.fixedSize()
+        }
+        .padding(.horizontal, SettingsTokens.Metric.fieldAccessoryInset)
+        .frame(minHeight: height)
+        .background(SettingsTokens.field, in: shape)
+        .overlay { shape.strokeBorder(SettingsTokens.hairline).allowsHitTesting(false) }
     }
 
     private struct CancelAnchor: NSViewRepresentable {
