@@ -85,12 +85,12 @@ struct WebhooksPage: View {
     private var list: some View {
         SettingsPageColumn {
             if let failure = model.keysFailure {
-                OwnerProblem(title: "Couldn’t Check Webhook Keys", failure: failure, page: .webhooks, host: host) {
+                OwnerProblem(title: "Couldn’t check webhook keys", failure: failure, page: .webhooks, host: host) {
                     Task { await model.load() }
                 }
             }
             if let failure = model.webhooks.lazy.filter(\.active).compactMap({ model.sendingFailures[$0.id] }).first {
-                OwnerProblem(title: "Couldn’t Check Webhook Deliveries", failure: failure, page: .webhooks, host: host) {
+                OwnerProblem(title: "Couldn’t check webhook deliveries", failure: failure, page: .webhooks, host: host) {
                     Task { await model.load() }
                 }
             }
@@ -127,7 +127,7 @@ struct WebhooksPage: View {
     private var othersNeedKeys: some View {
         SettingsSection(name: nil) {
             OwnerProblemRow(
-                title: "Other Webhooks Aren’t Listed", failure: .notPermitted(InstancePermission.keysManage.rawValue),
+                title: "Other webhooks aren’t listed", failure: .notPermitted(InstancePermission.keysManage.rawValue),
                 line: String(localized: "Seeing and ending the webhooks other apps and keys made needs Manage Keys."), page: .webhooks, host: host)
         }
     }
@@ -138,7 +138,7 @@ struct WebhooksPage: View {
         case .sending: String(localized: "Sending")
         case .off: String(localized: "Off")
         case .failing: String(localized: "Failing")
-        case .unread: String(localized: "Couldn’t Check")
+        case .unread: String(localized: "Couldn’t check")
         }
     }
 

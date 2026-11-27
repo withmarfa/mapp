@@ -60,14 +60,6 @@ struct ConnectorsPage: View {
             } message: { asked in
                 Text(verbatim: asked.message)
             }
-            .toolbar {
-                if subpage == nil, model.failure == nil, model.hasLoaded {
-                    ToolbarItem(placement: .primaryAction) {
-                        SettingsButton("Add a Connector…") { model.beginAdding() }
-                            .disabled(model.unplaced.isEmpty)
-                    }
-                }
-            }
             .accessibilityIdentifier("ConnectorsPage")
     }
 
@@ -110,7 +102,8 @@ struct ConnectorsPage: View {
             if model.entries.isEmpty {
                 SettingsSection(
                     name: nil,
-                    footer: Text("A connector comes with its plugin. Its settings and secrets are kept in this Marfa.")
+                    footer: Text("A connector comes with its plugin. Its settings and secrets are kept in this Marfa."),
+                    accessory: { addConnector }
                 ) {
                     SettingsEmptyCard(
                         symbol: "arrow.triangle.2.circlepath", title: Text("No Connectors"),
@@ -119,23 +112,31 @@ struct ConnectorsPage: View {
             } else {
                 SettingsSection(
                     name: nil,
-                    footer: Text("A connector comes with its plugin. Its settings and secrets are kept in this Marfa.")
+                    footer: Text("A connector comes with its plugin. Its settings and secrets are kept in this Marfa."),
+                    accessory: { addConnector }
                 ) {
                     if let failure = model.hostsFailure {
                         OwnerProblemRow(
-                            title: "Couldn’t Read Connector Machines", failure: failure, page: .connectors, host: host,
+                            title: "Couldn’t read connector machines", failure: failure, page: .connectors, host: host,
                             retry: { Task { await model.load() } })
                     }
                     ForEach(model.entries) { entry in
                         let health = model.health(of: entry)
                         SettingsLinkRow(
-                            verbatim: entry.summary.title, line: line(of: entry), lead: .well(host.markGlyph(entry.summary.mark)),
+                            verbatim: entry.summary.title, line: line(of: entry),
+                            lead: .custom(AnyView(host.markGlyph(entry.summary.mark).font(.system(size: 14)).accessibilityHidden(true))),
                             value: ConnectorWording.title(health), dot: Self.dot(health), lines: 1
                         ) { navigation?.push(Self.subpage(for: entry.summary)) }
                     }
                 }
             }
         }
+    }
+
+    /// Level with where a section title would be. Disabled when every connector already has a machine.
+    private var addConnector: some View {
+        SettingsButton("Add a Connector…", small: true) { model.beginAdding() }
+            .disabled(model.unplaced.isEmpty)
     }
 
     private func line(of entry: ConnectorsModel.Entry) -> String {
@@ -186,7 +187,8 @@ private struct ConnectorDetail: View {
     var body: some View {
         SettingsPageColumn {
             SettingsHead(
-                lead: SettingsWell(size: SettingsTokens.Metric.headTile) { host.markGlyph(summary.mark) }, title: Text(verbatim: summary.title),
+                lead: host.markGlyph(summary.mark).font(.system(size: SettingsTokens.Metric.headTile * SettingsTokens.Metric.wellGlyph)),
+                title: Text(verbatim: summary.title),
                 line: headLine.map { Text(verbatim: $0) }
             ) {
                 SettingsButton("Run Now") { Task { await model.runNow(summary.name) } }
@@ -246,7 +248,7 @@ private struct ConnectorDetail: View {
     @ViewBuilder private var machine: some View {
         if let failure = model.hostsFailure {
             OwnerProblemRow(
-                title: "Couldn’t Read Connector Machines", failure: failure, page: .connectors, host: host,
+                title: "Couldn’t read connector machines", failure: failure, page: .connectors, host: host,
                 retry: { Task { await model.reload(summary.name) } })
         }
         let held = model.hostID(of: entry)

@@ -88,7 +88,7 @@ struct PluginsPage: View {
             }
             ForEach(model.installed) { plugin in
                 SettingsLinkRow(
-                    verbatim: plugin.title, line: model.catalogueLine(of: plugin), lead: .well(host.markGlyph(plugin.mark)),
+                    verbatim: plugin.title, line: model.catalogueLine(of: plugin), lead: plainMark(host.markGlyph(plugin.mark)),
                     value: plugin.version
                 ) { navigation?.push(Self.subpage(named: plugin.name, title: plugin.title)) }
             }
@@ -131,7 +131,7 @@ struct PluginsPage: View {
                 }
                 ForEach(model.available) { entry in
                     SettingsLinkRow(
-                        verbatim: entry.title, line: entry.description, lead: .well(host.markGlyph(entry.mark)),
+                        verbatim: entry.title, line: entry.description, lead: plainMark(host.markGlyph(entry.mark)),
                         value: entry.version.description
                     ) { navigation?.push(Self.subpage(named: entry.name, title: entry.title)) }
                 }
@@ -168,7 +168,12 @@ private struct PluginNotices: View {
     }
 }
 
-/// A refusal in words: Allow More… where it is a permission, both releases where the server is too old.
+/// A plugin's mark as a plain glyph in the lead column, without the hairline well.
+private func plainMark(_ glyph: AnyView) -> SettingsLead {
+    .custom(AnyView(glyph.font(.system(size: 14)).accessibilityHidden(true)))
+}
+
+/// A refusal in words: Allow More where it is a permission, both releases where the server is too old.
 private struct PluginProblem: View {
     let problem: PluginsModel.Problem
     let model: PluginsModel
@@ -213,7 +218,7 @@ private struct ConnectorPermissionButton: View {
     let host: any MarfaSettingsHost
 
     var body: some View {
-        SettingsButton(host.isAllowingMore ? "Waiting…" : "Allow More…") {
+        SettingsButton(host.isAllowingMore ? "Waiting…" : "Allow More") {
             host.askForMore(naming: InstancePermission.connectorsManage.rawValue)
         }
         .disabled(host.isAllowingMore)
@@ -237,7 +242,7 @@ private struct PluginUpdateRow: View {
     var body: some View {
         SettingsRow(
             verbatim: "\(update.installed.title) \(update.entry.version)", line: line,
-            lead: .well(host.markGlyph(update.installed.mark)), lines: nil
+            lead: plainMark(host.markGlyph(update.installed.mark)), lines: nil
         ) {
             if model.isWorking(update.id) {
                 ProgressView().controlSize(.small)
@@ -248,7 +253,7 @@ private struct PluginUpdateRow: View {
             } else if !model.mayChange(update.installed) {
                 ConnectorPermissionButton(host: host)
             } else {
-                SettingsButton("Update", role: .update) { Task { await model.install(update.entry, asUpdate: true) } }
+                SettingsButton("Update", small: true) { Task { await model.install(update.entry, asUpdate: true) } }
             }
         }
     }

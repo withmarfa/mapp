@@ -258,7 +258,7 @@ struct PluginsAccess {
         if asUpdate, let held = plugin(name), !mayChange(held) {
             notice = nil
             problem = Problem(
-                plugin: name, title: String(localized: "Not Updated"),
+                plugin: name, title: String(localized: "Not updated"),
                 failure: .owner(.notPermitted(InstancePermission.connectorsManage.rawValue)))
             return
         }
@@ -267,7 +267,7 @@ struct PluginsAccess {
         defer { working.remove(name) }
         problem = nil
         notice = nil
-        let title = asUpdate ? String(localized: "Not Updated") : String(localized: "Not Installed")
+        let title = asUpdate ? String(localized: "Not updated") : String(localized: "Not Installed")
         await readBundle(of: entry)
         guard let bundle = bundle(name) else {
             if case .failed(let failure)? = bundles[name] { problem = Problem(plugin: name, title: title, failure: failure) }
@@ -357,7 +357,7 @@ struct PluginsAccess {
             notice = nil
             removal = nil
             problem = Problem(
-                plugin: plugin.name, title: String(localized: "Not Removed"),
+                plugin: plugin.name, title: String(localized: "Not removed"),
                 failure: .owner(.notPermitted(InstancePermission.connectorsManage.rawValue)))
             return
         }
@@ -374,7 +374,7 @@ struct PluginsAccess {
         guard mayChange(asked.plugin) else {
             removal = nil
             problem = Problem(
-                plugin: asked.plugin.name, title: String(localized: "Not Removed"),
+                plugin: asked.plugin.name, title: String(localized: "Not removed"),
                 failure: .owner(.notPermitted(InstancePermission.connectorsManage.rawValue)))
             return
         }
@@ -388,7 +388,7 @@ struct PluginsAccess {
             commands[name] = nil
             notice = Notice(title: String(localized: "Removed"), line: PluginWording.removed(answer, title: asked.plugin.title))
         } catch {
-            problem = Problem(plugin: name, title: String(localized: "Not Removed"), failure: .owner(error))
+            problem = Problem(plugin: name, title: String(localized: "Not removed"), failure: .owner(error))
             await context.learn(from: error)
             if error == .notFound {
                 installed.removeAll { $0.name == name }
