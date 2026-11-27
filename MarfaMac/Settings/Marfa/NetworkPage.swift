@@ -58,8 +58,7 @@ struct NetworkPage: View {
             SettingsPageColumn {
                 SettingsSection("Sign-In Address") {
                     SettingsRow(
-                        title: Text(verbatim: AddressesModel.display(settings.signIn)), line: Text("Where you sign in, and where apps connect."),
-                        titleGlyph: .link
+                        title: Text(verbatim: AddressesModel.display(settings.signIn)), line: Text("Where you sign in, and where apps connect.")
                     ) {
                         SettingsButton("Change…") { model.begin(.changeSignIn) }
                     }
@@ -71,7 +70,6 @@ struct NetworkPage: View {
                     ForEach(model.otherAddresses, id: \.self) { address in
                         SettingsRow(
                             title: Text(verbatim: AddressesModel.display(address)), line: AddressesModel.kind(of: address).map { Text(verbatim: $0) },
-                            titleGlyph: .link,
                             error: model.rowErrors[address].map { OwnerWording.line($0, on: .network) }
                         ) {
                             SettingsMoreMenu { Button("Remove", role: .destructive) { Task { await model.askToRemove(address: address) } } }
@@ -83,7 +81,7 @@ struct NetworkPage: View {
                 } content: {
                     ForEach(settings.websites, id: \.self) { website in
                         SettingsRow(
-                            title: Text(verbatim: AddressesModel.display(website)), titleGlyph: .link,
+                            title: Text(verbatim: AddressesModel.display(website)),
                             error: model.rowErrors[website].map { OwnerWording.line($0, on: .network) }
                         ) {
                             SettingsMoreMenu { Button("Remove", role: .destructive) { model.askToRemove(website: website) } }
