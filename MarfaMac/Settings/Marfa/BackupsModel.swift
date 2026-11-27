@@ -16,7 +16,6 @@ import Observation
     private(set) var backups: [BackupRecord] = []
     /// Where and how often, which only a sign-in holding `config.manage` reads; nil without it.
     private(set) var settings: UpkeepSettings?
-    /// Why the backups could not be read: the page says so in place of itself.
     private let loader = OwnerLoader()
     var failure: OwnerFailure? { loader.failure }
     private(set) var listFailure: OwnerFailure?
@@ -70,7 +69,7 @@ import Observation
         ])
     }
 
-    /// The newest backup, which Last Backup tells.
+    /// The newest backup in the destination, which can contain backups from several instances.
     var latest: BackupRecord? { backups.first }
 
     func lastBackupLine(health: BackupsHealth?) -> String {

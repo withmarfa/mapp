@@ -168,8 +168,8 @@ struct MarfaMarkSet: Identifiable, Hashable {
     /// Sets the type's icon, or with nil takes the owner's away, for every app. Answers why the server refused, or nil once it took it.
     func changeTypeIcon(_ icon: String?, ofType id: String) async -> OwnerFailure?
 
-    /// Items shown in Trash.
     var canReadTrash: Bool { get }
+    /// Items shown in Trash.
     var deletedItems: [MarfaDeletedItem] { get }
     var deletedCount: Int { get }
     /// How many days the server keeps deleted items, where it is known and limited.

@@ -1,8 +1,6 @@
 import Marfa
 import SwiftUI
 
-/// The Backups page: where the server keeps its backups and how often it takes one, Back Up Now, and the backups it holds with
-/// Show All opens a list where the owner can select a backup to restore.
 struct BackupsPage: View {
     static let allBackups = SettingsSubpage(id: "all-backups", title: String(localized: "All Backups"))
 
