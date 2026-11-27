@@ -5786,6 +5786,9 @@
     "It couldn’t be put in place." : {
 
     },
+    "It couldn’t be saved to Downloads. The copy is still at %@." : {
+
+    },
     "It depends on an item that isn’t available any more. Undoing it puts the item back as the server has it." : {
       "extractionState" : "manual"
     },
@@ -13152,6 +13155,19 @@
 
     },
     "“%@” was made by a newer version of the app. Update the app to import it. No shortcuts were changed." : {
+
+    },
+    "“%@” wasn’t attached and was saved to Downloads as “%@”." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "“%1$@” wasn’t attached and was saved to Downloads as “%2$@”."
+          }
+        }
+      }
+    },
+    "“%@” wasn’t attached and was saved to Downloads." : {
 
     },
     "“%@” wasn’t created" : {

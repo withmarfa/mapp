@@ -42,6 +42,8 @@ extension MarfaEngine {
         let holdLimit = TestHook<Duration>()
         /// Replaces the copy's attach, which the fake copy refuses, so a test can hold it as a large file's would be.
         let attaching = TestHook<@Sendable (_ item: String, _ title: String) async throws -> Marfa.Attached>()
+        /// Replaces the copy's add-file, which the fake copy refuses.
+        let adding = TestHook<@Sendable (_ file: URL, _ title: String?, _ tier: Marfa.Tier?, _ parent: String?) async throws -> Marfa.Added>()
         /// Chooses an error a name lookup fails with, given the ids in its batch, since a fake copy answers them all.
         let naming = TestHook<@Sendable ([String]) -> MarfaError?>()
         /// The ids of each name lookup asked, in order.
@@ -93,6 +95,13 @@ extension PictureCache {
     nonisolated struct TestHooks: Sendable {
         /// Runs as a trim begins, given whether the lock `removeAll` and `store` share is free then.
         let trimming = TestHook<@Sendable (_ lockIsFree: Bool) -> Void>()
+    }
+}
+
+extension MarfaLibrary {
+    nonisolated struct TestHooks: Sendable {
+        /// The folder a refused image is moved into. Nil uses the person's Downloads. Throwing leaves the staged file.
+        let savingRefusedFile = TestHook<@Sendable () throws -> URL>()
     }
 }
 #endif

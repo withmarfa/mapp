@@ -101,6 +101,9 @@ import Observation
     var isLoaded = false
     /// Where the library tells the person what it could not do or keep: the host's, for every library it opens.
     @ObservationIgnored let notices: Notices
+    #if DEBUG
+    @ObservationIgnored let hooks = TestHooks()
+    #endif
     /// Has every open page hand over its last edit, then says whether all of them did, so a change that moves an
     /// item's text moves what the person sees.
     @ObservationIgnored var handOverEdits: (@escaping (Bool) -> Void) -> Void = { EditorController.flushAll(leaving: false, then: $0) }

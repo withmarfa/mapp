@@ -16,7 +16,8 @@ extension View {
     /// Tells the person, in one window in front, each notice in the order it was told: something a library could
     /// not do, a change it could not keep, or an address that sends the key unencrypted. A notice carrying text the
     /// person typed puts it on the clipboard as they are first told, so it outlives the alert. A notice that offers
-    /// Settings asks `openSettings` to show the page, from the window the person answers in.
+    /// Settings asks `openSettings` to show the page, from the window the person answers in. One that saved files
+    /// elsewhere offers to show them in the Finder.
     func notices(_ notices: Notices, openSettings: @escaping (SettingsPage) -> Void) -> some View {
         modifier(NoticeAlert(notices: notices, openSettings: openSettings))
     }
@@ -51,6 +52,9 @@ private struct NoticeAlert: ViewModifier {
                 // The fix is the default button, as in a system alert; a notice with none keeps the system's OK.
                 if case .openSettings(let page) = notice.action {
                     Button("Open Settings…") { openSettings(page) }
+                    Button("Not Now", role: .cancel) {}
+                } else if case .showInFinder(let files) = notice.action {
+                    Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting(files) }
                     Button("Not Now", role: .cancel) {}
                 }
             } message: { notice in

@@ -4,21 +4,16 @@ import WebKit
 
 /// Images put into the item, and the files it embeds opened or shown.
 extension EditorController {
-    /// Attaches images to the item and links them where they were dropped, given in the page's own coordinates, or
-    /// at the caret. Whether there were images to take; they are read and placed once their files have been read,
-    /// if the item is still the one on the page. Each image that couldn't be taken is named, and the rest are
-    /// still placed, so trying again adds only those named. Images attached after the item left the page are named
-    /// too, since they are in the item's attachments but not in its text.
+    /// Takes images for the item that is open now and tries to place their links at the drop point or caret.
+    /// Reports each image that could not be attached or placed in the text.
     @discardableResult
     func insertImages(_ sources: [PastedImages.Source], at point: CGPoint? = nil) -> Bool {
-        guard isEditable, let pageItemID, library != nil, !sources.isEmpty else { return false }
+        guard isEditable, let pageItemID, let library, !sources.isEmpty else { return false }
         let height = webView.bounds.height
         Task {
             let (files, skipped) = await PastedImages.read(sources)
-            guard self.pageItemID == pageItemID, isEditable, let library else { return }
             let report = files.isEmpty ? AttachReport() : await library.attach(files, to: pageItemID)
-            // The images are kept either way; they go into the item only if it is still the one on the page.
-            let placed = self.pageItemID == pageItemID && isEditable
+            let placed = self.pageItemID == pageItemID && isEditable && acceptsInsertion
             let embeds = report.embeds
             var notPlaced: [String] = []
             if placed, !embeds.isEmpty,
@@ -26,7 +21,7 @@ extension EditorController {
                 notPlaced = embeds.map(\.name)
             }
             Self.reportUnplaced(
-                skipped: skipped, failed: report.failed, attached: embeds.count,
+                skipped: skipped, failed: report.failed, kept: report.kept, attached: embeds.count,
                 unplaced: placed ? [] : embeds.map(\.name), refused: notPlaced,
                 in: library.item(pageItemID)?.title ?? "", to: library
             )
@@ -42,7 +37,7 @@ extension EditorController {
             "height": Double(height),
         ]
         for attempt in 0...Self.hiddenTextRetryLimit {
-            guard pageItemID == id, isEditable else { return false }
+            guard pageItemID == id, isEditable, acceptsInsertion else { return false }
             let outcome: Any?
             do {
                 outcome = try await webView.callAsyncJavaScript(
@@ -61,13 +56,20 @@ extension EditorController {
     }
 
     private static func reportUnplaced(
-        skipped: [String], failed: [(name: String, reason: String)], attached: Int, unplaced: [String], refused: [String] = [],
+        skipped: [String], failed: [(name: String, reason: String)], kept: [KeptFile] = [],
+        attached: Int, unplaced: [String], refused: [String] = [],
         in title: String, to library: any ItemLibrary
     ) {
-        guard !skipped.isEmpty || !failed.isEmpty || !unplaced.isEmpty || !refused.isEmpty else { return }
+        guard !skipped.isEmpty || !failed.isEmpty || !kept.isEmpty || !unplaced.isEmpty || !refused.isEmpty else { return }
         let largest = Int64(PastedImages.largestImage).formatted(.byteCount(style: .memory))
         let lines = skipped.map { String(localized: "“\($0)” is larger than \(largest) or can’t be read.") }
             + failed.map { String(localized: "“\($0.name)” couldn’t be attached. \($0.reason)") }
+            + kept.map { file in
+                let saved = file.file.lastPathComponent
+                return saved == file.name
+                    ? String(localized: "“\(file.name)” wasn’t attached and was saved to Downloads.")
+                    : String(localized: "“\(file.name)” wasn’t attached and was saved to Downloads as “\(saved)”.")
+            }
             + unplaced.map { String(localized: "“\($0)” was attached to “\(title)” but isn’t in its text, because the item was no longer open for editing.") }
             + refused.map { String(localized: "“\($0)” was attached to “\(title)” but isn’t in its text. It was meant for a folded section or text not yet shown.") }
         let title = if skipped.isEmpty && failed.isEmpty {
@@ -77,7 +79,8 @@ extension EditorController {
         } else {
             String(localized: "Some Images Weren’t Attached")
         }
-        library.notices.tell(title, lines.joined(separator: "\n"))
+        let saved = kept.map(\.file)
+        library.notices.tell(title, lines.joined(separator: "\n"), action: saved.isEmpty ? nil : .showInFinder(saved))
     }
 
     nonisolated static let hiddenTextTitle = String(localized: "Text Wasn’t Added")
@@ -92,6 +95,10 @@ extension EditorController {
     /// does typing. Where the page never shows the item again, the files stay attached without being in its text.
     func append(_ embeds: [Embed], to id: ItemID) {
         guard !windowIsGone, !embeds.isEmpty else { return }
+        guard acceptsInsertion else {
+            notInText(embeds, of: id)
+            return
+        }
         pendingEmbeds[id, default: []] += embeds
         appendPendingEmbeds()
     }
@@ -104,7 +111,7 @@ extension EditorController {
             appendsAgain = true
             return
         }
-        guard let pageItemID, isReady, isEditable, let embeds = pendingEmbeds[pageItemID], !embeds.isEmpty else { return }
+        guard let pageItemID, isReady, isEditable, acceptsInsertion, let embeds = pendingEmbeds[pageItemID], !embeds.isEmpty else { return }
         isAppendingEmbeds = true
         appendsAgain = false
         let generation = generation

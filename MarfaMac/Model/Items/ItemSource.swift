@@ -77,10 +77,19 @@ nonisolated protocol EmbedResolver: Sendable {
     func addFile(_ file: URL, title: String?, tier: Tier?, tags: [String], parent: ItemID?) async throws -> ItemID
 }
 
-/// What attaching files gave: the text to write for each file attached, in order, and the name of each that
-/// wasn't, with why.
+/// A file the item would not take, moved into the person's Downloads folder.
+nonisolated struct KeptFile: Sendable, Equatable {
+    /// The name it was offered to the item under.
+    var name: String
+    /// The file in Downloads.
+    var file: URL
+}
+
+/// What attaching files gave: the text to write for each file attached, in order, each file the item would not
+/// take, saved in Downloads, and the name of each that could not be saved, with why.
 nonisolated struct AttachReport: Sendable {
     var embeds: [Embed] = []
+    var kept: [KeptFile] = []
     var failed: [(name: String, reason: String)] = []
 }
 

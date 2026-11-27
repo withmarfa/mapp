@@ -29,6 +29,8 @@ extension EditorController {
     /// were waiting on the edit it could not keep, and the person has been told once.
     func flush(leaving: Bool = false, then done: @escaping (Bool) -> Void = { _ in }) {
         releaseHeldEdit()
+        // A flush that leaves the window is its last one: an image still being read must not land in the page after it.
+        if leaving { acceptsInsertion = false }
         guard !isFlushing else { return waitingFlushes.append((leaving, done)) }
         isFlushing = true
         handOver(leaving: leaving) { [self] kept in
@@ -40,6 +42,7 @@ extension EditorController {
             isFlushing = false
             let waiting = waitingFlushes
             waitingFlushes = []
+            if !kept, (leaving || waiting.contains { $0.leaving }), !windowIsGone { acceptsInsertion = true }
             done(kept)
             guard kept else { return waiting.forEach { $0.done(false) } }
             // `done` may have started a flush of its own, which keeps its turn.
@@ -230,7 +233,13 @@ extension EditorController {
     /// capture does, since it would otherwise be lost; where they stay, as when an item is deleted, it waits.
     static func flushAll(leaving: Bool = true, trace: QuitTrace? = nil, then done: @escaping (Bool) -> Void) {
         let editors = open.allObjects
-        let gate = Gate(waitingFor: editors.count, then: done)
+        let gate = Gate(waitingFor: editors.count) { success in
+            // A quit that does not happen had stopped insertion on every window whose flush succeeded.
+            if leaving, !success {
+                for editor in editors where !editor.windowIsGone { editor.acceptsInsertion = true }
+            }
+            done(success)
+        }
         // One refusal is told, from the window that holds it, since that window comes forward and only one can.
         var told = false
         for editor in editors {
@@ -271,6 +280,7 @@ extension EditorController {
     /// while SwiftUI still holds the editor for a moment.
     func windowWent() {
         windowIsGone = true
+        acceptsInsertion = false
         quickLook = nil
         requestedItemID = nil
         cancelRequests()

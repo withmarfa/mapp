@@ -276,6 +276,103 @@ extension EditorTests {
         #expect(library.notices.waiting.last?.message == "“Photo” was attached to “Plan” but isn’t in its text, because the item was no longer open for editing.")
     }
 
+    @Test func anImageReadWhileThePageChangesIsAttachedToTheItemLeftAndNamed() async throws {
+        let first = FakeItemLibrary.note("Plan", modified: .now)
+        let second = FakeItemLibrary.note("Other", modified: .now)
+        let library = FakeItemLibrary(items: [first, second])
+        let (entered, enteredOpen) = AsyncStream<Void>.makeStream()
+        let (gate, open) = AsyncStream<Void>.makeStream()
+        defer {
+            PastedImages.reading.set(nil)
+            open.finish()
+        }
+        PastedImages.reading.set {
+            enteredOpen.yield()
+            for await _ in gate { break }
+        }
+        library.attaching = {
+            AttachReport(embeds: [Embed(link: "Attachments/Photo.png", name: "Photo")])
+        }
+        let editor = try await attachingEditor(library)
+        #expect(editor.insertImages(Self.pasted))
+        var started = false
+        for await _ in entered {
+            started = true
+            break
+        }
+        #expect(started)
+        editor.load(second)
+        try #require(await eventually { editor.pageItemID == second.id })
+        _ = try await editor.webView.evaluateJavaScript("1")
+        open.yield()
+        open.finish()
+        try #require(await eventually { library.attachedBatches.contains { $0.item == first.id } })
+        try #require(await eventually { library.notices.waiting.last != nil })
+        #expect(try await markdown(editor) == nil, "the item now on the page takes nothing")
+        #expect(editor.pageItemID == second.id)
+        #expect(library.attachedBatches.map(\.item) == [first.id])
+        #expect(library.attachedBatches.first?.names == ["Photo.png"])
+        #expect(library.notices.waiting.last?.title == "Images Weren’t Added to the Item")
+        #expect(library.notices.waiting.last?.message == "“Photo” was attached to “Plan” but isn’t in its text, because the item was no longer open for editing.")
+    }
+
+    @Test func anImageReadWhileTheWindowClosesIsAttachedAndNotWrittenIntoTheClosedPage() async throws {
+        let note = FakeItemLibrary.note("Plan", modified: .now)
+        let library = FakeItemLibrary(items: [note])
+        let (entered, enteredOpen) = AsyncStream<Void>.makeStream()
+        let (gate, open) = AsyncStream<Void>.makeStream()
+        defer {
+            PastedImages.reading.set(nil)
+            open.finish()
+        }
+        PastedImages.reading.set {
+            enteredOpen.yield()
+            for await _ in gate { break }
+        }
+        library.attaching = {
+            AttachReport(embeds: [Embed(link: "Attachments/Photo.png", name: "Photo")])
+        }
+        let editor = try await attachingEditor(library)
+        #expect(editor.hasItem)
+        #expect(editor.insertImages(Self.pasted))
+        var started = false
+        for await _ in entered {
+            started = true
+            break
+        }
+        #expect(started)
+        // The close callback flushes, then closes. It does not mark the page gone; the flush must.
+        let window = ImageCloseWindow(editor)
+        defer { window.tearDown() }
+        window.window.performClose(nil)
+        try #require(await eventually { !window.window.isVisible })
+        open.yield()
+        open.finish()
+        try #require(await eventually { library.attachedBatches.contains { $0.item == note.id } })
+        try #require(await eventually { library.notices.waiting.last != nil })
+        #expect(try await markdown(editor) == nil, "the closed page takes nothing")
+        #expect(library.attachedBatches.map(\.item) == [note.id])
+        #expect(library.attachedBatches.first?.names == ["Photo.png"])
+        #expect(library.notices.waiting.last?.title == "Images Weren’t Added to the Item")
+        #expect(library.notices.waiting.last?.message == "“Photo” was attached to “Plan” but isn’t in its text, because the item was no longer open for editing.")
+    }
+
+    @Test func aRefusedImageSavedToDownloadsIsSaidToBeThere() async throws {
+        let library = FakeItemLibrary(items: [FakeItemLibrary.note("Plan", modified: .now)])
+        let one = URL(fileURLWithPath: "/tmp/Photo.png")
+        let two = URL(fileURLWithPath: "/tmp/Two 2.png")
+        library.attaching = {
+            AttachReport(kept: [KeptFile(name: "Photo.png", file: one), KeptFile(name: "Two.png", file: two)])
+        }
+        let editor = try await attachingEditor(library)
+        #expect(editor.insertImages(Self.pasted))
+        #expect(await eventually { library.notices.waiting.last != nil })
+        #expect(try await markdown(editor) == nil, "nothing is inserted")
+        #expect(library.notices.waiting.last?.title == "Images Weren’t Added to the Item")
+        #expect(library.notices.waiting.last?.message == "“Photo.png” wasn’t attached and was saved to Downloads.\n“Two.png” wasn’t attached and was saved to Downloads as “Two 2.png”.")
+        #expect(library.notices.waiting.last?.action == .showInFinder([one, two]))
+    }
+
     @Test func filesQuickAddAttachedGoAtTheEndOfTheNewItemOnceThePageShowsIt() async throws {
         let shown = FakeItemLibrary.note("Plan", modified: .now)
         let new = FakeItemLibrary.note("Trip", modified: .now)
@@ -487,5 +584,23 @@ extension EditorTests {
         _ = try await editor.webView.evaluateJavaScript("1")
         #expect(await eventually { library.notices.told == 2 })
         #expect(library.notices.waiting.count == 1)
+    }
+}
+
+/// Closes through the window-close callback. The page is not marked gone: that is the flush's job.
+private final class ImageCloseWindow {
+    let window = TestWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 400), styleMask: [.titled, .closable], backing: .buffered, defer: false)
+    private var proxy: EditorCloseDelegate?
+
+    init(_ editor: EditorController) {
+        window.isReleasedWhenClosed = false
+        proxy = EditorCloseDelegate(editor: editor, window: window)
+        window.orderFront(nil)
+    }
+
+    func tearDown() {
+        proxy?.detach()
+        window.delegate = nil
+        if window.isVisible { window.close() }
     }
 }

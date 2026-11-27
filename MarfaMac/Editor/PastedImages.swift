@@ -7,6 +7,11 @@ enum PastedImages {
     /// The largest image taken in by a paste or drop.
     nonisolated static let largestImage = 50 * 1024 * 1024
 
+    #if DEBUG
+    /// Pauses a read so a test can change the page before the images are attached.
+    nonisolated static let reading = TestHook<@Sendable () async -> Void>()
+    #endif
+
     /// An image to attach: a file still to be read, or bytes already in hand.
     enum Source: Sendable {
         case file(URL)
@@ -33,6 +38,9 @@ enum PastedImages {
     /// The images' names and bytes, read away from the main thread, since a file can be large, and the name of each
     /// file that was too large or couldn't be read. A file chosen in an open panel is read under its security scope.
     @concurrent nonisolated static func read(_ sources: [Source]) async -> (images: [(name: String, data: Data)], skipped: [String]) {
+        #if DEBUG
+        if let pause = reading.current { await pause() }
+        #endif
         var images: [(name: String, data: Data)] = []
         var skipped: [String] = []
         for source in sources {
