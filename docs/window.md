@@ -34,7 +34,6 @@ paths:
 - **Five types show, then "N More".** Counts include kinds.
 - **Hover highlights rows,** swaps counts for Add and shows Add and More on headings. Sections stay open. The chosen row stays soft gray, focused or not.
 - **Customize Sidebar** uses a menu on each faded place.
-- **Go lists sidebar places, views and types, plus Archive** (`GoMenu`).
 
 ### A layout an earlier copy stored
 
@@ -52,7 +51,7 @@ paths:
 
 - **The top row is drawn in the content under a title the window hides** (`TopRowFrame`); a plain `toolbar` holds only the buttons.
 - **The views are a radio group;** VoiceOver reads every view, folded or not.
-- **The first pill's capsule aligns with the title's left edge.**
+- **The first pill's text aligns with the title's text.**
 - **The row folds by its room** (`ToolbarRoomProbe`) into N More, with hidden pills and New View…, and holds no width. One view makes no row.
 - **An on button is gray, never the accent.** An item that cannot act dims.
 - **Trap:** hide the title on the window (`hidesWindowTitle`), or it returns in full screen. Read the row's line from `TopRowSpace`, never a safe area: full screen hides the toolbar.

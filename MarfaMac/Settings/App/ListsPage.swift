@@ -150,6 +150,8 @@ private struct DensityPicture: View {
         .padding(.horizontal, Metric.densityPreviewInset)
     }
 
+    /// Laid out as `ItemRow` lays out a Standard row: a row with a picture holds it beside the lines under the title, so the
+    /// row is as tall as the picture needs.
     private func previewRow(_ content: RowContent, showsPicture: Bool) -> some View {
         VStack(alignment: .leading, spacing: Metric.densityLineGap) {
             HStack(spacing: Metric.buttonGap) {
@@ -165,26 +167,33 @@ private struct DensityPicture: View {
                         .fixedSize()
                 }
             }
-            if density == .standard, let preview = content.secondary {
-                Text(verbatim: preview)
-                    .font(SettingsTokens.font(.line))
-                    .foregroundStyle(SettingsTokens.secondaryText)
-                    .lineLimit(2)
-                    .padding(.trailing, showsPicture ? Metric.densitySamplePictureClearance : 0)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if density == .standard, !content.chips.isEmpty {
-                ChipLine(content: content, statusItem: nil, typeFont: InterfaceStyle.captionFont)
+            if density == .standard {
+                if showsPicture {
+                    HStack(alignment: .top, spacing: Metric.buttonGap) {
+                        details(content).frame(maxWidth: .infinity, alignment: .leading)
+                        RowPictureFrame { SamplePicture() }
+                    }
+                } else {
+                    details(content)
+                }
             }
         }
         .font(SettingsTokens.font(.title))
         .padding(.vertical, density == .standard ? Metric.densityStandardRowPadding : 0)
         .padding(.horizontal, Metric.densityRowInset)
-        .overlay(alignment: .topTrailing) {
-            if showsPicture {
-                RowPictureFrame { SamplePicture() }
-                    .padding(.top, Metric.densitySamplePictureTop)
-                    .padding(.trailing, Metric.densityRowInset)
+    }
+
+    private func details(_ content: RowContent) -> some View {
+        VStack(alignment: .leading, spacing: Metric.densityLineGap) {
+            if let preview = content.secondary {
+                Text(verbatim: preview)
+                    .font(SettingsTokens.font(.line))
+                    .foregroundStyle(SettingsTokens.secondaryText)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if !content.chips.isEmpty {
+                ChipLine(content: content, statusItem: nil, typeFont: InterfaceStyle.captionFont)
             }
         }
     }
@@ -210,6 +219,4 @@ private extension SettingsTokens.Metric {
     static let densityLineGap: CGFloat = 2
     static let densityStandardRowPadding: CGFloat = 10
     static let densityCompactRowHeight: CGFloat = 28 / densityRowScale
-    static let densitySamplePictureClearance: CGFloat = 52
-    static let densitySamplePictureTop: CGFloat = 31
 }

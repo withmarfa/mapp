@@ -78,6 +78,7 @@ A place lists items. Its layout, filters, sort, grouping and properties are its 
 - **The table and the list nest items under a listed parent** (`ItemNesting`). The table's "1 of 3" counts finished sub-items, from Marfa.
 - **A child whose parent is unlisted or in another group stands at the top,** as does a cycle's first item.
 - **A chosen sub-item opens its parents;** closing one moves the choice off them. Pages and arrows count drawn rows.
+- **The list's chevron is inside the row's card and takes a click;** titles stand one chevron in.
 - **A sub-item does not drag.**
 
 ## The View panel
