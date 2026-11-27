@@ -219,7 +219,7 @@ import Observation
         if source.unicodeScalars.count > 200 { return String(localized: "Use a source with at most 200 characters.") }
         if source == "." || source == ".." { return String(localized: "A source can’t be “.” or “..”.") }
         let lowered = source.lowercased()
-        if ["oauth:", "restored:", "connector-host:"].contains(where: { lowered.hasPrefix($0) }) {
+        if ["oauth:", "restored:", "connector-host:"].contains(where: { lowered.utf8.starts(with: $0.utf8) }) {
             return String(localized: "The prefixes oauth:, restored:, and connector-host: are reserved. Use a different source.")
         }
         return nil

@@ -1726,7 +1726,9 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         #expect(model.sheet == .new)
     }
 
-    @Test(arguments: [".", " .. ", "OAuth:reserved", "restored:reserved", "connector-host:reserved", String(repeating: "x", count: 201)])
+    @Test(arguments: [
+        ".", " .. ", "OAuth:reserved", "oauth:\u{0301}reserved", "restored:reserved", "connector-host:reserved", String(repeating: "x", count: 201),
+    ])
     func anInvalidSourceKeepsTheDraftAndShowsTheFieldWithoutMakingAKey(source: String) async {
         let bench = bench([])
         let model = KeysModel(context: bench.context)
