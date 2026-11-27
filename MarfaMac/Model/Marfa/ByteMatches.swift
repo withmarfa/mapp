@@ -3,9 +3,9 @@ import Marfa
 
 /// The package's per-file answers as the app's, one for each file in the order given.
 ///
-/// A thrown error, or a list that does not line up with the files, is no answer for the whole batch: the add goes
-/// ahead, since a failure is never read as "nothing holds these bytes". A file the package could not read is left
-/// out, which is no answer for that file alone. An empty holder list is an answer that nothing holds the bytes.
+/// A thrown error or a result count that differs from the file count leaves the whole batch unanswered.
+/// An unreadable file keeps its position and leaves only that file unanswered. An empty holder list means
+/// the server found no readable item holding those bytes.
 nonisolated enum ByteMatches {
     static func answers(for files: [URL], lookup: @Sendable () async throws -> [Marfa.FileMatch]) async -> FileMatches {
         let matches: [Marfa.FileMatch]
