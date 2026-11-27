@@ -21,9 +21,9 @@ struct SettingsWindowTests {
     @Test func everyRoutablePageHasASidebarEntry() {
         let sidebar = (SettingsPage.appGroups + SettingsPage.marfaGroups).flatMap { $0 }
         let moved: [SettingsPage: SettingsPage] = [
-            .overview: .account, .updates: .account, .addresses: .account, .fileStorage: .account,
-            .history: .account, .housekeeping: .account, .limits: .account, .monitoring: .account,
-            .startUp: .account, .apps: .keys, .links: .types,
+            .passkeys: .account, .browsers: .account, .network: .account, .fileStorage: .account,
+            .housekeeping: .account, .limits: .account, .monitoring: .account,
+            .apps: .keys, .links: .types,
         ]
         #expect(Set(sidebar + Array(moved.keys)) == Set(SettingsPage.allCases))
         for page in SettingsPage.allCases {
@@ -69,14 +69,14 @@ struct SettingsWindowTests {
 
     @Test func backAndForwardKeepMovedPageRoutes() {
         let launcher = SettingsLauncher()
-        launcher.show(.addresses)
-        #expect(launcher.navigation.page == .addresses)
+        launcher.show(.network)
+        #expect(launcher.navigation.page == .network)
         #expect(launcher.navigation.page.sidebarEntry == .account)
 
         launcher.show(.trash)
         #expect(launcher.navigation.page == .trash)
         launcher.navigation.back()
-        #expect(launcher.navigation.page == .addresses)
+        #expect(launcher.navigation.page == .network)
         launcher.navigation.forward()
         #expect(launcher.navigation.page == .trash)
     }
@@ -96,12 +96,11 @@ struct SettingsWindowTests {
     }
 
     @Test func theMarfasPagesNameThePermissionTheyNeed() {
-        #expect(MarfaSettingsPage.overview.permission == .instanceRead, "Overview opens with what the sign-in may read, and leaves the rest out")
         #expect(MarfaSettingsPage.trash.permission == .itemsPurge)
         #expect(MarfaSettingsPage.account.permission == nil, "Account opens without one and asks for sign_ins.manage from Change Password")
         #expect(MarfaSettingsPage.apps.permission == .grantsManage)
         #expect(MarfaSettingsPage.keys.permission == .keysManage)
-        #expect(MarfaSettingsPage.addresses.permission == .configManage)
+        #expect(MarfaSettingsPage.network.permission == .configManage)
         #expect(MarfaSettingsPage.types.permission == .schemaWrite)
         #expect(MarfaSettingsPage.plugins.permission == .schemaWrite)
     }

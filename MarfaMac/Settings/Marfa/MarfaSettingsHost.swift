@@ -101,6 +101,8 @@ struct MarfaMarkSet: Identifiable, Hashable {
     func tryAgain()
     /// Opens Connection, the way back from a page that cannot show itself.
     func showConnection()
+    /// Starts the app’s usual sign-out flow, including any changes waiting to be sent.
+    func requestSignOut()
     /// The package's client over the current server, which a page's own calls go through.
     func client() throws -> Client
     /// What opens something in the app, such as Show in the app; nil where the app has no such place.
@@ -126,7 +128,7 @@ struct MarfaMarkSet: Identifiable, Hashable {
     var ownerDrafts: OwnerDrafts { get }
 
     /// Where the Overview's Needs Attention and Health are read, kept by the app so the sidebar's badge is its count.
-    var overview: OverviewModel { get }
+    var overview: AccountOverview { get }
     /// The one reader of the server's health, which Overview, Backups and Housekeeping all read.
     var health: ServerHealthModel { get }
     /// The one model of the server's updates, which Overview and Updates both read, so one update is started and followed.
@@ -181,7 +183,7 @@ extension MarfaSettingsHost {
 
 /// A page of the Marfa's half of Settings, with the owner permission it needs to open.
 nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
-    case overview, account, apps, keys, addresses, plugins, types, sources, trash, history, fileStorage, connectors, webhooks, folders, backups, updates, housekeeping, activity, monitoring, limits, startUp, links
+    case account, passkeys, browsers, apps, keys, network, plugins, types, sources, trash, fileStorage, connectors, webhooks, folders, backups, housekeeping, activity, monitoring, limits, links
 
     /// The pages in groups, as the sidebar shows them.
     static let groups: [[MarfaSettingsPage]] = [
@@ -191,7 +193,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
 
     var sidebarEntry: MarfaSettingsPage {
         switch self {
-        case .overview, .updates, .addresses, .fileStorage, .history, .housekeeping, .limits, .monitoring, .startUp: .account
+        case .passkeys, .browsers, .network, .fileStorage, .housekeeping, .limits, .monitoring: .account
         case .apps: .keys
         case .links: .types
         default: self
@@ -200,80 +202,75 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
 
     var title: String {
         switch self {
-        case .overview: String(localized: "Overview")
+        case .passkeys: String(localized: "Passkeys")
+        case .browsers: String(localized: "Browsers Signed In")
         case .account: String(localized: "Account")
         case .apps: String(localized: "Apps")
         case .keys: String(localized: "Apps and Keys")
-        case .addresses: String(localized: "Addresses")
+        case .network: String(localized: "Network")
         case .types: String(localized: "Types")
         case .plugins: String(localized: "Plugins")
         case .sources: String(localized: "Sources")
         case .trash: String(localized: "Trash")
-        case .history: String(localized: "History")
-        case .fileStorage: String(localized: "File Storage")
+        case .fileStorage: String(localized: "Storage")
         case .connectors: String(localized: "Connectors")
         case .webhooks: String(localized: "Webhooks")
         case .folders: String(localized: "Folders")
         case .backups: String(localized: "Backups")
-        case .updates: String(localized: "Updates")
         case .housekeeping: String(localized: "Housekeeping")
         case .activity: String(localized: "Activity")
         case .monitoring: String(localized: "Monitoring")
         case .limits: String(localized: "Limits")
-        case .startUp: String(localized: "Start-Up")
         case .links: String(localized: "Links")
         }
     }
 
     var symbol: String {
         switch self {
-        case .overview: "server.rack"
+        case .passkeys: "person.badge.key.fill"
+        case .browsers: "safari.fill"
         case .account: "person.crop.circle"
         case .apps: "macwindow"
         case .keys: "key.fill"
-        case .addresses: "globe"
+        case .network: "globe"
         case .types: "shippingbox.fill"
         case .plugins: "puzzlepiece.extension.fill"
         case .sources: "tray.and.arrow.down.fill"
         case .trash: "trash"
-        case .history: "clock.arrow.circlepath"
         case .fileStorage: "externaldrive.fill"
         case .connectors: "arrow.triangle.2.circlepath"
         case .webhooks: "wave.3.right"
         case .folders: "folder.fill"
         case .backups: "externaldrive.badge.timemachine"
-        case .updates: "arrow.down.circle.fill"
         case .housekeeping: "sparkles"
         case .activity: "chart.bar.fill"
         case .monitoring: "waveform.path.ecg"
         case .limits: "gauge.with.needle"
-        case .startUp: "power"
         case .links: "link"
         }
     }
 
     var tone: SettingsTokens.Tone {
         switch self {
-        case .overview: .blue
+        case .passkeys: .indigo
+        case .browsers: .blue
         case .account: .indigo
         case .apps: .purple
         case .keys: .amber
-        case .addresses: .teal
+        case .network: .teal
         case .types: .orange
         case .plugins: .purple
         case .sources: .green
         case .trash: .gray
-        case .history: .indigo
         case .fileStorage: .blue
         case .connectors: .green
         case .webhooks: .pink
         case .folders: .blue
         case .backups: .green
-        case .updates: .blue
         case .housekeeping: .orange
         case .activity: .teal
         case .monitoring: .red
-        case .limits, .startUp: .gray
+        case .limits: .gray
         case .links: .indigo
         }
     }
@@ -283,9 +280,10 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
     /// Folders needs none: a folder is read as an item, under the access the app holds to every type.
     var permission: InstancePermission? {
         switch self {
-        case .overview, .updates, .housekeeping: .instanceRead
+        case .housekeeping: .instanceRead
+        case .passkeys, .browsers: .signInsManage
         case .backups: .backupsManage
-        case .addresses, .history, .fileStorage, .monitoring, .limits: .configManage
+        case .network, .fileStorage, .monitoring, .limits: .configManage
         case .account: nil
         case .apps: .grantsManage
         case .keys, .sources: .keysManage
@@ -296,35 +294,37 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .webhooks: .webhooksManage
         case .folders: nil
         case .activity: .auditRead
-        case .startUp: .instanceRead
         }
     }
 
     /// What the app isn't allowed to do on this page without its permission, in the page's own words from what the
     /// permission opens there. Pages that share a permission still say different things, since each opens a different part.
+    func missingPermission(in grants: Set<InstancePermission>) -> InstancePermission? {
+        if self == .limits || self == .housekeeping, !grants.isDisjoint(with: [.instanceRead, .configManage]) { return nil }
+        return permission.flatMap { grants.contains($0) ? nil : $0 }
+    }
+
     var permissionLine: String {
         switch self {
-        case .overview: String(localized: "The app isn’t allowed to read the server’s health and status.")
+        case .passkeys: String(localized: "The app isn’t allowed to manage your passkeys.")
+        case .browsers: String(localized: "The app isn’t allowed to manage your browser sign-ins.")
         case .account: ""
         case .apps: String(localized: "The app isn’t allowed to list, narrow or disconnect apps.")
         case .keys: String(localized: "The app isn’t allowed to list, make, extend or revoke keys.")
         case .types: String(localized: "The app isn’t allowed to change types, their icons, words or fields.")
         case .plugins: String(localized: "The app isn’t allowed to install, update or remove plugins.")
         case .sources: String(localized: "The app isn’t allowed to rename, mark or limit sources.")
-        case .addresses: String(localized: "The app isn’t allowed to see or change the server’s addresses.")
+        case .network: String(localized: "The app isn’t allowed to see or change the server’s addresses.")
         case .trash: String(localized: "The app isn’t allowed to list or permanently delete deleted items.")
-        case .history: String(localized: "The app isn’t allowed to see or change version and log retention.")
         case .fileStorage: String(localized: "The app isn’t allowed to see or change how the server keeps files.")
         case .connectors: String(localized: "The app isn’t allowed to see, pause, run or set up connectors.")
         case .webhooks: String(localized: "The app isn’t allowed to list, make, change or remove webhooks.")
         case .folders: ""
         case .backups: String(localized: "The app isn’t allowed to see, take or restore backups.")
-        case .updates: String(localized: "The app isn’t allowed to read whether a newer Marfa is ready.")
         case .housekeeping: String(localized: "The app isn’t allowed to read the jobs the server runs by itself.")
         case .activity: String(localized: "The app isn’t allowed to read the server’s audit log.")
         case .monitoring: String(localized: "The app isn’t allowed to see or change how the server is monitored.")
         case .limits: String(localized: "The app isn’t allowed to see or change the server’s limits.")
-        case .startUp: String(localized: "The app isn’t allowed to read the settings the server started with.")
         case .links: String(localized: "The app isn’t allowed to change link types.")
         }
     }
@@ -332,12 +332,14 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
     /// The titles of the rows the page holds, so the sidebar's search finds the page by them.
     var searchWords: [String] {
         switch self {
-        case .overview:
-            [String(localized: "Name"), String(localized: "Needs Attention"), String(localized: "This Marfa"), String(localized: "Health")]
+        case .passkeys: [String(localized: "Add Passkey"), String(localized: "Rename")]
+        case .browsers: [String(localized: "Sign Out")]
         case .account:
             [
                 String(localized: "Username"), String(localized: "Email"), String(localized: "Password"),
                 String(localized: "Change Password"), String(localized: "Passkeys"), String(localized: "Browsers"),
+                String(localized: "Check for Updates"), String(localized: "Check Automatically"), String(localized: "Profile"),
+                String(localized: "Problems"), String(localized: "Sign Out"), String(localized: "Name"),
             ]
         case .apps:
             [
@@ -345,7 +347,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
             ]
         case .keys:
             [String(localized: "New Key"), String(localized: "Revoke"), String(localized: "Expires"), String(localized: "Source")]
-        case .addresses:
+        case .network:
             [
                 String(localized: "Sign-In Address"), String(localized: "Other Addresses"), String(localized: "Websites"),
                 String(localized: "Add an Address"), String(localized: "Add a Website"),
@@ -368,11 +370,9 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
                 String(localized: "Deleted Items"), String(localized: "Restore"), String(localized: "Permanently Delete"),
                 String(localized: "Empty Trash"), String(localized: "Recently Deleted"), InstanceSetting.trashRetentionDays.title,
             ]
-        case .history:
-            InstanceSetting.versionSettings.map(\.title) + InstanceSetting.logSettings.map(\.title) + [String(localized: "Versions"), String(localized: "Logs")]
         case .fileStorage:
             [String(localized: "Where Files Are"), String(localized: "Reading Files"), String(localized: "Files From the Web"), String(localized: "Unused Files")]
-                + InstanceSetting.fileSettings.map(\.title)
+                + (InstanceSetting.fileSettings + InstanceSetting.versionSettings).map(\.title) + [String(localized: "Versions")]
         case .connectors:
             [
                 String(localized: "Pause"), String(localized: "Run Now"), String(localized: "Runs On"), String(localized: "Settings"),
@@ -394,12 +394,8 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
                 String(localized: "Keep Backups In"), String(localized: "Back Up Every"), String(localized: "Last Backup"), String(localized: "Back Up Now"),
                 String(localized: "Restore"), String(localized: "Folder"),
             ]
-        case .updates:
-            [
-                String(localized: "Check for Updates"), String(localized: "Update"), String(localized: "Check Automatically"), String(localized: "Last Update"),
-            ]
         case .housekeeping:
-            [String(localized: "Jobs"), String(localized: "Clean-up"), String(localized: "Confirm Date"), String(localized: "Clock")]
+            [String(localized: "Jobs"), String(localized: "Clean-up"), String(localized: "Confirm Date"), String(localized: "Clock"), String(localized: "Logs")] + InstanceSetting.logSettings.map(\.title)
         case .activity:
             [String(localized: "Audit Log"), String(localized: "Who Did What")]
         case .monitoring:
@@ -408,9 +404,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
                 String(localized: "Project Token"), String(localized: "Report Errors"),
             ]
         case .limits:
-            LimitSetting.all.map(\.title) + [String(localized: "Rate Limits"), String(localized: "Limit Requests"), String(localized: "Requests")]
-        case .startUp:
-            [String(localized: "Environment"), String(localized: "Settings Read When It Starts")]
+            LimitSetting.all.map(\.title) + [String(localized: "Rate Limits"), String(localized: "Limit Requests"), String(localized: "Requests"), String(localized: "Start-Up"), String(localized: "Environment")]
         case .links:
             [String(localized: "Links Between Items"), String(localized: "New Link Type")]
         }

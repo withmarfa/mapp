@@ -1,3 +1,4 @@
+import Marfa
 import SwiftUI
 
 /// The Limits page: how much of each kind of thing the server takes, as numbers with their units inside. A value is sent
@@ -5,6 +6,9 @@ import SwiftUI
 struct LimitsPage: View {
     let host: any MarfaSettingsHost
     @State private var model: LimitsModel
+
+    @State private var readOnlyStartUp: [StartUpSetting]?
+    @State private var readFailure: OwnerFailure?
 
     init(host: any MarfaSettingsHost) {
         self.host = host
@@ -18,10 +22,33 @@ struct LimitsPage: View {
     }
 
     var body: some View {
-        content
-            .task(id: host.serverAddress) { await model.load() }
+        Group {
+            if host.grants.contains(.configManage) { content }
+            else {
+                SettingsPageColumn {
+                    OwnerProblem(title: "Limits", failure: .notPermitted(InstancePermission.configManage.rawValue), page: .limits, host: host)
+                    if let readFailure {
+                        OwnerProblem(title: "Couldn’t Read Start-Up Settings", failure: readFailure, page: .limits, host: host) { Task { await readStartUp() } }
+                    } else if let readOnlyStartUp { StartUpSettings(rows: readOnlyStartUp) }
+                }
+            }
+        }
+            .task(id: host.grants) {
+                if host.grants.contains(.configManage) { await model.load() }
+                else { await readStartUp() }
+            }
             .onAppear { host.ownerDrafts.register(model) }
             .accessibilityIdentifier("LimitsPage")
+    }
+
+    private func readStartUp() async {
+        do {
+            readOnlyStartUp = try await host.instanceCalls.startUpSettings()
+            readFailure = nil
+        } catch {
+            readFailure = error
+            await OwnerContext(host: host).learn(from: error)
+        }
     }
 
     @ViewBuilder private var content: some View {
@@ -58,6 +85,7 @@ struct LimitsPage: View {
                     field(.largestFetch)
                     field(.fetchTime)
                 }
+                StartUpSettings(rows: model.startUp)
             }
         } else {
             OwnerLoading()

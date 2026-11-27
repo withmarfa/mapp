@@ -1,28 +1,25 @@
 import Marfa
 import SwiftUI
 
-/// The Updates page: the release the server runs, Check for Updates beside Update where one is ready, the steps while it
-/// updates, and how the last update ended. Where the server cannot update itself it says how, with Copy Steps.
-struct UpdatesPage: View {
+/// Server name, release and update controls on Account.
+struct AccountMarfaSection: View {
     let host: any MarfaSettingsHost
     @State private var copied = false
     @State private var asksToUpdate = false
-
-    private struct LoadID: Equatable {
-        let address: String?
-        let canChangeSettings: Bool
-    }
 
     init(host: any MarfaSettingsHost) {
         self.host = host
     }
 
-    /// The host's one updates model, which Overview reads too.
+    private var settings: InstanceSettingsModel { host.instanceSettings }
     private var model: UpdatesModel { host.updates }
 
     var body: some View {
         content
-            .task(id: LoadID(address: host.serverAddress, canChangeSettings: model.canChangeSettings)) { await model.load() }
+            .task(id: host.grants) {
+                if host.grants.contains(.configManage) { await settings.load() }
+                if host.grants.contains(.instanceRead) { await model.load() }
+            }
             .alert("Update \(host.serverName)?", isPresented: $asksToUpdate) {
                 Button("Cancel", role: .cancel) {}
                 Button("Update") {
@@ -32,24 +29,57 @@ struct UpdatesPage: View {
             } message: {
                 Text("\(host.serverName) restarts to finish the update. The app reconnects when it’s back.")
             }
-            .accessibilityIdentifier("UpdatesPage")
+            .accessibilityIdentifier("AccountRelease")
     }
 
     @ViewBuilder private var content: some View {
-        if let failure = model.failure {
-            OwnerFailureState(page: .updates, failure: failure, host: host) { Task { await model.load() } }
-        } else if model.hasLoaded, let status = model.status {
-            SettingsPageColumn {
-                if model.isUpdating {
-                    updating(status)
-                } else {
-                    problem(status)
-                    marfa(status)
-                    lastUpdate(status)
+        SettingsSection(name: Text("Marfa"), footer: lastUpdateLine) {
+            if host.grants.contains(.configManage) {
+                if settings.isAvailable { nameRow }
+                else if let failure = settings.failure {
+                    OwnerProblemRow(title: "Couldn’t Read the Name", failure: OwnerFailure(failure), page: .account, host: host) { Task { await settings.load() } }
                 }
+            } else {
+                locked("Name", permission: .configManage)
             }
-        } else {
-            OwnerLoading()
+            if !host.grants.contains(.instanceRead) {
+                locked("Version", permission: .instanceRead)
+            } else if let failure = model.failure {
+                OwnerProblemRow(title: "Couldn’t Read the Release", failure: failure, page: .account, host: host) { Task { await model.load() } }
+            } else if let status = model.status {
+                if model.isUpdating { updating(status) }
+                else { marfa(status) }
+            }
+        }
+        if host.grants.contains(.instanceRead), let status = model.status, !model.isUpdating { problem(status) }
+    }
+
+    private var lastUpdateLine: Text? {
+        guard host.grants.contains(.instanceRead), let last = model.status?.last else { return nil }
+        let title = last.result == .succeeded ? String(localized: "Updated to \(last.release)") : String(localized: "Tried \(last.release)")
+        return Text(verbatim: [title, lastLine(last)].joined(separator: ". "))
+    }
+
+    private func locked(_ title: LocalizedStringKey, permission: InstancePermission) -> some View {
+        SettingsRow(title) {
+            Button { host.askForMore(naming: permission.rawValue) } label: { Label("Not allowed", systemImage: "lock") }
+                .buttonStyle(.plain).disabled(host.isAllowingMore)
+        }
+    }
+
+    private var nameRow: some View {
+        let errors = InstanceRowErrors(model: settings, settings: [.name])
+        let text = Binding { settings.draft[.name] ?? "" } set: { settings.draft[.name] = $0 }
+        return VStack(alignment: .leading, spacing: 0) {
+            SettingsRow("Name", line: "What apps and the sign-in page show.", error: errors.message(for: .name)) {
+                SettingsField(
+                    title: "Name", text: text, prompt: String(localized: "Marfa"), isError: errors.isError(.name),
+                    onSubmit: { Task { await settings.save([.name]) } }, onEndEditing: { Task { await settings.save([.name]) } }
+                )
+                .disabled(settings.isSaving)
+                .accessibilityIdentifier("ThisMarfaName")
+            }
+            InstanceStatusLine(model: settings, settings: [.name])
         }
     }
 
@@ -59,7 +89,7 @@ struct UpdatesPage: View {
         let release = status.progress?.release ?? status.latest?.version
         let stages = UpdateStage.allCases
         let done = stages.filter { model.standing(of: $0) == .done }.count
-        return SettingsSection("Marfa") {
+        return Group {
             SettingsRow(
                 title: release.map { Text("Updating to \($0)") } ?? Text("Updating"),
                 line: Text(model.standing(of: .restarting) == .now ? "Restarting. The app reconnects when it is back." : "\(host.serverName) restarts when it is done.")
@@ -89,7 +119,7 @@ struct UpdatesPage: View {
     @ViewBuilder private func problem(_ status: UpdateStatus) -> some View {
         let undone = model.undone
         if undone != nil || model.error != nil || model.lostTrack {
-            SettingsSection("Needs Attention") {
+            SettingsSection("Update Problems") {
                 if let undone {
                     SettingsProblemRow(
                         title: Text("The update to \(undone.release) didn’t work"),
@@ -106,14 +136,14 @@ struct UpdatesPage: View {
                         actions: [SettingsProblemAction("Check Again") { Task { await model.load() } }])
                 }
                 if let error = model.error {
-                    OwnerProblemRow(title: "Couldn’t do that", failure: error, page: .updates, host: host)
+                    OwnerProblemRow(title: "Couldn’t do that", failure: error, page: .account, host: host)
                 }
             }
         }
     }
 
     private func marfa(_ status: UpdateStatus) -> some View {
-        SettingsSection("Marfa") {
+        Group {
             SettingsRow(title: title(status), line: Text(verbatim: line(status))) {
                 HStack(spacing: SettingsTokens.Metric.buttonGap) {
                     if model.needsMaintain {
@@ -153,53 +183,32 @@ struct UpdatesPage: View {
             }
             if let failure = model.settingsFailure {
                 OwnerProblemRow(
-                    title: "Couldn’t read automatic update settings", failure: failure, page: .updates, host: host,
+                    title: "Couldn’t read automatic update settings", failure: failure, page: .account, host: host,
                     retry: { Task { await model.load() } })
             } else if !model.canChangeSettings {
                 OwnerProblemRow(
                     title: "Can’t change automatic update settings", failure: .notPermitted(InstancePermission.configManage.rawValue),
-                    page: .updates, host: host)
+                    page: .account, host: host)
             }
         }
     }
 
     private func title(_ status: UpdateStatus) -> Text {
-        let known = status.running != OverviewModel.developmentVersion
-        if let latest = model.ready { return Text("Marfa \(latest.version) is ready") }
+        let known = status.running != "0.0.0"
         return known ? Text("Marfa \(status.running)") : Text("Marfa")
     }
 
     /// One sentence under the release: why it can't be checked, or how it gets updated.
     private func line(_ status: UpdateStatus) -> String {
-        if !status.checksAutomatically {
-            return String(localized: "Check Automatically is off, so \(host.serverName) isn’t looking for updates.")
-        }
-        if model.ready != nil {
-            return status.updatesItself
-                ? String(localized: "\(host.serverName) restarts to update.") : String(localized: "\(host.serverName) is updated where it runs.")
+        if let latest = model.ready {
+            if let published = OwnerWording.when(latest.published) { return String(localized: "\(latest.version) is ready. Published \(published).") }
+            return String(localized: "\(latest.version) is ready.")
         }
         if status.checkFailed { return String(localized: "The last check found no answer.") }
-        return String(localized: "What \(host.serverName) runs.")
+        return status.checksAutomatically ? String(localized: "The server is up to date.") : String(localized: "Automatic checks are off.")
     }
 
     // MARK: Last update
-
-    @ViewBuilder private func lastUpdate(_ status: UpdateStatus) -> some View {
-        if let last = status.last {
-            SettingsSection("Last Update") {
-                SettingsRow(
-                    title: last.result == .succeeded ? Text("Updated to \(last.release)") : Text("Tried \(last.release)"),
-                    line: Text(verbatim: lastLine(last))
-                ) {
-                    switch last.result {
-                    case .succeeded: SettingsValue("Succeeded", dot: SettingsTokens.ok)
-                    case .putBack: SettingsValue("Undone", dot: SettingsTokens.warning)
-                    case .failed: SettingsValue("Failed", dot: SettingsTokens.errorRed)
-                    }
-                }
-            }
-        }
-    }
 
     private func lastLine(_ last: UpdateOutcome) -> String {
         let when = last.finished.map { UpkeepWording.moment($0, hasTime: last.finishedHasTime) + "." }

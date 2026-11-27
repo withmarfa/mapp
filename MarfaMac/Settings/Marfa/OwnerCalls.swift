@@ -32,12 +32,11 @@ nonisolated struct OwnerProfile: Hashable, Sendable {
     var pictureIsReadable = false
     var hasPicture = false
 
-    var isEmpty: Bool { name == nil && username == nil && !emailIsReadable && !pictureIsReadable }
 }
 
 /// A part of the owner's profile an app may be allowed to change.
 nonisolated enum ProfileField: String, CaseIterable, Hashable, Sendable {
-    case name, avatar
+    case name, avatar, username, email
 }
 
 nonisolated struct OwnerPasskey: Identifiable, Hashable, Sendable {
@@ -242,6 +241,7 @@ nonisolated protocol OwnerCalls: Sendable {
     func changeableProfile() -> Set<ProfileField>
     /// Sends the owner's name alone, and answers the profile as the server then holds it.
     func setProfileName(_ name: String) async throws(OwnerFailure) -> OwnerProfile
+    func setProfileContact(_ field: ProfileContactField, to value: String) async throws(OwnerFailure) -> OwnerProfile
     /// The picture's bytes, or nil where there is none.
     func profilePicture() async throws(OwnerFailure) -> Data?
     /// Stores `picture`, a PNG, JPEG or WebP within the contract's limits (`ProfilePicture.prepared`), as the owner's picture.

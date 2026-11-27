@@ -6,7 +6,7 @@ import Foundation
 /// One thing the server says needs the owner's attention, as `GET /attention` words it.
 nonisolated struct AttentionConcern: Identifiable, Hashable, Sendable {
     enum Kind: String, Hashable, Sendable {
-        case health, job, connector, folder, key, backup, setting, clock, fault, unavailable
+        case health, job, connector, folder, key, backup, setting, clock, fault, webhook, unavailable
     }
 
     let kind: Kind
@@ -20,11 +20,6 @@ nonisolated struct AttentionConcern: Identifiable, Hashable, Sendable {
 /// How a part of the server stands, as `GET /health` words it, or `unknown` where the server could not check.
 nonisolated enum Condition: String, Hashable, Sendable {
     case ok, degraded, down, unknown
-}
-
-/// How one part of the server stands.
-nonisolated struct HealthPart: Hashable, Sendable {
-    var condition: Condition
 }
 
 /// The version and sizes returned by the server's metrics endpoint.

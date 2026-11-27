@@ -410,11 +410,10 @@ nonisolated private func record(_ name: String, hoursAgo: Int = 0) -> BackupReco
         #expect(bench.refreshed == 1)
     }
 
-    @Test func theNeedsAPermissionLinesOfTheThreePagesAreEachTheirOwn() {
-        let lines = [MarfaSettingsPage.backups, .updates, .housekeeping].map(\.permissionLine)
-        #expect(Set(lines).count == 3)
+    @Test func upkeepPagesNameTheirPermissions() {
+        let lines = [MarfaSettingsPage.backups, .housekeeping].map(\.permissionLine)
+        #expect(Set(lines).count == 2)
         #expect(MarfaSettingsPage.backups.permission == .backupsManage)
-        #expect(MarfaSettingsPage.updates.permission == .instanceRead)
         #expect(MarfaSettingsPage.housekeeping.permission == .instanceRead)
     }
 }

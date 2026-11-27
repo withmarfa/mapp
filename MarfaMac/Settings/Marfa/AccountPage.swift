@@ -1,244 +1,173 @@
 import AppKit
+import Marfa
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// The Account page: the owner's picture and name, which can be changed, the username and email as the server holds them,
-/// Change Password…, the passkeys with Add a Passkey…, and the browsers signed in, each with Sign Out.
 struct AccountPage: View {
     let host: any MarfaSettingsHost
     @State private var model: AccountModel
     @State private var choosesPicture = false
-    @Environment(\.openURL) private var openURL
+    @State private var jobCount: Int?
+    @State private var monitoringCount: Int?
 
     init(host: any MarfaSettingsHost) {
         self.host = host
         _model = State(initialValue: AccountModel(context: OwnerContext(host: host)))
     }
 
+    private var address: String { host.serverAddress.map(AddressesModel.display) ?? "" }
+
     var body: some View {
-        content
-            .task(id: host.serverAddress) { await model.load() }
-            .onAppear { host.ownerDrafts.register(model) }
-            .settingsSheet(presenting: model.sheet != nil, dismiss: dismissSheet) { AccountSheet(model: model) }
-            .fileImporter(isPresented: $choosesPicture, allowedContentTypes: [.image]) { chosen in
-                switch chosen {
-                case .success(let file): Task { await model.setPicture(from: file) }
-                case .failure: model.pictureNotChosen()
+        SettingsPageColumn {
+            SettingsPageHeader(name: host.serverName, address: address) {
+                Button("Sign Out", action: host.requestSignOut)
+                    .buttonStyle(.bordered).buttonBorderShape(.capsule).controlSize(.regular)
+                    .accessibilityIdentifier("AccountSignOut")
+            }
+            problems
+            if !model.canManageSignIns {
+                SettingsSection("Permissions") {
+                    SettingsProblemRow(
+                        title: Text("This App Can’t Manage Sign-Ins"), line: Text("Your password, passkeys and browsers need this permission."),
+                        symbol: "lock", actions: [SettingsProblemAction("Allow More") { Task { await model.allowSignIns() } }]
+                    ).disabled(host.isAllowingMore)
                 }
             }
-            .alert(
-                model.question?.title ?? "", isPresented: Binding { model.question != nil } set: { if !$0 { model.cancelQuestion() } },
-                presenting: model.question
-            ) { asked in
-                Button("Cancel", role: .cancel) {}
-                Button(asked.confirm, role: .destructive) { Task { await model.confirm(asked) } }
-            } message: { asked in
-                Text(verbatim: asked.message)
+            if let profile = model.profile {
+                profileRows(profile)
+            } else if let failure = model.failure {
+                OwnerProblem(title: "Couldn’t Read the Profile", failure: failure, page: .account, host: host) { Task { await model.load() } }
+            } else {
+                OwnerLoading()
             }
-            .accessibilityIdentifier("AccountPage")
-    }
-
-    private static var unnamed: String { String(localized: "Passkey") }
-
-    private func dismissSheet() {
-        switch model.sheet {
-        case .password?: model.closePasswordSheet()
-        case .renamePasskey?: model.closeRename()
-        case nil: break
-        }
-    }
-
-    @ViewBuilder private var content: some View {
-        if model.failure != nil || !model.hasLoaded {
-            SettingsStandingState(scrolls: true) {
-                AccountServerSettingsSection(host: host)
-            } state: {
-                if let failure = model.failure {
-                    OwnerFailureState(page: .account, failure: failure, host: host) { Task { await model.load() } }
-                } else {
-                    OwnerLoading()
-                }
+            security
+            AccountMarfaSection(host: host)
+            SettingsSection("Server") {
+                link(.network, value: address)
+                link(.fileStorage, value: storageSize)
             }
-        } else {
-            SettingsPageColumn {
-                if let profile = model.profile { profileSection(profile) }
-                passwordSection
-                if model.canManageSignIns {
-                    if let failure = model.listsFailure {
-                        OwnerProblem(title: "Couldn’t Read the Sign-Ins", failure: failure, page: .account, host: host, retry: { Task { await model.load() } })
-                    } else {
-                        passkeysSection
-                        browsersSection
-                    }
-                } else {
-                    SettingsSection("Passkeys and Browsers") {
-                        SettingsProblemRow(
-                            title: Text("Sign-Ins"), line: Text("The app isn’t allowed to list and end your sign-ins."), symbol: "lock", tone: nil,
-                            actions: [
-                                SettingsProblemAction(host.isAllowingMore ? "Waiting…" : "Allow More…") {
-                                    Task { await model.allowSignIns(); await model.load() }
-                                }
-                            ]
-                        )
-                        .disabled(host.isAllowingMore)
-                    }
-                }
-                AccountServerSettingsSection(host: host)
+            SettingsSection("Advanced") {
+                link(.monitoring, value: monitoringCount.map { String(localized: "\($0) of 3 on") })
+                link(.limits)
+                link(.housekeeping, value: host.grants.contains(.instanceRead) ? jobCount.map { $0 == 1 ? String(localized: "1 job") : String(localized: "\($0) jobs") } : nil)
             }
         }
+        .task(id: host.grants) {
+            async let profile: Void = model.load()
+            if host.grants.contains(.instanceRead) {
+                jobCount = try? await host.ownerCalls.housekeepingJobs().count
+            } else { jobCount = nil }
+            if host.grants.contains(.configManage) {
+                let snapshot = try? await host.instanceCalls.storedSettings()
+                monitoringCount = snapshot?.enabledMonitoringCount
+            } else { monitoringCount = nil }
+            await profile
+        }
+        .onAppear { host.ownerDrafts.register(model) }
+        .settingsSheet(presenting: model.sheet != nil, dismiss: { model.closePasswordSheet() }) { AccountSheet(model: model) }
+        .fileImporter(isPresented: $choosesPicture, allowedContentTypes: [.image]) { chosen in
+            switch chosen {
+            case .success(let file): Task { await model.setPicture(from: file) }
+            case .failure: model.pictureNotChosen()
+            }
+        }
+        .accessibilityIdentifier("AccountPage")
     }
 
-    /// Profile, and below it, in a section of its own since it has a mark, what the sign-in may not change, or may not read:
-    /// a name or picture the sign-in may not see is shown only there, locked. Where it may read nothing of the profile, the
-    /// locked row stands as Profile.
-    @ViewBuilder private func profileSection(_ profile: OwnerProfile) -> some View {
-        if !profile.isEmpty { profileRows(profile) }
-        let locked = model.lockedProfile
-        if !locked.isEmpty {
-            SettingsSection(name: profile.isEmpty ? Text("Profile") : nil) {
-                SettingsProblemRow(
-                    title: lockedTitle(locked), line: lockedLine(locked, of: profile), symbol: "lock", tone: nil,
-                    actions: [
-                        SettingsProblemAction(host.isAllowingMore ? "Waiting…" : "Allow More…") { Task { await model.allowProfileChanges() } }
-                    ]
-                )
-                .disabled(host.isAllowingMore)
-                .accessibilityIdentifier("AccountProfileLocked")
+    private var storageSize: String? {
+        guard host.grants.contains(.instanceRead), host.overview.metricsFailure == nil, let metrics = host.overview.metrics,
+            let database = metrics.databaseBytes else { return nil }
+        return ByteCountFormatter.string(fromByteCount: Int64(database) + Int64(metrics.fileBytes), countStyle: .file)
+    }
+
+    @ViewBuilder private var problems: some View {
+        let overview = host.overview
+        if host.grants.contains(.instanceRead) {
+            if let failure = overview.failure {
+                OwnerProblem(title: "Couldn’t Check for Problems", failure: failure, page: .account, host: host) { Task { await overview.load() } }
+            } else if !overview.concerns.isEmpty {
+                SettingsSection("Problems") {
+                    ForEach(overview.concerns) { concern in
+                        let page = concern.destination
+                        SettingsProblemRow(title: Text(verbatim: concern.shownTitle), line: concern.shownLine.map { Text(verbatim: $0) },
+                            actions: [SettingsProblemAction(verbatim: page == .keys ? String(localized: "Show Keys") : String(localized: "Show \(page.title)")) { host.show(page) }])
+                    }
+                }
             }
         }
     }
 
     private func profileRows(_ profile: OwnerProfile) -> some View {
         SettingsSection("Profile") {
-            if profile.pictureIsReadable {
-                SettingsRow(
-                    "Picture", error: model.pictureError,
-                    lead: .custom(AnyView(ProfilePictureMark(picture: model.picture, name: profile.name ?? profile.username)))
-                ) {
-                    if model.changeable.contains(.avatar) {
-                        SettingsButton(model.isSendingPicture ? "Sending…" : "Change…", reserving: "Change…") { choosesPicture = true }
-                            .disabled(model.isSendingPicture)
-                            .accessibilityIdentifier("AccountChangePicture")
-                    }
+            SettingsRow("Picture", error: model.pictureError) {
+                if profile.pictureIsReadable {
+                    ProfilePictureMark(picture: model.picture, name: profile.name ?? profile.username)
+                }
+                if profile.pictureIsReadable && model.changeable.contains(.avatar) {
+                    SettingsButton("Change…") { choosesPicture = true }
+                        .disabled(model.isSendingPicture)
+                        .accessibilityIdentifier("AccountChangePicture")
+                } else { profileLock }
+            }
+            SettingsRow("Name", error: model.nameError) {
+                if profile.name != nil && model.changeable.contains(.name) {
+                    SettingsField(title: "Name", text: $model.nameDraft, isError: model.nameError != nil,
+                        onSubmit: { Task { await model.saveName() } }, onEndEditing: { Task { await model.saveName() } })
+                        .disabled(model.isSavingName).accessibilityIdentifier("AccountName")
+                } else {
+                    if let name = profile.name { SettingsValue(verbatim: name) }
+                    profileLock
                 }
             }
-            if let name = profile.name {
-                SettingsRow("Name", error: model.nameError) {
-                    if model.changeable.contains(.name) {
-                        SettingsField(
-                            title: "Name", text: $model.nameDraft, isError: model.nameError != nil,
-                            onSubmit: { Task { await model.saveName() } }, onEndEditing: { Task { await model.saveName() } }
-                        )
-                        .disabled(model.isSavingName)
-                        .accessibilityIdentifier("AccountName")
-                    } else {
-                        SettingsValue(verbatim: name)
-                    }
+            profileField(.username, readable: profile.username != nil, value: profile.username)
+            profileField(.email, readable: profile.emailIsReadable, value: profile.email)
+        }
+    }
+
+    private var profileLock: some View {
+        Button { Task { await model.allowProfileChanges() } } label: {
+            Label("Not Allowed", systemImage: "lock").labelStyle(.iconOnly)
+        }.buttonStyle(.plain).disabled(host.isAllowingMore)
+    }
+
+    private func profileField(_ field: ProfileContactField, readable: Bool, value: String?) -> some View {
+        SettingsRow(verbatim: field.title, error: model.contactErrors[field]) {
+            if readable && model.changeable.contains(field.scope) {
+                SettingsField(title: LocalizedStringKey(field.title),
+                    text: Binding { model.contactDrafts[field] ?? value ?? "" } set: { model.contactDrafts[field] = $0 },
+                    isError: model.contactErrors[field] != nil, onSubmit: { Task { await model.saveContact(field) } },
+                    onEndEditing: { Task { await model.saveContact(field) } })
+                    .disabled(model.savingContacts.contains(field))
+            } else {
+                if readable { SettingsValue(verbatim: value ?? String(localized: "Not Set")) }
+                profileLock
+            }
+        }
+    }
+
+    private var security: some View {
+        SettingsSection(name: Text("Security"), footer: model.note.map { Text(verbatim: $0) }) {
+            if model.canManageSignIns {
+                SettingsRow("Password", line: "Changing it signs out every browser.") {
+                    SettingsButton("Change…") { Task { await model.beginChangePassword() } }.accessibilityIdentifier("AccountChangePassword")
+                }
+            } else {
+                SettingsLinkRow(verbatim: String(localized: "Password"), lock: String(localized: "Not allowed")) {
+                    Task { await model.beginChangePassword() }
                 }
             }
-            if let username = profile.username {
-                SettingsRow("Username", line: "You sign in with it.") { SettingsValue(verbatim: username) }
-            }
-            if profile.emailIsReadable {
-                SettingsRow("Email", line: "Optional. Not used to sign in.") {
-                    if let email = profile.email { SettingsValue(verbatim: email) } else { SettingsValue("Not Set") }
-                }
-            }
+            let known = model.hasLoaded && model.failure == nil && model.listsFailure == nil
+            link(.passkeys, value: known ? model.passkeys.count.formatted() : nil)
+            link(.browsers, value: known ? model.browsers.count.formatted() : nil)
         }
     }
 
-    private func lockedTitle(_ locked: Set<ProfileField>) -> Text {
-        switch (locked.contains(.name), locked.contains(.avatar)) {
-        case (true, true): Text("Name and Picture")
-        case (true, false): Text("Name")
-        default: Text("Picture")
-        }
-    }
-
-    /// What is locked of each: nil where it is free, false where it can be read and not changed, true where it is hidden.
-    private func lockedLine(_ locked: Set<ProfileField>, of profile: OwnerProfile) -> Text {
-        let name = locked.contains(.name) ? profile.name == nil : nil
-        let picture = locked.contains(.avatar) ? !profile.pictureIsReadable : nil
-        switch (name, picture) {
-        case (false?, nil): return Text("The app isn’t allowed to change your name.")
-        case (true?, nil): return Text("The app isn’t allowed to show or change your name.")
-        case (nil, false?): return Text("The app isn’t allowed to change your picture.")
-        case (nil, true?): return Text("The app isn’t allowed to show or change your picture.")
-        case (false?, false?): return Text("The app isn’t allowed to change your name and picture.")
-        case (true?, true?): return Text("The app isn’t allowed to show or change your name and picture.")
-        case (false?, true?): return Text("The app isn’t allowed to change your name, or to show or change your picture.")
-        case (true?, false?): return Text("The app isn’t allowed to show or change your name, or to change your picture.")
-        case (nil, nil): return Text(verbatim: "")
-        }
-    }
-
-    private var passwordSection: some View {
-        SettingsSection(name: Text("Password"), footer: model.note.map { Text(verbatim: $0) }) {
-            SettingsRow("Password", line: "Changing it signs out every browser.") {
-                SettingsButton("Change…") { Task { await model.beginChangePassword() } }
-                    .accessibilityIdentifier("AccountChangePassword")
-            }
-        }
-    }
-
-    private var passkeysSection: some View {
-        SettingsSection("Passkeys") {
-            ForEach(model.passkeys) { passkey in
-                SettingsRow(
-                    verbatim: passkey.name ?? Self.unnamed, line: Self.line(added: passkey.added, used: passkey.lastUsed),
-                    error: model.rowErrors[passkey.id].map { OwnerWording.line($0, on: .account) }, lead: .symbol("touchid")
-                ) {
-                    SettingsMoreMenu {
-                        Button("Rename…") { model.beginRename(passkey) }
-                        Button("Remove…", role: .destructive) { model.askToRemove(passkey) }
-                    }
-                }
-            }
-            SettingsAddRow("Add a Passkey…") {
-                Task { if let address = await model.passkeyAddress() { openURL(address) } }
-            }
-        }
-    }
-
-    private var browsersSection: some View {
-        SettingsSection("Browsers", line: "Signed in with your password or a passkey.") {
-            if model.browsers.isEmpty {
-                SettingsEmptyCard(symbol: "safari", title: Text("No Browsers"), line: Text("No browsers are signed in."))
-            }
-            ForEach(model.browsers) { browser in
-                SettingsRow(
-                    verbatim: browser.name, line: Self.line(added: browser.added, used: browser.lastUsed, signedIn: true),
-                    error: model.rowErrors[browser.id].map { OwnerWording.line($0, on: .account) }, lead: .symbol("safari")
-                ) {
-                    SettingsButton("Sign Out…") { model.askToEnd(browser) }
-                }
-            }
-        }
-    }
-
-    /// "Added 3 October. Used today."
-    static func line(added: Date?, used: Date?, signedIn: Bool = false, now: Date = .now, calendar: Calendar = .current) -> String {
-        var parts: [String] = []
-        if let added {
-            let day = OwnerWording.day(added, now: now, calendar: calendar)
-            parts.append(signedIn ? String(localized: "Signed in \(day).") : String(localized: "Added \(day)."))
-        }
-        parts.append(OwnerWording.used(used, now: now, calendar: calendar) + ".")
-        return parts.joined(separator: " ")
-    }
-}
-
-/// Links to the server settings pages, including when the Account read is unavailable.
-struct AccountServerSettingsSection: View {
-    let host: any MarfaSettingsHost
-
-    var body: some View {
-        let pages: [MarfaSettingsPage] = [.overview, .updates, .addresses, .fileStorage, .history, .housekeeping, .limits, .monitoring, .startUp]
-        SettingsSection("Server Settings") {
-            ForEach(pages, id: \.self) { page in
-                MarfaSettingsPageRow(page: page, host: host)
-            }
-        }
+    private func link(_ page: MarfaSettingsPage, value: String? = nil) -> some View {
+        let locked = page.missingPermission(in: host.grants) != nil
+        return SettingsLinkRow(verbatim: page == .browsers ? String(localized: "Browsers") : page.title, lead: .tile(page.symbol, page.tone),
+            value: locked ? nil : value, valueGlyph: page == .network ? .link : nil,
+            lock: locked ? String(localized: "Not allowed") : nil) { host.show(page) }
+            .accessibilityIdentifier("SettingsLink-\(page.rawValue)")
     }
 }
 

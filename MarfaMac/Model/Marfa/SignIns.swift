@@ -188,7 +188,7 @@ nonisolated struct SystemSignIns: SignIns {
 
     /// What Account shows and changes: the username and email, read only, and the name and picture, which the owner may
     /// approve as read only. The username is never asked to change: password sign-in matches it.
-    static let accountScopes = ["profile.username:read", "profile.email:read", "profile.name:write", "profile.avatar:read", "profile.avatar:write"]
+    static let accountScopes = ["profile.username:read", "profile.username:write", "profile.email:read", "profile.email:write", "profile.name:write", "profile.avatar:read", "profile.avatar:write"]
 
     /// Whether `scopes`, as a sign-in holds them, let it read the owner's name.
     static func readsProfile(_ scopes: [String]) -> Bool { profileScopes.allSatisfy(scopes.contains) }

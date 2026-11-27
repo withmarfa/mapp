@@ -14,7 +14,7 @@ struct SettingsControlTests {
         let calls = FakeOwnerCalls()
         settings.ownerCalls = calls
         let read = page == .account ? "profile" : "keys"
-        let destination: MarfaSettingsPage = page == .account ? .addresses : .apps
+        let destination: MarfaSettingsPage = page == .account ? .network : .apps
         let link = "SettingsLink-\(destination.rawValue)"
         let pending = calls.hold(read)
         let window = host(MarfaSettingsPageView(page: page, host: settings))
@@ -32,6 +32,22 @@ struct SettingsControlTests {
         })
         try await press(in: window, matching: link, attribute: "accessibilityIdentifier")
         #expect(settings.shown == [destination, destination])
+    }
+
+    @Test(arguments: [MarfaSettingsPage.account, .passkeys, .browsers, .network])
+    func anUnreachableServerShowsOnlyTheGate(_ page: MarfaSettingsPage) async throws {
+        let settings = StubMarfaHost(settings: InstanceSettingsModel { nil })
+        settings.connection = .notAnswering(lastAnswered: nil)
+        let calls = FakeOwnerCalls()
+        settings.ownerCalls = calls
+        let window = host(MarfaSettingsPageView(page: page, host: settings))
+        defer { window.contentView = nil; window.close() }
+        try #require(await eventually {
+            window.contentView?.layoutSubtreeIfNeeded()
+            return !elements(window.contentView, matching: "Try Again", attribute: "accessibilityLabel").isEmpty
+        })
+        #expect(calls.calls.isEmpty)
+        #expect(elements(window.contentView, matching: "AccountSignOut", attribute: "accessibilityIdentifier").isEmpty)
     }
 
     @Test(arguments: [0, 1], Finish.allCases)

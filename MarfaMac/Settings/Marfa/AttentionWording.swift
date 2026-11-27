@@ -1,9 +1,35 @@
 import Foundation
 
-/// How a concern from `GET /attention` is told on the Overview: the server's short title and one plain line the app words from the
+/// How a concern from `GET /attention` is told in Account: the server's short title and one plain line the app words from the
 /// concern's kind and reference. The server's own description is never shown, since it names settings by key and requests by
 /// path for an operator; a kind the app has no wording for shows its title alone.
 nonisolated extension AttentionConcern {
+    var destination: MarfaSettingsPage {
+        switch kind {
+        case .webhook: .webhooks
+        case .key: .keys
+        case .connector: .connectors
+        case .folder: .folders
+        case .backup: .backups
+        case .job, .clock: .housekeeping
+        case .setting where reference.contains("/"): .connectors
+        case .setting where reference.hasPrefix("object_store_"): .fileStorage
+        case .setting where reference.hasPrefix("backup_"): .backups
+        case .setting: .monitoring
+        case .health: reference == "backups" ? .backups : .fileStorage
+        case .fault: .activity
+        case .unavailable:
+            switch reference {
+            case "keys": .keys
+            case "connectors": .connectors
+            case "folders": .folders
+            case "webhooks": .webhooks
+            case "housekeeping": .housekeeping
+            default: .activity
+            }
+        }
+    }
+
     var shownTitle: String {
         guard kind == .setting else { return title }
         // The server's own title names the setting by its key, so a setting the app has no name for is told without it.
@@ -13,6 +39,8 @@ nonisolated extension AttentionConcern {
 
     var shownLine: String? {
         switch kind {
+        case .webhook:
+            return String(localized: "Its recent deliveries have failed.")
         case .health:
             return String(localized: "The server’s own check found a problem.")
         case .job:

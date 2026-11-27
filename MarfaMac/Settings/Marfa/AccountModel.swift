@@ -2,6 +2,19 @@ import Foundation
 import Marfa
 import Observation
 
+nonisolated enum ProfileContactField: Hashable {
+    case username, email
+
+    var scope: ProfileField { self == .username ? .username : .email }
+    var title: String { self == .username ? String(localized: "Username") : String(localized: "Email") }
+
+    func held(in profile: OwnerProfile?) -> String { (self == .username ? profile?.username : profile?.email) ?? "" }
+
+    func unsaved(_ value: String) -> OwnerDraft {
+        .typed(title: self == .username ? String(localized: "Username Not Changed") : String(localized: "Email Not Changed"), text: value)
+    }
+}
+
 /// The Account page: the owner's profile as the server holds it, with the name and picture to change, the password, the
 /// passkeys and the browsers signed in. The sign-ins need `sign_ins.manage`, which every sign-in asks for; where the owner did
 /// not approve it, Change Password asks again for everything the sign-in lacks. The name and picture need the profile's own
@@ -110,16 +123,44 @@ import Observation
         ])
     }
 
-    // MARK: Name and picture
-
-    /// What of the profile the page shows locked, since the sign-in may not change it, or may not read it at all.
-    var lockedProfile: Set<ProfileField> {
-        guard let profile else { return [] }
-        var locked: Set<ProfileField> = []
-        if profile.name == nil || !changeable.contains(.name) { locked.insert(.name) }
-        if !profile.pictureIsReadable || !changeable.contains(.avatar) { locked.insert(.avatar) }
-        return locked
+    func loadSignIns(passkeysOnly: Bool) async {
+        await loader.load(in: context, primary: { () throws(OwnerFailure) in
+            if passkeysOnly {
+                passkeys = try await context.calls.passkeys()
+            } else {
+                browsers = try await context.calls.browserSignIns()
+            }
+        })
     }
+
+    var contactDrafts: [ProfileContactField: String] = [:]
+    private(set) var contactErrors: [ProfileContactField: String] = [:]
+    private(set) var savingContacts: Set<ProfileContactField> = []
+
+    func saveContact(_ field: ProfileContactField) async {
+        guard let typed = contactDrafts[field], changeable.contains(field.scope), !savingContacts.contains(field) else { return }
+        let value = typed.trimmingCharacters(in: .whitespacesAndNewlines)
+        contactErrors[field] = nil
+        guard value != field.held(in: profile) else { contactDrafts[field] = nil; return }
+        savingContacts.insert(field)
+        defer { savingContacts.remove(field) }
+        let closing = closings
+        do {
+            let result = try await context.calls.setProfileContact(field, to: value)
+            switch field {
+            case .username: profile?.username = result.username
+            case .email: profile?.email = result.email
+            }
+            if contactDrafts[field] == typed { contactDrafts[field] = nil }
+        } catch {
+            await context.learn(from: error)
+            if case .notPermitted = error { changeable = context.calls.changeableProfile() }
+            if closings == closing { contactErrors[field] = OwnerWording.line(error, on: .account) }
+            else { context.lateDraft(field.unsaved(typed)); contactDrafts[field] = nil }
+        }
+    }
+
+    // MARK: Name and picture
 
     /// Asks again for everything, the profile's scopes among them, and reads what the new sign-in may do.
     func allowProfileChanges() async {
@@ -151,7 +192,7 @@ import Observation
         defer { isSavingName = false }
         let closings = closings
         do {
-            profile = try await context.calls.setProfileName(name)
+            profile?.name = try await context.calls.setProfileName(name).name
         } catch {
             await context.learn(from: error)
             if case .notPermitted = error { changeable = context.calls.changeableProfile() }
@@ -194,7 +235,8 @@ import Observation
             return (sent, ProfilePicture.thumbnail(sent))
         }.value
         guard let prepared else { return false }
-        profile = try await context.calls.setProfilePicture(prepared.sent)
+        let updated = try await context.calls.setProfilePicture(prepared.sent)
+        profile?.hasPicture = updated.hasPicture
         picture = prepared.shown
         return true
     }
@@ -305,7 +347,7 @@ import Observation
         } catch {
             renameError = OwnerWording.line(error)
             await context.learn(from: error)
-            if error == .notFound { await load() }
+            if error == .notFound { await loadSignIns(passkeysOnly: true) }
         }
     }
 
@@ -389,6 +431,11 @@ import Observation
             nameDraft = held
         }
         nameError = nil
+        for (field, value) in contactDrafts where !savingContacts.contains(field) {
+            if value != field.held(in: profile) { drafts.append(field.unsaved(value)) }
+            contactDrafts[field] = nil
+            contactErrors[field] = nil
+        }
         return drafts + takeSheetDrafts()
     }
 

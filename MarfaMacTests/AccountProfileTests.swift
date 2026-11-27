@@ -14,6 +14,24 @@ import Testing
         return account
     }
 
+    @Test func refusedContactEditsSurviveReloadAndHandover() async {
+        let bench = OwnerBench()
+        bench.calls.state.withLock {
+            $0.profile.emailIsReadable = true
+            $0.changeableProfile = [.email]
+        }
+        let account = await loaded(bench)
+        #expect(account.picture == nil)
+        #expect(account.profile?.email == nil)
+        account.contactDrafts[.email] = "edited@example.com"
+        bench.calls.fail("setProfileContact", with: .unreachable)
+        await account.saveContact(.email)
+        await account.load()
+        #expect(account.contactDrafts[.email] == "edited@example.com")
+        #expect(account.contactErrors[.email] != nil)
+        #expect(account.takeDrafts().contains(.typed(title: "Email Not Changed", text: "edited@example.com")))
+    }
+
     @Test func aRefusedNameKeepsWhatWasTypedThroughAReadAgain() async {
         let bench = OwnerBench()
         let account = await loaded(bench)

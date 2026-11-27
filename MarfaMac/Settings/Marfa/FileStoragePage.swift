@@ -33,6 +33,12 @@ struct FileStoragePage: View {
                     InstanceChoiceRow(model: model, setting: .blobCleanupGraceSeconds, among: all, line: "How long a file is left alone before it is removed.")
                     unused
                 }
+                SettingsSection("Versions", footer: "A type can keep its own versions.") {
+                    ForEach(InstanceSetting.versionSettings, id: \.self) { setting in
+                        InstanceChoiceRow(model: model, setting: setting, among: InstanceSetting.versionSettings, line: setting == .versionMaxVersions ? "For one item." : nil)
+                    }
+                    InstanceStatusLine(model: model, settings: InstanceSetting.versionSettings)
+                }
                 InstanceStatusLine(model: model, settings: all)
             }
         }

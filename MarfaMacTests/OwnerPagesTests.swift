@@ -209,6 +209,17 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         }
     }
 
+    func setProfileContact(_ field: ProfileContactField, to value: String) async throws(OwnerFailure) -> OwnerProfile {
+        try enter("setProfileContact")
+        return state.withLock { state in
+            switch field {
+            case .username: state.profile.username = value.lowercased()
+            case .email: state.profile.email = value.isEmpty ? nil : value.lowercased()
+            }
+            return state.profile
+        }
+    }
+
     func profilePicture() async throws(OwnerFailure) -> Data? {
         try enter("profilePicture")
         return state.withLock { $0.picture }
