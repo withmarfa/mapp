@@ -70,7 +70,7 @@ private struct TopRowOverList: ViewModifier {
                             .padding(.trailing, TopRowMetrics.pillsTrail)
                     } else {
                         TopRowViewsLine(browser: browser, content: row)
-                            .padding(.leading, lead)
+                            .padding(.leading, lead - TopRowMetrics.pillInset)
                             .padding(.trailing, TopRowMetrics.pillsTrail)
                     }
                 })

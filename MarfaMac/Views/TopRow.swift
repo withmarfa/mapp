@@ -280,7 +280,7 @@ private struct TopRowPillStyle: ButtonStyle {
             .font(.system(size: 13 * scale, weight: isChosen ? .medium : .regular))
             .foregroundStyle(isChosen ? .primary : .secondary)
             .lineLimit(1)
-            .padding(.horizontal, 11)
+            .padding(.horizontal, TopRowMetrics.pillInset)
             .frame(height: TopRowMetrics.pillHeight * max(1, scale))
             .background { if isChosen { Capsule().fill(Color.primary.opacity(0.07)) } }
             .contentShape(Capsule())
@@ -291,7 +291,7 @@ private struct TopRowPillStyle: ButtonStyle {
 private struct TopRowMenuLabel: View {
     @Environment(\.interfaceTextSize) private var textSize
     let title: Text
-    var padding: CGFloat = 11
+    var padding: CGFloat = TopRowMetrics.pillInset
     var isChosen = false
 
     var body: some View {
@@ -407,7 +407,7 @@ private struct TopRowPills: View {
             .fixedSize()
             .focused($nameFocused)
             .font(.system(size: 13, weight: .medium))
-            .padding(.horizontal, 11)
+            .padding(.horizontal, TopRowMetrics.pillInset)
             .frame(height: TopRowMetrics.pillHeight)
             .background(Capsule().fill(Color.primary.opacity(0.07)))
             .onSubmit { commitRename(choice) }
@@ -494,8 +494,11 @@ enum TopRowMetrics {
     static let lead: CGFloat = 40
     /// The same in a list column beside a page, where the title's text stands where the rows' text does.
     static let listLead: CGFloat = 16
-    /// What the row of views keeps clear at its trailing edge. Its first pill stands where the title does, capsule edge to edge.
+    /// What the row of views keeps clear at its trailing edge.
     static let pillsTrail: CGFloat = 29
+    /// How far a pill's text stands inside its capsule. The row of views starts this far before the title's edge, so its
+    /// first pill's text stands where the title's text does.
+    static let pillInset: CGFloat = 11
     static let pillHeight: CGFloat = 28
     /// The title's line at the least: the toolbar's usual height, which stands in full screen while the toolbar is hidden.
     static let lineHeight: CGFloat = 52
