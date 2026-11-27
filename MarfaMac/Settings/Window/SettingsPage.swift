@@ -8,7 +8,6 @@ nonisolated enum SettingsPage: CaseIterable, Hashable, Sendable {
     static let passkeys = SettingsPage.marfa(.passkeys)
     static let browsers = SettingsPage.marfa(.browsers)
     static let account = SettingsPage.marfa(.account)
-    static let apps = SettingsPage.marfa(.apps)
     static let keys = SettingsPage.marfa(.keys)
     static let network = SettingsPage.marfa(.network)
     static let plugins = SettingsPage.marfa(.plugins)

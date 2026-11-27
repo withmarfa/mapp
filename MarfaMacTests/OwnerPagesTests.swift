@@ -1187,11 +1187,126 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
 
     private func bench(_ app: AppAccess) -> OwnerBench {
         let bench = OwnerBench()
+        bench.grants.insert(.itemsPurge)
         bench.calls.state.withLock {
             $0.apps = [app]
             $0.names = ["core.note": "Note"]
         }
         return bench
+    }
+
+    @Test func disconnectWithoutPurgePermissionKeepsTheAppsData() async throws {
+        var app = app()
+        app.vendors = ["app.raycast"]
+        let bench = bench(app)
+        bench.grants.remove(.itemsPurge)
+        let model = AppsModel(context: bench.context)
+        await model.load()
+        model.askToDisconnect(app)
+        let question = try #require(model.question)
+        #expect(question.checkbox == nil)
+        await model.confirm(question)
+        #expect(bench.calls.state.withLock { $0.disconnects.first?.removingData } == false)
+    }
+
+    @Test func registeredAppTypesNeedSchemaWriteForRemoval() async {
+        let bench = bench(keeping: ["app.raycast": kept()])
+        bench.calls.state.withLock { $0.names["app.raycast.setting"] = "Settings" }
+        let model = AppsModel(context: bench.context)
+        await model.load()
+        await model.readData(of: model.apps[0])
+        model.askToRemoveData(model.apps[0], vendor: "app.raycast")
+        #expect(model.question == nil)
+        model.askToDisconnect(model.apps[0])
+        #expect(model.question?.checkbox == nil)
+        bench.grants.insert(.schemaWrite)
+        model.askToDisconnect(model.apps[0])
+        #expect(model.question?.checkbox != nil)
+    }
+
+    @Test func aSignInThatCanOnlyReadAppDataCannotRemoveIt() async {
+        var app = app(scopes: ["*:read"])
+        app.vendors = ["app.raycast"]
+        let bench = bench(app)
+        bench.grants.insert(.schemaWrite)
+        bench.calls.state.withLock {
+            $0.appData["app.raycast"] = AppData(vendor: "app.raycast", types: kept().types, clientID: app.clientID)
+        }
+        let model = AppsModel(context: bench.context)
+        await model.load()
+        await model.readData(of: app)
+        model.askToRemoveData(app, vendor: "app.raycast")
+        #expect(model.question == nil)
+        model.askToDisconnect(app)
+        #expect(model.question?.checkbox == nil)
+    }
+
+    @Test func aNamespaceReadRefusalLeavesDisconnectAvailableWithoutRemoval() async {
+        let bench = bench(keeping: ["app.raycast": kept()])
+        let model = AppsModel(context: bench.context)
+        await model.load()
+        bench.calls.fail("appData", with: .notPermitted(nil))
+        await model.readData(of: model.apps[0])
+        model.askToDisconnect(model.apps[0])
+        #expect(model.question?.checkbox == nil)
+        #expect(model.question?.confirm == "Disconnect")
+    }
+
+    @Test func aKeyNeedsWriteOnEachAffectedType() async {
+        let bench = bench(keeping: ["app.raycast": kept()])
+        bench.grants.insert(.schemaWrite)
+        bench.calls.state.withLock {
+            $0.identity = OwnIdentity(keyID: "key-1", expires: nil, keyTypes: ["*": .write, "app.raycast.setting": .read])
+        }
+        let model = AppsModel(context: bench.context)
+        await model.load()
+        await model.readData(of: model.apps[0])
+        model.askToRemoveData(model.apps[0], vendor: "app.raycast")
+        #expect(model.question == nil)
+        model.askToDisconnect(model.apps[0])
+        #expect(model.question?.checkbox == nil)
+    }
+
+    @Test func appDataRefusalsUseTheAppsWording() {
+        let refusal = OwnerFailure.refused("internal server wording")
+        #expect(AppDataWording.stoppedAfterRemoving(refusal) == "The server couldn’t do that.")
+    }
+
+    @Test func refusedDataRemovalLeavesAConfirmedWayToDisconnectAndKeepData() async throws {
+        let bench = bench(keeping: ["app.raycast": kept()])
+        let model = AppsModel(context: bench.context)
+        await model.load()
+        model.askToDisconnect(model.apps[0])
+        bench.calls.fail("disconnect", with: .notPermitted("schema.write"))
+        await model.confirm(try #require(model.question), alsoRemovingData: true)
+        #expect(model.apps.count == 1)
+        #expect(bench.refreshed == 1)
+        #expect(model.disconnectDataFailures["g1"] == .notPermitted("schema.write"))
+        model.askToDisconnect(model.apps[0], keepingData: true)
+        let retry = try #require(model.question)
+        #expect(retry.checkbox == nil)
+        bench.calls.fail("disconnect", with: nil)
+        await model.confirm(retry, alsoRemovingData: true)
+        #expect(bench.calls.state.withLock { $0.disconnects.first?.removingData } == false)
+        #expect(bench.calls.state.withLock { $0.appData["app.raycast"] != nil })
+    }
+
+    @Test func anOAuthSignInUsesTheServerVerifiedClientID() async {
+        var current = app()
+        current.vendors = ["app.raycast"]
+        let bench = bench(current)
+        bench.calls.state.withLock {
+            $0.appData["app.raycast"] = AppData(vendor: "app.raycast", types: [], clientID: current.clientID)
+        }
+        let model = AppsModel(context: bench.context, ownVendor: "app.raycast")
+        await model.load()
+        #expect(model.isCurrent(current))
+        model.askToDisconnect(current)
+        #expect(model.question?.message.contains("Disconnecting this app also signs this Mac out.") == true)
+
+        bench.calls.state.withLock { $0.identity = OwnIdentity(keyID: "key-1", expires: nil) }
+        await model.load()
+        #expect(!model.isCurrent(current), "a key can read the namespace without using the app's grant to sign in")
     }
 
     @Test func narrowingAsksFirstAndSendsTheAccessItWasReadAs() async throws {
@@ -1563,6 +1678,58 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
 
 @MainActor
 @Suite(.hangLimit) struct KeysModelTests {
+    @Test(arguments: [OwnerFailure.notPermitted("keys.manage"), .unreachable])
+    func aFailedRevokeKeepsTheKeyAndExplainsWhy(_ failure: OwnerFailure) async throws {
+        let bench = bench([key()])
+        let model = KeysModel(context: bench.context)
+        await model.load()
+        model.askToRevoke(try #require(model.key("k1")))
+        bench.calls.fail("revoke", with: failure)
+        await model.confirm(try #require(model.question))
+        #expect(model.keys.map(\.id) == ["k1"])
+        #expect(model.revoked == nil)
+        #expect(model.rowErrors["k1"] == failure)
+    }
+
+    @Test func revokingTheCurrentKeySaysItSignsThisMacOut() async throws {
+        let bench = bench([key()])
+        bench.calls.state.withLock { $0.identity = OwnIdentity(keyID: "k1", expires: nil) }
+        let model = KeysModel(context: bench.context)
+        await model.load()
+        let current = try #require(model.key("k1"))
+        #expect(model.isCurrent(current))
+        model.askToRevoke(current)
+        #expect(model.question?.message.contains("signs this Mac out") == true)
+    }
+
+    @Test func anExpiredKeyIsDescribedInThePastTense() {
+        let now = Date.now
+        #expect(KeysPage.expiryLine(key(expires: now.addingTimeInterval(-60)), now: now).hasPrefix("Expired "))
+    }
+
+    @Test func anExpiringKeyRemainsListedOnTheAccountProblemsDestination() async {
+        let soon = key(expires: .now.addingTimeInterval(86_400))
+        let bench = bench([soon])
+        let model = KeysModel(context: bench.context)
+        await model.load()
+        #expect(model.ownersKeys == [soon])
+        #expect(KeysPage.expiryLine(soon).hasPrefix("Expires "))
+        let concern = AttentionConcern(kind: .key, reference: soon.id, title: "A key expires tomorrow")
+        #expect(concern.repair == .page(.keys))
+    }
+
+    @Test func mintGrantsScopedKeyAccessAndManageGrantsExtension() {
+        let bench = bench([])
+        let model = KeysModel(context: bench.context)
+        bench.grants = [.grantsManage]
+        #expect(!model.canReadKeys)
+        bench.grants.insert(.keysMint)
+        #expect(model.canReadKeys)
+        #expect(!model.canExtend)
+        bench.grants.insert(.keysManage)
+        #expect(model.canExtend)
+    }
+
     private func key(_ id: String = "k1", expires: Date? = nil, types: [String: AccessLevel] = ["*": .write, "core.note": .read]) -> KeyInfo {
         KeyInfo(id: id, label: "Importer", source: "importer", permissions: ["items.purge"], tier: .feed, types: types, expires: expires, appClientID: nil)
     }
@@ -1783,7 +1950,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
             taken == [
                 .told(
                     title: "Key Not Copied",
-                    message: "The key “Lisbon zine importer” was made, and its secret can’t be shown again. If you didn’t copy it, revoke the key on the Keys page.")
+                    message: "The key “Lisbon zine importer” was made, and its secret can’t be shown again. If you didn’t copy it, revoke the key in Apps and Keys.")
             ])
         #expect(!String(describing: taken).contains("marfa_k1_secret"), "the secret is never handed over")
         #expect(model.created == nil)
@@ -1809,7 +1976,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
             bench.late == [
                 .told(
                     title: "Key Not Copied",
-                    message: "The key “Lisbon zine importer” was made, and its secret can’t be shown again. If you didn’t copy it, revoke the key on the Keys page.")
+                    message: "The key “Lisbon zine importer” was made, and its secret can’t be shown again. If you didn’t copy it, revoke the key in Apps and Keys.")
             ])
         #expect(model.created == nil, "the secret is dropped, not kept for a window that is gone")
         #expect(model.sheet == nil)
@@ -2023,6 +2190,41 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         await model.confirm(question)
         #expect(model.keys.isEmpty)
         #expect(model.revoked == "k1")
+    }
+
+    @Test(arguments: [true, false]) func aMissingRevokeChecksTheListBeforeRemovingTheRow(stillListed: Bool) async throws {
+        let bench = bench([key()])
+        let model = KeysModel(context: bench.context)
+        await model.load()
+        model.askToRevoke(model.keys[0])
+        bench.calls.fail("revoke", with: .notFound)
+        if !stillListed { bench.calls.state.withLock { $0.keys = [] } }
+        await model.confirm(try #require(model.question))
+        #expect(bench.calls.calls.filter { $0 == "keys" }.count == 2)
+        #expect((model.key("k1") != nil) == stillListed)
+        #expect(model.isGone("k1") != stillListed)
+        #expect((model.rowErrors["k1"] != nil) == stillListed)
+    }
+
+    @Test func aMissingRevokeWithAnUnreadableListKeepsTheRow() async throws {
+        let bench = bench([key()])
+        let model = KeysModel(context: bench.context)
+        await model.load()
+        model.askToRevoke(model.keys[0])
+        bench.calls.fail("revoke", with: .notFound)
+        bench.calls.fail("keys", with: .unreachable)
+        await model.confirm(try #require(model.question))
+        #expect(model.key("k1") != nil)
+        #expect(model.rowErrors["k1"] != nil)
+    }
+
+    @Test func revokeWarnsAboutSignOutWhenIdentityCouldNotBeRead() async {
+        let bench = bench([key()])
+        let model = KeysModel(context: bench.context)
+        bench.calls.fail("identity", with: .unreachable)
+        await model.load()
+        model.askToRevoke(model.keys[0])
+        #expect(model.question?.message.contains("If this Mac uses this key") == true)
     }
 
     @Test func aKeyRevokedElsewhereWhileItsPageIsOpenIsToldGone() async {

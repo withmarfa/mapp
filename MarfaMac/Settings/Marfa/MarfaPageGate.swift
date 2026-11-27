@@ -82,7 +82,12 @@ struct MarfaSettingsPageView: View {
             switch page {
             case .passkeys, .browsers: AccountSignInsPage(page: page, host: host)
             case .account: AccountPage(host: host)
-            case .apps: AppsPage(host: host, subpage: subpage)
+            case .apps:
+                if let subpage {
+                    AppsPage(host: host, subpage: subpage)
+                } else {
+                    KeysPage(host: host, subpage: nil)
+                }
             case .keys: KeysPage(host: host, subpage: subpage)
             case .network: NetworkPage(host: host)
             case .plugins: PluginsPage(host: host, subpage: subpage)
@@ -108,7 +113,6 @@ struct MarfaSettingsPageView: View {
         guard subpage == nil else { return nil }
         switch page {
         case .account where host.serverAddress != nil: return AnyView(AccountHeader(host: host))
-        case .keys: return AnyView(AppsSettingsSection(host: host))
         default: return nil
         }
     }

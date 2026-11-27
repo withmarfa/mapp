@@ -12,15 +12,15 @@ These pages show and change what the server holds for its owner. Every call goes
 
 ## Pages
 
-The page gate checks the connection and the sign-in’s permissions. A configured Marfa keeps its Account header and Sign Out above any connection state. Each section that needs additional access identifies the permission. Account links to the server settings pages, and Apps and Keys links to Apps.
+The page gate checks connection and permissions. A configured Marfa keeps its Account header and Sign Out above any connection state. Sections identify additional permissions. Apps and Keys links to each connected app’s settings.
 
 | Page | Opens with | Its job |
 | --- | --- | --- |
 | Account | none | Profile, sign-out, sign-in controls and server settings. Problems and the release need `instance.read`. Updating needs `instance.maintain` |
 | Passkeys | `sign_ins.manage` | Add a passkey in the browser, rename one or remove it |
 | Browsers | `sign_ins.manage` | See and end browser sessions |
-| Apps | `grants.manage` | Connected apps: access, owner permissions, keys they made, data they keep |
-| Apps and Keys | `keys.manage` | The owner's keys and apps' keys. Making one needs `keys.mint` |
+| Apps and Keys | None | Connected apps need `grants.manage`. Listing all keys needs `keys.manage`. A sign-in with only `keys.mint` can create keys and manage keys within its reach |
+| App details | `grants.manage` | A connected app’s access, owner permissions, keys and data. Removing data also needs `items.purge` |
 | Network | `config.manage` | Sign-in and other addresses, websites allowed, private addresses |
 | Plugins | `schema.write` | Plugins installed, newer and available. One with a connector needs `connectors.manage` |
 | Types | `schema.write` | Types, fields, status words, and rules |
@@ -39,7 +39,7 @@ The page gate checks the connection and the sign-in’s permissions. A configure
 
 ## Permissions
 
-- **A page never shows content behind a missing permission.** It shows Needs a Permission in its own words, with Allow More, because a row that cannot load looks like a fault. `MarfaPageGate` decides.
+- **A missing page permission shows Needs a Permission with Allow More.** `MarfaPageGate` decides. Apps and Keys checks access to each section independently and shows a locked row for an unavailable action.
 - **A sign-in asks for every permission an app can hold**, and the owner grants what they choose. A page rereads the grants after approval and still says what is missing.
 - **A `forbidden` answer rereads the grants** and offers Allow More… in the problem row (`OwnerProblemRow`).
 - **Owner permissions are counted, never all or nothing**, and can only be turned off on a key's or an app's page (`OwnerPermissionsRow`).

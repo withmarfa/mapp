@@ -23,7 +23,7 @@ struct SettingsWindowTests {
         let moved: [SettingsPage: SettingsPage] = [
             .passkeys: .account, .browsers: .account, .network: .account, .fileStorage: .account,
             .housekeeping: .account, .limits: .account, .monitoring: .account,
-            .apps: .keys, .links: .types,
+            .marfa(.apps): .keys, .links: .types,
         ]
         #expect(Set(sidebar + Array(moved.keys)) == Set(SettingsPage.allCases))
         for page in SettingsPage.allCases {
@@ -105,7 +105,7 @@ struct SettingsWindowTests {
         #expect(MarfaSettingsPage.trash.permission == nil)
         #expect(MarfaSettingsPage.account.permission == nil, "Account opens without one and asks for sign_ins.manage from Change Password")
         #expect(MarfaSettingsPage.apps.permission == .grantsManage)
-        #expect(MarfaSettingsPage.keys.permission == .keysManage)
+        #expect(MarfaSettingsPage.keys.permission == nil, "Apps and Keys checks each section’s permission")
         #expect(MarfaSettingsPage.network.permission == .configManage)
         #expect(MarfaSettingsPage.types.permission == .schemaWrite)
         #expect(MarfaSettingsPage.plugins.permission == .schemaWrite)
