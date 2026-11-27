@@ -20,7 +20,7 @@ extension EditorTests {
         editor.alreadyInMarfa.viewAppeared()
         #expect(editor.insertImages([.file(disk.url("shot.png")), .file(disk.url("other.png"))]))
         try #require(await eventually { editor.alreadyInMarfa.question != nil })
-        #expect(editor.alreadyInMarfa.question?.title == "1 of 2 Files Are Already in Marfa")
+        #expect(editor.alreadyInMarfa.question?.title == "1 of 2 Files Already in Marfa")
         editor.alreadyInMarfa.answer(.cancel)
         // Time for an attach made after Cancel to reach the library, which nothing signals when none is made.
         try await Task.sleep(for: .milliseconds(300))

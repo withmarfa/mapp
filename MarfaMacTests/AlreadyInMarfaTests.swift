@@ -69,7 +69,7 @@ struct AlreadyInMarfaTests {
         }
         try #require(await eventually { browser.alreadyInMarfa.question != nil })
         let question = try #require(browser.alreadyInMarfa.question)
-        #expect(question.title == "3 of 4 Files Are Already in Marfa")
+        #expect(question.title == "3 of 4 Files Already in Marfa")
         #expect(question.message == """
             “a.png” has the same contents as “Beach Day”.
             “b.png” has the same contents as “Trip” and 1 other item.
@@ -203,7 +203,7 @@ struct AlreadyInMarfaTests {
         try #require(await eventually { browser.alreadyInMarfa.question != nil })
         let question = try #require(browser.alreadyInMarfa.question)
         #expect(question.rows.map(\.file.lastPathComponent) == ["match.png"])
-        #expect(question.title == "1 of 3 Files Are Already in Marfa")
+        #expect(question.title == "1 of 3 Files Already in Marfa")
         browser.alreadyInMarfa.answer(.open)
         #expect(await adding.value.count == 2)
         #expect(library.addedFiles.map(\.name) == ["none.png", "unanswered.png"], "a file with no answer is added, never skipped")

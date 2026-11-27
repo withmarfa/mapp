@@ -1,18 +1,12 @@
 import Foundation
 import Observation
 
-/// The question every add of a file asks first: a drop, an import, Quick Add's file and Add Attachment. The library
-/// is asked which items already hold each file's bytes (`ItemLibrary.itemsWithSameBytes(as:)`), and where any does,
-/// the person is asked once for the whole batch: Add Anyway adds every file, Open adds only the files with no match
-/// and opens the items that matched, and Cancel adds nothing. A file is left out only by Open or Cancel: no answer,
-/// a failure, a check that takes longer than `limit` or no view left to ask in adds every file as if nothing had
-/// been asked.
+/// Checks a batch before an import or attachment. Only an explicit Open or Cancel can exclude a file.
 @MainActor
 enum AlreadyInMarfa {
     /// How long the whole check, hashing and lookup, may take before the files are added unasked.
     static let limit: Duration = .seconds(10)
 
-    /// What the person chose.
     enum Choice: Equatable, Sendable {
         case addAnyway
         case open
@@ -62,7 +56,7 @@ enum AlreadyInMarfa {
             if rows.count == total {
                 return String(localized: "\(rows.count) Files Are Already in Marfa")
             }
-            return String(localized: "\(rows.count) of \(total) Files Are Already in Marfa")
+            return String(localized: "\(rows.count) of \(total) Files Already in Marfa")
         }
 
         var message: String {
@@ -73,8 +67,7 @@ enum AlreadyInMarfa {
             return lines.joined(separator: "\n")
         }
 
-        /// “It has the same contents as “Beach Day”.”, naming the file where the title does not, and counting the
-        /// other items.
+        /// Names the file when the title does not. A truncated result has no exact count.
         private static func sentence(for row: Row, named file: String?) -> String {
             let first = row.items.first?.name ?? ""
             let others = row.items.count - 1

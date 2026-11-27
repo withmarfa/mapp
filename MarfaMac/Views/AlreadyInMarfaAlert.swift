@@ -1,9 +1,7 @@
 import SwiftUI
 
 extension View {
-    /// Shows the system's alert for files about to be added that are already in Marfa (`AlreadyInMarfa`), one
-    /// question at a time. Open is the default button: Return then adds no second copy and loses nothing, since the
-    /// files with no match are still added. A view that goes lets what waits go ahead unasked, as with no answer.
+    /// Withdrawing the view releases pending adds because the person has not chosen to skip any files.
     func asksAboutFilesInMarfa(_ asking: AlreadyInMarfa.Asking) -> some View {
         modifier(AlreadyInMarfaAlert(asking: asking))
     }

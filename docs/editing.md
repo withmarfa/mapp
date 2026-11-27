@@ -18,7 +18,7 @@ paths:
 
 # Making and editing
 
-Item changes go through `ItemLibrary` as `ItemWrite` values (`docs/value-panels.md`, `MarfaMac/Model/AGENTS.md`).
+Item changes use `ItemLibrary` and `ItemWrite` (`docs/value-panels.md`, `MarfaMac/Model/AGENTS.md`).
 
 ## What an item allows
 
@@ -59,14 +59,14 @@ Every editor asks `Item.allows(_:)` for the `ItemChange` it writes (`ValueEditKi
 
 ### Typed text is never lost
 
-`NewItemDrafts` keeps drafts by slot and instance through a closed window, quit or refusal; its doc comments name each step. A draft being sent is frozen; edits start another. An interrupted draft returns if its item is absent. Adding again asks first (`mayBeInMarfa`).
+`NewItemDrafts` keeps drafts by slot and instance through a window close, quit or refusal. Editing a draft while it is being sent starts another. An interrupted draft returns if its item is absent. Adding it again asks first (`mayBeInMarfa`).
 
 ### Dropping
 
 - **Files dropped on a list join the place in view** (`Browser.fileDropTarget`): a collection, the Feed, else the Library.
 - **A collection's row, card or sidebar row takes items and files** (`dropsInto`).
 - **A drop is one undo step and one toast;** Undo unlinks, then moves them to Recently Deleted.
-- **Every add of a file first asks about files already in Marfa** (`AlreadyInMarfa`), in one alert. Open, the default, adds the rest and opens matches; no answer adds all.
+- **Files are checked as a batch.** A match prompts once. Open skips matches. Quick Add keeps the remaining files in the draft. A lookup without an answer lets the add proceed.
 
 ## Changing type
 

@@ -1527,12 +1527,12 @@
     "%lld of %lld" : {
       "extractionState" : "manual"
     },
-    "%lld of %lld Files Are Already in Marfa" : {
+    "%lld of %lld Files Already in Marfa" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "%1$lld of %2$lld Files Are Already in Marfa"
+            "value" : "%1$lld of %2$lld Files Already in Marfa"
           }
         }
       }
