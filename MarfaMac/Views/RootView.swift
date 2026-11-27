@@ -115,7 +115,10 @@ struct WelcomeView: View {
                 Text("The app reads and writes your library on a Marfa server. Enter its address and sign in from Settings.")
             }
         } actions: {
-            Button("Connect…") { browser.showSettings(.connection) }
+            Button("Connect…") {
+                libraries.marfaSettings.showsConnectSheet = true
+                browser.showSettings(.connection)
+            }
                 .appButton(.primary, size: .large)
                 .accessibilityIdentifier("WelcomeConnect")
         }

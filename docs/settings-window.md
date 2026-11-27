@@ -51,7 +51,7 @@ See `docs/owner-settings.md` for Marfa pages and `docs/settings-sync.md` for sto
 | Lists | Density, From (All Items or Library), sort, and grouping. A view or place can override these defaults |
 | Layouts | Types are grouped by origin and namespace. Export and Import transfer the date, secondary line, and facts (`docs/type-looks.md`). `PagePlacements` stores pins and Linked From. Restore Defaults resets both stores for one type |
 | Search | Excluded types and sources keep their names if missing (`SearchLeaveOuts`). Add explains the ten-condition limit. Included controls archived and Feed items. Results controls order and snippets. Searches within a place omit nothing |
-| Connection | Sign-in, address status, Account link, permission and queue counts, downloads, space used, and exports. Other Marfas shows when other copies exist. Disconnect reads the queue and asks about unsent changes |
+| Connection | Sign In opens the Connect to a Marfa sheet with address status and code sign-in. Connected pages show the Account link, permissions, queue, downloads, and exports. Disconnect checks for unsent changes |
 
 - **A choice whose thing is gone keeps its name, marked as missing** (`MissingChoice`), and the app uses the default meanwhile.
 - **Import, restore and reset save a restore point first.** If that fails, nothing changes.

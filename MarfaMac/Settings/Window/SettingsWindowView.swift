@@ -29,6 +29,7 @@ struct SettingsWindowView: View {
         NavigationSplitView {
             SettingsSidebar(
                 selection: Binding { navigation.page } set: { navigation.show($0) }, search: $search,
+                hasMarfa: libraries.host.configuredConnection != nil,
                 badges: { page in
                     guard page == .account, badgeAddress != nil else { return nil }
                     return host.overview.attentionBadge
