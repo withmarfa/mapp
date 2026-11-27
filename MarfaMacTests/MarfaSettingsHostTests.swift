@@ -24,13 +24,13 @@ import Testing
         return (adapter, libraries, source)
     }
 
-    @Test func signingOutFromAccountOpensTheExistingDisconnectConfirmation() async throws {
+    @Test func signingOutAsksForConfirmationAndKeepsAccountOpen() async throws {
         let (_, libraries, _) = try await connected(HostBench())
         let launcher = SettingsLauncher()
         launcher.show(.account)
         let settings = AppSettingsHost(libraries: libraries, launcher: launcher)
         settings.requestSignOut()
-        #expect(launcher.navigation.page == .connection)
+        #expect(launcher.navigation.page == .account)
         #expect(libraries.marfaSettings.isConfirmingDisconnect)
         #expect(libraries.host.configuredConnection != nil)
     }
