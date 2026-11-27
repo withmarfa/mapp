@@ -16,6 +16,8 @@ extension PreferencesSync {
             var frozenBuild: String?
             /// Set once this Mac removed the item or saw it in the bin, so an emptied bin does not bring it back.
             var removed: Bool?
+            /// Every item the last removal queued, including duplicates and conflicted copies.
+            var removedItems: Set<String>?
 
             init(item: String, base: PreferenceUnits, frozenBuild: String? = nil) {
                 self.item = item

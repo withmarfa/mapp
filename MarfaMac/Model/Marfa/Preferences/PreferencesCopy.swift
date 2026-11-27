@@ -52,6 +52,8 @@ nonisolated protocol PreferencesCopy: Sendable {
     func remove(_ item: String) async throws -> String
     /// The queued writes that move a settings item to the bin and have no answer yet.
     func pendingRemovals() async throws -> Set<String>
+    /// Catches the copy up with Marfa. False while a settings removal still waits.
+    func catchUpAfterRemovals() async throws -> Bool
     /// Whether the queue holds a write the server has not answered that is not one of these items' own, such as the
     /// library's: sending the queue sends it too.
     func holdsOtherChanges(besides items: Set<String>) async throws -> Bool
@@ -202,6 +204,12 @@ nonisolated struct WorkingCopyPreferences: PreferencesCopy {
         let rows = try await MarfaEngine.asking { try await copy.items.get(named, includingBin: true) }.rows
         let ours = Set(rows.filter { $0.type == PreferencesType.id }.map(\.id))
         return Set(writes.filter { $0.itemId.map(ours.contains) ?? false }.map(\.id))
+    }
+
+    func catchUpAfterRemovals() async throws -> Bool {
+        guard try await pendingRemovals().isEmpty else { return false }
+        _ = try await MarfaEngine.asking { try await copy.catchUp() }
+        return true
     }
 
     func holdsOtherChanges(besides items: Set<String>) async throws -> Bool {

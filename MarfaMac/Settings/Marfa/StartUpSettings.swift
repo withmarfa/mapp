@@ -1,15 +1,7 @@
 import SwiftUI
 
-/// What the server started with, read only: each setting only whoever runs it can change, with what it does and whether it is
-/// set. Its value is never shown, since some are secrets and the rest are the machine's own.
-struct StartUpPage: View {
-    let host: any MarfaSettingsHost
-    @State private var store: StoredSettings
-
-    init(host: any MarfaSettingsHost) {
-        self.host = host
-        _store = State(initialValue: StoredSettings(context: OwnerContext(host: host), calls: host.instanceCalls))
-    }
+struct StartUpSettings: View {
+    let rows: [StartUpSetting]
 
     private var columns: [SettingsTableColumn<StartUpSetting>] {
         [
@@ -26,28 +18,12 @@ struct StartUpPage: View {
     }
 
     var body: some View {
-        content
-            .task(id: host.serverAddress) { await store.load() }
-            .accessibilityIdentifier("StartUpPage")
-    }
-
-    @ViewBuilder private var content: some View {
-        if let failure = store.failure, store.snapshot == nil {
-            OwnerFailureState(page: .startUp, failure: failure, host: host) { Task { await store.load() } }
-        } else if let snapshot = store.snapshot {
-            SettingsPageColumn {
-                SettingsSection(
-                    name: Text("Set Where \(host.serverName) Runs"), line: Text("Read when it starts. Change them there.")
-                ) {
-                    if snapshot.startUp.isEmpty {
-                        SettingsEmptyCard(symbol: "power", title: Text("Nothing listed"), line: Text("\(host.serverName) lists no start-up settings."))
-                    } else {
-                        SettingsSectionTable(rows: snapshot.startUp, columns: columns)
-                    }
-                }
+        SettingsSection("Set Where It Runs", footer: "Read when the server starts. Change them where it runs.") {
+            if rows.isEmpty {
+                SettingsEmptyCard(symbol: "power", title: Text("No Start-Up Settings"), line: Text("The server lists no start-up settings."))
+            } else {
+                SettingsSectionTable(rows: rows, columns: columns)
             }
-        } else {
-            OwnerLoading()
         }
     }
 }

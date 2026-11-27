@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// The configured Marfa, its sign-in and this Mac’s copy, or the sign-in form before a Marfa is configured.
+/// The configured Marfa, its sign-in and this Mac’s copy, or the entry to sign in.
 struct ConnectionPage: View {
     let settingsHost: AppSettingsHost
     @Environment(Libraries.self) private var libraries
@@ -17,44 +17,34 @@ struct ConnectionPage: View {
     private var model: MarfaSettingsModel { libraries.marfaSettings }
 
     var body: some View {
-        SettingsPageColumn {
+        Group {
             if let connection = host.configuredConnection {
-                connected(to: connection)
+                SettingsPageColumn {
+                    connected(to: connection)
+                    codeSection
+                    noticeSection
+                    ConnectionCopySections()
+                        .id(connection)
+                    let hasOtherMarfas = host.hasOtherMarfas(besides: connection)
+                    if hasOtherMarfas || isChoosingOther { otherServer(hasOtherMarfas: hasOtherMarfas) }
+                }
             } else {
                 disconnected
             }
-            codeSection
-            noticeSection
-            if let connection = host.configuredConnection {
-                ConnectionCopySections()
-                    .id(connection)
-                let hasOtherMarfas = host.hasOtherMarfas(besides: connection)
-                if hasOtherMarfas || isChoosingOther { otherServer(hasOtherMarfas: hasOtherMarfas) }
-                disconnect
-            }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("ConnectionPage")
-        .onChange(of: model.isConfirmingDisconnect) { _, isAsking in
-            guard isAsking else { return }
-            model.isConfirmingDisconnect = false
-            askToDisconnect()
+        .settingsSheet(presenting: model.showsConnectSheet && host.configuredConnection == nil, dismiss: dismissConnect) {
+            ConnectToMarfaSheet(model: model, dismiss: dismissConnect)
         }
-        .alert(
-            "Couldn’t Remove This App’s Settings",
-            isPresented: Binding { model.settingsRemovalFailure != nil } set: { if !$0 { model.stayConnected() } }
-        ) {
-            Button("Stay Connected", role: .cancel) {}
-            Button("Disconnect Anyway", role: .destructive) { Task { await model.disconnectAnyway() } }
-        } message: {
-            Text(verbatim: model.settingsRemovalFailure?.reason == .discardedChangesWait
-                ? appSettingsWords.discardedChangesWait : appSettingsWords.removalNotTaken)
-        }
+        .onDisappear { model.closeConnectSheet() }
         .task(id: NameRequest(connection: host.configuredConnection, isOnline: host.state == .online, readsProfile: host.readsProfile)) {
             if accountNameServer != host.configuredConnection {
                 accountName = nil
                 accountNameServer = host.configuredConnection
                 isChoosingOther = false
             }
+            if host.configuredConnection != nil { model.showsConnectSheet = false }
             guard let connection = host.configuredConnection, host.state == .online else { return }
             let name = host.readsProfile ? await MarfaServerCalls(connection: connection, signIns: host.signIns).ownerName() : nil
             if !Task.isCancelled, host.configuredConnection == connection { accountName = name }
@@ -71,27 +61,43 @@ struct ConnectionPage: View {
     // MARK: Not connected
 
     private var disconnected: some View {
-        SettingsSection("Connect to a Marfa", line: "The app shows one Marfa at a time.") {
-            if let address = host.unusableAddress {
-                SettingsProblemRow(
-                    title: Text("Change the Saved Address"), line: Text(verbatim: Words.savedAddressHasMore(address)), actions: [])
-                    .accessibilityIdentifier("MarfaSavedAddressNeedsChange")
+        VStack(spacing: 0) {
+            if host.unusableAddress != nil || (model.notice != nil && !model.showsConnectSheet) {
+                SettingsPageColumn(scrolls: false) {
+                    if let address = host.unusableAddress {
+                        SettingsCard {
+                            SettingsProblemRow(
+                                title: Text("Change the Saved Address"), line: Text(verbatim: Words.savedAddressHasMore(address)),
+                                actions: [])
+                                .accessibilityIdentifier("MarfaSavedAddressNeedsChange")
+                        }
+                    }
+                    if !model.showsConnectSheet { noticeSection }
+                }
             }
-            SettingsRow("Address") {
-                SettingsField(
-                    title: "Address", text: Bindable(model).address, onSubmit: { model.start(.connect(usingCode: false)) }
-                )
-                .disabled(model.isWorking)
-                .accessibilityIdentifier("MarfaAddress")
+            Group {
+                if !model.showsConnectSheet {
+                    VStack(spacing: SettingsTokens.Metric.State.spacing) {
+                        Text("Not Signed In").settingsFont(.stateTitle).accessibilityAddTraits(.isHeader)
+                        Text("Sign in to your Marfa to open your library.")
+                            .settingsFont(.small)
+                            .foregroundStyle(SettingsTokens.secondaryText)
+                        SettingsButton("Sign In", role: .confirm) { model.showsConnectSheet = true }
+                            .padding(.top, SettingsTokens.Metric.State.actionGap)
+                            .accessibilityIdentifier("MarfaOpenConnect")
+                    }
+                }
             }
-            SettingsRow("Sign In", line: "On the server’s own page, in a sheet.") {
-                SettingsButton("Sign In…") { model.start(.connect(usingCode: false)) }
-                    .disabled(!model.canConnect)
-                    .accessibilityIdentifier("MarfaConnect")
-            }
-            codeSignInRow(canStart: model.canConnect, step: .connect(usingCode: true), identifier: "MarfaConnectCode")
-            if model.isWorking { signInProgress }
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, SettingsTokens.Metric.pageSide)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .background(SettingsTokens.page)
+    }
+
+    private func dismissConnect() {
+        if model.isWorking { model.cancelSignIn() }
+        else { model.closeConnectSheet() }
     }
 
     // MARK: Connected
@@ -225,43 +231,6 @@ struct ConnectionPage: View {
         }
     }
 
-    // Connection keeps Disconnect until Account has its Sign Out action.
-    private var disconnect: some View {
-        SettingsSection("Disconnect") {
-            SettingsRow(
-                verbatim: String(localized: "Disconnect from \(LibraryDescription.name(libraries))"),
-                line: String(localized: "Removes this Mac’s copy and signs the app out.")
-            ) {
-                HStack(spacing: SettingsTokens.Metric.buttonGap) {
-                    if model.isWorking { ProgressView().controlSize(.small) }
-                    SettingsButton("Disconnect…", role: .destructive) { model.requestDisconnect() }
-                        .disabled(model.isWorking)
-                        .accessibilityIdentifier(host.state == .keyRefused ? "MarfaRefusedDisconnect" : "MarfaDisconnect")
-                }
-            }
-        }
-    }
-
-    private var appSettingsWords: ConnectionSettings {
-        ConnectionSettings(standing: libraries.preferences.standing, name: LibraryDescription.name(libraries))
-    }
-
-    /// The question before Disconnect, with the choice to take this app's settings out of the Marfa too where they are kept there.
-    private func askToDisconnect() {
-        let name = LibraryDescription.name(libraries)
-        SettingsAlert.confirm(
-            title: String(localized: "Disconnect from \(name)?"),
-            message: String(localized: "The app removes its copy from this Mac and signs out. Webhooks it made are deleted. Your items stay."),
-            confirm: String(localized: "Disconnect"),
-            checkbox: model.offersSettingsRemoval ? appSettingsWords.disconnectChoice : nil,
-            window: NSApp.keyWindow
-        ) { confirmed, checked in
-            guard confirmed else { return }
-            model.alsoRemovesSettings = checked
-            Task { await model.disconnect() }
-        }
-    }
-
     // MARK: Shared
 
     private func codeSignInRow(canStart: Bool, step: MarfaSettingsModel.SignInStep, identifier: String) -> some View {
@@ -307,22 +276,7 @@ struct ConnectionPage: View {
     /// The code to approve on another device, while a sign-in with a code waits for it.
     @ViewBuilder private var codeSection: some View {
         if let code = model.code {
-            SettingsSection(
-                name: Text("Approve This App with This Code"),
-                footer: Text("Open \(code.address.absoluteString) on any device, sign in and type the code. It stops working at \(DateDisplay.timeOfDay(of: code.expiresAt, format: .stored())).")
-            ) {
-                SettingsRow(verbatim: code.code) {
-                    SettingsButton("Copy Code") {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(code.code, forType: .string)
-                    }
-                }
-                .textSelection(.enabled)
-                .accessibilityIdentifier("MarfaSignInCode")
-                SettingsRow(title: Text("Approve in a Browser"), line: Text(verbatim: code.address.absoluteString)) {
-                    SettingsButton("Open Page…") { NSWorkspace.shared.open(code.completeAddress ?? code.address) }
-                }
-            }
+            ConnectionCodeSection(code: code)
         }
     }
 

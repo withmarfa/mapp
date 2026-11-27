@@ -8,10 +8,69 @@ import Testing
 @MainActor
 @Suite(.hangLimit) struct AccountProfileTests {
     private func loaded(_ bench: OwnerBench) async -> AccountModel {
+        if bench.scopes.isEmpty { bench.scopes = ["profile:write"] }
         bench.calls.state.withLock { $0.profile.name = "Mira Castell" }
         let account = AccountModel(context: bench.context)
         await account.load()
         return account
+    }
+
+    @Test func changingTheUsernameNeedsItsOwnScope() {
+        #expect(ProfileField.email.mayWrite(holding: ["profile:write"].contains))
+        #expect(!ProfileField.username.mayWrite(holding: ["profile:write", "profile.username:read"].contains))
+        #expect(ProfileField.username.mayWrite(holding: ["profile.username:write"].contains))
+    }
+
+    @Test func clearingEmailWritesOnceAndKeepsTheUsername() async {
+        let bench = OwnerBench()
+        bench.calls.state.withLock { $0.profile.email = "someone@example.com" }
+        let account = await loaded(bench)
+        account.contactDrafts[.email] = ""
+        await account.saveContact(.email)
+        await account.saveContact(.email)
+        #expect(account.profile?.email == nil)
+        #expect(account.profile?.username == "mira")
+        #expect(bench.calls.calls.filter { $0 == "setProfileContact" }.count == 1)
+    }
+
+    @Test func refusedContactEditsSurviveReloadAndHandover() async {
+        let bench = OwnerBench()
+        bench.calls.state.withLock {
+            $0.profile.emailIsReadable = true
+        }
+        let account = await loaded(bench)
+        #expect(account.picture == nil)
+        #expect(account.profile?.email == nil)
+        account.contactDrafts[.email] = "edited@example.com"
+        bench.calls.fail("setProfileContact", with: .unreachable)
+        await account.saveContact(.email)
+        await account.load()
+        #expect(account.contactDrafts[.email] == "edited@example.com")
+        #expect(account.contactErrors[.email] != nil)
+        #expect(account.takeDrafts().contains(.typed(title: "Email Not Changed", text: "edited@example.com")))
+    }
+
+    @Test func refusedContactsSurviveTheReleaseOfTheirAccountPage() async {
+        let bench = OwnerBench()
+        bench.scopes = ["profile:write", "profile.username:write"]
+        let drafts = OwnerDrafts()
+        weak var released: AccountModel?
+        do {
+            let account = await loaded(bench)
+            released = account
+            drafts.register(account)
+            bench.calls.fail("setProfileContact", with: .unreachable)
+            for (field, text) in [(ProfileContactField.email, "edited@example.com"), (.username, "castell")] {
+                account.contactDrafts[field] = text
+                await account.saveContact(field)
+            }
+            drafts.pageLeft(account)
+        }
+        #expect(released == nil)
+        let kept = drafts.takeAll()
+        #expect(kept.contains(.typed(title: "Email Not Changed", text: "edited@example.com")))
+        #expect(kept.contains(.typed(title: "Username Not Changed", text: "castell")))
+        #expect(drafts.takeAll().isEmpty)
     }
 
     @Test func aRefusedNameKeepsWhatWasTypedThroughAReadAgain() async {
@@ -25,6 +84,25 @@ import Testing
         await account.load()
         #expect(account.nameDraft == "Mira Castell-Owen")
         #expect(account.profile?.name == "Mira Castell")
+    }
+
+    @Test func anEmailRefusedAfterLeavingThePageArrivesOnce() async throws {
+        let bench = OwnerBench()
+        let account = await loaded(bench)
+        let drafts = OwnerDrafts()
+        drafts.register(account)
+        let gate = bench.calls.hold("setProfileContact")
+        defer { gate.open() }
+        account.contactDrafts[.email] = "edited@example.com"
+        let saving = Task { await account.saveContact(.email) }
+        try #require(await eventually { bench.calls.state.withLock { $0.waiting["setProfileContact"] == 1 } })
+        drafts.pageLeft(account)
+        #expect(drafts.takeAll().isEmpty)
+        bench.calls.fail("setProfileContact", with: .unreachable)
+        gate.open()
+        await saving.value
+        #expect(bench.late == [.typed(title: "Email Not Changed", text: "edited@example.com")])
+        #expect(account.takeDrafts().isEmpty)
     }
 
     @Test func twoQuickSubmitsSendOneSave() async {

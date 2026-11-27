@@ -25,7 +25,7 @@ See `docs/owner-settings.md` for Marfa pages and `docs/settings-sync.md` for sto
 
 - **Pages draw with `Parts/`.** Keep app models out of parts.
 - **Every measure, color and font is in `SettingsTokens`.**
-- **A row is a lead, a title, one line and one trailing control** (`SettingsRow`), two lines at most. A problem row may hold two buttons, as may the release row of Updates.
+- **A row is a lead, a title, one line and one trailing control** (`SettingsRow`), two lines at most. A problem row may hold two buttons, as may the release row on Account.
 - **A value a button acts on goes in the row's line**, except Connection’s permission count and opened-file size. Show problem text in full.
 - **A refused input keeps what was typed**, with one line under the title that says why.
 - **Put an add button at the trailing edge of the section title** (`SettingsSection`'s accessory). Use the same slot for header choices or search and a filter when the section needs them. Put a note about the section in its footer.
@@ -51,7 +51,7 @@ See `docs/owner-settings.md` for Marfa pages and `docs/settings-sync.md` for sto
 | Lists | Density, From (All Items or Library), sort, and grouping. A view or place can override these defaults |
 | Layouts | Types are grouped by origin and namespace. Export and Import transfer the date, secondary line, and facts (`docs/type-looks.md`). `PagePlacements` stores pins and Linked From. Restore Defaults resets both stores for one type |
 | Search | Excluded types and sources keep their names if missing (`SearchLeaveOuts`). Add explains the ten-condition limit. Included controls archived and Feed items. Results controls order and snippets. Searches within a place omit nothing |
-| Connection | Sign-in, address status, Account link, permission and queue counts, downloads, space used, and exports. Other Marfas shows when other copies exist. Disconnect reads the queue and asks about unsent changes |
+| Connection | Sign In opens the address and code sheet. Connected pages show Account, permissions, queue, downloads, and exports. Account’s Sign Out checks for unsent changes |
 
 - **A choice whose thing is gone keeps its name, marked as missing** (`MissingChoice`), and the app uses the default meanwhile.
 - **Import, restore and reset save a restore point first.** If that fails, nothing changes.

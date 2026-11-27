@@ -76,8 +76,8 @@ extension ClientOwnerCalls {
     func identity() async throws(OwnerFailure) -> OwnIdentity {
         do {
             return try await run { client in
-                let key = try await client.getCurrentKey().ok.body.json
-                return OwnIdentity(keyID: key.id, expires: Self.date(key.expiresAt))
+                let key = Self.info(try await client.getCurrentKey().ok.body.json)
+                return OwnIdentity(keyID: key.id, expires: key.expires, keyTypes: key.types, appClientID: key.appClientID)
             }
         } catch {
             // A signed-in app's token is not a key, and the server says so; it has no expiry of its own as a caller.

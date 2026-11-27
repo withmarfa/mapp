@@ -21,20 +21,9 @@ nonisolated enum MonitoringSecret: String, CaseIterable, Hashable, Sendable, Ide
     var title: String {
         switch self {
         case .heartbeatAddress, .telemetryAddress: String(localized: "Address")
-        case .postHogHost: String(localized: "PostHog Host")
-        case .postHogToken: String(localized: "Project Token")
+        case .postHogHost: String(localized: "Error reports address")
+        case .postHogToken: String(localized: "Project token")
         case .telemetryHeaders: String(localized: "Headers")
-        }
-    }
-
-    /// What the secret is called as a title, where a concern asks for it to be set again.
-    var settingTitle: String {
-        switch self {
-        case .heartbeatAddress: String(localized: "Heartbeat Address")
-        case .postHogHost: String(localized: "PostHog Host")
-        case .postHogToken: String(localized: "PostHog Project Token")
-        case .telemetryAddress: String(localized: "Telemetry Address")
-        case .telemetryHeaders: String(localized: "Telemetry Headers")
         }
     }
 
@@ -58,7 +47,7 @@ nonisolated enum MonitoringSecret: String, CaseIterable, Hashable, Sendable, Ide
         switch self {
         case .heartbeatAddress: String(localized: "The server stops sending its heartbeat.")
         case .postHogHost, .postHogToken: String(localized: "The PostHog host and the project token are removed together, and error reports stop.")
-        case .telemetryAddress: String(localized: "The server stops sending telemetry.")
+        case .telemetryAddress: String(localized: "The server stops sending traces, logs, and metrics. Error reports use their own address.")
         case .telemetryHeaders: String(localized: "Telemetry is sent without these headers.")
         }
     }
@@ -127,19 +116,24 @@ struct MonitoringSecretSheet: Identifiable, Equatable {
     }
 
     var failure: OwnerFailure? { store.failure }
-    var isLoaded: Bool { store.snapshot != nil }
+    var isLoaded: Bool { store.snapshot != nil && store.failure == nil }
 
     func load() async { await store.load() }
 
     // MARK: Reading
 
-    func isOn(_ key: String) -> Bool { store.setting(key)?.value?.bool ?? false }
+    func reports(_ key: String) -> Bool { store.setting(key) != nil }
+
+    func isOn(_ key: String) -> Bool {
+        if key == "error_reporting_enabled", !isOn("telemetry_enabled") { return false }
+        return store.setting(key)?.value?.bool == true
+    }
     func isSet(_ secret: MonitoringSecret) -> Bool { store.setting(secret.key)?.isSet ?? false }
 
     /// Whether the server has what it sends reports with, so a switch that is on does something.
     var heartbeatHasReceiver: Bool { isSet(.heartbeatAddress) }
     var errorReportsHaveReceiver: Bool { isSet(.postHogHost) && isSet(.postHogToken) }
-    var telemetryHasReceiver: Bool { isSet(.telemetryAddress) }
+    var telemetryHasReceiver: Bool { isSet(.telemetryAddress) || (isOn("error_reporting_enabled") && errorReportsHaveReceiver) }
 
     func line(_ key: String) -> String? { lines[key] }
 
@@ -154,7 +148,7 @@ struct MonitoringSecretSheet: Identifiable, Equatable {
     /// Turns a switch on or off. The server turns the heartbeat and the error reports on only where something receives them,
     /// so that is said here, in one line, before anything is sent.
     func setSwitch(_ key: String, _ on: Bool) async {
-        guard !isWriting, isOn(key) != on else { return }
+        guard reports(key), key != "error_reporting_enabled" || isOn("telemetry_enabled"), !isWriting, isOn(key) != on else { return }
         lines[key] = nil
         notice = nil
         if on {
@@ -264,10 +258,18 @@ struct MonitoringSecretSheet: Identifiable, Equatable {
     private static func name(_ key: String) -> String {
         if let secret = MonitoringSecret.allCases.first(where: { $0.key == key }) { return secret.title }
         switch key {
-        case "heartbeat_enabled": return String(localized: "Send a Heartbeat")
-        case "error_reporting_enabled": return String(localized: "Report Errors")
-        case "telemetry_enabled": return String(localized: "Send Telemetry")
+        case "heartbeat_enabled": return String(localized: "Send a heartbeat")
+        case "error_reporting_enabled": return String(localized: "Report errors")
+        case "telemetry_enabled": return String(localized: "Send telemetry")
         default: return key
         }
+    }
+}
+
+extension InstanceSettingsSnapshot {
+    var activeMonitoringCount: Int? {
+        guard let enabledMonitoringCount else { return nil }
+        let reportsArePaused = setting("telemetry_enabled")?.value?.bool == false && setting("error_reporting_enabled")?.value?.bool == true
+        return reportsArePaused ? enabledMonitoringCount - 1 : enabledMonitoringCount
     }
 }

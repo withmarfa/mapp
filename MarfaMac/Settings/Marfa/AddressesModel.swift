@@ -2,7 +2,7 @@ import Foundation
 import Marfa
 import Observation
 
-/// The Addresses page: where the instance signs people in, the other addresses it answers on and the websites allowed to
+/// The Network page: where the instance signs people in, the other addresses it answers on and the websites allowed to
 /// call it. An address is added, removed or moved only after the server's own check says what it would do, and moving
 /// the sign-in address shows what changes and asks first. The instance read is named in every write, so another instance
 /// answering at the address is told, not written to.
@@ -40,6 +40,7 @@ import Observation
     private(set) var plan: AddressPlan?
     /// Why the typed address can't be used, in one line; the sheet keeps what was typed.
     private(set) var inputError: String?
+    private(set) var approvalNotice: String?
     private(set) var isChecking = false
     private(set) var isWriting = false
     /// One line under the page's rows after a refused change, by the address or website.
@@ -99,6 +100,7 @@ import Observation
         input = ""
         plan = nil
         inputError = nil
+        approvalNotice = nil
         self.sheet = sheet
     }
 
@@ -107,6 +109,7 @@ import Observation
         sheet = nil
         plan = nil
         inputError = nil
+        approvalNotice = nil
         input = ""
     }
 
@@ -117,6 +120,7 @@ import Observation
         isChecking = false
         plan = nil
         inputError = nil
+        approvalNotice = nil
         guard let settings, let sheet else { return }
         guard let origin = Self.origin(from: input) else {
             if !input.trimmingCharacters(in: .whitespaces).isEmpty {
@@ -182,6 +186,7 @@ import Observation
             await commitWebsite(adding: Self.origin(from: input))
         case .addAddress, .changeSignIn:
             guard canConfirm, let plan = currentPlan else { return }
+            approvalNotice = nil
             isWriting = true
             defer { isWriting = false }
             do {
@@ -190,6 +195,10 @@ import Observation
                 self.plan = nil
                 input = ""
             } catch {
+                if sheet == .changeSignIn, error == .notConfirmed {
+                    approvalNotice = OwnerWording.line(error)
+                    return
+                }
                 inputError = OwnerWording.line(error)
                 await context.learn(from: error)
                 if error == .conflict { await readAgainAndCheck(telling: error) }
@@ -350,7 +359,7 @@ import Observation
         defer { isWriting = false }
         switch await store.write([Self.key: .set(.bool(on))]) {
         case .saved: break
-        case .elsewhere: notice = StoredSettingWording.elsewhere([String(localized: "Private Addresses")])
+        case .elsewhere: notice = StoredSettingWording.elsewhere([String(localized: "Private addresses")])
         case .failed(let failure): line = StoredSettingWording.line(failure)
         }
     }

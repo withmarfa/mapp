@@ -262,7 +262,7 @@ import Testing
         await model.set(true)
         await model.allow()
         #expect(calls.sent.isEmpty)
-        #expect(model.notice?.contains("Private Addresses was changed elsewhere") == true)
+        #expect(model.notice?.contains("Private addresses was changed elsewhere") == true)
         #expect(model.isOn)
     }
 

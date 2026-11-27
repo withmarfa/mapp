@@ -53,7 +53,7 @@ enum SettingsTokens {
     static let selection = adaptive(light: NSColor(white: 0, alpha: 0.07), dark: NSColor(white: 1, alpha: 0.1))
     /// Where a row is under the pointer.
     static let hover = adaptive(light: NSColor(white: 0, alpha: 0.04), dark: NSColor(white: 1, alpha: 0.06))
-    /// A value that can't be changed, in a field's place.
+    /// The fill of a field with accessories or of a read-only value.
     static let field = adaptive(light: .white, dark: NSColor(white: 0.12, alpha: 1))
     static let shortcutField = adaptive(light: .white, dark: NSColor(white: 0.23, alpha: 1))
     static let shortcutEdge = adaptive(light: NSColor(white: 0, alpha: 0.102), dark: NSColor(white: 1, alpha: 0.102))
@@ -203,6 +203,7 @@ enum SettingsTokens {
         /// A field's height, which the system draws and a read-only value is as tall as.
         static let controlHeight: CGFloat = 28
         static let smallControlHeight: CGFloat = 24
+        static let fieldAccessoryInset: CGFloat = 8
         static let popUpMinimumWidth: CGFloat = 120
         static let smallNumberWidth: CGFloat = 64
         static let controlScaleForLarge: CGFloat = 1.3
@@ -249,6 +250,7 @@ enum SettingsTokens {
         static let shortcutPlaceholderInset: CGFloat = 8
         static let shortcutMinimumLabelScale: CGFloat = 0.75
         static let tile: CGFloat = 24
+        static let avatarInitialsMinimumScale: CGFloat = 0.35
         /// A tile's corner radius and the box its symbol is fitted in, as shares of its side: the symbol keeps even
         /// padding whatever its shape, as in System Settings' sidebar.
         static let tileRounding: CGFloat = 0.27

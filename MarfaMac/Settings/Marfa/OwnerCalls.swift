@@ -31,13 +31,15 @@ nonisolated struct OwnerProfile: Hashable, Sendable {
     /// Whether the sign-in may read the picture, and whether there is one to read.
     var pictureIsReadable = false
     var hasPicture = false
-
-    var isEmpty: Bool { name == nil && username == nil && !emailIsReadable && !pictureIsReadable }
 }
 
 /// A part of the owner's profile an app may be allowed to change.
 nonisolated enum ProfileField: String, CaseIterable, Hashable, Sendable {
-    case name, avatar
+    case name, avatar, username, email
+
+    func mayWrite(holding scope: (String) -> Bool) -> Bool {
+        scope("profile.\(rawValue):write") || (self != .username && scope("profile:write"))
+    }
 }
 
 nonisolated struct OwnerPasskey: Identifiable, Hashable, Sendable {
@@ -81,6 +83,7 @@ nonisolated struct AppData: Hashable, Sendable {
 
     let vendor: String
     var types: [Kind]
+    var clientID: String?
 
     var active: Int { types.reduce(0) { $0 + $1.active } }
     var archived: Int { types.reduce(0) { $0 + $1.archived } }
@@ -153,6 +156,8 @@ nonisolated struct OwnIdentity: Hashable, Sendable {
     var keyID: String?
     /// When that key ends, where it does. A signed-in app counts as having no expiry of its own.
     var expires: Date?
+    var keyTypes: [String: AccessLevel]?
+    var appClientID: String?
 
     /// Whether this sign-in made what `maker` made, by the key's id. A signed-in app is not told from another app: the server
     /// names the maker of an app's webhook by its client id, which neither the server nor the package tells the app about
@@ -237,11 +242,9 @@ nonisolated protocol OwnerCalls: Sendable {
     func browserSignIns() async throws(OwnerFailure) -> [BrowserSignIn]
     func endSignIn(_ id: String) async throws(OwnerFailure)
     func changePassword(from current: String, to new: String) async throws(OwnerFailure) -> PasswordOutcome
-    /// The parts of the profile the sign-in may change, as its scopes say; every part where it holds no scopes to read, as a
-    /// key does, so the server decides.
-    func changeableProfile() -> Set<ProfileField>
     /// Sends the owner's name alone, and answers the profile as the server then holds it.
     func setProfileName(_ name: String) async throws(OwnerFailure) -> OwnerProfile
+    func setProfileContact(_ field: ProfileContactField, to value: String) async throws(OwnerFailure) -> OwnerProfile
     /// The picture's bytes, or nil where there is none.
     func profilePicture() async throws(OwnerFailure) -> Data?
     /// Stores `picture`, a PNG, JPEG or WebP within the contract's limits (`ProfilePicture.prepared`), as the owner's picture.
@@ -293,7 +296,7 @@ nonisolated protocol OwnerCalls: Sendable {
     /// Changes only what `change` names and answers the webhook as the server holds it.
     func change(webhook id: String, _ change: WebhookChange) async throws(OwnerFailure) -> OwnerWebhook
     func delete(webhook id: String) async throws(OwnerFailure)
-    func deliveries(of webhook: String) async throws(OwnerFailure) -> [WebhookDeliveryInfo]
+    func deliveries(of webhook: String, limit: Int) async throws(OwnerFailure) -> [WebhookDeliveryInfo]
     func redeliver(_ delivery: String, of webhook: String) async throws(OwnerFailure) -> WebhookDeliveryInfo
 
     /// The server's health: the open fields for any sign-in, the rest for `instance.read`.
@@ -438,6 +441,11 @@ nonisolated struct ClientOwnerCalls: OwnerCalls {
         switch error {
         case .forbidden(let code, _, let server):
             if code == "access_denied" { return .notConfirmed }
+            if code == "type_not_permitted", let grant = server?.details?.object?["grant"]?.object,
+                let name = grant["name"]?.string, let level = grant["level"]?.string
+            {
+                return .notPermitted("\(name):\(level)")
+            }
             return .notPermitted(server?.details?.object?["required_scope"]?.string)
         case .notFound: return .notFound
         case .versionConflict: return .conflict

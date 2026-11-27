@@ -63,6 +63,8 @@ final class PreferencesSync {
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var listening: Task<Void, Never>?
     @ObservationIgnored private var pending: Task<Void, Never>?
+    @ObservationIgnored private var removalCatchUp: Task<Void, Never>?
+    @ObservationIgnored private var removalCaughtUp = false
     @ObservationIgnored private var running = false
     /// Above zero while a removal, or an import, a restore or Reset, is under way: no step runs.
     @ObservationIgnored private var holding = 0
@@ -143,6 +145,7 @@ final class PreferencesSync {
         listening = nil
         pending?.cancel()
         pending = nil
+        stopRemovalCatchUp()
         copy = nil
         item = nil
         standing = .off(.noMarfa)
@@ -179,6 +182,7 @@ final class PreferencesSync {
     func remove(confirmed: Bool = false, sendsOtherChanges: Bool = true) async throws {
         guard let copy else { return }
         let generation = generation
+        stopRemovalCatchUp()
         pending?.cancel()
         pending = nil
         // A step under way ends first, and none starts until the items are in the bin, so none writes to a binned item
@@ -200,7 +204,12 @@ final class PreferencesSync {
         standing = .off(.removed)
         if let instance = try await copy.readiness().instance {
             var record = Record.read(defaults)
-            record.marfas[instance]?.removed = true
+            if var adopted = record.marfas[instance] {
+                adopted.removed = true
+                adopted.removedItems = (adopted.removedItems ?? [adopted.item]).union(held.map(\.id))
+                record.marfas[instance] = adopted
+            }
+            record.restarting.remove(instance)
             record.save(defaults)
         }
         if confirmed {
@@ -226,10 +235,31 @@ final class PreferencesSync {
         await run()
         guard generation == self.generation, standing == .off(.removed) else { return }
         var record = Record.read(defaults)
-        record.marfas[instance] = nil
         record.restarting.insert(instance)
         record.save(defaults)
         await run()
+    }
+
+    private func stopRemovalCatchUp() {
+        removalCatchUp?.cancel()
+        removalCatchUp = nil
+        removalCaughtUp = false
+    }
+
+    /// A restart may need the server. Flushing on departure must still be able to finish from this Mac's copy.
+    private func catchUpAfterRemoval(in copy: any PreferencesCopy) {
+        guard removalCatchUp == nil else { return }
+        let generation = generation
+        removalCatchUp = Task { [weak self] in
+            guard self?.generation == generation else { return }
+            let caughtUp = (try? await copy.catchUpAfterRemovals()) == true
+            guard !Task.isCancelled, let self, self.generation == generation else { return }
+            self.removalCatchUp = nil
+            if caughtUp {
+                self.removalCaughtUp = true
+                self.schedule(after: .zero)
+            }
+        }
     }
 
     // MARK: Replacing on purpose
@@ -308,6 +338,8 @@ final class PreferencesSync {
     private func step() async {
         guard let copy, holding == 0 else { return }
         let generation = generation
+        // A catch-up completed during a read cannot make the list that read returned current.
+        let removalWasCaughtUp = removalCaughtUp
         do {
             let ready = try await copy.readiness()
             guard generation == self.generation else { return }
@@ -317,8 +349,25 @@ final class PreferencesSync {
             let items = try await copy.items()
             answered.merge(await copy.answers()) { _, later in later }
             guard generation == self.generation else { return }
-            let originals = items.filter { !$0.isConflictedCopy }
             var record = Record.read(defaults)
+            if var adopted = record.marfas[instance], adopted.removed == true {
+                item = nil
+                standing = .off(.removed)
+                guard record.restarting.contains(instance) else { return }
+                let removedItems = adopted.removedItems ?? [adopted.item]
+                if !removalWasCaughtUp, items.contains(where: { removedItems.contains($0.id) }) {
+                    if removalCaughtUp { again = true } else { catchUpAfterRemoval(in: copy) }
+                    return
+                }
+                if items.contains(where: { $0.id == adopted.item }) {
+                    adopted.removed = nil
+                    adopted.removedItems = nil
+                    record.marfas[instance] = adopted
+                } else {
+                    record.marfas[instance] = nil
+                }
+            }
+            let originals = items.filter { !$0.isConflictedCopy }
             let local = readLocal()
             if let adopted = record.marfas[instance] {
                 if let chosen = originals.first, chosen.id == adopted.item {
@@ -333,9 +382,6 @@ final class PreferencesSync {
                     try saveRestorePoint(.adoption)
                     guard let adopted = try await adopt(originals, local: local, in: copy, generation: generation) else { return }
                     record.marfas[instance] = adopted
-                } else if adopted.removed == true {
-                    item = nil
-                    return standing = .off(.removed)
                 } else if try await copy.isBinned(adopted.item) {
                     guard generation == self.generation else { return }
                     record = Record.read(defaults)
@@ -360,8 +406,8 @@ final class PreferencesSync {
                 }
                 guard let adopted else { return }
                 record.marfas[instance] = adopted
-                record.restarting.remove(instance)
             }
+            if record.restarting.remove(instance) != nil { stopRemovalCatchUp() }
             record.last = instance
             // This step wrote the settings marked to win that it read; a mark made since stays.
             let read = record.winning ?? [:]

@@ -37,7 +37,7 @@ struct MarfaPageGate<Content: View>: View {
                     action: ("Try Again", { host.tryAgain() }))
             }
         case .connected:
-            if let permission = page.permission, !host.grants.contains(permission) {
+            if let permission = page.missingPermission(in: host.grants) {
                 standing {
                     SettingsPageState(
                         symbol: "lock", title: Text("Needs a Permission"), line: Text(verbatim: page.permissionLine),
@@ -53,7 +53,7 @@ struct MarfaPageGate<Content: View>: View {
     /// A state, under `above` where the page has something to offer in any state.
     @ViewBuilder private func standing<State: View>(@ViewBuilder _ state: () -> State) -> some View {
         if let above {
-            SettingsStandingState(scrolls: page == .account) { above } state: { state() }
+            SettingsStandingState { above } state: { state() }
         } else {
             state()
         }
@@ -80,11 +80,16 @@ struct MarfaSettingsPageView: View {
     var body: some View {
         MarfaPageGate(page: page, host: host, above: standingContent) {
             switch page {
-            case .overview: OverviewPage(host: host)
+            case .passkeys, .browsers: AccountSignInsPage(page: page, host: host)
             case .account: AccountPage(host: host)
-            case .apps: AppsPage(host: host, subpage: subpage)
+            case .apps:
+                if let subpage {
+                    AppsPage(host: host, subpage: subpage)
+                } else {
+                    KeysPage(host: host, subpage: nil)
+                }
             case .keys: KeysPage(host: host, subpage: subpage)
-            case .addresses: AddressesPage(host: host)
+            case .network: NetworkPage(host: host)
             case .plugins: PluginsPage(host: host, subpage: subpage)
             case .sources: SourcesPage(host: host, subpage: subpage)
             case .types: TypesPage(host: host, subpage: subpage)
@@ -92,25 +97,22 @@ struct MarfaSettingsPageView: View {
             case .activity: ActivityPage(host: host)
             case .monitoring: MonitoringPage(host: host)
             case .limits: LimitsPage(host: host)
-            case .startUp: StartUpPage(host: host)
             case .trash: TrashPage(host: host, showsAll: subpage?.id == TrashPage.allDeleted.id)
-            case .history: HistoryPage(host: host)
             case .fileStorage: FileStoragePage(host: host)
             case .connectors: ConnectorsPage(host: host, subpage: subpage)
             case .webhooks: WebhooksPage(host: host, subpage: subpage)
             case .folders: FoldersPage(host: host, subpage: subpage)
             case .backups: BackupsPage(host: host, showsAll: subpage?.id == BackupsPage.allBackups.id)
-            case .updates: UpdatesPage(host: host)
             case .housekeeping: HousekeepingPage(host: host)
             }
         }
+        .id(host.serverAddress)
     }
 
     private var standingContent: AnyView? {
         guard subpage == nil else { return nil }
         switch page {
-        case .account: return AnyView(AccountServerSettingsSection(host: host))
-        case .keys: return AnyView(AppsSettingsSection(host: host))
+        case .account where host.serverAddress != nil: return AnyView(AccountHeader(host: host))
         default: return nil
         }
     }
@@ -122,7 +124,7 @@ struct MarfaSettingsPageRow: View {
     let host: any MarfaSettingsHost
 
     private var lock: String? {
-        guard host.connection == .connected, let permission = page.permission, !host.grants.contains(permission) else { return nil }
+        guard host.connection == .connected, page.missingPermission(in: host.grants) != nil else { return nil }
         return String(localized: "Not allowed")
     }
 

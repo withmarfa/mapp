@@ -181,6 +181,11 @@ nonisolated extension SourceLimit {
     var value: SourceRuleValue? { limit?.value(of: rule) }
     var isOn: Bool { value != nil }
 
+    func status(of rule: SourceRule) -> String? {
+        guard failure == nil, let limit else { return nil }
+        return limit.value(of: rule) == nil ? String(localized: "Off") : String(localized: "On")
+    }
+
     /// The types a limit can name, by name: the server's own, with any the limit names that the server no longer lists.
     var typeChoices: [Choice] {
         let known = typeNames.filter { !$0.key.hasPrefix("system") }

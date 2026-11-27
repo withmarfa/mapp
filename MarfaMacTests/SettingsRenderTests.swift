@@ -40,7 +40,7 @@ import Testing
     var ownerCalls: any OwnerCalls = FakeOwnerCalls()
     var instanceCalls: any InstanceCalls = FakeInstanceCalls()
     var folderCalls: any FolderCalls = FakeFolderCalls()
-    var overview: OverviewModel
+    var overview: AccountOverview
     var health: ServerHealthModel
     var updates: UpdatesModel
     var shown: [MarfaSettingsPage] = []
@@ -57,14 +57,14 @@ import Testing
         let context = OwnerContext(calls: FakeOwnerCalls(), grants: { [] })
         let reader = ServerHealthModel(context: context)
         health = reader
-        overview = OverviewModel(context: context, health: reader)
+        overview = AccountOverview(context: context)
         updates = UpdatesModel(context: context)
     }
 
-    /// Binds the Overview and the health reader to the host's own calls and grants, as the app does.
+    /// Binds the Account readings and the health reader to the host's own calls and grants, as the app does.
     func bindOverview() {
         health = ServerHealthModel(context: OwnerContext(host: self))
-        overview = OverviewModel(context: OwnerContext(host: self), health: health)
+        overview = AccountOverview(context: OwnerContext(host: self))
         updates = UpdatesModel(context: OwnerContext(host: self))
     }
 
@@ -80,7 +80,10 @@ import Testing
     }
 
     func marks(matching query: String, in set: MarfaMarkSet) -> [String] { ["lucide:inbox", "lucide:rss", "lucide:book-open"] }
-    func markGlyph(_ id: String) -> AnyView { AnyView(Image(systemName: "tray")) }
+    func markGlyph(_ id: String) -> AnyView {
+        if id.isEmpty { return AnyView(Image(systemName: "tray")) }
+        return AnyView(RowIconImage(icon: .type(id)).foregroundStyle(SettingsTokens.secondaryText))
+    }
     func markTitle(_ id: String) -> String { id }
     func typeMark(for pattern: String) -> AnyView { AnyView(TypeTile(icon: typeIcons[pattern], size: .side)) }
     var typeCalls: any TypeCalls = FakeTypeCalls()
@@ -105,6 +108,8 @@ import Testing
     func refreshGrants() async {}
     func tryAgain() {}
     func showConnection() {}
+    private(set) var signOutRequests = 0
+    func requestSignOut() { signOutRequests += 1 }
     func client() throws -> Client { throw MarfaServerCalls.Ending.keyRefused }
     func restoreDeleted(_ ids: Set<String>) { deletedItems.removeAll { ids.contains($0.id) } }
     func deleteDeletedPermanently(_ ids: Set<String>) {}
@@ -468,7 +473,7 @@ struct RenderedWindow<Detail: View>: View {
             selection: .marfa(page), sheet: sheet, badge: badge, detail: MarfaSettingsPageView(page: page, host: host).environment(\.settingsSubpage, subpage))
     }
 
-    @Test func overview() async throws {
+    @Test func accountProblems() async throws {
         let host = await stub()
         fake(host).state.withLock {
             $0.concerns = [
@@ -482,19 +487,20 @@ struct RenderedWindow<Detail: View>: View {
             $0.health?.backups.lastBackup = Calendar.current.date(bySettingHour: 14, minute: 0, second: 0, of: .now)
         }
         host.bindOverview()
-        try await SettingsRender.png(windowed(.overview, host: host, badge: 2), size: Self.size, named: "Overview")
+        await host.overview.load()
+        try await SettingsRender.png(windowed(.account, host: host, badge: 2), size: Self.size, named: "Account")
     }
 
-    @Test func overviewWithoutTheOwnersPermissions() async throws {
+    @Test func accountWithoutTheOwnersPermissions() async throws {
         let host = await stub { $0.grants = [.instanceRead, .keysManage, .itemsPurge, .grantsManage, .keysMint] }
         fake(host).state.withLock {
             $0.metrics = InstanceMetricsReading(version: "0.0.84", databaseBytes: 214_000_000, fileBytes: 3_400_000_000)
         }
         host.bindOverview()
-        try await SettingsRender.png(windowed(.overview, host: host), size: Self.size, named: "Overview, without the owner’s permissions")
+        try await SettingsRender.png(windowed(.account, host: host), size: Self.size, named: "Account, without the owner’s permissions")
     }
 
-    @Test func overviewWithARefusedWrite() async throws {
+    @Test func accountWithARefusedWrite() async throws {
         let source = FakeInstanceConfig([.name: .text("Castell Studio"), .versionRecentDays: .number(30)])
         source.updateFailure.withLock { $0 = .refused("That name is already taken on this server.") }
         let settings = InstanceSettingsModel { .init(id: "https://marfa.castell.studio", source: source) }
@@ -508,19 +514,23 @@ struct RenderedWindow<Detail: View>: View {
             await settings.save([.name])
         }
         try await SettingsRender.png(
-            windowed(.overview, host: host), size: Self.size, named: "Overview, a write the server refused", settle: .milliseconds(1_000))
+            windowed(.account, host: host), size: Self.size, named: "Account, a write the server refused", settle: .milliseconds(1_000))
         try await refused.value
     }
 
     private static let sourceRows = [
-        MarfaSourceRow(code: "marfa-mac", name: "Marfa for Mac", mark: nil, count: 4_212, nameOrigin: .app),
-        MarfaSourceRow(code: "github", name: "GitHub", mark: nil, count: 318, nameOrigin: .set),
-        MarfaSourceRow(code: "readwise", name: "Readwise", mark: nil, count: 127, nameOrigin: .key),
-        MarfaSourceRow(code: "rss", name: "RSS", mark: nil, count: 156, nameOrigin: .key),
+        MarfaSourceRow(code: "marfa-mac", name: "Marfa for Mac", mark: "lucide:app-window", count: 429, nameOrigin: .app),
+        MarfaSourceRow(code: "studio", name: "Studio Notes", mark: "lucide:folder", count: 337, nameOrigin: .key),
+        MarfaSourceRow(code: "readwise", name: "Readwise", mark: "lucide:book", count: 154, nameOrigin: .key),
+        MarfaSourceRow(code: "rss", name: "RSS", mark: "lucide:rss", count: 151, nameOrigin: .key),
+        MarfaSourceRow(code: "raycast", name: "Raycast", mark: "lucide:command", count: 111, nameOrigin: .app),
+        MarfaSourceRow(code: "github", name: "GitHub", mark: "lucide:code-xml", count: 47, nameOrigin: .set),
+        MarfaSourceRow(code: "claude", name: "Claude", mark: "lucide:sparkle", count: 45, nameOrigin: .app),
     ]
 
     @Test func sources() async throws {
         let host = await stub { $0.sources = Self.sourceRows }
+        fake(host).state.withLock { $0.sourceLimit.allowlist = (["core.note"], ["studio"]) }
         try await SettingsRender.png(windowed(.sources, host: host), size: Self.size, named: "Sources")
     }
 
@@ -545,10 +555,10 @@ struct RenderedWindow<Detail: View>: View {
         let settings = InstanceSettingsModel { .init(id: "https://marfa.castell.studio", source: source) }
         await settings.load()
         try await SettingsRender.png(
-            windowed(.history, host: StubMarfaHost(settings: settings)), size: Self.size, named: "History")
+            windowed(.fileStorage, host: StubMarfaHost(settings: settings)), size: Self.size, named: "Storage, versions")
     }
 
-    @Test func fileStorage() async throws {
+    @Test(arguments: [ColorScheme.light, .dark]) func serverPages(appearance: ColorScheme) async throws {
         let source = FakeInstanceConfig([
             .blobMinCopies: .number(1), .diskReserveMegabytes: .number(128), .enrichmentEnabled: .flag(true), .enrichmentOcrEnabled: .flag(true),
             .mcpFetchEnabled: .flag(true), .mcpFetchMaxMegabytes: .number(50), .blobCleanupEnabled: .flag(true), .blobCleanupGraceSeconds: .number(86_400),
@@ -562,9 +572,24 @@ struct RenderedWindow<Detail: View>: View {
                     FileStoreRow(id: "a", kind: .disk, locator: "/var/lib/marfa/files", error: nil),
                     FileStoreRow(id: "b", kind: .folder, locator: "/Volumes/Studio Backup", error: nil),
                 ], orphanCount: 3, orphanBytes: 12_000_000, firstFound: .now, orphansComplete: true)
-            $0.metrics.fileBytes = 3_400_000_000
+            $0.metrics = InstanceMetricsReading(version: "1", databaseBytes: 214_000_000, fileBytes: 3_400_000_000)
+            $0.jobs = [
+                HousekeepingJob(name: "backup", intervalSeconds: 3600, lastFinished: .now, outcome: .succeeded),
+                HousekeepingJob(name: "blob-integrity", intervalSeconds: 3600, lastFinished: .now, outcome: .failed),
+                HousekeepingJob(name: "heartbeat", intervalSeconds: 60, lastFinished: nil, outcome: nil),
+            ]
         }
-        try await SettingsRender.png(windowed(.fileStorage, host: host), size: Self.size, named: "File Storage")
+        let calls = try #require(host.instanceCalls as? FakeInstanceCalls)
+        calls.changeElsewhere("telemetry_enabled", to: .bool(false))
+        calls.state.withLock { $0.settings["heartbeat_url"]?.isSet = true }
+        host.bindOverview()
+        for (page, height) in [(MarfaSettingsPage.fileStorage, 1460), (.monitoring, 900), (.limits, 1030), (.housekeeping, 900)] {
+            try await SettingsRender.png(windowed(page, host: host), size: CGSize(width: Self.size.width, height: CGFloat(height)),
+                named: "\(page.title), \(appearance)", appearance: appearance, settle: .milliseconds(900))
+        }
+        host.grants = [.instanceRead]
+        try await SettingsRender.png(windowed(.fileStorage, host: host), size: CGSize(width: Self.size.width, height: 1460),
+            named: "Storage, read only, \(appearance)", appearance: appearance, settle: .milliseconds(900))
     }
 
     @Test func trash() async throws {
@@ -598,7 +623,7 @@ struct RenderedWindow<Detail: View>: View {
     @Test func notAnswering() async throws {
         let host = await stub { $0.connection = .notAnswering(lastAnswered: .now.addingTimeInterval(-600)) }
         try await SettingsRender.png(
-            RenderedWindow(selection: .overview, detail: MarfaSettingsPageView(page: .overview, host: host)), size: Self.size,
+            RenderedWindow(selection: .account, detail: MarfaSettingsPageView(page: .account, host: host)), size: Self.size,
             named: "Castell Studio not answering")
     }
 
@@ -612,7 +637,7 @@ struct RenderedWindow<Detail: View>: View {
             RenderedWindow(selection: .editor, search: "zzzz", detail: EditorPage()), size: Self.size, named: "Sidebar, search with no match")
     }
 
-    // MARK: The owner's pages (Account, Apps, Keys, Addresses)
+    // MARK: The owner's pages
 
     private static let days: (Int) -> Date = { Date.now.addingTimeInterval(-86_400 * Double($0)) }
 
@@ -696,8 +721,26 @@ struct RenderedWindow<Detail: View>: View {
 
     func context(_ host: StubMarfaHost) -> OwnerContext { OwnerContext(host: host) }
 
-    @Test func account() async throws {
-        try await page(.account, owner(), named: "Account")
+    @Test(arguments: [ColorScheme.light, .dark]) func accountBoards(appearance: ColorScheme) async throws {
+        let host = owner()
+        let source = FakeInstanceConfig([.name: .text("Castell Studio")])
+        source.config.withLock { $0.signInAddress = "https://marfa.castell.studio" }
+        host.instanceSettings = InstanceSettingsModel { .init(id: "https://marfa.castell.studio", source: source) }
+        fake(host).state.withLock { state in
+            state.profile = OwnerProfile(name: "Mira Castell", username: "mcastell", emailIsReadable: true, email: "mira@castell.studio", pictureIsReadable: true)
+            state.metrics = InstanceMetricsReading(version: "0.0.106", databaseBytes: 200_000_000, fileBytes: 3_400_000_000)
+            state.update.running = "0.0.106"
+            state.update.available = true
+            state.update.latest = UpdateRelease(version: "0.0.107")
+            state.concerns = [.init(kind: .key, reference: "key", title: "A key expires next Monday")]
+        }
+        host.bindOverview()
+        await host.overview.load()
+        for page in [MarfaSettingsPage.account, .passkeys, .browsers, .network] {
+            let height = page == .account ? CGFloat(1300) : Self.size.height
+            try await SettingsRender.png(windowed(page, host: host, badge: host.overview.attentionBadge),
+                size: CGSize(width: Self.size.width, height: height), named: "\(page.title), \(appearance)", appearance: appearance)
+        }
     }
 
     @Test func accountChangingThePassword() async throws {
@@ -727,10 +770,6 @@ struct RenderedWindow<Detail: View>: View {
         try await page(.account, host, named: "Account, without sign_ins.manage")
     }
 
-    @Test func apps() async throws {
-        try await page(.apps, owner(), named: "Apps")
-    }
-
     @Test func anApp() async throws {
         try await page(.apps, owner(), subpage: SettingsSubpage(id: "app:g2", title: "Raycast"), named: "An app, Raycast")
     }
@@ -752,11 +791,72 @@ struct RenderedWindow<Detail: View>: View {
     @Test func appsNeedsAPermission() async throws {
         let host = owner()
         host.grants = [.configManage]
-        try await page(.apps, host, named: "Apps, without grants.manage")
+        try await page(.keys, host, named: "Apps and Keys, without grants.manage")
     }
 
     @Test func keys() async throws {
-        try await page(.keys, owner(), named: "Keys")
+        let host = owner()
+        fake(host).state.withLock { state in
+            state.names.merge([
+                "core.snippet": "Snippets", "core.person": "People", "core.place": "Places",
+                "core.file": "Files", "core.message": "Messages", "core.highlight": "Highlights", "core.media": "Media",
+            ]) { name, _ in name }
+            state.apps[0].name = "Marfa for Mac"
+            state.apps[0].scopes += ["edge.*:write"] + InstancePermission.allCases.map(\.rawValue)
+            state.apps[1].scopes += ["core.snippet:write", "metadata.types:write", "metadata.edge_types:write", "webhooks.manage"]
+            state.apps[2].name = "Claude"
+            state.apps[2].scopes += ["core.note:write", "core.person:read", "core.place:read"]
+            state.apps[2].lastUsed = .now
+            state.apps[3].name = nil
+            state.apps[3].scopes = ["*:read"]
+            state.keys[0].permissions = []
+            state.keys[0].lastUsed = .now
+            state.keys[1].label = "Studio folder sync"
+            state.keys[1].types = ["core.note": .write, "core.file": .write]
+            state.keys[1].permissions = ["webhooks.manage"]
+            state.keys[1].lastUsed = Self.days(1)
+            state.keys[2].types = ["core.task": .write, "core.message": .write]
+            state.keys[2].lastUsed = .now.addingTimeInterval(-60)
+            state.keys += [
+                KeyInfo(id: "readwise", label: "Readwise connector", source: "readwise", permissions: [], tier: .feed,
+                        types: ["core.highlight": .write, "core.media": .write], lastUsed: .now.addingTimeInterval(-120), appClientID: nil),
+                KeyInfo(id: "rss", label: "RSS connector", source: "rss", permissions: [], tier: .feed,
+                        types: ["core.bookmark": .write], lastUsed: .now.addingTimeInterval(-180), appClientID: nil),
+            ]
+        }
+        try await page(.keys, host, named: "Apps and Keys")
+    }
+
+    @Test func appsAndKeysEmpty() async throws {
+        let host = owner()
+        fake(host).state.withLock {
+            $0.apps = []
+            $0.keys = []
+        }
+        try await page(.keys, host, named: "Apps and Keys, empty")
+    }
+
+    @Test func appsAndKeysWithoutKeysManage() async throws {
+        let host = owner()
+        host.grants = [.grantsManage, .keysMint]
+        try await page(.keys, host, named: "Apps and Keys, without keys.manage")
+    }
+
+    @Test func appsAndKeysLongNamesAndExpiry() async throws {
+        let host = owner()
+        fake(host).state.withLock {
+            $0.apps[0].name = String(repeating: "Castell Studio ", count: 12)
+            $0.keys[0].label = String(repeating: "Castell Studio ", count: 12)
+            $0.keys[1].expires = .now.addingTimeInterval(-600)
+            $0.identity = OwnIdentity(keyID: $0.keys[0].id, expires: $0.keys[0].expires)
+        }
+        try await page(.keys, host, named: "Apps and Keys, long names and expiry")
+    }
+
+    @Test func appsAndKeysServerNotAnswering() async throws {
+        let host = owner()
+        host.connection = .notAnswering(lastAnswered: nil)
+        try await page(.keys, host, named: "Apps and Keys, server not answering")
     }
 
     @Test func keysWithoutKeysMint() async throws {
@@ -801,10 +901,31 @@ struct RenderedWindow<Detail: View>: View {
         let model = KeysModel(context: context(host))
         await model.load()
         model.beginNewKey()
-        model.draft.name = "Lisbon zine importer"
-        model.draft.source = "lisbon-zine"
-        model.draft.exceptions["core.bookmark"] = .write
+        model.draft.name = "Newsletter script"
+        model.draft.source = "newsletter-script"
         try await page(.keys, host, sheet: AnyView(KeySheet(model: model)), named: "New Key")
+    }
+
+    @Test(arguments: [ColorScheme.light, .dark], [13, 24])
+    func newKeyWithChosenAccess(appearance: ColorScheme, textSize: Int) async throws {
+        let host = owner()
+        (host.ownerCalls as? FakeOwnerCalls)?.state.withLock { state in
+            state.names["core.event"] = "Events"
+            state.names["core.place"] = "Places"
+        }
+        let model = KeysModel(context: context(host))
+        await model.load()
+        model.beginNewKey()
+        model.draft.name = "Studio site"
+        model.draft.source = "studio-site"
+        model.draft.everyType = .none
+        model.draft.exceptions = ["core.note": .write, "core.event": .read, "core.place": .read]
+        model.draft.permissions = ["instance.read", "webhooks.manage"]
+        try await SettingsRender.png(
+            RenderedWindow(selection: .marfa(.keys), sheet: AnyView(KeySheet(model: model)),
+                           detail: MarfaSettingsPageView(page: .keys, host: host))
+                .environment(\.settingsTextScale, InterfaceStyle.scale(for: textSize)),
+            size: Self.size, named: "New Key, chosen access, \(appearance), \(textSize) pt", appearance: appearance)
     }
 
     @Test func aKeysOwnerPermissions() async throws {
@@ -837,16 +958,17 @@ struct RenderedWindow<Detail: View>: View {
             named: "New Key, in a short window")
     }
 
-    @Test func newKeyRefused() async throws {
+    @Test(arguments: [true, false]) func newKeyRefused(sourceHeld: Bool) async throws {
         let host = owner()
-        (host.ownerCalls as? FakeOwnerCalls)?.fail("create", with: .refused("That source is taken by another key."))
+        if sourceHeld { (host.ownerCalls as? FakeOwnerCalls)?.fail("create", with: .sourceHeld("That source is taken by another key.")) }
         let model = KeysModel(context: context(host))
         await model.load()
         model.beginNewKey()
         model.draft.name = "Lisbon zine importer"
-        model.draft.source = "lisbon-zine"
+        model.draft.source = sourceHeld ? "lisbon-zine" : "."
         await model.make()
-        try await page(.keys, host, sheet: AnyView(KeySheet(model: model)), named: "New Key, refused")
+        try await page(.keys, host, sheet: AnyView(KeySheet(model: model)),
+                       named: sourceHeld ? "New Key, source held" : "New Key, invalid source")
     }
 
     @Test func theKeyShownOnce() async throws {
@@ -861,7 +983,7 @@ struct RenderedWindow<Detail: View>: View {
     }
 
     @Test func addresses() async throws {
-        try await page(.addresses, owner(), named: "Addresses")
+        try await page(.network, owner(), named: "Network")
     }
 
     @Test func addressesAddingOne() async throws {
@@ -871,7 +993,7 @@ struct RenderedWindow<Detail: View>: View {
         model.begin(.addAddress)
         model.input = "studio.castell.design"
         await model.check()
-        try await page(.addresses, host, sheet: AnyView(AddressSheet(model: model, serverName: "Castell Studio")), named: "Addresses, adding one")
+        try await page(.network, host, sheet: AnyView(AddressSheet(model: model, serverName: "Castell Studio")), named: "Network, adding one")
     }
 
     @Test func addressesAddingOneTheServerRefuses() async throws {
@@ -881,7 +1003,7 @@ struct RenderedWindow<Detail: View>: View {
         model.begin(.addAddress)
         model.input = "https://castell.studio/path"
         await model.check()
-        try await page(.addresses, host, sheet: AnyView(AddressSheet(model: model, serverName: "Castell Studio")), named: "Addresses, an address refused")
+        try await page(.network, host, sheet: AnyView(AddressSheet(model: model, serverName: "Castell Studio")), named: "Network, an address refused")
     }
 
     @Test func addressesChangingTheSignInAddress() async throws {
@@ -900,13 +1022,28 @@ struct RenderedWindow<Detail: View>: View {
         model.begin(.changeSignIn)
         model.input = "studio.castell.design"
         await model.check()
-        try await page(.addresses, host, sheet: AnyView(AddressSheet(model: model, serverName: "Castell Studio")), named: "Addresses, changing the sign-in address")
+        try await page(.network, host, sheet: AnyView(AddressSheet(model: model, serverName: "Castell Studio")), named: "Network, changing the sign-in address")
     }
 
     // MARK: Webhooks and Folders
 
     @Test func webhooks() async throws {
-        try await page(.webhooks, owner(), named: "Webhooks")
+        let host = owner()
+        fake(host).state.withLock {
+            $0.names["studio.job"] = "Jobs"
+            $0.webhooks[0].maker?.name = "Marfa for Mac"
+            $0.webhooks[1].maker?.name = "Marfa for Mac"
+            $0.webhooks[0].typeFilter = "studio.job"
+            $0.webhooks[1].typeFilter = "studio.job"
+            $0.webhooks[3].maker = .init(kind: .app, id: "studio-sync", name: "Studio Folder Sync")
+            $0.webhooks[3].typeFilter = "core.note"
+            $0.deliveries["w4"] = []
+        }
+        try await page(.webhooks, host, named: "Webhooks")
+    }
+
+    @Test func webhooksWithAFailedDelivery() async throws {
+        try await page(.webhooks, owner(), named: "Webhooks, failed delivery")
     }
 
     @Test func webhooksWithoutManageKeys() async throws {
@@ -931,10 +1068,29 @@ struct RenderedWindow<Detail: View>: View {
         try await page(.webhooks, host, named: "Webhooks, a revoked key's among them")
     }
 
-    @Test func noWebhooks() async throws {
+    @Test func webhooksEmpty() async throws {
         let host = owner()
-        (host.ownerCalls as? FakeOwnerCalls)?.state.withLock { $0.webhooks = [] }
-        try await page(.webhooks, host, named: "Webhooks, none yet")
+        fake(host).state.withLock { $0.webhooks = [] }
+        try await page(.webhooks, host, named: "SettingsProposal-Edge-WebhooksEmpty")
+        #expect(!fake(host).calls.contains("deliveries"))
+    }
+
+    @Test func sourcesWithLockedRules() async throws {
+        let host = await stub {
+            $0.sources = Self.sourceRows
+            $0.grants.remove(.configManage)
+        }
+        try await page(.sources, host, named: "Sources, rules locked")
+        #expect(!fake(host).calls.contains("sourceLimit"))
+    }
+
+    @Test func sourcesAndWebhooksWhenTheServerDoesNotAnswer() async throws {
+        let host = owner()
+        host.connection = .notAnswering(lastAnswered: nil)
+        for page in [MarfaSettingsPage.sources, .webhooks] {
+            try await self.page(page, host, named: "\(page.title), not answering")
+        }
+        #expect(!fake(host).calls.contains("webhooks") && !fake(host).calls.contains("sourceLimit"))
     }
 
     @Test func aWebhook() async throws {
@@ -975,8 +1131,9 @@ struct RenderedWindow<Detail: View>: View {
 
     @Test func webhooksWithoutWebhooksManage() async throws {
         let host = owner()
-        host.grants = []
+        host.grants = [.keysManage]
         try await page(.webhooks, host, named: "Webhooks, without webhooks.manage")
+        #expect(!fake(host).calls.contains("webhooks"))
     }
 
     @Test func folders() async throws {

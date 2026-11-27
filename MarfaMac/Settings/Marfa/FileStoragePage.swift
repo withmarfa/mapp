@@ -1,7 +1,7 @@
 import Marfa
 import SwiftUI
 
-/// The File Storage page: where the server keeps files, how it reads, fetches and cleans them up. Switches and choices are sent
+/// The Storage page: where the server keeps files, how it reads, fetches and cleans them up. Switches and choices are sent
 /// at once, numbers when Return is pressed or the field is left.
 struct FileStoragePage: View {
     let host: any MarfaSettingsHost
@@ -13,69 +13,122 @@ struct FileStoragePage: View {
     }
 
     private var model: InstanceSettingsModel { host.instanceSettings }
-    private let all = InstanceSetting.fileSettings
+    private let all = InstanceSetting.fileSettings + InstanceSetting.versionSettings + [.trashRetentionDays]
 
     var body: some View {
-        InstanceSettingsGate(page: .fileStorage, host: host) {
-            SettingsPageColumn {
-                whereFilesAre
-                SettingsSection("Reading Files") {
-                    InstanceToggleRow(model: model, setting: .enrichmentEnabled, among: all, line: "So search finds words in PDFs and documents.")
-                    InstanceToggleRow(model: model, setting: .enrichmentOcrEnabled, among: all, line: "So search finds words in pictures.")
-                }
-                SettingsSection("Files From the Web") {
-                    InstanceToggleRow(
-                        model: model, setting: .mcpFetchEnabled, among: all, line: "When a chat asks \(host.serverName) to save a link.")
-                    InstanceNumberRow(model: model, setting: .mcpFetchMaxMegabytes, among: all, unit: "MB")
-                }
-                SettingsSection("Unused Files") {
-                    InstanceToggleRow(model: model, setting: .blobCleanupEnabled, among: all)
-                    InstanceChoiceRow(model: model, setting: .blobCleanupGraceSeconds, among: all, line: "How long a file is left alone before it is removed.")
-                    unused
-                }
-                InstanceStatusLine(model: model, settings: all)
+        Group {
+            if host.grants.contains(.configManage) {
+                InstanceSettingsGate(page: .fileStorage, host: host) { catalog in content(catalog) }
+            } else {
+                content(nil)
             }
         }
-        .task(id: host.serverAddress) { await storage.load() }
+        .task(id: host.grants) { if host.grants.contains(.instanceRead) { await storage.load() } }
         .accessibilityIdentifier("FileStoragePage")
+    }
+
+    private func content(_ catalog: LimitsModel?) -> some View {
+        SettingsPageColumn {
+            if let catalog, let notice = catalog.notice { OwnerNotice(title: "Changed Elsewhere", line: notice, close: { catalog.dismissNotice() }) }
+            files(catalog)
+            SettingsSection("Versions", footer: "A type can keep its own.") {
+                ForEach(InstanceSetting.versionSettings, id: \.self) { setting in
+                    choice(setting, catalog)
+                }
+            }
+            SettingsSection("Trash") {
+                choice(.trashRetentionDays, catalog)
+            }
+            SettingsSection("Reading Files") {
+                toggle(.enrichmentEnabled, catalog, line: "So search finds words in PDFs and documents.")
+                toggle(.enrichmentOcrEnabled, catalog)
+                field(.largestFileRead, catalog)
+                field(.mostTextKept, catalog)
+                field(.tries, catalog)
+            }
+            SettingsSection("Files from the Web") {
+                if let catalog, catalog.setting(LimitSetting.fetchSwitch)?.value?.bool != nil {
+                    SettingsRow("Let agents fetch files", line: "From a web address, or a file attached in a chat.", error: catalog.lines[LimitSetting.fetchSwitch]) {
+                        SettingsToggle(title: "Let agents fetch files", isOn: Binding { catalog.isOn(LimitSetting.fetchSwitch) } set: { on in
+                            Task { await catalog.setSwitch(LimitSetting.fetchSwitch, on) }
+                        })
+                        .disabled(catalog.saving.contains(LimitSetting.fetchSwitch))
+                    }
+                } else if catalog == nil {
+                    locked(InstanceSetting.mcpFetchEnabled.title)
+                }
+                field(.largestFetch, catalog)
+                field(.fetchTime, catalog)
+            }
+            if catalog != nil { InstanceStatusLine(model: model, settings: all) }
+        }
+    }
+
+    private func locked(_ title: String) -> some View {
+        LockedInstanceRow(title: title, permission: .configManage, host: host)
+    }
+
+    @ViewBuilder private func choice(_ setting: InstanceSetting, _ catalog: LimitsModel?) -> some View {
+        if let catalog { InstanceChoiceRow(model: model, setting: setting, among: all, catalog: catalog) }
+        else { locked(setting.title) }
+    }
+
+    @ViewBuilder private func toggle(_ setting: InstanceSetting, _ catalog: LimitsModel?, line: LocalizedStringKey? = nil) -> some View {
+        if let catalog { InstanceToggleRow(model: model, setting: setting, among: all, catalog: catalog, line: line) }
+        else { locked(setting.title) }
+    }
+
+    @ViewBuilder private func field(_ limit: LimitSetting, _ catalog: LimitsModel?) -> some View {
+        if let catalog { LimitField(model: catalog, limit: limit) }
+        else { locked(limit.title) }
     }
 
     // MARK: Where files are
 
-    @ViewBuilder private var whereFilesAre: some View {
-        SettingsSection("Where Files Are") {
-            if let failure = storage.failure {
+    private func files(_ catalog: LimitsModel?) -> some View {
+        SettingsSection("Files") {
+            if !host.grants.contains(.instanceRead) {
+                LockedInstanceRow(title: String(localized: "File storage details"), permission: .instanceRead, host: host)
+            } else if let failure = storage.failure {
                 OwnerProblemRow(
-                    title: "Couldn’t Read Where Files Are", failure: failure, page: .fileStorage, host: host,
+                    title: "Couldn’t read where files are", failure: failure, page: .fileStorage, host: host,
                     retry: { Task { await storage.load() } })
             } else if let stores = storage.stores {
                 ForEach(stores.stores) { store in storeRow(store) }
+                if let bytes = storage.metrics?.databaseBytes, storage.fileBytesFailure == nil {
+                    SettingsRow("Database") { SettingsValue(verbatim: Int64(bytes).formatted(.byteCount(style: .file))) }
+                }
                 if let failure = storage.fileBytesFailure {
                     OwnerProblemRow(
-                        title: "Couldn’t Read the Total File Size", failure: failure, page: .fileStorage, host: host,
+                        title: "Couldn’t read the total file size", failure: failure, page: .fileStorage, host: host,
                         retry: { Task { await storage.load() } })
                 }
             } else {
-                SettingsRow("Reading Where Files Are…") { ProgressView().controlSize(.small) }
+                SettingsRow("Reading where files are…") { ProgressView().controlSize(.small) }
             }
-            InstanceChoiceRow(model: model, setting: .blobMinCopies, among: all)
-            InstanceNumberRow(model: model, setting: .diskReserveMegabytes, among: all, unit: "MB", line: "Uploads stop below this.")
+            choice(.blobMinCopies, catalog)
+            if let catalog {
+                InstanceNumberRow(model: model, setting: .diskReserveMegabytes, among: all, catalog: catalog, unit: "MB", line: "Uploads stop below this.")
+            } else { locked(InstanceSetting.diskReserveMegabytes.title) }
+            toggle(.blobCleanupEnabled, catalog)
+            choice(.blobCleanupGraceSeconds, catalog)
+            if host.grants.contains(.instanceRead) { unused }
         }
     }
 
     private func storeRow(_ store: FileStoreRow) -> some View {
         let title: String =
             switch store.kind {
-            case .disk: String(localized: "\(host.serverName)’s Disk")
-            case .folder: String(localized: "Backup Folder")
-            case .objectStore: String(localized: "Object Store")
+            case .disk: String(localized: "This Marfa’s disk")
+            case .folder: String(localized: "Backup folder")
+            case .objectStore: String(localized: "Object store")
             }
         return SettingsRow(
-            title: Text(verbatim: title), line: store.error == nil ? Text(verbatim: store.locator) : nil, error: store.error,
-            lead: .symbol(store.kind == .objectStore ? "externaldrive.connected.to.line.below" : "externaldrive")
+            title: Text(verbatim: title), line: store.error == nil ? Text(verbatim: store.locator) : nil,
+            lineGlyph: store.kind == .objectStore ? .link : .folder, error: store.error
         ) {
             if store.kind == .disk {
-                if let bytes = storage.fileBytes { SettingsValue(verbatim: Int64(bytes).formatted(.byteCount(style: .file))) }
+                if let bytes = storage.fileBytes, storage.fileBytesFailure == nil { SettingsValue(verbatim: Int64(bytes).formatted(.byteCount(style: .file))) }
             } else {
                 SettingsValue("A copy of each file")
             }

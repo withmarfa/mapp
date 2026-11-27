@@ -2,10 +2,10 @@ import Foundation
 import Marfa
 import Observation
 
-/// The Updates page: the release the server runs, whether a newer one is ready, Check for Updates and Update, the steps an
+/// The release controls on Account show the release the server runs, whether a newer one is ready, Check for Updates and Update, the steps an
 /// update goes through while it runs, and how the last one ended. Starting an update needs `instance.maintain`; the server
 /// restarts to take it, so the page follows it, treating a server that does not answer for a while as restarting. An update
-/// the server put back is told with its own words and offers Try Again, never a second Update.
+/// the server put back offers Try Again when the sign-in can start another update.
 @Observable @MainActor final class UpdatesModel {
     private let context: OwnerContext
     /// How long to wait between reads while an update runs, and how many unanswered reads to wait through before giving up.
@@ -82,20 +82,7 @@ import Observation
             }
         }, showBeforeFinishing: true, after: {
             guard generation == stopGeneration, !Task.isCancelled else { return }
-            await loader.read(.required(settingsRead) { [self] () throws(OwnerFailure) in
-                guard canChangeSettings else {
-                    settings = nil
-                    return
-                }
-                do throws(OwnerFailure) {
-                    let reading = try await context.calls.upkeepSettings()
-                    guard generation == stopGeneration, !Task.isCancelled, canChangeSettings else { return }
-                    settings = reading
-                } catch {
-                    guard generation == stopGeneration, !Task.isCancelled else { return }
-                    throw error
-                }
-            }, in: context)
+            await loadAutomaticChecks()
         })
         guard generation == stopGeneration, !Task.isCancelled, status?.progress != nil else { return }
         await follow()
@@ -107,7 +94,7 @@ import Observation
     /// answers 404 then.
     var canCheck: Bool {
         guard let status else { return false }
-        return status.checksAutomatically && !isChecking && !isUpdating
+        return !needsMaintain && status.checksAutomatically && !isChecking && !isUpdating
     }
 
     /// Whether the sign-in lacks `instance.maintain`, which Update and Check for Updates need: the page offers Allow More… first.
@@ -131,10 +118,10 @@ import Observation
     /// Whether Update can be pressed: a newer release is ready, the server can swap its own programs and nothing is running.
     var canUpdate: Bool {
         guard let status else { return false }
-        return status.available && status.updatesItself && !isUpdating && !isChecking && !lostTrack
+        return !needsMaintain && status.available && status.updatesItself && !isUpdating && !isChecking && !lostTrack
     }
 
-    /// Starts the update the owner confirmed on Overview or Updates. Where the status was not read yet, it is read first (and
+    /// Starts the update the owner confirmed on Account. Where the status was not read yet, it is read first (and
     /// an update that runs is followed to its end), and the update starts only if a release is still ready.
     func confirmUpdate() async {
         if status == nil {
@@ -226,6 +213,24 @@ import Observation
     }
 
     // MARK: Check Automatically
+
+    func loadAutomaticChecks() async {
+        let generation = stopGeneration
+        await loader.read(.required(settingsRead) { [self] () throws(OwnerFailure) in
+            guard canChangeSettings else {
+                settings = nil
+                return
+            }
+            do throws(OwnerFailure) {
+                let reading = try await context.calls.upkeepSettings()
+                guard generation == stopGeneration, !Task.isCancelled, canChangeSettings else { return }
+                settings = reading
+            } catch {
+                guard generation == stopGeneration, !Task.isCancelled else { return }
+                throw error
+            }
+        }, in: context)
+    }
 
     func setChecksAutomatically(_ on: Bool) async {
         guard canChangeSettings, settingsFailure == nil, let settings, !isSwitching, settings.checksForUpdates != on else { return }

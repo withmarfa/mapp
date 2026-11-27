@@ -188,7 +188,7 @@ nonisolated enum Words {
         case nil:
             return [
                 lead, String(localized: "The app can’t tell whether that copy holds changes that haven’t reached the server."),
-                String(localized: "To send any changes it holds, install the previous version of the app and connect it to this server if it isn’t already. The app can’t remove a copy it can’t count, so when that version has sent everything, update the app, choose Disconnect, then Keep Copy and Disconnect, and move the copy’s folder to the Trash. After that, connect to the server again."),
+                String(localized: "To send any changes it holds, install the previous version of the app and connect it to this server if it isn’t already. The app can’t remove a copy it can’t count, so when that version has sent everything, update the app, choose Sign Out in Account, then Keep Copy and Sign Out, and move the copy’s folder to the Trash. After that, connect to the server again."),
             ].joined(separator: " ")
         }
     }
@@ -269,7 +269,7 @@ nonisolated enum Words {
 
     static func approvalMayStandTitle(_ which: ForgottenApproval) -> String {
         switch which {
-        case .left: String(localized: "Disconnected, but This App May Still Be Approved")
+        case .left: String(localized: "Signed Out, but This App May Still Be Approved")
         case .abandoned: String(localized: "This App May Still Be Approved")
         }
     }
@@ -393,7 +393,7 @@ nonisolated enum Words {
     /// sent there. The count is of the changes the copy holds that no server has taken; `nil` where it can't be read.
     static func otherServer(unsent: UInt64?) -> String {
         let lead = String(localized: "This address now reaches a different Marfa server from the one this copy of your library was made for, so the app has stopped syncing it.")
-        let way = String(localized: "To start a new copy from this server, choose Disconnect in Settings, then connect again.")
+        let way = String(localized: "To start a new copy from this server, choose Sign Out in Account, then connect again.")
         switch unsent {
         case let count? where count > 0:
             return [lead, notSent(Int(clamping: count)), way].joined(separator: " ")

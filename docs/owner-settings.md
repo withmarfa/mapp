@@ -12,36 +12,34 @@ These pages show and change what the server holds for its owner. Every call goes
 
 ## Pages
 
-A page opens with the permission here (`MarfaSettingsPage.permission`). A part that needs another permission says so in its place. Account links to the server settings pages, and Apps and Keys links to Apps. These links stay available while the page loads or shows a problem.
+The page gate checks connection and permissions. A configured Marfa keeps its Account header and Sign Out above any connection state. Sections identify additional permissions. Apps and Keys links to each connected app’s settings.
 
 | Page | Opens with | Its job |
 | --- | --- | --- |
-| Overview | `instance.read` | How the Marfa stands, what needs attention, its name and release |
-| Account | none | The owner's name and picture, password, passkeys, browsers signed in |
-| Apps | `grants.manage` | Connected apps: access, owner permissions, keys they made, data they keep |
-| Apps and Keys | `keys.manage` | The owner's keys and apps' keys. Making one needs `keys.mint` |
-| Addresses | `config.manage` | Sign-in and other addresses, websites allowed, private addresses |
+| Account | none | Profile, sign-out, sign-in controls and server settings. Problems and the release need `instance.read`. Updating needs `instance.maintain` |
+| Passkeys | `sign_ins.manage` | Add a passkey in the browser, rename one or remove it |
+| Browsers | `sign_ins.manage` | See and end browser sessions |
+| Apps and Keys | None | Connected apps need `grants.manage`. Listing all keys needs `keys.manage`. A sign-in with only `keys.mint` can create keys and manage keys within its reach |
+| App details | `grants.manage` | A connected app’s access, owner permissions, keys and data. Removing data also needs `items.purge` |
+| Network | `config.manage` | Sign-in and other addresses, websites allowed, private addresses |
 | Plugins | `schema.write` | Plugins installed, newer and available. One with a connector needs `connectors.manage` |
 | Types | `schema.write` | Types, fields, status words, and rules |
 | Links | `schema.write` | Link types. Opens from Types |
 | Sources | `keys.manage` | Names and marks of sources. Both source rules need `config.manage` |
-| Trash | `items.purge` | Restore items or empty Trash. Choose Select Items or Show All to permanently delete selected items. Changing how long items wait needs `config.manage` |
-| History | `config.manage` | How long and how many versions, and how long logs, are kept |
-| File Storage | `config.manage` | Where files are kept, copies, reading text, removing unused files |
+| Trash | `items.purge` | Restore items or empty Trash. Choose Select Items or Show All to permanently delete selected items. Storage controls how long items stay in Trash |
+| Storage | `instance.read` or `config.manage` | File locations, sizes, and unused files need `instance.read`. Each configuration control needs `config.manage` |
 | Connectors | `connectors.manage` | Each connector's health, machine, sign-in, settings and mapping |
 | Webhooks | `webhooks.manage` | Webhooks by maker, their events and deliveries |
 | Folders | type access to `system.folder` | Synced folders: patterns, limits, copies, Stop Syncing |
 | Backups | `backups.manage` | Destination, backups, restore. Destination and interval need `config.manage` |
-| Updates | `instance.read` | The release and an update's progress. Starting one needs `instance.maintain` |
-| Housekeeping | `instance.read` | The jobs the server runs. Confirming its clock needs `instance.maintain` |
+| Housekeeping | `instance.read` or `config.manage` | Jobs need `instance.read`. Confirming the clock needs `instance.maintain`. Log retention needs `config.manage` |
 | Activity | none to open. Usage needs `instance.read`. Log needs `audit.read` | How many items this Marfa holds, and the audit log |
-| Monitoring | `config.manage` | Heartbeat, error reports and telemetry |
-| Limits | `config.manage` | The server's adjustable limits |
-| Start-Up | `instance.read` | What the server started with, never a value |
+| Monitoring | `config.manage` | Pausing telemetry pauses error reports. The owner can still change or remove the reporting destination |
+| Limits | `config.manage` or `instance.read` | Request, rate, inbound delivery, and live update limits need `config.manage`. Either permission can read start-up setting names and whether each is set |
 
 ## Permissions
 
-- **A page never shows content behind a missing permission.** It shows Needs a Permission in its own words, with Allow More, because a row that cannot load looks like a fault. `MarfaPageGate` decides. Activity opens without one permission: a tab the sign-in lacks shows that state, and the other tab stays open.
+- **A missing page permission shows Needs a Permission with Allow More.** `MarfaPageGate` decides. Apps and Keys checks access to each section independently and shows a locked row for an unavailable action. Activity opens without one permission: a tab the sign-in lacks shows that state, and the other tab stays open.
 - **A sign-in asks for every permission an app can hold**, and the owner grants what they choose. A page rereads the grants after approval and still says what is missing.
 - **A `forbidden` answer rereads the grants** and offers Allow More… in the problem row (`OwnerProblemRow`).
 - **Owner permissions are counted, never all or nothing**, and can only be turned off on a key's or an app's page (`OwnerPermissionsRow`).
@@ -53,7 +51,8 @@ A page opens with the permission here (`MarfaSettingsPage.permission`). A part t
 - **Ask before anything that cannot be got back**, naming what goes and what stays: narrowing, revoking, disconnecting, emptying, shorter retention, less free disk, a raised folder limit, removing a type, plugin or data.
 - **A question holds its version.** What is confirmed is sent on the version it named, whatever is read while the alert is open.
 - **A typed safety number asks when the field is left**, because a person passes through other numbers while typing.
-- **A shorter or unknown retention always asks.** With no value the app can read, any choice may be shorter. Keep Versions asks on every change.
+- **Version history** asks before a change to any snapshot window or a possible reduction of the version cap. The server applies the cap after all three windows. Keep Versions asks on every change.
+- **Trash and log retention** ask before a shorter period. Use the server’s reported default for an unset period. If the default is unknown, ask when the change could shorten retention.
 - **Removing an app's data counts first and never half-tells.** It repeats until nothing is left, says how many went where it stops, and never says nothing changed once an item has gone.
 - **The app's own data is never removed here.** Connection's Remove… stops `PreferencesSync` first; a purge from here would delete the item under it.
 - **A disconnected app's keys still work** (`keys-and-oauth/grant-revoke-keeps-keys`); its webhooks go.
@@ -69,7 +68,7 @@ A page opens with the permission here (`MarfaSettingsPage.permission`). A part t
 
 ## What a person typed
 
-- **A refusal keeps what was typed**, marks the field and says why under it. Clearing it loses work the person cannot see again.
+- **A refusal preserves what the person typed.** A refused limit or free disk reserve returns to its last reported value. When the app shows the recovery notice, it copies the original input to the clipboard. Other fields keep the input and show the reason for the refusal.
 - **A draft is handed back** at the end of the window or the app (`OwnerDrafts`, `Notices.notKept`). Where a call is in flight, its failure hands it back.
 - **A pop-up or switch sends at once; a field sends on Return or when left.** Emptied, it removes the stored value.
 - **A number out of range is never sent.** A separator the Mac's region does not use is refused, not guessed at.
@@ -91,7 +90,7 @@ A page opens with the permission here (`MarfaSettingsPage.permission`). A part t
 - **One reader of health** (`ServerHealthModel`) and one follower of an update (`UpdatesModel`) serve every page.
 - **A part's word comes from its own status**, and unreadable is Couldn't Check, never Working.
 - **A server that does not answer during an update is restarting**, not at fault. When the app stops waiting it offers Check Again, not Update, because the server may still be updating.
-- **An update put back offers Try Again and no second Update.**
+- **After a rollback,** a release the server can still install offers Try Again to a sign-in with `instance.maintain`. Other sign-ins see Allow More.
 - **A connector's health is derived**, because the server gives no word for it (`ConnectorHealth.of`). Unreadable is never "waiting to start".
 - **Pause, Resume and Run Now are stored choices** that the connector follows at its next run. The app never runs a connector.
 
@@ -99,7 +98,7 @@ A page opens with the permission here (`MarfaSettingsPage.permission`). A part t
 
 - **The server's own error texts are never shown**, because they name settings by key and requests by path. Pages word a title and one line; details go to the app's log. A field may show the server's reason where it holds no key, code or route.
 - **A setting with no name in the app is counted or described**, never shown by its key.
-- **Needs Attention offers only an action the sign-in may take**: a concern opens its page, or says what is wrong.
+- **Problems and the Account badge share the server’s attention list.** Account refreshes it when opened. A problem opens the page that fixes it or offers a command to copy for settings the app cannot change. Without `instance.read`, Problems offers Allow More.
 - **A problem row's title is a sentence.**
 
 ## Plugins, types and connectors

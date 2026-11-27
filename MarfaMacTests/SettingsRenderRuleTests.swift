@@ -47,7 +47,6 @@ extension SettingsRenderTests {
     @Test func types() async throws { try await page(.types, owner(), named: "Types") }
     @Test func connectors() async throws { try await page(.connectors, owner(), named: "Connectors") }
     @Test func backups() async throws { try await page(.backups, owner(), named: "Backups") }
-    @Test func updates() async throws { try await page(.updates, owner(), named: "Updates") }
     @Test func housekeeping() async throws { try await page(.housekeeping, owner(), named: "Housekeeping") }
     @Test func activityUsage() async throws {
         let host = owner()
@@ -91,7 +90,6 @@ extension SettingsRenderTests {
     }
     @Test func monitoring() async throws { try await page(.monitoring, owner(), named: "Monitoring") }
     @Test func limits() async throws { try await page(.limits, owner(), named: "Limits") }
-    @Test func startUp() async throws { try await page(.startUp, owner(), named: "Start-Up") }
 
     /// The sign-in code's row and the row that opens the page it is typed on, each with one button.
     @Test func connectionWaitingForACode() async throws {

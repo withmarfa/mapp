@@ -8,6 +8,7 @@ struct SettingsLinkRow: View {
     private let lead: SettingsLead
     private let value: Text?
     private let dot: Color?
+    private let titleGlyph: SettingsTextGlyph?
     private let lineGlyph: SettingsTextGlyph?
     private let valueGlyph: SettingsTextGlyph?
     private let lock: String?
@@ -16,7 +17,7 @@ struct SettingsLinkRow: View {
 
     init(
         verbatim title: String, line: String? = nil, lead: SettingsLead = .none, value: String? = nil, dot: Color? = nil,
-        lines: Int? = 2, lineGlyph: SettingsTextGlyph? = nil, valueGlyph: SettingsTextGlyph? = nil, lock: String? = nil,
+        lines: Int? = 2, titleGlyph: SettingsTextGlyph? = nil, lineGlyph: SettingsTextGlyph? = nil, valueGlyph: SettingsTextGlyph? = nil, lock: String? = nil,
         action: @escaping () -> Void
     ) {
         self.title = Text(verbatim: title)
@@ -25,6 +26,7 @@ struct SettingsLinkRow: View {
         self.value = value.map { Text(verbatim: $0) }
         self.dot = dot
         self.lines = lines
+        self.titleGlyph = titleGlyph
         self.lineGlyph = lineGlyph
         self.valueGlyph = valueGlyph
         self.lock = lock
@@ -33,7 +35,7 @@ struct SettingsLinkRow: View {
 
     var body: some View {
         Button(action: action) {
-            SettingsRow(title: title, line: line, lineGlyph: lineGlyph, lead: rowLead, lines: lines) {
+            SettingsRow(title: title, line: line, titleGlyph: titleGlyph, lineGlyph: lineGlyph, lead: rowLead, lines: lines) {
                 if let lock {
                     SettingsLockedValue(text: lock)
                 } else {

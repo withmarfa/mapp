@@ -104,6 +104,11 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
             StoredSetting(key: key, value: nil, defaultValue: nil, isStored: set, isSecret: true, isSet: set)
         }
         let all = [
+            number("trash_retention_days", 60), number("version_max_versions", 500), number("version_recent_days", 30),
+            number("version_daily_snapshot_days", 90), number("version_weekly_snapshot_days", 365), number("audit_retention_days", 90),
+            number("event_log_retention_days", 30), number("row_log_retention_days", 30), number("inbound_handled_retention_days", 7),
+            number("inbound_pending_retention_days", 30), number("blob_min_copies", 1), number("disk_reserve_bytes", 134_217_728),
+            flag("enrichment_enabled", true), flag("enrichment_ocr_enabled", true), flag("blob_cleanup_enabled", true), number("blob_cleanup_grace_seconds", 86400),
             number("max_request_bytes", 1_048_576), number("max_bulk_request_bytes", 16_777_216),
             number("rate_limit_requests", 4000), number("rate_limit_keys_requests", 200), number("rate_limit_window_seconds", 60),
             number("enrichment_max_blob_bytes", 20_971_520), number("enrichment_max_text_chars", 100_000),
@@ -195,6 +200,8 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
         default: .data
         }
     }
+
+    func startUpSettings() async throws(OwnerFailure) -> [StartUpSetting] { try await storedSettings().startUp }
 
     func storedSettings() async throws(OwnerFailure) -> InstanceSettingsSnapshot {
         try enter("storedSettings")
@@ -313,17 +320,20 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
         #expect(model.hasProblem(.tries))
     }
 
-    @Test func aRefusedWriteKeepsTheInputWithOneLineInPlainWords() async {
+    @Test func aRefusedWriteRestoresTheHeldValueWithOneLineInPlainWords() async {
         let calls = FakeInstanceCalls()
         calls.state.withLock { $0.refusal = "`max_request_bytes` can't be less than the bulk limit; PATCH /config refused." }
-        let model = limitsModel(calls)
+        var returned: [OwnerDraft] = []
+        let model = LimitsModel(context: OwnerContext(calls: FakeOwnerCalls(), grants: { [.configManage] }, lateDraft: { returned.append($0) }), calls: calls)
         await model.load()
         model.drafts["max_request_bytes"] = "2"
         await model.commit(.largestRequest)
-        #expect(model.text(.largestRequest) == "2", "what was typed stays")
+        #expect(model.text(.largestRequest) == "1", "the last server value returns")
         #expect(model.line(.largestRequest) == "The server refused this change. Nothing was changed.", "no backticks, names or routes")
         #expect(model.hasProblem(.largestRequest))
+        #expect(returned == [.typed(title: LimitSetting.largestRequest.title, text: "2")])
         calls.state.withLock { $0.refusal = "A request can't be larger than the bulk limit." }
+        model.type("2", for: .largestRequest)
         await model.commit(.largestRequest)
         #expect(model.line(.largestRequest) == "A request can't be larger than the bulk limit.", "a refusal with plain words is shown")
     }
@@ -365,7 +375,7 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
         #expect(model.notice == nil, "it did not change somewhere else: another Marfa answered")
         #expect(model.line(.tries) == "Another Marfa now answers at this address. Nothing was sent.")
         #expect(model.held(.tries) == 3, "the other Marfa's value is not adopted")
-        #expect(model.text(.tries) == "4", "what was typed stays")
+        #expect(model.text(.tries) == "3", "the original value returns")
         await model.commit(.tries)
         #expect(calls.sent.isEmpty, "no retry is sent to it")
         #expect(calls.state.withLock { $0.instanceIDsSent }.isEmpty)
@@ -441,8 +451,9 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
         model.drafts["enrichment_max_attempts"] = "4"
         await model.commit(.tries)
         #expect(refreshed.count == 1)
+        #expect(!model.isLoaded)
         #expect(model.line(.tries) == OwnerWording.permissionLine("config.manage"))
-        #expect(model.text(.tries) == "4", "the input stays")
+        #expect(model.text(.tries) == "3")
     }
 
     @Test func aReadRefusedForWantOfAPermissionIsThePagesState() async {
@@ -474,6 +485,41 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
         #expect(!model.isOn("rate_limit_enabled"))
     }
 
+    @Test func aMissingSettingAndAStartOnlySettingCannotBeWritten() async {
+        let calls = FakeInstanceCalls()
+        calls.state.withLock { $0.settings["rate_limit_enabled"] = nil }
+        let model = limitsModel(calls)
+        await model.load()
+        await model.setSwitch("rate_limit_enabled", true)
+        await model.setSwitch("MARFA_PORT", true)
+        #expect(calls.sent.isEmpty)
+    }
+
+    @Test func pausingTelemetryPausesReportsAndPreservesTheirStoredSwitch() async {
+        let calls = FakeInstanceCalls()
+        let model = monitoringModel(calls)
+        await model.load()
+        await model.setSwitch("telemetry_enabled", false)
+        #expect(!model.isOn("error_reporting_enabled"))
+        #expect((try? await calls.storedSettings())?.activeMonitoringCount == 1)
+        #expect(model.isOn("heartbeat_enabled"))
+        await model.setSwitch("error_reporting_enabled", true)
+        await model.setSwitch("telemetry_enabled", true)
+        #expect(model.isOn("error_reporting_enabled"))
+        #expect(calls.sent == [["telemetry_enabled": .set(.bool(false))], ["telemetry_enabled": .set(.bool(true))]])
+    }
+
+    @Test func retentionChoicesIncludeTheServersBoundsInTheirOwnUnits() {
+        for setting in InstanceSetting.versionSettings + InstanceSetting.logSettings + [.trashRetentionDays, .blobCleanupGraceSeconds] {
+            let choices = InstanceChoices.options(for: setting, holding: nil, defaultValue: nil).compactMap(\.value)
+            #expect(choices.contains(setting.range.lowerBound))
+            #expect(choices.contains(setting.range.upperBound))
+        }
+        #expect(InstanceSetting.versionMaxVersions.range == 1...1_000_000)
+        #expect(InstanceChoices.title(.trashRetentionDays, 0) == "No Limit")
+        #expect(InstanceChoices.title(.versionRecentDays, 0) == "0 Days")
+    }
+
     @Test func aLimitThatDependsOnASwitchIsOffWhileTheSwitchIs() async {
         let calls = FakeInstanceCalls()
         let model = limitsModel(calls)
@@ -497,7 +543,7 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
         await model.load()
         model.drafts["max_request_bytes"] = "9"
         model.drafts["enrichment_max_attempts"] = "3"
-        #expect(model.takeDrafts() == [.typed(title: "Largest Request", text: "9")], "a value the server already holds is no draft")
+        #expect(model.takeDrafts() == [.typed(title: "Largest request", text: "9")], "a value the server already holds is no draft")
         #expect(model.drafts.isEmpty)
     }
 
@@ -511,6 +557,46 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
 }
 
 @Suite(.hangLimit) @MainActor struct MonitoringTests {
+    @Test func aPausedReportDestinationCanBeEditedAndRemovedBeforeResuming() async throws {
+        let calls = FakeInstanceCalls()
+        calls.changeElsewhere("telemetry_enabled", to: .bool(false))
+        let model = monitoringModel(calls)
+        await model.load()
+        #expect(!model.isOn("error_reporting_enabled"))
+        model.begin(.postHogHost)
+        model.sheet?.inputs["posthog_host"] = "https://reports.example"
+        model.sheet?.inputs["posthog_project_token"] = "test"
+        await model.save()
+        #expect(model.errorReportsHaveReceiver)
+        model.askToRemove(.postHogToken)
+        let question = try #require(model.question)
+        await model.confirm(question)
+        await model.setSwitch("telemetry_enabled", true)
+        #expect(!model.telemetryHasReceiver)
+        #expect(!model.errorReportsHaveReceiver)
+    }
+
+    @Test(arguments: ["traces", "logs", "metrics"])
+    func signalOverridesNeedABaseAndErrorReportsNeedTheirOwnSwitch(signal: String) async {
+        let calls = FakeInstanceCalls()
+        let key = "otel_exporter_otlp_\(signal)_endpoint"
+        calls.state.withLock {
+            $0.settings[key] = StoredSetting(key: key, value: nil, defaultValue: nil, isStored: true, isSecret: true, isSet: true)
+            $0.settings["posthog_host"]?.isSet = true
+            $0.settings["posthog_project_token"]?.isSet = true
+        }
+        calls.changeElsewhere("error_reporting_enabled", to: .bool(false))
+        let model = monitoringModel(calls)
+        await model.load()
+        #expect(!model.telemetryHasReceiver)
+        await model.setSwitch("error_reporting_enabled", true)
+        #expect(model.telemetryHasReceiver)
+        await model.setSwitch("error_reporting_enabled", false)
+        calls.state.withLock { $0.settings["otel_exporter_otlp_endpoint"]?.isSet = true }
+        await model.load()
+        #expect(model.telemetryHasReceiver)
+    }
+
     @Test func aSecretIsOnlySetOrNotSet() async {
         let calls = FakeInstanceCalls()
         calls.state.withLock { $0.settings["heartbeat_url"]?.isSet = true }
@@ -635,7 +721,7 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
         model.sheet?.inputs["posthog_host"] = "https://eu.example"
         model.sheet?.inputs["posthog_project_token"] = "phc_secret"
         await model.save()
-        #expect(model.notice == "PostHog Host was changed elsewhere. The app read the new value; yours wasn’t saved.")
+        #expect(model.notice == "Error reports address was changed elsewhere. The app read the new value; yours wasn’t saved.")
         model.dismissNotice()
         #expect(model.notice == nil)
     }
@@ -1078,11 +1164,10 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
         #expect(MarfaSettingsPage.activity.permission == nil, "Usage and Log each name their own permission")
         #expect(ActivityTab.log.permission == .auditRead)
         #expect(MarfaSettingsPage.monitoring.permission == .configManage)
-        #expect(MarfaSettingsPage.limits.permission == .configManage)
-        #expect(MarfaSettingsPage.startUp.permission == .instanceRead)
+        #expect(MarfaSettingsPage.limits.missingPermission(in: [.instanceRead]) == nil)
+        #expect(MarfaSettingsPage.limits.missingPermission(in: [.configManage]) == nil)
         #expect(ActivityTab.log.permissionLine == "The app isn’t allowed to read the server’s audit log.")
         #expect(MarfaSettingsPage.monitoring.permissionLine == "The app isn’t allowed to see or change how the server is monitored.")
         #expect(MarfaSettingsPage.limits.permissionLine == "The app isn’t allowed to see or change the server’s limits.")
-        #expect(MarfaSettingsPage.startUp.permissionLine == "The app isn’t allowed to read the settings the server started with.")
     }
 }

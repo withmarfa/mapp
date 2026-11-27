@@ -2,10 +2,20 @@ import Foundation
 import Marfa
 import Observation
 
-/// The Account page: the owner's profile as the server holds it, with the name and picture to change, the password, the
-/// passkeys and the browsers signed in. The sign-ins need `sign_ins.manage`, which every sign-in asks for; where the owner did
-/// not approve it, Change Password asks again for everything the sign-in lacks. The name and picture need the profile's own
-/// scopes, which every sign-in asks for too. A refused write keeps what was typed.
+nonisolated enum ProfileContactField: Hashable {
+    case username, email
+
+    var scope: ProfileField { self == .username ? .username : .email }
+    var title: String { self == .username ? String(localized: "Username") : String(localized: "Email") }
+
+    func held(in profile: OwnerProfile?) -> String { (self == .username ? profile?.username : profile?.email) ?? "" }
+
+    func unsaved(_ value: String) -> OwnerDraft {
+        .typed(title: self == .username ? String(localized: "Username Not Changed") : String(localized: "Email Not Changed"), text: value)
+    }
+}
+
+/// Profile edits, password changes and sign-in management for Account and the pages it opens.
 @Observable @MainActor final class AccountModel: OwnerDraftHolding {
     enum Sheet: Equatable {
         case password
@@ -32,14 +42,14 @@ import Observation
 
     private(set) var profile: OwnerProfile?
     /// What the sign-in may change of the profile.
-    private(set) var changeable: Set<ProfileField> = []
+    var changeable: Set<ProfileField> { Set(ProfileField.allCases.filter { $0.mayWrite(holding: context.holds) }) }
     /// The name as typed, sent on Return or when the field is left. A reply never changes it while Settings is open.
     var nameDraft = ""
     private(set) var nameError: String?
     /// Whether the name is being sent, or the grants read again after a refusal: the field takes no typing meanwhile, so
     /// one name is sent at a time.
     private(set) var isSavingName = false
-    /// Counts each time Settings closes, so a send that fails after it hands back what was typed instead of showing it.
+    /// A save that fails after draft handover returns the text through a notice.
     private var closings = 0
     /// A small copy of the picture for its row, where there is one the sign-in may read. Nothing larger is kept.
     private(set) var picture: Data?
@@ -50,6 +60,12 @@ import Observation
     /// Why the page can't be shown at all.
     private let loader = OwnerLoader()
     var failure: OwnerFailure? { loader.failure }
+    var gateFailure: OwnerFailure? {
+        switch failure {
+        case .signedOut, .unreachable, .instanceChanged, .unsupported, .notPermitted: failure
+        default: nil
+        }
+    }
     /// Why the passkeys and browsers couldn't be read, where the profile could.
     private let signInsRead = OwnerLoader.ReadStatus()
     var listsFailure: OwnerFailure? { signInsRead.failure }
@@ -84,7 +100,6 @@ import Observation
             let typed = isNameEdited
             let read = try await context.calls.profile()
             profile = read
-            changeable = context.calls.changeableProfile()
             if !typed {
                 nameDraft = read.name ?? ""
                 nameError = nil
@@ -110,16 +125,43 @@ import Observation
         ])
     }
 
-    // MARK: Name and picture
-
-    /// What of the profile the page shows locked, since the sign-in may not change it, or may not read it at all.
-    var lockedProfile: Set<ProfileField> {
-        guard let profile else { return [] }
-        var locked: Set<ProfileField> = []
-        if profile.name == nil || !changeable.contains(.name) { locked.insert(.name) }
-        if !profile.pictureIsReadable || !changeable.contains(.avatar) { locked.insert(.avatar) }
-        return locked
+    func loadSignIns(passkeysOnly: Bool) async {
+        await loader.load(in: context, primary: { () throws(OwnerFailure) in
+            if passkeysOnly {
+                passkeys = try await context.calls.passkeys()
+            } else {
+                browsers = try await context.calls.browserSignIns()
+            }
+        })
     }
+
+    var contactDrafts: [ProfileContactField: String] = [:]
+    private(set) var contactErrors: [ProfileContactField: String] = [:]
+    private(set) var savingContacts: Set<ProfileContactField> = []
+
+    func saveContact(_ field: ProfileContactField) async {
+        guard let typed = contactDrafts[field], changeable.contains(field.scope), !savingContacts.contains(field) else { return }
+        let value = typed.trimmingCharacters(in: .whitespacesAndNewlines)
+        contactErrors[field] = nil
+        guard value != field.held(in: profile) else { contactDrafts[field] = nil; return }
+        savingContacts.insert(field)
+        defer { savingContacts.remove(field) }
+        let closing = closings
+        do {
+            let result = try await context.calls.setProfileContact(field, to: value)
+            switch field {
+            case .username: profile?.username = result.username
+            case .email: profile?.email = result.email
+            }
+            if contactDrafts[field] == typed { contactDrafts[field] = nil }
+        } catch {
+            await context.learn(from: error)
+            if closings == closing { contactErrors[field] = OwnerWording.line(error, on: .account) }
+            else { context.lateDraft(field.unsaved(typed)); contactDrafts[field] = nil }
+        }
+    }
+
+    // MARK: Name and picture
 
     /// Asks again for everything, the profile's scopes among them, and reads what the new sign-in may do.
     func allowProfileChanges() async {
@@ -151,10 +193,9 @@ import Observation
         defer { isSavingName = false }
         let closings = closings
         do {
-            profile = try await context.calls.setProfileName(name)
+            profile?.name = try await context.calls.setProfileName(name).name
         } catch {
             await context.learn(from: error)
-            if case .notPermitted = error { changeable = context.calls.changeableProfile() }
             if closings == self.closings {
                 nameError = OwnerWording.line(error, on: .account)
             } else {
@@ -180,7 +221,6 @@ import Observation
         } catch {
             pictureError = OwnerWording.line(error, on: .account)
             await context.learn(from: error)
-            if case .notPermitted = error { changeable = context.calls.changeableProfile() }
         }
     }
 
@@ -194,7 +234,8 @@ import Observation
             return (sent, ProfilePicture.thumbnail(sent))
         }.value
         guard let prepared else { return false }
-        profile = try await context.calls.setProfilePicture(prepared.sent)
+        let updated = try await context.calls.setProfilePicture(prepared.sent)
+        profile?.hasPicture = updated.hasPicture
         picture = prepared.shown
         return true
     }
@@ -220,6 +261,7 @@ import Observation
         if !canManageSignIns {
             guard await allowSignIns() else { return }
             await load()
+            guard gateFailure == nil, canManageSignIns else { return }
         }
         clearPasswordInput()
         sheet = .password
@@ -305,7 +347,7 @@ import Observation
         } catch {
             renameError = OwnerWording.line(error)
             await context.learn(from: error)
-            if error == .notFound { await load() }
+            if error == .notFound { await loadSignIns(passkeysOnly: true) }
         }
     }
 
@@ -323,7 +365,7 @@ import Observation
 
     func askToEnd(_ browser: BrowserSignIn) {
         question = Question(
-            action: .endBrowser(browser.id), title: String(localized: "Sign out “\(browser.name)”?"),
+            action: .endBrowser(browser.id), title: String(localized: "Sign Out “\(browser.name)”?"),
             message: String(localized: "It must sign in again with your password or a passkey. Apps and keys keep working."),
             confirm: String(localized: "Sign Out"))
     }
@@ -376,7 +418,7 @@ import Observation
 
     // MARK: Closing
 
-    /// The owner's name and the name typed for a passkey, which the app gives back when Settings closes. A password is
+    /// Unsaved profile and passkey edits are returned when Settings closes. A password is
     /// dropped and never handed over.
     func takeDrafts() -> [OwnerDraft] {
         var drafts: [OwnerDraft] = []
@@ -389,6 +431,11 @@ import Observation
             nameDraft = held
         }
         nameError = nil
+        for (field, value) in contactDrafts where !savingContacts.contains(field) {
+            if value != field.held(in: profile) { drafts.append(field.unsaved(value)) }
+            contactDrafts[field] = nil
+            contactErrors[field] = nil
+        }
         return drafts + takeSheetDrafts()
     }
 

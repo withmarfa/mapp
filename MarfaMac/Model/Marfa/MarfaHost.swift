@@ -161,6 +161,7 @@ import os
     /// Whether a sign-in waits on the person (the browser's page, or a code to approve elsewhere). Stopping the step
     /// then changes nothing; once it is false the sign-in is being used, and stopping would end it.
     private(set) var isSigningIn = false
+    private(set) var isPreparingInitialSignIn = false
     /// The server a switch signed in to whose approval is kept while the person answers the question about changes that
     /// arrived during the sign-in. The answer uses it, and dropping the question ends it. Its address is also kept in
     /// the defaults, since quitting with the question open drops it without a step to end it: the next launch does.
@@ -336,6 +337,13 @@ import os
         return hasCopy(connection) ? nil : 0
     }
 
+    /// Reads what a sign-out question can show while leaving the copy and approval in place.
+    func unsentChangesBeforeSignOut() async -> UnsentChanges? {
+        if let source { return await source.unsentWrites() }
+        guard let connection = configuredConnection, hasCopy(connection) else { return UnsentChanges(ids: []) }
+        return await Self.unsentChanges(in: location.store(for: connection))
+    }
+
     /// Opens the saved library's copy and paints from it, then asks the server.
     func launch() async {
         // The question that held it is gone with the last run. It is never the address this run connects to: an
@@ -379,11 +387,25 @@ import os
             return try await changeAddress(to: address, via: method)
         }
         try begin()
-        defer { isBusy = false }
+        isPreparingInitialSignIn = true
+        defer {
+            isPreparingInitialSignIn = false
+            isBusy = false
+        }
+        guard !Task.isCancelled else { throw .signIn(.canceled) }
         await dropPendingSignIn()
-        guard await handOverEdits() else { throw .unavailable(message: String(localized: "Finish editing the current item before changing libraries.")) }
+        guard !Task.isCancelled else { throw .signIn(.canceled) }
+        let handedOver = await handOverEdits()
+        guard !Task.isCancelled else { throw .signIn(.canceled) }
+        guard handedOver else { throw .unavailable(message: String(localized: "Finish editing the current item before changing libraries.")) }
         let instance = await identify(connection)
+        guard !Task.isCancelled else { throw .signIn(.canceled) }
         let made = try await signInUnlessHeld(to: connection, via: method)
+        isPreparingInitialSignIn = false
+        if Task.isCancelled {
+            if made { await Task { await endSignIn(of: connection) }.value }
+            throw .signIn(.canceled)
+        }
         let earlier: MarfaCopies.Record
         do {
             earlier = try place(connection, in: await plannedFolder(for: connection, instance: instance), instance: instance)
@@ -708,6 +730,7 @@ import os
 
     /// Signs in as the person chose. Nothing is kept unless it finishes.
     private func signIn(to connection: MarfaConnection, via method: SignInMethod) async throws(Problem) {
+        guard !Task.isCancelled else { throw .signIn(.canceled) }
         isSigningIn = true
         defer { isSigningIn = false }
         let signedIn: SignedIn

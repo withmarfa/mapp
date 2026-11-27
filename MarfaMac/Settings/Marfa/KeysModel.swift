@@ -123,6 +123,10 @@ import Observation
     /// Whether the app may give a key more time, which `keys.manage` allows for any key.
     var canExtend: Bool { context.grants().contains(.keysManage) }
 
+    var canReadKeys: Bool { canExtend || canMake }
+
+    func isCurrent(_ key: KeyInfo) -> Bool { identity?.keyID == key.id }
+
     /// What a key can be extended to now: only a later day than it ends on, and none past the day the key the app is signed in
     /// with ends, which the server holds it to. A key that never ends has nothing to extend, and never is offered only where
     /// the app's own sign-in does not end. Nothing is offered while the app's own sign-in is not known.
@@ -176,18 +180,24 @@ import Observation
 
     func make() async {
         guard canMakeDraft else { return }
-        isMaking = true
-        defer { isMaking = false }
         draftError = nil
         sourceError = nil
+        let source = draft.source.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let error = Self.invalidSource(source) {
+            sourceError = error
+            return
+        }
+
+        isMaking = true
         var types: [String: AccessLevel] = ["*": draft.everyType]
         for (pattern, level) in draft.exceptions { types[pattern] = level }
         let request = NewKey(
             label: draft.name.trimmingCharacters(in: .whitespacesAndNewlines),
-            source: draft.source.trimmingCharacters(in: .whitespacesAndNewlines), tier: draft.tier,
+            source: source, tier: draft.tier,
             expires: draft.expires.date(), types: types, permissions: draft.permissions.sorted())
         do {
             let made = try await context.calls.create(request)
+            isMaking = false
             if closedWhileMaking {
                 closedWhileMaking = false
                 sheet = nil
@@ -198,6 +208,7 @@ import Observation
             }
             await load()
         } catch {
+            isMaking = false
             if closedWhileMaking {
                 closedWhileMaking = false
                 sheet = nil
@@ -208,11 +219,21 @@ import Observation
         }
     }
 
+    private static func invalidSource(_ source: String) -> String? {
+        if source.unicodeScalars.count > 200 { return String(localized: "Use a source with at most 200 characters.") }
+        if source == "." || source == ".." { return String(localized: "A source can’t be “.” or “..”.") }
+        let lowered = source.lowercased()
+        if ["oauth:", "restored:", "connector-host:"].contains(where: { lowered.utf8.starts(with: $0.utf8) }) {
+            return String(localized: "The prefixes oauth:, restored:, and connector-host: are reserved. Use a different source.")
+        }
+        return nil
+    }
+
     /// The notice for a key made and never copied: its secret can't be shown again.
     private static func notCopied(_ label: String) -> OwnerDraft {
         .told(
             title: String(localized: "Key Not Copied"),
-            message: String(localized: "The key “\(label)” was made, and its secret can’t be shown again. If you didn’t copy it, revoke the key on the Keys page."))
+            message: String(localized: "The key “\(label)” was made, and its secret can’t be shown again. If you didn’t copy it, revoke the key in Apps and Keys."))
     }
 
     /// Closes the sheet; the plaintext key goes with it, as it is shown only once.
@@ -317,9 +338,15 @@ import Observation
     }
 
     func askToRevoke(_ key: KeyInfo) {
+        var message = String(localized: "Anything using it stops at once. This can’t be undone.")
+        if identityFailure != nil || identity == nil {
+            message += " " + String(localized: "If this Mac uses this key, revoking it signs this Mac out.")
+        } else if isCurrent(key) {
+            message += " " + String(localized: "Revoking this key also signs this Mac out.")
+        }
         question = Question(
             action: .revoke(key.id), title: String(localized: "Revoke “\(key.label)”?"),
-            message: String(localized: "Anything using it stops at once. This can’t be undone."), confirm: String(localized: "Revoke"))
+            message: message, confirm: String(localized: "Revoke"))
     }
 
     func cancelQuestion() { question = nil }
@@ -343,13 +370,27 @@ import Observation
                 revoked = id
             } catch {
                 if error == .notFound {
-                    markGone(id)
+                    await checkAfterMissingRevoke(id)
                 } else {
                     rowErrors[id] = error
                 }
                 await context.learn(from: error)
             }
         }
+    }
+
+    private func checkAfterMissingRevoke(_ id: String) async {
+        do {
+            let read = try await context.calls.keys()
+            guard let actual = read.first(where: { $0.id == id }) else {
+                markGone(id)
+                return
+            }
+            if let index = keys.firstIndex(where: { $0.id == id }) { keys[index] = actual }
+        } catch {
+            await context.learn(from: error)
+        }
+        rowErrors[id] = .notFound
     }
 
     private func change(_ id: String, _ change: KeyChange) async {

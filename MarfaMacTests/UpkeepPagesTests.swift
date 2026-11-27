@@ -1,5 +1,6 @@
 import Foundation
 import Marfa
+import MarfaAPI
 import Synchronization
 import Testing
 @testable import MarfaMac
@@ -44,6 +45,12 @@ nonisolated private func record(_ name: String, hoursAgo: Int = 0) -> BackupReco
 
 @MainActor
 @Suite(.hangLimit) struct BackupsModelTests {
+    @Test func anUnreportedBackupIntervalHasNoNumericValue() {
+        let interval: Int? = ClientOwnerCalls.upkeep(.init(instanceId: "instance-1")).intervalSeconds
+        #expect(interval == nil)
+        #expect(ClientOwnerCalls.upkeep(.init(instanceId: "instance-1", backupIntervalSeconds: 0)).intervalSeconds == 0)
+    }
+
     private func bench(grants: Set<InstancePermission> = [.backupsManage, .configManage]) -> OwnerBench {
         let bench = OwnerBench(grants: grants)
         bench.calls.state.withLock { $0.backups = [record("c", hoursAgo: 0), record("b", hoursAgo: 1), record("a", hoursAgo: 2)] }
@@ -320,6 +327,23 @@ nonisolated private func record(_ name: String, hoursAgo: Int = 0) -> BackupReco
         #expect(bench.calls.state.withLock { $0.updatesStarted } == 1)
     }
 
+    @Test func retryingARolledBackUpdateRequiresMaintainAtConfirmation() async {
+        var status = ready()
+        status.last = UpdateOutcome(result: .putBack, release: "0.0.85", finished: someday)
+        let owner = bench(status)
+        let model = UpdatesModel(context: owner.context, pause: .zero)
+        await model.load()
+        #expect(model.canUpdate)
+        owner.grants.remove(.instanceMaintain)
+        #expect(!model.canUpdate)
+        #expect(!model.canCheck)
+        owner.calls.fail("startUpdate", with: .notPermitted("instance.maintain"))
+        await model.confirmUpdate()
+        await model.checkForUpdates()
+        #expect(!owner.calls.calls.contains("startUpdate"))
+        #expect(!owner.calls.calls.contains("checkForUpdates"))
+    }
+
     @Test func anUpdateRefusedForWantOfAPermissionNamesItAndReadsTheGrantsAgain() async {
         let bench = bench(ready())
         bench.calls.fail("startUpdate", with: .notPermitted("instance.maintain"))
@@ -372,6 +396,19 @@ nonisolated private func record(_ name: String, hoursAgo: Int = 0) -> BackupReco
         return bench
     }
 
+    @Test func theJobsComeFromTheServerIncludingNewJobsAndFailedRuns() async {
+        let bench = bench()
+        let model = HousekeepingModel(context: bench.context)
+        bench.calls.state.withLock { $0.jobs = [] }
+        await model.load()
+        #expect(model.hasLoaded && model.listed.isEmpty)
+        let failed = job("new-job", every: 73, .failed)
+        bench.calls.state.withLock { $0.jobs = [failed] }
+        await model.load()
+        #expect(model.listed == [failed])
+        #expect(UpkeepWording.result(model.listed.first?.outcome) == "Failed")
+    }
+
     @Test func confirmingAsksFirstAndSendsNothingUntilTheOwnerAgrees() async {
         let bench = bench()
         let model = HousekeepingModel(context: bench.context)
@@ -410,11 +447,10 @@ nonisolated private func record(_ name: String, hoursAgo: Int = 0) -> BackupReco
         #expect(bench.refreshed == 1)
     }
 
-    @Test func theNeedsAPermissionLinesOfTheThreePagesAreEachTheirOwn() {
-        let lines = [MarfaSettingsPage.backups, .updates, .housekeeping].map(\.permissionLine)
-        #expect(Set(lines).count == 3)
+    @Test func upkeepPagesNameTheirPermissions() {
+        let lines = [MarfaSettingsPage.backups, .housekeeping].map(\.permissionLine)
+        #expect(Set(lines).count == 2)
         #expect(MarfaSettingsPage.backups.permission == .backupsManage)
-        #expect(MarfaSettingsPage.updates.permission == .instanceRead)
         #expect(MarfaSettingsPage.housekeeping.permission == .instanceRead)
     }
 }

@@ -24,6 +24,17 @@ import Testing
         return (adapter, libraries, source)
     }
 
+    @Test func signingOutAsksForConfirmationAndKeepsAccountOpen() async throws {
+        let (_, libraries, _) = try await connected(HostBench())
+        let launcher = SettingsLauncher()
+        launcher.show(.account)
+        let settings = AppSettingsHost(libraries: libraries, launcher: launcher)
+        settings.requestSignOut()
+        #expect(launcher.navigation.page == .account)
+        #expect(libraries.marfaSettings.isConfirmingDisconnect)
+        #expect(libraries.host.configuredConnection != nil)
+    }
+
     @Test func withNoServerSetThePagesHaveNoCopyOpen() throws {
         let bench = HostBench()
         let defaults = ThrowawayDefaults.make("MarfaSettingsHostTests")
@@ -84,7 +95,7 @@ import Testing
             scopes: ScriptedSignIns.approvedBeyondPermissions.filter { $0 != ClientOwnerCalls.registeringLinkTypes })
         await libraries.host.refreshGrants()
         #expect(adapter.grants == SystemSignIns.askedAtSignIn && libraries.host.readsProfile)
-        #expect(adapter.lacksAsked, "Overview offers Allow More…")
+        #expect(adapter.lacksAsked, "Connection offers more access")
         func account() -> ConnectionAccount {
             ConnectionAccount(
                 state: .online, grants: adapter.grants, grantsRead: true, readsProfile: libraries.host.readsProfile,
@@ -224,7 +235,8 @@ import Testing
 
     @Test func aReadRefusedForThePagesOwnPermissionSaysTheSameAsItsGateAndAnotherOneSaysItsOwn() {
         #expect(OwnerWording.permissionLine("keys.manage", on: .sources) == MarfaSettingsPage.sources.permissionLine)
-        #expect(OwnerWording.permissionLine(nil, on: .keys) == MarfaSettingsPage.keys.permissionLine)
+        #expect(MarfaSettingsPage.keys.missingPermission(in: []) == nil)
+        #expect(OwnerWording.permissionLine(nil, on: .keys) == OwnerWording.permissionLine(nil))
         #expect(OwnerWording.permissionLine("backups.manage", on: .sources) == OwnerWording.permissionLine("backups.manage"))
         #expect(OwnerWording.permissionLine("config.manage", on: .account) == OwnerWording.permissionLine("config.manage"))
     }

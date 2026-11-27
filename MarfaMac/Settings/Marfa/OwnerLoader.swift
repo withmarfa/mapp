@@ -70,8 +70,4 @@ import Observation
         }
     }
 
-    func reset() {
-        failure = nil
-        hasLoaded = false
-    }
 }

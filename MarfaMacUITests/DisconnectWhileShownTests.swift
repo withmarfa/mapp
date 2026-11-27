@@ -1,6 +1,6 @@
 import XCTest
 
-/// Disconnecting a live library from Settings while the main window shows it, with the details pane open. The
+/// Signing out of a live library from Settings while the main window shows it, with the details pane open. The
 /// window must stay open and ask for a server again, not crash on a library that is no longer there.
 ///
 /// Needs a throwaway server: it runs only with `MARFA_MAC_LEAVING_UI` set, and takes the server from `MARFA_API_URL` and
@@ -28,39 +28,39 @@ nonisolated final class DisconnectWhileShownTests: XCTestCase {
         app?.terminate()
     }
 
-    @MainActor private func disconnectFromSettings() {
+    @MainActor private func signOutFromSettings() {
         app.typeKey(",", modifierFlags: .command)
         let sidebar = app.descendants(matching: .any).matching(identifier: "SettingsSidebar").element(boundBy: 0)
         XCTAssertTrue(sidebar.waitForExistence(timeout: 5))
-        app.descendants(matching: .any).matching(identifier: "SettingsPage-connection").element(boundBy: 0).click()
-        let disconnect = app.buttons["MarfaDisconnect"]
-        XCTAssertTrue(disconnect.waitForExistence(timeout: 5))
-        let confirm = app.sheets.buttons["Disconnect"]
+        app.descendants(matching: .any).matching(identifier: "SettingsPage-account").element(boundBy: 0).click()
+        let signOut = app.buttons["AccountSignOut"]
+        XCTAssertTrue(signOut.waitForExistence(timeout: 5))
+        let confirm = app.sheets.buttons["Sign Out"]
         // A system prompt can take the first click, which the test's interruption handling answers; the question is then asked again.
         for _ in 0..<3 where !confirm.exists {
-            disconnect.click()
+            signOut.click()
             if confirm.waitForExistence(timeout: 4) { break }
         }
         XCTAssertTrue(confirm.exists, "the question was asked")
         confirm.click()
     }
 
-    /// Once the library is gone the main window asks for a server again, and Settings shows Connection's server form.
+    /// Once the library is gone the main window asks for a server again, and Connection offers to sign in.
     @MainActor private func assertLeft(_ extra: String) {
-        XCTAssertTrue(app.textFields["MarfaAddress"].waitForExistence(timeout: 20), "the window asks for a server again \(extra)")
+        XCTAssertTrue(app.buttons["MarfaOpenConnect"].waitForExistence(timeout: 20), "the window offers to sign in again \(extra)")
         XCTAssertNotEqual(app.state, .notRunning, "the app is still running")
-        XCTAssertFalse(app.buttons["MarfaDisconnect"].exists, "there is no library to disconnect from")
+        XCTAssertFalse(app.buttons["AccountSignOut"].exists, "there is no sign-in to end")
         XCTAssertFalse(app.descendants(matching: .any)["SidebarNew"].exists, "the library is gone from the window")
     }
 
-    @MainActor func testDisconnectingWhileTheWindowShowsTheLibraryLeavesTheWindowOpen() {
-        disconnectFromSettings()
+    @MainActor func testSigningOutWhileTheWindowShowsTheLibraryLeavesTheWindowOpen() {
+        signOutFromSettings()
         assertLeft("")
     }
 
-    @MainActor func testDisconnectingWithTheDetailsPaneOpenLeavesTheWindowOpen() {
+    @MainActor func testSigningOutWithTheDetailsPaneOpenLeavesTheWindowOpen() {
         app.typeKey("i", modifierFlags: [.command, .option])
-        disconnectFromSettings()
+        signOutFromSettings()
         assertLeft("with the details open")
     }
 }
