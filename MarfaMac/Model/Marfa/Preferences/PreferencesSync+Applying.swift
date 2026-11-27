@@ -19,10 +19,7 @@ extension PreferencesSync {
         if !resuming.isEmpty {
             let returning = remote.merged.filter { resuming.includes($0.key.group) }
             let replace = Set(local.units.keys.filter { resuming.includes($0.group) }).union(returning.keys)
-            // Let each store set its unreadable data aside before replacing this group's settings.
-            if local.frozen.contains(where: { resuming.includes($0.group) }) { storesReadAgain() }
-            let protected = readLocal().frozen
-            outcome.toLocal.formUnion(replace.filter { unit in !protected.contains { $0.owns(unit) } })
+            outcome.toLocal.formUnion(replace)
             outcome.merged.merge(returning) { _, shared in shared }
             let inherited = Set(returning.keys).subtracting(remote.first.keys)
             if !inherited.isEmpty { adopted.fromOtherItems = (adopted.fromOtherItems ?? []).union(inherited) }
@@ -32,14 +29,26 @@ extension PreferencesSync {
         let kept = adopted.frozen.filter { unit, _ in !retrying.contains(unit) && outcome.merged[unit] == before[unit] }
         var written = outcome.merged.filter { PreferenceJSON.value($0.value) != nil }
         for (unit, frozen) in kept { written[unit] = frozen.left }
+        var refused: PreferenceUnits = [:]
+        for unit in outcome.toLocal where resuming.includes(unit.group) || adopted.frozen[unit]?.rejected != nil {
+            guard let value = outcome.merged[unit], kept[unit] == nil,
+                  let setting = PreferencesMap.synced.first(where: { $0.owns(unit) }),
+                  !setting.reader.accepts(value, unit) else { continue }
+            if adopted.frozen[unit]?.rejected != value { setting.setAsideRejected(value, in: defaults) }
+            refused[unit] = value
+            written[unit] = local.units[unit].flatMap { setting.reader.accepts($0, unit) ? $0 : nil }
+        }
         let settings = writeLocal(outcome.toLocal, from: written)
         let held = settings.isEmpty && resuming.isEmpty ? [:] : readLocal().units
         if !settings.isEmpty {
             // A store sets aside what it cannot read, such as a value a later version of the app wrote: that is no change of the
             // person's, so the Marfa keeps it and nothing deletes it or writes its field without it.
+            let compared = Set(outcome.merged.keys).union(held.keys).union(outcome.toLocal)
             for setting in settings {
-                for unit in Set(outcome.merged.keys).union(held.keys) where setting.owns(unit) && kept[unit] == nil {
-                    if let value = written[unit], held[unit] != value {
+                for unit in compared where setting.owns(unit) && kept[unit] == nil {
+                    if let value = refused[unit] {
+                        adopted.frozen[unit] = Record.Frozen(left: held[unit], rejected: value)
+                    } else if let value = written[unit], held[unit] != value {
                         adopted.frozen[unit] = Record.Frozen(left: held[unit], rejected: resuming.includes(unit.group) ? value : nil)
                     } else {
                         adopted.frozen[unit] = nil
@@ -54,7 +63,7 @@ extension PreferencesSync {
             adopted.base = resuming.excludingFrom(adopted.base)
             adopted.base.merge(held.filter { resuming.includes($0.key.group) }) { _, value in value }
         }
-        for (unit, frozen) in kept where frozen.rejected != nil { adopted.base[unit] = frozen.left }
+        for (unit, frozen) in adopted.frozen where frozen.rejected != nil { adopted.base[unit] = nil }
         var unsent = outcome.toRemote
         if !settings.isEmpty { progress?(adopted, unsent) }
         // A field is written whole. Keep the followed item's own members outside this edit.

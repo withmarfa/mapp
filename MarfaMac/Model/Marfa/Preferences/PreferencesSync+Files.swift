@@ -70,6 +70,18 @@ extension PreferencesSync {
         return domain
     }
 
+    /// A delayed resume needs another point only if the user edited a returning setting in the meantime.
+    func protectEditsBeforeResume(_ groups: Set<PreferenceGroup>) throws(RestorePoints.Failure) {
+        guard let domain else { throw .notSaved }
+        let current = try SettingsSnapshot(of: defaults, domain: domain)
+        if let last = restorePoints.list().first(where: { $0.reason == .resumingGroup }),
+           let saved = try? restorePoints.snapshot(of: last.id),
+           PreferencesMap.synced.allSatisfy({ !groups.includes($0.group) || saved.values[$0.key] == current.values[$0.key] }) {
+            return
+        }
+        try restorePoints.save(current, reason: .resumingGroup, build: build)
+    }
+
     /// Has the stores read the defaults again after `settings` were replaced on this Mac on purpose, and marks them to
     /// win at the next step that follows the Marfa (`Record.winning`), even over another Mac's change not yet taken, but
     /// for the units `except` names by setting key, where this Mac kept what it held.

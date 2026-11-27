@@ -18,9 +18,9 @@ paths:
 | This app's settings | Settings that follow the person to another Mac, such as New Opens |
 | This Mac only | Widths, last place, playback places, recent kinds, New Item's tags and parents, any-app shortcuts, error-report consent, export plans |
 
-- **Give each setting one home**, the narrowest a person would expect. Add its key to `MacSettings.keys` and `PreferencesMap` together. Tests check coverage.
-- **The app reads the defaults**, so launch needs no network.
-- **Store only what a person chose.** A default value is left out, so a better default reaches them.
+- **Give each setting one home.** Add its key to `MacSettings.keys` and `PreferencesMap` together.
+- **Launch reads defaults offline.**
+- **Store only what a person chose** so new defaults reach them.
 - **A new member of a stored value is optional**, so older values decode.
 - **A library's own settings are named by its Marfa,** else its copy's folder. `LibrarySettings` moves earlier names' first; losers go to `Restore Points/Library Settings Set Aside/`, unreadable or undecided stay unsynced.
 
@@ -37,11 +37,15 @@ paths:
 
 ## Groups you can keep on this Mac
 
-Settings > General > Sync with This Marfa has nine switches, all on by default. Each choice belongs to one Mac and one Marfa instance.
+Settings > General > Sync with This Marfa has nine switches per Mac and Marfa instance, all on by default.
 
-With a group off, edits, removals, imports and restores stay local. Other Macs can still change the shared values.
+With a group off, edits, removals, imports and restores stay local. Other Macs can still sync.
 
-Turning a group back on saves a restore point. If saving fails, the group stays off. Once the copy is whole, the Mac reads original settings items oldest first, taking the first value found or the default. This step queues no field or row changes for the returning group. Other groups continue to sync.
+Turning a group on saves a restore point. A failed save leaves it off. The whole group neither sends nor takes changes until the copy is complete, earlier names have settled and every setting is unprotected.
+
+The Mac drops the group's sync record and reads original items oldest first, taking the first value or the default. It sends nothing for the group. Only values its readers accept and keep count as shared. Unreadable values stay in the Marfa.
+
+A conflicted copy containing an off or resuming group's settings stays for the Mac that made it, including after resume.
 
 Settings files and restore points exclude the switches. Reset clears them and preserves remote values for groups previously off.
 
@@ -59,7 +63,7 @@ Settings files and restore points exclude the switches. Reset clears them and pr
 - **Each step compares local, remote and last shared values** (`PreferencesMerge`). A drag makes one write.
 - **The record of what both hold is saved before the item is written**, so a refused write never sends another Mac's change back as this Mac's.
 - **The later write wins**, row by row and member by member. A table's change log can undo a batch from the command line.
-- **Conflicts resolve by member.** This Mac reclaims members it sent and takes the rest. It leaves copies containing off groups for other Macs.
+- **Conflicts resolve by member.** This Mac reclaims members it sent and takes the rest.
 - **After another Mac's change reaches the defaults, the stores read them again**, so open windows and shortcuts follow. A store that reads its value once joins the `reload` `Libraries` gives `PreferencesSync`.
 - **A row that no setting here owns is the Marfa's.** A later version may have written it, so it is never changed or deleted.
 

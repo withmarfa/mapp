@@ -44,7 +44,7 @@ See `docs/owner-settings.md` for Marfa pages and `docs/settings-sync.md` for sto
 
 | Page | What to know before a change |
 | --- | --- |
-| General | Reopen Windows follows the Mac until the person changes it, and only then writes `NSQuitAlwaysKeepsWindows`. Send Error Reports and Updates show only in a build that carries a destination or a feed. Sync with This Marfa chooses which groups to share with the connected Marfa |
+| General | Reopen Windows follows the Mac until changed, then writes `NSQuitAlwaysKeepsWindows`. Send Error Reports and Updates appear only in builds with a destination or feed. Sync with This Marfa chooses which settings groups to share |
 | Appearance | A color is stored as a name or a hex value. Installed fonts are listed when the page appears, never before |
 | Keyboard | Every menu command with its shortcut, and the any-app ones (`docs/commands.md`) |
 | Editor | Each change reaches an open page. Inkkit's options go as one set (`EditorOptions`), because each of its calls replaces the whole set. Edit Pages As applies to items opened next, never to the page shown |

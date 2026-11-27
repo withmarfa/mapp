@@ -354,31 +354,51 @@ final class PreferencesSync {
             guard generation == self.generation else { return }
             let originals = items.filter { !$0.isConflictedCopy }
             var record = Record.read(defaults)
-            let resuming = (record.paused?[instance] ?? []).subtracting(groups.off(in: instance))
-            let local = readLocal()
+            var local = readLocal()
+            let requested = (record.paused?[instance] ?? []).subtracting(local.off)
             let previous = record.marfas[instance]
-            let needsOthers = previous?.item != originals.first?.id || !resuming.isEmpty || previous?.fromOtherItems?.isEmpty == false
+            let needsOthers = previous?.item != originals.first?.id || !requested.isEmpty || previous?.fromOtherItems?.isEmpty == false
             var values: [PreferenceUnits] = []
             for original in originals.prefix(needsOthers ? originals.count : 1) {
                 values.append(local.off.excludingFrom(try await copy.units(of: original.id)))
             }
-            let remote = Remote(originals: values)
+            let siblings = items.filter(\.isConflictedCopy)
+            let preserved = try await conflictsToKeep(siblings, protecting: local.off.union(requested),
+                                                     previous: record.preservedConflicts?[instance] ?? [], in: copy)
             guard generation == self.generation else { return }
-            if !resuming.isEmpty {
+            if record.preservedConflicts?[instance] != (preserved.isEmpty ? nil : preserved) {
+                var conflicts = record.preservedConflicts ?? [:]
+                conflicts[instance] = preserved.isEmpty ? nil : preserved
+                record.preservedConflicts = conflicts.isEmpty ? nil : conflicts
+                record.save(defaults)
+            }
+            let all = Remote(originals: values)
+            var deferred = frozenGroups(in: requested, local: local)
+            let readyToResume = requested.subtracting(deferred)
+            if !readyToResume.isEmpty {
                 // The person may have edited these settings while the copy was filling. Protect those edits too.
-                do { try saveRestorePoint(.resumingGroup) } catch {
-                    for group in resuming { groups.set(false, for: group, in: instance) }
+                do { try protectEditsBeforeResume(readyToResume) } catch {
+                    for group in readyToResume { groups.set(false, for: group, in: instance) }
                     groupNotSaved()
                     again = true
                     return
                 }
+                let moved = EarlierPlace.settleForResume(readyToResume, remote: all.merged, in: defaults)
+                if !moved.isEmpty {
+                    deferred.formUnion(moved)
+                    again = true
+                }
             }
+            let resuming = requested.subtracting(deferred)
+            local.off.formUnion(deferred)
+            local.units = deferred.excludingFrom(local.units)
+            let remote = deferred.isEmpty ? all : Remote(originals: values.map(deferred.excludingFrom))
             for group in resuming { record.marfas[instance]?.forget(group) }
             if let adopted = record.marfas[instance] {
                 if let chosen = originals.first, chosen.id == adopted.item {
                     guard let followed = try await follow(
                         chosen, remote: remote, from: adopted, of: instance, local: local, switched: record.last != instance,
-                        resuming: resuming, winning: record.winning ?? [:], siblings: items.filter(\.isConflictedCopy), in: copy,
+                        resuming: resuming, winning: record.winning ?? [:], siblings: siblings.filter { !preserved.contains($0.id) }, in: copy,
                         generation: generation)
                     else { return }
                     record.marfas[instance] = followed
@@ -436,6 +456,28 @@ final class PreferencesSync {
             // A read or a write the copy refused leaves everything as it was; the next change tries again.
             Telemetry.logger(.sync).error("This app's settings could not sync: \(String(describing: type(of: error)), privacy: .public)")
         }
+    }
+
+    private func conflictsToKeep(_ siblings: [PreferencesItem], protecting groups: Set<PreferenceGroup>,
+                                 previous: Set<String>, in copy: any PreferencesCopy) async throws -> Set<String> {
+        var kept = previous.intersection(siblings.map(\.id))
+        for sibling in siblings where !groups.isEmpty && !kept.contains(sibling.id) {
+            if try await copy.units(of: sibling.id).keys.contains(where: { groups.includes($0.group) }) {
+                kept.insert(sibling.id)
+            }
+        }
+        return kept
+    }
+
+    private func frozenGroups(in requested: Set<PreferenceGroup>, local: Local) -> Set<PreferenceGroup> {
+        guard !requested.isEmpty else { return [] }
+        let frozen = requested.intersection(local.frozen.compactMap(\.group))
+        let unresolved = unsettled(library)
+        if local.frozen.contains(where: { frozen.includes($0.group) && !unresolved.contains($0.key) }) {
+            storesReadAgain()
+            if readLocal().frozen.count < local.frozen.count { again = true }
+        }
+        return frozen
     }
 
     /// This Mac's settings, and what each setting this Mac cannot read, or that has not yet moved to this library's
@@ -625,9 +667,7 @@ final class PreferencesSync {
             }
             record.save(defaults)
         }
-        for sibling in siblings where resuming.isEmpty {
-            // Another Mac can still use the conflicted values of a group this Mac leaves alone.
-            if !local.off.isEmpty, try await copy.units(of: sibling.id).keys.contains(where: { local.off.includes($0.group) }) { continue }
+        for sibling in siblings {
             _ = try await copy.remove(sibling.id)
         }
         item = chosen

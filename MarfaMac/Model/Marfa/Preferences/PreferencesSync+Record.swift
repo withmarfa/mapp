@@ -58,6 +58,8 @@ extension PreferencesSync {
         }
 
         var marfas: [String: Adopted] = [:]
+        /// Copies left for the Mac that made them while a group was off, until that Mac removes them.
+        var preservedConflicts: [String: Set<String>]?
         /// Groups that must take this Marfa's settings when next enabled with a whole copy.
         var paused: [String: Set<PreferenceGroup>]?
         var last: String?
