@@ -471,7 +471,7 @@ import Testing
         await model.disconnect()
         #expect(!model.isConnected)
         #expect(bench.savedAddress == nil)
-        #expect(model.notice?.title == "Disconnected, but This App May Still Be Approved")
+        #expect(model.notice?.title == "Signed Out, but This App May Still Be Approved")
     }
 
     /// A sign-out that waits on a server that does not answer holds the step for up to a minute: the person is shown

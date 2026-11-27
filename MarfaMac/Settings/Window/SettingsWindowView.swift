@@ -61,7 +61,6 @@ struct SettingsWindowView: View {
         .interfaceTextStyle()
         .appAccent()
         .environment(\.settingsTextScale, InterfaceStyle.scale(for: textSize))
-        .environment(libraries)
         .environment(libraries.host)
         .environment(\.library, libraries.current)
         .containerBackground(SettingsTokens.page, for: .window)
@@ -76,6 +75,10 @@ struct SettingsWindowView: View {
                 DepartureSheet(model: libraries.marfaSettings, departure: departure)
             }
         }
+        .modifier(SignOutPresentation(model: libraries.marfaSettings) {
+            if case .marfa = navigation.page { navigation.show(.connection) }
+        })
+        .environment(libraries)
         .environment(\.settingsSheets, sheets)
         .settingsSheet(isPresented: sheets.isPresented, dismiss: { sheets.dismiss() }) {
             if let content = sheets.content { content }

@@ -30,8 +30,27 @@ struct DepartureSheet: View {
         model.host.configuredConnection.map { model.host.location.directory(for: $0).path } ?? ""
     }
 
+    private var title: Text {
+        guard isDisconnecting, let count = departure.unsent?.count else { return Text("Changes Haven’t Been Sent") }
+        return count == 1 ? Text("1 Change Hasn’t Been Sent") : Text("\(count) Changes Haven’t Been Sent")
+    }
+
+    private var explanation: Text {
+        if !canDiscard {
+            Text("Keep the copy and the changes stay on this Mac.")
+        } else if isOtherVersion {
+            Text("Keep the copy and the changes stay on this Mac. Install the previous version of the app and connect it to the same server, and it sends them. Discard the copy and they’re lost.")
+        } else if !isDisconnecting {
+            Text("Keep the copy and the changes stay on this Mac. Connect to the same server again and they’re sent. Discard the copy and they’re lost.")
+        } else if departure.unsent?.count == 1 {
+            Text("Keep the copy and the change is sent when you sign in to this Marfa again. Discard it and the change is lost.")
+        } else {
+            Text("Keep the copy and they’re sent when you sign in to this Marfa again. Discard it and they’re lost.")
+        }
+    }
+
     var body: some View {
-        SettingsSheet(title: Text("Changes Haven’t Been Sent"), isWide: true) {
+        SettingsSheet(title: title, line: explanation, isWide: true) {
             VStack(alignment: .leading, spacing: SettingsTokens.Metric.sheetSpacing) {
                 if departure.isAskedAgain {
                     Text("More changes arrived while you were deciding. Look at them before you choose.")
@@ -39,23 +58,11 @@ struct DepartureSheet: View {
                         .foregroundStyle(SettingsTokens.warning)
                 }
                 if let unsent = departure.unsent {
-                    Text(Words.notSent(unsent.count)).settingsFont(.title)
+                    if !isDisconnecting { Text(Words.notSent(unsent.count)).settingsFont(.title) }
                     changes(unsent)
                 } else {
                     Text(Words.cannotDiscard(folder: copyFolder)).settingsFont(.title)
                 }
-                Group {
-                    if !canDiscard {
-                        Text("Keep the copy and the changes stay on this Mac.")
-                    } else if isOtherVersion {
-                        Text("Keep the copy and the changes stay on this Mac. Install the previous version of the app and connect it to the same server, and it sends them. Discard the copy and they’re lost.")
-                    } else {
-                        Text("Keep the copy and the changes stay on this Mac. Connect to the same server again and they’re sent. Discard the copy and they’re lost.")
-                    }
-                }
-                .settingsFont(.small)
-                .foregroundStyle(SettingsTokens.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
                 if departure.holdsSettingsRemoval {
                     Text(verbatim: words.removalWaiting)
                         .settingsFont(.small)
@@ -64,18 +71,16 @@ struct DepartureSheet: View {
                         .accessibilityIdentifier("DepartureRemovalWaiting")
                 }
                 if isDisconnecting, model.offersSettingsRemoval {
-                    Toggle(words.disconnectChoice, isOn: Bindable(model).alsoRemovesSettings)
-                        .toggleStyle(.checkbox)
-                        .accessibilityIdentifier("DepartureRemoveSettings")
-                    Text(verbatim: words.sendsWaitingChanges)
-                        .settingsFont(.small)
-                        .foregroundStyle(SettingsTokens.secondaryText)
-                        .fixedSize(horizontal: false, vertical: true)
+                    SettingsCheckRow(
+                        verbatim: words.signOutChoice, line: words.sendsWaitingChanges,
+                        isOn: Bindable(model).alsoRemovesSettings
+                    )
+                    .accessibilityIdentifier("DepartureRemoveSettings")
                 }
             }
         } leading: {
             if canDiscard {
-                SettingsButton(isDisconnecting ? "Discard Changes and Disconnect" : "Discard Changes and Switch", role: .destructive) {
+                SettingsButton(isDisconnecting ? "Discard and Sign Out" : "Discard Changes and Switch", role: .destructive) {
                     Task { await model.answer(.discardCopy) }
                 }
                 .disabled(model.alsoRemovesSettings)
@@ -87,7 +92,7 @@ struct DepartureSheet: View {
                 .accessibilityIdentifier("DepartureCancel")
             // With the settings' removal ticked it deletes from the Marfa, so Return must not press it.
             SettingsButton(
-                isDisconnecting ? "Keep Copy and Disconnect" : "Keep Copy and Switch", role: model.alsoRemovesSettings ? .normal : .confirm
+                isDisconnecting ? "Keep Copy and Sign Out" : "Keep Copy and Switch", role: model.alsoRemovesSettings ? .normal : .confirm
             ) {
                 Task { await model.answer(.keepCopy) }
             }
@@ -99,27 +104,37 @@ struct DepartureSheet: View {
 
     @ViewBuilder private func changes(_ unsent: UnsentChanges) -> some View {
         if !unsent.texts.isEmpty {
-            ScrollView {
-                VStack(alignment: .leading, spacing: SettingsTokens.Metric.sheetListSpacing) {
-                    ForEach(unsent.texts) { text in
-                        VStack(alignment: .leading, spacing: SettingsTokens.Metric.sheetChangeSpacing) {
-                            Text(text.content.plainText)
-                                .textSelection(.enabled)
-                                .lineLimit(SettingsTokens.Metric.sheetTextLines)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            SettingsButton("Copy Text", small: true) { copy(text.content.plainText) }
-                        }
-                        .padding(SettingsTokens.Metric.sheetChangePadding)
-                        .background(SettingsTokens.buttonFill, in: .rect(cornerRadius: SettingsTokens.Metric.sheetChangeRadius))
+            SettingsCard {
+                ForEach(unsent.texts) { text in
+                    let operation = wording(for: text.change)
+                    let words = changeWords(text.content, operation: operation.title)
+                    SettingsRow(title: words.title, line: words.line, lead: operation.lead, lines: nil) {
+                        SettingsButton("Copy Text", small: true) { copy(text.content.plainText) }
                     }
+                    .textSelection(.enabled)
                 }
             }
-            .frame(maxHeight: SettingsTokens.Metric.sheetListMaxHeight)
         }
         if unsent.count > unsent.texts.count {
             Text(Words.moreNotShown(unsent.count - unsent.texts.count))
                 .settingsFont(.small)
                 .foregroundStyle(SettingsTokens.secondaryText)
+        }
+    }
+
+    private func changeWords(_ content: SyncContent, operation: Text) -> (title: Text, line: Text) {
+        guard let title = content.title, !title.isEmpty else { return (operation, Text(verbatim: content.plainText)) }
+        var rest = content
+        rest.title = nil
+        let detail = rest.plainText
+        return (Text(verbatim: title), detail.isEmpty ? operation : Text("\(operation)\n\(detail)"))
+    }
+
+    private func wording(for change: SyncProblemEntry.Change) -> (title: Text, lead: SettingsLead) {
+        switch change {
+        case .create: (Text("Created"), .symbol("plus"))
+        case .edit: (Text("Edited"), .symbol("pencil"))
+        default: (Text("Unsent change"), .none)
         }
     }
 

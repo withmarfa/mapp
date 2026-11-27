@@ -85,6 +85,8 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
     var otherAddress = ""
     var showsConnectSheet = false
     private(set) var notice: Notice?
+    private var wasSigningOut = false
+    var signOutNotice: Notice? { wasSigningOut ? notice : nil }
     private(set) var isWorking = false
     private(set) var isAllowingMore = false
 
@@ -258,6 +260,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
     /// A disconnect with nothing waiting is confirmed once, since it ends the sign-in. With changes waiting, the
     /// question about them is the confirmation, so it is not asked twice.
     func requestDisconnect() {
+        guard !isWorking else { return }
         offersSettingsRemoval = settingsKept?.isKept() ?? false
         alsoRemovesSettings = false
         settingsRemovalFailure = nil
@@ -387,7 +390,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
             switch reached {
             case .left:
                 Notice(
-                    title: String(localized: "Disconnected, but Not Everything Was Removed"),
+                    title: String(localized: "Signed Out, but Not Everything Was Removed"),
                     message: withApproval(removalMessage(signIn: signIn, copy: copy), approvalAt, .left))
             case .switched:
                 Notice(
@@ -502,7 +505,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         let message = withApproval(told, approvalAt, .left)
         switch reached {
         case .left:
-            return Notice(title: String(localized: "Disconnected, but the Copy Was Kept"), message: message)
+            return Notice(title: String(localized: "Signed Out, but the Copy Was Kept"), message: message)
         case .switched:
             return Notice(title: String(localized: "Switched Servers, but the Copy Was Kept"), message: message)
         case .notOpened, .signedInAgain:
@@ -566,6 +569,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
             code = nil
         }
         notice = nil
+        if case .leaving = step { wasSigningOut = true } else { wasSigningOut = false }
         lastEnding = nil
         do {
             try await work()
