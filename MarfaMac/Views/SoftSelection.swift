@@ -146,7 +146,9 @@ struct SoftSelection: NSViewRepresentable {
         private let hoverMark: CALayer?
         private var pointerIsOver = false
         private var placedHover: (frame: NSRect?, color: CGColor)?
-        /// The separators hidden beside the hovered row, which AppKit hides beside a chosen row but leaves beside any other.
+        /// The separators this code hid beside the hovered row, which AppKit hides beside a chosen row but leaves beside
+        /// any other. Only a separator that was showing is hidden and recorded, so one AppKit or SwiftUI hid
+        /// (beside a chosen row, under a heading, at a section's end) is never shown by this code.
         private var hiddenSeparators: [Weak<NSView>] = []
         /// The rows the pointer gets no mark on. SwiftUI's table answers nothing to `shouldSelectRow` for a row it will
         /// not select, so the lists name their headings themselves.
@@ -297,23 +299,36 @@ struct SoftSelection: NSViewRepresentable {
         }
 
         /// Hides the lines under the row at `row` and above it, so that no line runs along the edge of the hovered mark, as
-        /// none does along a chosen one. Every other row's line is shown again, which also covers a row view the table
-        /// has reused for another row since. A row view's separator is a subview of its own that the system makes, found
-        /// by its class's name; where there is none, the lines stay.
+        /// none does along a chosen one. Those it hid for another row are shown again, which also covers a row view the
+        /// table has reused for another row since. A row view's separator is a subview of its own that the system
+        /// makes, found by its class's name; where there is none, the lines stay.
         private func hideSeparators(besideRow row: Int) {
-            var hidden: [NSView] = []
+            var wanted: [NSView] = []
             if row >= 0, let table {
                 for index in [row - 1, row] where index >= 0 {
-                    if let separator = table.rowView(atRow: index, makeIfNecessary: false)?.subviews.first(where: Self.isSeparator) {
-                        hidden.append(separator)
+                    if let rowView = table.rowView(atRow: index, makeIfNecessary: false), let separator = Self.bottomSeparator(of: rowView) {
+                        wanted.append(separator)
                     }
                 }
             }
+            var kept: [Weak<NSView>] = []
             for entry in hiddenSeparators {
-                if let view = entry.object, !hidden.contains(where: { $0 === view }) { view.isHidden = false }
+                guard let view = entry.object else { continue }
+                if wanted.contains(where: { $0 === view }) { kept.append(entry) } else { view.isHidden = false }
             }
-            hidden.forEach { $0.isHidden = true }
-            hiddenSeparators = hidden.map(Weak.init)
+            for view in wanted where !view.isHidden {
+                view.isHidden = true
+                kept.append(Weak(view))
+            }
+            hiddenSeparators = kept
+        }
+
+        /// The line at a row view's foot: of the separator subviews it holds, the one lowest on screen.
+        private static func bottomSeparator(of rowView: NSTableRowView) -> NSView? {
+            let separators = rowView.subviews.filter(isSeparator)
+            return rowView.isFlipped
+                ? separators.max { $0.frame.midY < $1.frame.midY }
+                : separators.min { $0.frame.midY < $1.frame.midY }
         }
 
         private static func isSeparator(_ view: NSView) -> Bool {

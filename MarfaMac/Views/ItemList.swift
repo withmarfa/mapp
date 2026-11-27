@@ -118,7 +118,8 @@ struct ItemList: View, Equatable {
                 let nest = nesting[line.id]
                 let row = ListLineRow(
                     line: line, content: contents[line.id], density: density, excerpt: excerpts[line.id], browser: browser,
-                    fold: browser.listShape?.arranged == true ? { browser.toggleGroup($0, in: library) } : nil, nest: nest, order: order)
+                    fold: browser.listShape?.arranged == true ? { browser.toggleGroup($0, in: library) } : nil, nest: nest,
+                    nests: !nesting.isEmpty, order: order)
                 .selectionDisabled(line.itemID == nil)
                 .listRowSeparator(line.itemID == nil ? .hidden : .automatic, edges: .top)
                 .listRowSeparator(line.isHeading || line.endsSection || line.drawsMore != nil ? .hidden : .automatic, edges: .bottom)
@@ -177,6 +178,8 @@ private struct ListLineRow: View {
     var fold: ((String) -> Void)?
     /// Where the item stands among its parents, where the list nests it.
     var nest: ItemNesting.Place?
+    /// Whether the list nests anywhere, so that an item in a section with no sub-items keeps the titles' edge.
+    var nests = false
     let order: ItemOrder
 
     var body: some View {
@@ -210,7 +213,7 @@ private struct ListLineRow: View {
                 ItemRow(content: content, density: density, excerpt: excerpt, itemID: line.id)
                     .wantsCounts(of: line.id, content.countQueries, in: library.counts)
                     .hoverQuickActions(for: line.id, actions: browser.quickActions(for: item))
-                    .nested(nest) { browser.toggleSubItems(of: line.id, in: library, order: order) }
+                    .nested(nest, listNests: nests) { browser.toggleSubItems(of: line.id, in: library, order: order) }
             }
         }
     }
@@ -219,15 +222,21 @@ private struct ListLineRow: View {
 extension View {
     /// A list row under its parent: stood in by its depth, with the chevron of a parent before it (`SubItemDisclosure`),
     /// inside the row's own space, so that it is inside the card and takes a click. How many sub-items are done is the
-    /// type's look's to say, as a progress count, as on a card.
-    @ViewBuilder fileprivate func nested(_ nest: ItemNesting.Place?, toggle: @escaping () -> Void) -> some View {
+    /// type's look's to say, as a progress count, as on a card. Where the list nests anywhere, a row of a section with
+    /// no sub-items keeps the room of the chevron, so every section's titles and lines share one edge.
+    @ViewBuilder fileprivate func nested(_ nest: ItemNesting.Place?, listNests: Bool, toggle: @escaping () -> Void) -> some View {
         if let nest {
             HStack(spacing: SubItemDisclosure.gap) {
                 SubItemDisclosure(place: nest, toggle: toggle)
                 self
             }
             .padding(.leading, CGFloat(nest.depth) * SubItemDisclosure.indent)
-            // The line under a row starts at its parents' titles, not at its own: every depth's line starts at one inset.
+            .alignmentGuide(.listRowSeparatorLeading) { _ in SubItemDisclosure.width + SubItemDisclosure.gap }
+        } else if listNests {
+            HStack(spacing: SubItemDisclosure.gap) {
+                Color.clear.frame(width: SubItemDisclosure.width, height: 1).accessibilityHidden(true)
+                self
+            }
             .alignmentGuide(.listRowSeparatorLeading) { _ in SubItemDisclosure.width + SubItemDisclosure.gap }
         } else {
             self
