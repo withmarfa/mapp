@@ -29,7 +29,7 @@ struct FileStoragePage: View {
 
     private func content(_ catalog: LimitsModel?) -> some View {
         SettingsPageColumn {
-            if let catalog, let notice = catalog.notice { OwnerNotice(title: "Changed Elsewhere", line: notice, close: { catalog.dismissNotice() }) }
+            if let catalog, let notice = catalog.notice { OwnerNotice(title: "Changed elsewhere", line: notice, close: { catalog.dismissNotice() }) }
             usage
             files(catalog)
             SettingsSection("Versions", footer: "A type can keep its own.") {
@@ -98,15 +98,25 @@ struct FileStoragePage: View {
                     retry: { Task { await storage.loadUsage() } })
             }
         } else if let reading = storage.usage {
-            SettingsSection(name: Text(verbatim: Self.used(reading))) {
-                SettingsStorageBar(
-                    parts: reading.parts.map { .init(name: $0.kind.title, tone: Self.tone($0.kind), bytes: $0.bytes) },
-                    freeBytes: reading.freeBytes, freeName: String(localized: "Free on disk"), label: Self.label(reading))
-            }
+            usageReading(reading)
         } else {
             SettingsSection("Storage") {
                 SettingsRow("Reading storage usage…") { ProgressView().controlSize(.small) }
             }
+        }
+    }
+
+    /// The amount and the bar sit on the page. The shared bar already carries its own inset, so it needs no card.
+    private func usageReading(_ reading: StorageBar.Reading) -> some View {
+        VStack(alignment: .leading, spacing: SettingsTokens.Metric.sectionGap) {
+            Text(verbatim: Self.used(reading))
+                .settingsFont(.sectionName)
+                .accessibilityAddTraits(.isHeader)
+                .frame(maxWidth: .infinity, minHeight: SettingsTokens.Metric.sectionHeader, alignment: .bottomLeading)
+                .padding(.horizontal, SettingsTokens.Metric.inset)
+            SettingsStorageBar(
+                parts: reading.parts.map { .init(name: $0.kind.title, tone: Self.tone($0.kind), bytes: $0.bytes) },
+                freeBytes: reading.freeBytes, freeName: String(localized: "Free on disk"), label: Self.label(reading))
         }
     }
 
@@ -206,6 +216,8 @@ struct FileStoragePage: View {
     }
 
     static func found(_ date: Date?, now: Date = .now, calendar: Calendar = .current) -> String? {
-        date.map { String(localized: "Found \(OwnerWording.day($0, now: now, calendar: calendar))") }
+        guard let date else { return nil }
+        let when = OwnerWording.when(date, now: now, calendar: calendar) ?? OwnerWording.day(date, now: now, calendar: calendar)
+        return String(localized: "Found \(when)")
     }
 }

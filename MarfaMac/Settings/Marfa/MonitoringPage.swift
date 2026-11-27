@@ -36,7 +36,7 @@ struct MonitoringPage: View {
             OwnerFailureState(page: .monitoring, failure: failure, host: host) { Task { await model.load() } }
         } else if model.isLoaded {
             SettingsPageColumn {
-                if let notice = model.notice { OwnerNotice(title: "Changed Elsewhere", line: notice, close: { model.dismissNotice() }) }
+                if let notice = model.notice { OwnerNotice(title: "Changed elsewhere", line: notice, close: { model.dismissNotice() }) }
                 SettingsSection("Heartbeat") {
                     switchRow(
                         "Send a heartbeat", key: "heartbeat_enabled", hasReceiver: model.heartbeatHasReceiver,

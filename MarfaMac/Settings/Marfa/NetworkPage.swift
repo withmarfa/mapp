@@ -64,7 +64,7 @@ struct NetworkPage: View {
                         SettingsButton("Change…") { model.begin(.changeSignIn) }
                     }
                 }
-                if let failure = model.rowErrors[settings.signIn] { OwnerProblem(title: "Not Changed", failure: failure, page: .network, host: host) }
+                if let failure = model.rowErrors[settings.signIn] { OwnerProblem(title: "Not changed", failure: failure, page: .network, host: host) }
                 SettingsSection("Other Addresses", footer: "This Marfa answers on these too.") {
                     SettingsButton("Add Address…") { model.begin(.addAddress) }
                 } content: {
@@ -98,7 +98,7 @@ struct NetworkPage: View {
     }
 
     @ViewBuilder private var networkSection: some View {
-        if let notice = network.notice { OwnerNotice(title: "Changed Elsewhere", line: notice, close: { network.dismissNotice() }) }
+        if let notice = network.notice { OwnerNotice(title: "Changed elsewhere", line: notice, close: { network.dismissNotice() }) }
         if network.isLoaded || network.failure != nil { networkRows }
     }
 

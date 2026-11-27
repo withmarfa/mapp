@@ -74,12 +74,11 @@ import Observation
         origin.hasPrefix("https://") ? String(origin.dropFirst(8)) : origin
     }
 
-    /// What kind of address a row is, where that can be told from the address.
+    /// What kind of address a row is, where that can be told from the address. A numeric address already says what it is.
     static func kind(of origin: String) -> String? {
         let host = URLComponents(string: origin)?.host ?? display(origin)
         if host.hasSuffix(".local") { return String(localized: "On the local network.") }
-        let isNumber = host.split(separator: ".").count == 4 && host.split(separator: ".").allSatisfy { Int($0) != nil }
-        return isNumber || host.contains(":") ? String(localized: "An IP address.") : nil
+        return nil
     }
 
     // MARK: Reading
