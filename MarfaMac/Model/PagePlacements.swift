@@ -79,19 +79,27 @@ nonisolated struct PagePlacements: Equatable, Sendable {
         }
     }
 
-    /// By type identifier.
-    private(set) var choices: [String: Choice]
+    /// Multiple spellings of the same key survive an edit to another type.
+    private var entries: [String: [PlacementEntry]] = [:]
+
+    var choices: [String: Choice] {
+        entries.compactMapValues { $0.first?.choice }.filter { !$0.value.isEmpty }
+    }
 
     init(_ choices: [String: Choice] = [:]) {
-        self.choices = choices.filter { !$0.value.isEmpty }
+        for (key, choice) in choices where !choice.isEmpty {
+            if let entry = PlacementEntry(key: key, choice: choice) { entries[key] = [entry] }
+        }
     }
+
+    private func choice(for type: TypeID) -> Choice? { entries[type.rawValue]?.first?.choice }
 
     /// How the page treats items of `type`: the person's choice over the defaults.
     func placement(of type: TypeID, in catalogue: Catalogue) -> PagePlacement {
-        PagePlacement(type: type, catalogue: catalogue, choice: choices[type.rawValue] ?? Choice())
+        PagePlacement(type: type, catalogue: catalogue, choice: choice(for: type) ?? Choice())
     }
 
-    func hasChoice(for type: TypeID) -> Bool { choices[type.rawValue] != nil }
+    func hasChoice(for type: TypeID) -> Bool { choice(for: type).map { !$0.isEmpty } ?? false }
 
     /// The properties pinned for `type`, in order: the person's list, or the default pins with none chosen. At most
     /// four, none twice. An identifier the type no longer has stays in the list, and the page skips it.
@@ -173,7 +181,7 @@ nonisolated struct PagePlacements: Equatable, Sendable {
     mutating func setDraggedOrder(_ order: [String], of type: TypeID) {
         var merged = PagePlacement.unique(order)
         let named = Set(merged)
-        let saved = choices[type.rawValue]?.rowOrder ?? []
+        let saved = choice(for: type)?.rowOrder ?? []
         for (at, row) in saved.enumerated() where !named.contains(row) && !merged.contains(row) {
             if at > 0, let after = merged.firstIndex(of: saved[at - 1]) {
                 merged.insert(row, at: after + 1)
@@ -191,7 +199,7 @@ nonisolated struct PagePlacements: Equatable, Sendable {
     mutating func moveRow(_ row: String, among visible: [String], of type: TypeID) {
         let visible = PagePlacement.unique(visible)
         guard let at = visible.firstIndex(of: row) else { return }
-        var order = PagePlacement.unique((choices[type.rawValue]?.rowOrder ?? []) + visible)
+        var order = PagePlacement.unique((choice(for: type)?.rowOrder ?? []) + visible)
         order.removeAll { $0 == row }
         // After the row it now follows on the page, or, first of all, before the one it now precedes.
         if at > 0, let after = order.firstIndex(of: visible[at - 1]) {
@@ -213,53 +221,58 @@ nonisolated struct PagePlacements: Equatable, Sendable {
 
     /// Takes back every choice for the type, so it follows the defaults again.
     mutating func reset(_ type: TypeID) {
-        choices[type.rawValue] = nil
+        if hasChoice(for: type) { entries[type.rawValue] = nil }
     }
 
     private mutating func update(_ type: TypeID, _ change: (inout Choice) -> Void) {
-        var choice = choices[type.rawValue] ?? Choice()
-        change(&choice)
-        choices[type.rawValue] = choice.isEmpty ? nil : choice
+        let previous = choice(for: type) ?? Choice()
+        var edited = previous
+        change(&edited)
+        guard edited != previous else { return }
+        if edited.isEmpty {
+            entries[type.rawValue] = nil
+        } else if let entry = PlacementEntry(key: type.rawValue, choice: edited) {
+            entries[type.rawValue] = [entry]
+        }
     }
 }
 
-/// The choice as `@AppStorage` keeps it: JSON with sorted keys, so the same choice is the same text.
 nonisolated extension PagePlacements: RawRepresentable {
     var rawValue: String {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys]
-        return (try? encoder.encode(choices)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+        "{" + entries.keys.sorted().flatMap { entries[$0, default: []].map(\.text) }.joined(separator: ",") + "}"
     }
 
     init?(rawValue: String) {
-        guard let choices = try? JSONDecoder().decode([String: Choice].self, from: Data(rawValue.utf8)) else { return nil }
-        self.init(choices)
-    }
-}
-
-nonisolated extension PagePlacements {
-    private struct ReadableChoice: Decodable {
-        let value: Choice?
-
-        init(from decoder: any Decoder) {
-            value = try? Choice(from: decoder)
-        }
+        guard let entries = PlacementEntry.read(rawValue) else { return nil }
+        self.entries = entries
     }
 
     static func stored(in defaults: UserDefaults = .standard) -> PagePlacements {
-        guard let text = defaults.string(forKey: key),
-              let entries = try? JSONDecoder().decode([String: ReadableChoice].self, from: Data(text.utf8)) else { return PagePlacements() }
-        return PagePlacements(entries.compactMapValues(\.value))
+        defaults.string(forKey: key).flatMap(Self.init(rawValue:)) ?? PagePlacements()
     }
 
     static func update(in defaults: UserDefaults = .standard, _ change: (inout PagePlacements) -> Void) {
-        // This write replaces every type's choices, so text it could not read is kept rather than lost.
-        if let text = defaults.string(forKey: key), PagePlacements(rawValue: text) == nil {
-            defaults.set((defaults.stringArray(forKey: setAsideKey) ?? []) + [text], forKey: setAsideKey)
+        let text = defaults.string(forKey: key)
+        let original = text.flatMap(Self.init(rawValue:))
+        let previous = original ?? PagePlacements()
+        var edited = previous
+        change(&edited)
+        guard edited.entries != previous.entries else { return }
+        if let text { setAsideUnreadable(in: original, text: text, defaults: defaults) }
+        defaults.set(edited.rawValue, forKey: key)
+    }
+
+    private static func setAsideUnreadable(in original: Self?, text: String, defaults: UserDefaults) {
+        var copies = defaults.stringArray(forKey: setAsideKey) ?? []
+        if let original {
+            let unreadable = original.entries.filter { $0.value.contains { $0.choice == nil } }
+            guard !unreadable.isEmpty else { return }
+            // Siblings stay in the active document. Back them up once, even across repeated edits.
+            let last = copies.last.flatMap(Self.init(rawValue:))
+            if unreadable.allSatisfy({ last?.entries[$0.key] == $0.value }) { return }
         }
-        var value = stored(in: defaults)
-        change(&value)
-        defaults.set(value.rawValue, forKey: key)
+        copies.append(text)
+        defaults.set(copies, forKey: setAsideKey)
     }
 }
 

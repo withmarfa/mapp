@@ -102,7 +102,8 @@ struct PagePlacementsTests {
     @Test func textThatIsNotAChoiceIsNotOne() {
         #expect(PagePlacements(rawValue: "not json") == nil)
         #expect(PagePlacements(rawValue: "[]") == nil)
-        #expect(PagePlacements(rawValue: #"{"aic.ticket":{"linkedFrom":"somewhere"}}"#) == nil)
+        let unknown = PagePlacements(rawValue: #"{"aic.ticket":{"linkedFrom":"somewhere"}}"#)
+        #expect(unknown?.hasChoice(for: Self.ticket) == false, "an unreadable choice follows the default")
     }
 
     @Test func aMemberThisVersionDoesNotReadSurvivesARewrite() throws {
@@ -199,7 +200,7 @@ struct PagePlacementsTests {
 
     @Test func aChoiceSavedAsShownOrHiddenIsReadOnceAsThreeStatesWithNothingLost() throws {
         let old = #"{"aic.comment":{"rows":{"github_id":true}},"aic.ticket":{"linkedFrom":"page","pins":["repo"],"rowOrder":["repo"],"rows":{"repo":false}}}"#
-        let placements = try #require(PagePlacements(rawValue: old))
+        var placements = try #require(PagePlacements(rawValue: old))
         let ticket = try #require(placements.choices["aic.ticket"])
         #expect(ticket.shows == ["repo": .hidden])
         #expect(ticket.linkedFrom == .page)
@@ -210,6 +211,8 @@ struct PagePlacementsTests {
         #expect(placements.placement(of: Self.comment, in: Self.catalogue).shows("github_id") == .whenSet)
         #expect(placements.placement(of: Self.comment, in: Self.catalogue).shows("other_id") == .whenSet)
         // Written with `shows`, and `rows` beside it for an older copy, and read the same way again.
+        #expect(placements.rawValue == old)
+        placements.setPins(["state"], of: Self.ticket)
         let written = placements.rawValue
         #expect(written.contains(#""shows":{"repo":"hidden"}"#))
         #expect(written.contains(#""rows":{"repo":false}"#))
@@ -358,6 +361,23 @@ struct PagePlacementsTests {
         #expect(placements.pins(of: Self.task, in: Self.catalogue) == ["state", "child-of"])
         #expect(!placements.hasChoice(for: Self.task))
         #expect(placements.hasChoice(for: Self.ticket))
+    }
+
+    @Test func resettingALookLeavesThatTypesUnreadablePageEntryAlone() {
+        let defaults = ThrowawayDefaults.make("PagePlacementsTests.unreadableReset")
+        let stored = #"{"aic.ticket":{"pins":false}}"#
+        defaults.set(stored, forKey: PagePlacements.key)
+        PagePlacements.update(in: defaults) { $0.reset(Self.ticket) }
+        #expect(defaults.string(forKey: PagePlacements.key) == stored)
+        #expect(defaults.object(forKey: PagePlacements.setAsideKey) == nil)
+    }
+
+    @Test func aWriteSetsAsideAnUnreadableWholeDocument() {
+        let defaults = ThrowawayDefaults.make("PagePlacementsTests.brokenDocument")
+        defaults.set("{not json", forKey: PagePlacements.key)
+        PagePlacements.update(in: defaults) { $0.setPins(["repo"], of: Self.ticket) }
+        #expect(defaults.stringArray(forKey: PagePlacements.setAsideKey) == ["{not json"])
+        #expect(PagePlacements.stored(in: defaults).pins(of: Self.ticket, in: Self.catalogue) == ["repo"])
     }
 
     @Test func storedTextThatCannotBeReadIsSetAsideBeforeItIsWrittenOver() throws {

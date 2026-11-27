@@ -61,21 +61,42 @@ struct LayoutsTests {
 
     // MARK: The page
 
-    @Test func aLayoutWriteKeepsUnreadablePlacementsUnderTheirKey() throws {
+    @Test(arguments: [false, true])
+    func editingNotesChangesOnlyItsSyncedRow(reset: Bool) throws {
         let defaults = ThrowawayDefaults.make("LayoutsTests.setAside")
-        let mixed = #"{"core.note":{"pins":["author"]},"missing.type":{"pins":42},"core.task":{"pins":["priority"]}}"#
+        let unreadable = #""missing\u002etype" : { "pins" : 4.20e1, "extra": ["},\"", null] }"#
+        let readable = #""core.task" : { "pins": ["prior\u0069ty"] }"#
+        let mixed = #"{"core.note":{"pins":["author"]},\#(unreadable),\#(readable)}"#
         defaults.set(mixed, forKey: PagePlacements.key)
+        let setting = try #require(PreferencesMap.synced.first { $0.key == PagePlacements.key })
+        func rows() throws -> PreferenceUnits {
+            guard case .units(let units) = setting.read(defaults, library: server) else {
+                throw CocoaError(.coderReadCorrupt)
+            }
+            return units
+        }
+        let base = try rows()
         let page = layoutPage(note, defaults: defaults)
         #expect(page.hasChanges)
-        #expect(defaults.object(forKey: PagePlacements.setAsideKey) == nil, "reading alone leaves the stored document untouched")
-        page.restore()
-        let saved = try #require(defaults.stringArray(forKey: PagePlacements.setAsideKey)?.last)
-        #expect(saved == mixed)
-        let entries = try #require(JSONSerialization.jsonObject(with: Data(saved.utf8)) as? [String: Any])
-        #expect(entries["missing.type"] as? [String: Int] == ["pins": 42])
-        let remaining = PagePlacements.stored(in: defaults)
-        #expect(!remaining.hasChoice(for: note))
-        #expect(remaining.pins(of: task, in: catalogue) == ["priority"])
+        #expect(defaults.object(forKey: PagePlacements.setAsideKey) == nil)
+        if reset { page.restore() } else { page.pin("date") }
+
+        let active = try #require(defaults.string(forKey: PagePlacements.key))
+        #expect(active.contains(unreadable))
+        #expect(active.contains(readable))
+        #expect(defaults.stringArray(forKey: PagePlacements.setAsideKey) == [mixed])
+        let merge = try PreferencesMerge.reconcile(local: rows(), remote: base, base: base)
+        let notes = PreferenceUnit.row(.types, setting: PagePlacements.key, key: note.rawValue)
+        #expect(merge.toRemote == [notes])
+        let other = PreferenceUnit.row(.types, setting: PagePlacements.key, key: "missing.type")
+        #expect(merge.merged[other] == base[other])
+        page.pin("tags")
+        #expect(defaults.stringArray(forKey: PagePlacements.setAsideKey) == [mixed])
+        if reset {
+            #expect(merge.merged[notes] == nil)
+        } else {
+            #expect(merge.merged[notes] == #"{"pins":["author","date"],"rows":{}}"#)
+        }
     }
 
     @Test func pinsAndLinkedFromAreReadBackFromThePlacementsStore() {

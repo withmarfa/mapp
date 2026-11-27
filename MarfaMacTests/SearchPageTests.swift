@@ -2,6 +2,7 @@ import Foundation
 import Marfa
 import MarfaTesting
 import Synchronization
+import SwiftUI
 import Testing
 @testable import MarfaMac
 
@@ -59,6 +60,42 @@ import Testing
         store.update("marfa:a") { $0.sources = ["gone", "github"]; $0.types = [F.ticket] }
         store.update("marfa:a") { $0.sources.remove("gone") }
         #expect(store.leaveOut(for: "marfa:a") == SearchLeaveOut(types: [F.ticket], sources: ["github"]))
+    }
+
+    @MainActor @Test func openingSearchBeforeAnotherMacsRemovalArrivesKeepsThatRemoval() throws {
+        let a = ThrowawayDefaults.make("SearchPageTests.first")
+        let b = ThrowawayDefaults.make("SearchPageTests.second")
+        let libraries = Libraries(host: HostBench().host(), defaults: b)
+        let key = libraries.libraryKey
+        let first = SearchLeaveOuts(defaults: a)
+        first.update(key) { $0.sources = ["github"] }
+        libraries.searchLeaveOuts.update(key) { $0.sources = ["github"] }
+        let setting = try #require(PreferencesMap.synced.first { $0.key == SearchLeaveOuts.defaultsKey })
+        func units(_ defaults: UserDefaults) throws -> PreferenceUnits {
+            guard case .units(let units) = setting.read(defaults, library: key) else {
+                throw CocoaError(.coderReadCorrupt)
+            }
+            return units
+        }
+        let base = try units(a)
+        first.update(key) { $0.remove(.source("github")) }
+        let before = b.data(forKey: SearchLeaveOuts.defaultsKey)
+        let library = FakeItemLibrary()
+        library.sources.infos = ["github": SourceInfo(code: "github", name: "GitHub", mark: nil, nameOrigin: .key)]
+        let page = SearchPage().environment(libraries).environment(\.library, library).defaultAppStorage(b)
+        let host = NSHostingView(rootView: page)
+        let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 700, height: 700), styleMask: [.borderless], backing: .buffered, defer: false)
+        window.contentView = host
+        defer { window.contentView = nil }
+        host.layoutSubtreeIfNeeded()
+        #expect(b.data(forKey: SearchLeaveOuts.defaultsKey) == before)
+
+        let merge = try PreferencesMerge.reconcile(local: units(b), remote: units(a), base: base)
+        #expect(merge.toRemote.isEmpty)
+        setting.write(merge.merged, to: b, library: key)
+        libraries.searchLeaveOuts.reload()
+        #expect(first.leaveOut(for: key).isEmpty)
+        #expect(libraries.searchLeaveOut.isEmpty)
     }
 
     @MainActor @Test func missingExclusionsKeepTheirNamesAfterReopeningTheStore() {

@@ -10,11 +10,12 @@ struct SearchPage: View {
     @AppStorage(SearchOptions.includesFeedKey) private var includesFeed = SearchOptions.includesFeedStandard
     @AppStorage(SearchOptions.orderKey) private var order = SearchOptions.Order.standard
     @AppStorage(SearchOptions.showsSnippetsKey) private var showsSnippets = SearchOptions.showsSnippetsStandard
+    @State private var namesByLibrary: [String: [String: String]] = [:]
     @State private var adding = false
 
     var body: some View {
         SettingsPageColumn {
-            leftOut
+            leftOut.id(libraries.libraryKey)
             include
             results
         }
@@ -29,7 +30,11 @@ struct SearchPage: View {
 
     // MARK: Left out
 
-    private var leaveOut: SearchLeaveOut { libraries.searchLeaveOut }
+    private var leaveOut: SearchLeaveOut {
+        var displayed = libraries.searchLeaveOut
+        displayed.names.merge(namesByLibrary[libraries.libraryKey] ?? [:]) { _, lastSeen in lastSeen }
+        return displayed
+    }
 
     private func change(_ change: (inout SearchLeaveOut) -> Void) {
         libraries.searchLeaveOuts.update(libraries.libraryKey, change)
@@ -83,7 +88,7 @@ struct SearchPage: View {
                 removeMenu(.type(type))
             }
             .onChange(of: library.catalogue.itemTypes[type].map { _ in entry.title }, initial: true) { _, title in
-                if let title, leaveOut.types.contains(type) { change { $0.names[entry.id] = title } }
+                if let title { namesByLibrary[libraries.libraryKey, default: [:]][entry.id] = title }
             }
         case .subtype(_, let parent):
             SettingsRow(verbatim: entry.title, lead: .mark(Image(typeGlyph: entry.icon)), size: .compact) {
@@ -97,7 +102,7 @@ struct SearchPage: View {
                 removeMenu(.source(code))
             }
             .onChange(of: library.sources.infos[code]?.name, initial: true) { _, name in
-                if let name, leaveOut.sources.contains(code) { change { $0.names[entry.id] = name } }
+                if let name { namesByLibrary[libraries.libraryKey, default: [:]][entry.id] = name }
             }
         }
     }
