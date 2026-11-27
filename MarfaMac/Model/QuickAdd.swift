@@ -297,6 +297,20 @@ final class QuickAdd {
     var asksAgain = false
     /// Asks, in the panel, about the draft's files that are already in Marfa (`AlreadyInMarfa`).
     @ObservationIgnored let alreadyInMarfa = AlreadyInMarfa.Asking()
+    /// A matched file stayed in the draft because its item could not be opened.
+    static func tellUnopenedMatches(_ files: [URL], to notices: Notices) {
+        let names = files.map { "“\($0.lastPathComponent)”" }.sorted().formatted(.list(type: .and))
+        if files.count == 1 {
+            notices.tell(
+                String(localized: "Couldn’t Open Item"),
+                String(localized: "\(names) is already in Marfa, but that item couldn’t be opened, so the file stays in the new item."))
+        } else {
+            notices.tell(
+                String(localized: "Couldn’t Open Items"),
+                String(localized: "\(names) are already in Marfa, but those items couldn’t be opened, so the files stay in the new item."))
+        }
+    }
+
     /// What the line and the text form say of a draft that may be in Marfa already.
     static var mayBeInMarfaNotice: String {
         String(localized: "This may already be in Marfa. The app quit while it was being added, so check the library before you add it again.")
@@ -884,8 +898,10 @@ extension Browser {
     /// person has seen that. Nothing empty is ever written. `toasts` hears the line's Added, with an Undo that takes
     /// back the add alone. A draft that may be in Marfa already (`QuickAdd.mayBeInMarfa`) is added only `again`.
     /// The draft's files already in Marfa are asked about after the parent (`AlreadyInMarfa`): Cancel adds nothing
-    /// and keeps the draft as typed; Open takes the matched files out of the draft, adds nothing yet and opens the
-    /// items that matched, since the files are parts of one item the person may still want without them.
+    /// and keeps the draft as typed, including the warning that a recovered draft may already be in Marfa. Open
+    /// takes the matched files out of the draft, adds nothing yet and opens every item that matched, since the
+    /// files are parts of one item the person may still want without them. A match that cannot be opened stays in
+    /// the draft, and the person is told. The warning is cleared only once a write starts.
     @discardableResult
     func saveQuickAdd(
         in library: any ItemLibrary, undoManager: UndoManager?, opening: Bool = true, toasts: ToastPresenter? = nil,
@@ -905,12 +921,9 @@ extension Browser {
         }
         guard !quickAdd.isSaving, QuickAdd.canSave(draft, in: library), quickAdd.unfinishedLists.isEmpty else { return nil }
         // A draft back from a quit mid-add may be in Marfa already, so it is added again only once the person says so.
-        if quickAdd.mayBeInMarfa {
-            guard again else {
-                quickAdd.asksAgain = true
-                return nil
-            }
-            quickAdd.mayBeInMarfa = false
+        if quickAdd.mayBeInMarfa, !again {
+            quickAdd.asksAgain = true
+            return nil
         }
         let missing = draft.files.filter { !$0.isOnDisk }
         guard missing.isEmpty else {
@@ -963,8 +976,10 @@ extension Browser {
             }
             if plan.isCancelled { return nil }
             if !plan.open.isEmpty {
-                quickAdd.draft?.files.removeAll { !plan.add.contains($0.url) }
-                if isShowing(library) { openFound(plan.open, in: library, order: order) }
+                let missed = await openMatches(plan.open, in: library, order: order)
+                let kept = Set(plan.recoveredFiles(missed: missed))
+                quickAdd.draft?.files.removeAll { !plan.add.contains($0.url) && !kept.contains($0.url) }
+                if !kept.isEmpty { QuickAdd.tellUnopenedMatches(Array(kept), to: library.notices) }
                 return nil
             }
         }
@@ -982,6 +997,7 @@ extension Browser {
                 return nil
             }
             let title = NameText.trimmed(draft.title)
+            quickAdd.mayBeInMarfa = false
             id = await library.addFile(
                 file.url, title: title.isEmpty ? nil : title, parentID: draft.parentID, tier: draft.tier, tags: draft.tags)
             let held = quickAdd.fileSent(id, telling: library.notices)
@@ -1014,6 +1030,7 @@ extension Browser {
             }
             let opensGroup = startsGroup && undoManager?.groupsByEvent == false
             if opensGroup { undoManager?.beginUndoGrouping() }
+            quickAdd.mayBeInMarfa = false
             id = library.createItem(
                 as: made, typeID: draft.typeID, title: draft.title, body: draft.body,
                 properties: draft.properties.filter { $0.value != .null }, tags: draft.tags, parentID: draft.parentID,

@@ -15,7 +15,11 @@ private struct AlreadyInMarfaAlert: ViewModifier {
             .alert(
                 asking.question?.title ?? "",
                 // Every way out of the alert is one of its buttons, Escape being Cancel's, so only they answer.
-                isPresented: Binding { asking.question != nil } set: { _ in },
+                // The setter accepts the dismissal, and the next question waits until that write, because SwiftUI
+                // keeps the alert that is up when only its data changes.
+                isPresented: Binding { asking.question != nil } set: { presented in
+                    if !presented { asking.alertDismissed() }
+                },
                 presenting: asking.question
             ) { question in
                 Button("Add Anyway") { asking.answer(.addAnyway, to: question.id) }

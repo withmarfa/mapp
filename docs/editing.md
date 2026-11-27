@@ -59,14 +59,14 @@ Every editor asks `Item.allows(_:)` for the `ItemChange` it writes (`ValueEditKi
 
 ### Typed text is never lost
 
-`NewItemDrafts` keeps drafts by slot and instance through a window close, quit or refusal. Editing a draft while it is being sent starts another. An interrupted draft returns if its item is absent. Adding it again asks first (`mayBeInMarfa`).
+`NewItemDrafts` keeps drafts by slot and instance through a window close, quit or refusal. A sent draft starts another. An interrupted draft returns if its item is absent. Add Again asks first (`mayBeInMarfa`); Cancel keeps that warning until the write starts.
 
 ### Dropping
 
 - **Files dropped on a list join the place in view** (`Browser.fileDropTarget`): a collection, the Feed, else the Library.
 - **A collection's row, card or sidebar row takes items and files** (`dropsInto`).
 - **A drop is one undo step and one toast;** Undo unlinks, then moves them to Recently Deleted.
-- **Files are checked as a batch.** A match prompts once. Open skips matches. Quick Add keeps the remaining files in the draft. A lookup without an answer lets the add proceed.
+- **Files are checked as a batch.** One prompt. Open shows every match, or adds a file it could not open. Quick Add keeps the rest. Pasted images are checked. No answer still adds.
 
 ## Changing type
 
@@ -81,7 +81,7 @@ A right click on a property's name opens a menu with two parts (`FieldMenu`).
 
 - **The app's part is pin, move and hide.** It writes nothing to the item or the type, so a read-only item offers it too.
 - **Marfa's part is renaming a field or a choice, adding and removing choices, and removing the field** (`TypeDefinitionEdit`). It needs the server and is never queued: a type's definition has no version.
-- **The type is read again just before it is sent**, and the change is refused if the field changed. It narrows the race without closing it.
+- **The type is read again just before it is sent**, and the change is refused if the field changed.
 - **Only a field that the type itself declares, and no type above it does, can change** (`FieldLock`). A type Marfa ships, or one under `common`, changes nothing. A plugin's own root reads as editable until the server refuses.
 - **A choice word is never renamed**, only added, moved or removed: items hold the word.
 - **A field's key never changes**: items hold values under it. A rename changes its label.

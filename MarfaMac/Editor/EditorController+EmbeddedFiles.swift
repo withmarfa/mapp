@@ -5,30 +5,40 @@ import WebKit
 /// Images put into the item, and the files it embeds opened or shown.
 extension EditorController {
     /// Takes images for the item that is open now and tries to place their links at the drop point or caret.
-    /// Reports each image that could not be attached or placed in the text. Image files already in Marfa are asked
-    /// about first (`AlreadyInMarfa`): Cancel attaches nothing, and Open attaches the rest and opens the items that
-    /// matched. Pasted bytes have no file to check, so they are attached unasked.
+    /// Reports each image that could not be attached or placed in the text. Files and pasted bytes already in Marfa
+    /// are asked about first (`AlreadyInMarfa`): Cancel attaches nothing, and Open attaches the rest and opens
+    /// every item that matched. A match that cannot be opened is attached, and the person is told. A pasted
+    /// image is staged to a temporary file for the check, and that file is removed whatever the person chooses.
     @discardableResult
     func insertImages(_ sources: [PastedImages.Source], at point: CGPoint? = nil) -> Bool {
         guard isEditable, let pageItemID, let asked = library, !sources.isEmpty else { return false }
         let height = webView.bounds.height
         Task {
-            let fileURLs = sources.compactMap { source -> URL? in if case .file(let url) = source { url } else { nil } }
-            let plan = await AlreadyInMarfa.check(fileURLs, in: asked, asking: alreadyInMarfa)
+            let staged = Self.stageForChecking(sources)
+            defer { staged.remove() }
+            let plan = await AlreadyInMarfa.check(staged.urls, in: asked, asking: alreadyInMarfa)
             guard !plan.isCancelled else { return }
-            let sources = sources.filter { source in
-                if case .file(let url) = source { plan.add.contains(url) } else { true }
+            let reached = await AlreadyInMarfa.reachable(plan.open, in: asked)
+            let adding = Set(plan.filesToAdd(missed: reached.missed))
+            let recovered = Set(plan.recoveredFiles(missed: reached.missed))
+            let chosen = staged.entries.filter { entry in
+                guard let url = entry.url else { return true }
+                return adding.contains(url)
+            }
+            let recoveredNames = staged.entries.compactMap { entry -> String? in
+                guard let url = entry.url, recovered.contains(url) else { return nil }
+                return entry.name
             }
             // Opened only once the rest are placed, since opening an item takes the page from this one.
-            defer { if !plan.open.isEmpty { openFound(plan.open) } }
-            guard !sources.isEmpty else { return }
+            defer { openFound(reached.open) }
+            guard !chosen.isEmpty else { return }
             guard self.pageItemID == pageItemID, isEditable else {
                 asked.notices.tell(
                     String(localized: "Images Weren’t Attached"),
                     String(localized: "The item was no longer open for editing, so nothing was attached. Add the images again."))
                 return
             }
-            let (files, skipped) = await PastedImages.read(sources)
+            let (files, skipped) = await PastedImages.read(chosen.map(\.source))
             // The page may have moved on while the files were read. They still belong to the item that was open.
             let report = files.isEmpty ? AttachReport() : await asked.attach(files, to: pageItemID)
             let placed = self.pageItemID == pageItemID && isEditable && acceptsInsertion
@@ -38,6 +48,10 @@ extension EditorController {
                 await !place(embeds.map { ["src": $0.link, "alt": $0.name] }, at: point, height: height, in: pageItemID) {
                 notPlaced = embeds.map(\.name)
             }
+            let failedNames = Set(report.failed.map(\.name))
+            let readNames = Set(files.map(\.name))
+            let told = recoveredNames.filter { readNames.contains($0) && !failedNames.contains($0) }
+            if !told.isEmpty { Self.tellUnopened(told, to: asked) }
             Self.reportUnplaced(
                 skipped: skipped, failed: report.failed, kept: report.kept, attached: embeds.count,
                 unplaced: placed ? [] : embeds.map(\.name), refused: notPlaced,
@@ -47,9 +61,69 @@ extension EditorController {
         return true
     }
 
-    /// Opens items the person chose to see in place of the images they matched.
+    /// A pasted image written beside the files, so the same check can read its bytes. Removed on every outcome.
+    private struct ImageCheckBatch {
+        struct Entry {
+            let source: PastedImages.Source
+            let url: URL?
+            var name: String {
+                switch source {
+                case .file(let url): url.lastPathComponent
+                case .data(let name, _): name
+                }
+            }
+        }
+
+        let directory: URL?
+        let entries: [Entry]
+        var urls: [URL] { entries.compactMap(\.url) }
+
+        func remove() {
+            guard let directory else { return }
+            try? FileManager.default.removeItem(at: directory)
+        }
+    }
+
+    /// Stages each pasted image under a temporary directory. A file keeps its own URL. Bytes that cannot be staged
+    /// are still attached, unchecked, rather than dropped.
+    private static func stageForChecking(_ sources: [PastedImages.Source]) -> ImageCheckBatch {
+        let hasData = sources.contains { if case .data = $0 { true } else { false } }
+        let directory = hasData
+            ? URL.temporaryDirectory.appending(path: "marfa-mac-paste-\(UUID().uuidString)", directoryHint: .isDirectory)
+            : nil
+        var entries: [ImageCheckBatch.Entry] = []
+        for (index, source) in sources.enumerated() {
+            switch source {
+            case .file(let url):
+                entries.append(ImageCheckBatch.Entry(source: source, url: url))
+            case .data(let name, let data):
+                guard let directory else {
+                    entries.append(ImageCheckBatch.Entry(source: source, url: nil))
+                    continue
+                }
+                let folder = directory.appending(path: String(index), directoryHint: .isDirectory)
+                let url = folder.appending(path: name)
+                do {
+                    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                    try data.write(to: url, options: .atomic)
+                    entries.append(ImageCheckBatch.Entry(source: source, url: url))
+                } catch {
+                    entries.append(ImageCheckBatch.Entry(source: source, url: nil))
+                }
+            }
+        }
+        return ImageCheckBatch(directory: directory, entries: entries)
+    }
+
+    private static func tellUnopened(_ names: [String], to library: any ItemLibrary) {
+        let lines = names.map { String(localized: "“\($0)” was attached because its item couldn’t be opened.") }
+        library.notices.tell(String(localized: "Couldn’t Open Item"), lines.joined(separator: "\n"))
+    }
+
+    /// Opens every item the person chose to see in place of the images they matched.
     private func openFound(_ ids: [ItemID]) {
-        if let onOpenFound { onOpenFound(ids) } else if let first = ids.first { follow(first) }
+        guard !ids.isEmpty else { return }
+        if let onOpenFound { onOpenFound(ids) } else { for id in ids { follow(id) } }
     }
 
     /// Asks the page to put the images in, and again after the next paint while it refuses them for folded text,

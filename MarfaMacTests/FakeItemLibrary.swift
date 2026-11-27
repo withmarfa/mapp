@@ -160,6 +160,19 @@ final class FakeItemLibrary: ItemLibrary {
 
     func item(_ id: ItemID) -> Item? { items.first { $0.id == id } }
 
+    /// An item the copy does not hold yet, brought in when something asks to open it.
+    var arrivals: [ItemID: Item] = [:]
+    /// Each item something asked to open, in order, held or not.
+    private(set) var heldForOpening: [ItemID] = []
+
+    func holdForOpening(_ id: ItemID) async -> Bool {
+        heldForOpening.append(id)
+        if item(id) != nil { return true }
+        guard let arriving = arrivals[id] else { return false }
+        items.append(arriving)
+        return item(id) != nil
+    }
+
     /// How often a place's items were listed, for tests of what is kept rather than asked for again.
     @ObservationIgnored private(set) var placeReads = 0
 

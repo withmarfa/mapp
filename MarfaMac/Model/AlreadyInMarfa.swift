@@ -21,9 +21,56 @@ enum AlreadyInMarfa {
         let open: [ItemID]
         /// Whether the person chose Cancel, so nothing at all is written.
         var isCancelled = false
+        /// Each matched file and the items holding it, so one that cannot be opened is added instead.
+        var matched: [Match] = []
+
+        /// A file already in Marfa, and the items that hold its bytes.
+        struct Match: Equatable {
+            let file: URL
+            let items: [ItemID]
+        }
 
         /// Every file is added, with no question asked or Add Anyway chosen.
         static func addingAll(_ files: [URL]) -> Plan { Plan(add: files, open: []) }
+
+        /// The files to add: those with no match, and each matched file whose items could not be opened.
+        func filesToAdd(missed: [ItemID]) -> [URL] {
+            let extra = recoveredFiles(missed: missed)
+            return add + extra.filter { !add.contains($0) }
+        }
+
+        /// Matched files whose items are all among `missed`, so none of them was opened.
+        func recoveredFiles(missed: [ItemID]) -> [URL] {
+            let missedIDs = Set(missed)
+            return matched.compactMap { match in
+                guard !match.items.isEmpty, match.items.allSatisfy(missedIDs.contains) else { return nil }
+                return match.file
+            }
+        }
+    }
+
+    /// Brings each item into the library. Those it holds afterwards can be opened; the rest are added.
+    static func reachable(_ ids: [ItemID], in library: any ItemLibrary) async -> (open: [ItemID], missed: [ItemID]) {
+        var open: [ItemID] = []
+        var missed: [ItemID] = []
+        for id in ids {
+            if library.item(id) != nil {
+                open.append(id)
+            } else if await library.holdForOpening(id) {
+                open.append(id)
+            } else {
+                missed.append(id)
+            }
+        }
+        return (open, missed)
+    }
+
+    /// What a toast or a notice says when matched files were added because their items could not be opened.
+    static func unopenedMessage(_ count: Int) -> String {
+        if count == 1 {
+            return String(localized: "1 file was added because the item already in Marfa couldn’t be opened.")
+        }
+        return String(localized: "\(count) files were added because the items already in Marfa couldn’t be opened.")
     }
 
     /// One question for a batch: the files already in Marfa, each with the items holding its bytes.
@@ -49,6 +96,9 @@ enum AlreadyInMarfa {
         /// How many files the message names one by one before it says how many more there are.
         static let listLimit = 5
 
+        /// Whether Open covers more than the one file the title names, including files the message does not list.
+        var openShowsAll: Bool { rows.count > 1 }
+
         var title: String {
             if rows.count == 1, total == 1 {
                 return String(localized: "“\(rows[0].file.lastPathComponent)” Is Already in Marfa")
@@ -64,6 +114,7 @@ enum AlreadyInMarfa {
             var lines = rows.prefix(Self.listLimit).map { Self.sentence(for: $0, named: $0.file.lastPathComponent) }
             let rest = rows.count - Self.listLimit
             if rest > 0 { lines.append(AttributedString(localized: "And ^[\(rest) more file](inflect: true).").text) }
+            if openShowsAll { lines.append(String(localized: "Open shows all of them.")) }
             return lines.joined(separator: "\n")
         }
 
@@ -96,24 +147,31 @@ enum AlreadyInMarfa {
         private(set) var question: Question?
         @ObservationIgnored private var waiting: [(question: Question, answer: CheckedContinuation<Choice?, Never>)] = []
         @ObservationIgnored private var views = 0
+        /// True after an alert is dismissed until the next one is allowed up. SwiftUI ignores a new question while one is up.
+        @ObservationIgnored private var dismissalPending = false
 
         /// The person's choice, or nil where no view could ask them.
         func ask(_ question: Question) async -> Choice? {
             guard views > 0 else { return nil }
             return await withCheckedContinuation { continuation in
                 waiting.append((question, continuation))
-                if self.question == nil { self.question = question }
+                if self.question == nil, !dismissalPending { self.question = question }
             }
         }
 
         /// The person's choice for the question shown. One for another question, as from an alert already gone, is
-        /// ignored.
+        /// ignored. The next question waits until this alert has gone.
         func answer(_ choice: Choice, to id: Question.ID? = nil) {
             guard let first = waiting.first, id == nil || first.question.id == id else { return }
             waiting.removeFirst()
-            question = waiting.first?.question
+            question = nil
+            dismissalPending = true
             first.answer.resume(returning: choice)
+            scheduleNext()
         }
+
+        /// The alert wrote that it is no longer presented, so the next question may come up.
+        func alertDismissed() { finishDismissal() }
 
         func viewAppeared() { views += 1 }
 
@@ -124,7 +182,27 @@ enum AlreadyInMarfa {
             let unasked = waiting
             waiting = []
             question = nil
+            dismissalPending = false
             for entry in unasked { entry.answer.resume(returning: nil) }
+        }
+
+        /// Lets the dismissal land, then shows what still waits. One turn is enough for the model; the alert's own
+        /// dismissal calls `finishDismissal` as well, and the second finds nothing left to do.
+        private func scheduleNext() {
+            Task { @MainActor in
+                await Task.yield()
+                self.finishDismissal()
+            }
+        }
+
+        private func finishDismissal() {
+            guard dismissalPending, question == nil else { return }
+            guard views > 0, let next = waiting.first else {
+                dismissalPending = false
+                return
+            }
+            dismissalPending = false
+            question = next.question
         }
     }
 
@@ -150,7 +228,9 @@ enum AlreadyInMarfa {
             let matched = Set(rows.map(\.file))
             var opening: [ItemID] = []
             for id in rows.flatMap({ $0.items.map(\.id) }) where !opening.contains(id) { opening.append(id) }
-            return Plan(add: files.filter { !matched.contains($0) }, open: opening)
+            return Plan(
+                add: files.filter { !matched.contains($0) }, open: opening,
+                matched: rows.map { Plan.Match(file: $0.file, items: $0.items.map(\.id)) })
         case .cancel:
             return Plan(add: [], open: [], isCancelled: true)
         }

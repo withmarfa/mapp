@@ -12,8 +12,9 @@ extension Browser {
     /// safe and a drop cut short would lose the rest; only the window's own steps (selecting what was added,
     /// revealing it) stop once the window has changed library, and once the person has moved to another place their
     /// selection is left alone. Before anything is added, the files already in Marfa are asked about once
-    /// (`AlreadyInMarfa`): Cancel adds nothing, and Open adds the rest and opens the items that matched in place of
-    /// selecting what was added. Returns the items made.
+    /// (`AlreadyInMarfa`): Cancel adds nothing, and Open adds the rest and opens every item that matched in place of
+    /// selecting what was added. A matched file whose item cannot be opened is added, and the toast says so.
+    /// Returns the items made.
     @discardableResult
     func importFiles(
         _ urls: [URL], unreadable: Int = 0, to target: FileDropTarget? = nil,
@@ -33,13 +34,22 @@ extension Browser {
         QuickAdd.File.tellUnreadable(notRead, unreadable: unreadable, to: library.notices)
         let plan = await AlreadyInMarfa.check(files.map(\.url), in: library, asking: alreadyInMarfa)
         guard !plan.isCancelled else { return [] }
-        files.removeAll { !plan.add.contains($0.url) }
+        let reached = isShowing(library)
+            ? await AlreadyInMarfa.reachable(plan.open, in: library)
+            : (open: [ItemID](), missed: plan.open)
+        let adding = Set(plan.filesToAdd(missed: reached.missed))
+        let recovered = Set(plan.recoveredFiles(missed: reached.missed))
+        files.removeAll { !adding.contains($0.url) }
         var added: [ItemID] = []
+        var unopened = 0
         for file in files {
-            if let id = await library.addFile(file.url, title: nil, parentID: nil, tier: QuickAdd.startingTier(in: target.place), tags: []) { added.append(id) }
+            if let id = await library.addFile(file.url, title: nil, parentID: nil, tier: QuickAdd.startingTier(in: target.place), tags: []) {
+                added.append(id)
+                if recovered.contains(file.url) { unopened += 1 }
+            }
         }
         guard !added.isEmpty else {
-            if isShowing(library) { openFound(plan.open, in: library, order: order) }
+            if isShowing(library) { showFound(reached.open, in: library, order: order) }
             return []
         }
         // A drop is told, joined and given its Undo only for what the library holds: a source that has not shown an
@@ -63,10 +73,11 @@ extension Browser {
         }
         let asked = files.count + notRead.count + unreadable
         let leftOut = target.collection == nil ? 0 : added.count - (joined ? held.count : 0)
-        say(addedMessage(added.count, of: asked, to: target.isOnCollection ? target.name : nil, leftOut: leftOut, from: target.name),
-            symbol: "arrow.down.doc", step: step, toasts: toasts)
-        if !plan.open.isEmpty {
-            if isShowing(library) { openFound(plan.open, in: library, order: order) }
+        say(addedMessage(
+            added.count, of: asked, to: target.isOnCollection ? target.name : nil, leftOut: leftOut, from: target.name,
+            unopened: unopened), symbol: "arrow.down.doc", step: step, toasts: toasts)
+        if !reached.open.isEmpty {
+            if isShowing(library) { showFound(reached.open, in: library, order: order) }
             return added
         }
         guard isShowing(library), shown.isSame(target.shown), let first = held.first else { return added }
@@ -106,12 +117,18 @@ extension Browser {
     /// What the toast says of a drop: how many files were added, of how many asked for where some were not, and the
     /// collection they joined where the drop was on one. Where `leftOut` of them did not join the collection, it
     /// says so instead.
-    private func addedMessage(_ count: Int, of asked: Int, to collection: String?, leftOut: Int, from place: String) -> String {
+    private func addedMessage(_ count: Int, of asked: Int, to collection: String?, leftOut: Int, from place: String, unopened: Int = 0) -> String {
+        if unopened == count, leftOut == 0, collection == nil { return AlreadyInMarfa.unopenedMessage(unopened) }
         let added = count == asked
             ? AttributedString(localized: "^[Added \(count) File](inflect: true)").text
             : String(localized: "Added \(count) of \(asked) Files")
-        if leftOut > 0 { return String(localized: "\(added), \(leftOut) not in \(place)") }
-        return collection.map { String(localized: "\(added) to \($0)") } ?? added
+        let placed = if leftOut > 0 {
+            String(localized: "\(added), \(leftOut) not in \(place)")
+        } else {
+            collection.map { String(localized: "\(added) to \($0)") } ?? added
+        }
+        guard unopened > 0 else { return placed }
+        return String(localized: "\(placed) \(AlreadyInMarfa.unopenedMessage(unopened))")
     }
 
     /// The collection the window shows.

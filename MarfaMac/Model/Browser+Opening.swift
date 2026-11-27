@@ -25,8 +25,26 @@ extension Browser {
 
     /// Opens items already in Marfa that the person asked to see in place of the files they were adding
     /// (`AlreadyInMarfa`): one as a link to it opens, several in windows where Open Items says so, and otherwise
-    /// chosen together where the window lists the first. An item the library does not hold is left out.
-    func openFound(_ ids: [ItemID], in library: any ItemLibrary, order: ItemOrder, defaults: UserDefaults = .standard) {
+    /// all of them chosen together. An item the copy does not hold yet is fetched first. Returns the ids that
+    /// still could not be opened, whose files are added instead.
+    @discardableResult
+    func openFound(_ ids: [ItemID], in library: any ItemLibrary, order: ItemOrder, defaults: UserDefaults = .standard) async -> [ItemID] {
+        let reached = await AlreadyInMarfa.reachable(ids, in: library)
+        showFound(reached.open, in: library, order: order, defaults: defaults)
+        return reached.missed
+    }
+
+    /// Opens matches in this window, or through `opensFoundElsewhere` when another window is showing the library,
+    /// as the new-item line over another app does. Ids nobody could open come back so their files are not dropped.
+    func openMatches(_ ids: [ItemID], in library: any ItemLibrary, order: ItemOrder) async -> [ItemID] {
+        if isShowing(library) { return await openFound(ids, in: library, order: order) }
+        if let opensFoundElsewhere { return await opensFoundElsewhere(ids) }
+        return ids
+    }
+
+    /// Shows items the library already holds: one as a link to it opens, several in windows where Open Items says
+    /// so, and otherwise all of them chosen together, including one the open place does not list.
+    func showFound(_ ids: [ItemID], in library: any ItemLibrary, order: ItemOrder, defaults: UserDefaults = .standard) {
         let held = ids.compactMap { library.item($0) }
         guard let first = held.first else { return }
         if held.count == 1 {
@@ -35,8 +53,7 @@ extension Browser {
             open(Set(held.map(\.id)), as: .newWindow, defaults: defaults)
         } else {
             reveal(first, in: library, order: order)
-            let listed = Set(placeItems(in: library).map(\.id))
-            selection = Set(held.map(\.id).filter { $0 == first.id || listed.contains($0) })
+            selection = Set(held.map(\.id))
         }
     }
 

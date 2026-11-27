@@ -187,6 +187,10 @@ nonisolated final class MarfaSource: ItemSource {
         .noAnswer
     }
 
+    func pinForOpening(_ id: ItemID) async throws {
+        _ = try await copy.pin(id.rawValue)
+    }
+
     func instanceID() async -> String? {
         try? await engine.reading.status().instanceId
     }

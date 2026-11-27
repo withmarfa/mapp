@@ -2,6 +2,12 @@ import Foundation
 
 /// Reading the library: items and their text and places, as the views observe them.
 extension MarfaLibrary {
+    func holdForOpening(_ id: ItemID) async -> Bool {
+        if item(id) != nil { return true }
+        do { try await source.pinForOpening(id) } catch { return false }
+        return await waitUntilHolding([id], within: AlreadyInMarfa.limit)
+    }
+
     func item(_ id: ItemID) -> Item? {
         guard let record = records[id] else {
             _ = membershipRevision
