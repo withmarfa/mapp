@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The Addresses page's sheets, which the window shows in its middle: adding an address or a website, and moving the
+/// The Network page's sheets, which the window shows in its middle: adding an address or a website, and moving the
 /// sign-in address, which says what changes first.
 struct AddressSheet: View {
     @Bindable var model: AddressesModel

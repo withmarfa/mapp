@@ -1,7 +1,7 @@
 import Marfa
 import SwiftUI
 
-/// The File Storage page: where the server keeps files, how it reads, fetches and cleans them up. Switches and choices are sent
+/// The Storage page: where the server keeps files, how it reads, fetches and cleans them up. Switches and choices are sent
 /// at once, numbers when Return is pressed or the field is left.
 struct FileStoragePage: View {
     let host: any MarfaSettingsHost

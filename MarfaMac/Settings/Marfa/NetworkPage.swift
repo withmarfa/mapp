@@ -74,7 +74,7 @@ struct NetworkPage: View {
                             titleGlyph: .link,
                             error: model.rowErrors[address].map { OwnerWording.line($0, on: .network) }
                         ) {
-                            SettingsMoreMenu { Button("Remove…", role: .destructive) { Task { await model.askToRemove(address: address) } } }
+                            SettingsMoreMenu { Button("Remove", role: .destructive) { Task { await model.askToRemove(address: address) } } }
                         }
                     }
                 }
@@ -86,7 +86,7 @@ struct NetworkPage: View {
                             title: Text(verbatim: AddressesModel.display(website)), titleGlyph: .link,
                             error: model.rowErrors[website].map { OwnerWording.line($0, on: .network) }
                         ) {
-                            SettingsMoreMenu { Button("Remove…", role: .destructive) { model.askToRemove(website: website) } }
+                            SettingsMoreMenu { Button("Remove", role: .destructive) { model.askToRemove(website: website) } }
                         }
                     }
                 }
@@ -105,9 +105,9 @@ struct NetworkPage: View {
     private var networkRows: some View {
         SettingsSection(name: nil) {
             if network.isLoaded {
-                SettingsRow("Private Addresses", line: "Lets webhooks and the heartbeat reach this network.", error: network.line, lines: nil) {
+                SettingsRow("Private addresses", line: "Lets webhooks and the heartbeat reach this network.", error: network.line, lines: nil) {
                     SettingsToggle(
-                        title: "Private Addresses",
+                        title: "Private addresses",
                         isOn: Binding {
                             network.isOn
                         } set: { on in
@@ -118,7 +118,7 @@ struct NetworkPage: View {
                     .accessibilityIdentifier("PrivateAddresses")
                 }
             } else if let failure = network.failure {
-                OwnerProblemRow(title: "Couldn’t Read Private Addresses", failure: failure, page: .network, host: host) {
+                OwnerProblemRow(title: "Couldn’t read private addresses", failure: failure, page: .network, host: host) {
                     Task { await network.load() }
                 }
             }

@@ -1124,7 +1124,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         await account.load()
         account.askToEnd(account.browsers[0])
         let question = try #require(account.question)
-        #expect(question.title == "Sign out “Safari on macOS”?")
+        #expect(question.title == "Sign Out “Safari on macOS”?")
         #expect(!bench.calls.calls.contains("endSignIn"), "nothing is sent before the owner agrees")
         account.cancelQuestion()
         #expect(account.question == nil)

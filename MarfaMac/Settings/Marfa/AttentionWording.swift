@@ -34,8 +34,8 @@ nonisolated extension AttentionConcern {
     var shownTitle: String {
         guard kind == .setting else { return title }
         // The server's own title names the setting by its key, so a setting the app has no name for is told without it.
-        guard let secret = MonitoringSecret.named(key: reference) else { return String(localized: "Set a Secret Again") }
-        return String(localized: "Set \(secret.settingTitle) Again")
+        guard let secret = MonitoringSecret.named(key: reference) else { return String(localized: "Set a secret again") }
+        return String(localized: "Set the \(secret.removalName) again")
     }
 
     var shownLine: String? {

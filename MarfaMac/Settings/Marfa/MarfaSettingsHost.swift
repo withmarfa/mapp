@@ -91,7 +91,7 @@ struct MarfaMarkSet: Identifiable, Hashable {
     func refreshGrants() async
     /// What the owner's pages (Account, Apps, Keys, Network) ask of the server.
     var ownerCalls: any OwnerCalls { get }
-    /// What Activity, Monitoring, Limits and Start-Up ask of the server.
+    /// What the pages read and change through the instance API.
     var instanceCalls: any InstanceCalls { get }
     /// What Folders asks of the open working copy, which reads, changes and stops a folder.
     var folderCalls: any FolderCalls { get }
@@ -122,7 +122,7 @@ struct MarfaMarkSet: Identifiable, Hashable {
     /// Asks the owner for a plugin bundle file, and reads it. Nil where the owner chose none.
     func chooseBundleFile() async -> PluginFileChoice?
 
-    /// The server's own settings, drafted on This Marfa's fields.
+    /// The shared model for edits to the server’s settings.
     var instanceSettings: InstanceSettingsModel { get }
     /// The open owner's pages that hold something typed and not kept, which the app asks when Settings closes.
     var ownerDrafts: OwnerDrafts { get }
@@ -338,7 +338,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
             [
                 String(localized: "Username"), String(localized: "Email"), String(localized: "Password"),
                 String(localized: "Change Password"), String(localized: "Passkeys"), String(localized: "Browsers"),
-                String(localized: "Check for Updates"), String(localized: "Check Automatically"), String(localized: "Profile"),
+                String(localized: "Check for Updates"), String(localized: "Check automatically"), String(localized: "Profile"),
                 String(localized: "Problems"), String(localized: "Sign Out"), String(localized: "Name"),
             ]
         case .apps:

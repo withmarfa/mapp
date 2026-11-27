@@ -71,7 +71,7 @@ struct AccountSignInsPage: View {
                 ) {
                     SettingsMoreMenu {
                         Button("Rename…") { model.beginRename(passkey) }
-                        Button("Remove…", role: .destructive) { model.askToRemove(passkey) }
+                        Button("Remove", role: .destructive) { model.askToRemove(passkey) }
                     }
                 }
             }
@@ -88,7 +88,7 @@ struct AccountSignInsPage: View {
                     verbatim: browser.name, line: Self.line(added: browser.added, used: browser.lastUsed, signedIn: true),
                     error: model.rowErrors[browser.id].map { OwnerWording.line($0, on: page) }, lead: .symbol("safari")
                 ) {
-                    SettingsMoreMenu { Button("Sign Out…", role: .destructive) { model.askToEnd(browser) } }
+                    SettingsMoreMenu { Button("Sign Out", role: .destructive) { model.askToEnd(browser) } }
                 }
             }
         }

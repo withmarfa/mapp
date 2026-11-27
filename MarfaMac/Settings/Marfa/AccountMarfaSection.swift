@@ -38,7 +38,7 @@ struct AccountMarfaSection: View {
             if host.grants.contains(.configManage) {
                 if settings.isAvailable { nameRow }
                 else if let failure = settings.failure {
-                    OwnerProblemRow(title: "Couldn’t Read the Name", failure: OwnerFailure(failure), page: .account, host: host) { Task { await settings.load() } }
+                    OwnerProblemRow(title: "Couldn’t read the name", failure: OwnerFailure(failure), page: .account, host: host) { Task { await settings.load() } }
                 }
             } else {
                 locked("Name", permission: .configManage)
@@ -46,7 +46,7 @@ struct AccountMarfaSection: View {
             if !host.grants.contains(.instanceRead) {
                 locked("Version", permission: .instanceRead)
             } else if let failure = model.failure {
-                OwnerProblemRow(title: "Couldn’t Read the Release", failure: failure, page: .account, host: host) { Task { await model.load() } }
+                OwnerProblemRow(title: "Couldn’t read the release", failure: failure, page: .account, host: host) { Task { await model.load() } }
             } else if let status = model.status {
                 if model.isUpdating { updating(status) }
                 else { marfa(status) }
@@ -133,12 +133,12 @@ struct AccountMarfaSection: View {
                 }
                 if model.lostTrack {
                     SettingsProblemRow(
-                        title: Text("The Server Hasn’t Come Back Yet"),
+                        title: Text("The server hasn’t come back yet"),
                         line: Text("The app stopped waiting. Check again to see where it stands."),
                         actions: [SettingsProblemAction("Check Again") { Task { await model.load() } }])
                 }
                 if let error = model.error {
-                    OwnerProblemRow(title: "Couldn’t Update", failure: error, page: .account, host: host)
+                    OwnerProblemRow(title: "Couldn’t update", failure: error, page: .account, host: host)
                 }
             }
         }
@@ -181,19 +181,19 @@ struct AccountMarfaSection: View {
 
     @ViewBuilder private var automaticChecks: some View {
         if !model.canChangeSettings {
-            locked("Check Automatically", permission: .configManage)
+            locked("Check automatically", permission: .configManage)
         } else if let failure = model.settingsFailure {
-            OwnerProblemRow(title: "Couldn’t Read Automatic Update Settings", failure: failure, page: .account, host: host) {
+            OwnerProblemRow(title: "Couldn’t read automatic update settings", failure: failure, page: .account, host: host) {
                 Task { await model.loadAutomaticChecks() }
             }
         } else if let settings = model.settings {
-            SettingsRow("Check Automatically") {
-                SettingsToggle(title: "Check Automatically", isOn: Binding { settings.checksForUpdates } set: { on in
+            SettingsRow("Check automatically") {
+                SettingsToggle(title: "Check automatically", isOn: Binding { settings.checksForUpdates } set: { on in
                     Task { await model.setChecksAutomatically(on) }
                 }).disabled(model.isSwitching)
             }
             if !host.grants.contains(.instanceRead), let error = model.error {
-                OwnerProblemRow(title: "Couldn’t Change Automatic Update Settings", failure: error, page: .account, host: host)
+                OwnerProblemRow(title: "Couldn’t change automatic update settings", failure: error, page: .account, host: host)
             }
         }
     }
@@ -210,7 +210,7 @@ struct AccountMarfaSection: View {
             return String(localized: "\(latest.version) is ready.")
         }
         if status.checkFailed { return String(localized: "The last check found no answer.") }
-        return status.checksAutomatically ? String(localized: "The server is up to date.") : String(localized: "Automatic checks are off.")
+        return status.checksAutomatically ? String(localized: "Automatic checks are on.") : String(localized: "Automatic checks are off.")
     }
 
     // MARK: Last update

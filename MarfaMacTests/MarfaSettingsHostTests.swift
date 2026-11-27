@@ -95,7 +95,7 @@ import Testing
             scopes: ScriptedSignIns.approvedBeyondPermissions.filter { $0 != ClientOwnerCalls.registeringLinkTypes })
         await libraries.host.refreshGrants()
         #expect(adapter.grants == SystemSignIns.askedAtSignIn && libraries.host.readsProfile)
-        #expect(adapter.lacksAsked, "Overview offers Allow More…")
+        #expect(adapter.lacksAsked, "Connection offers more access")
         func account() -> ConnectionAccount {
             ConnectionAccount(
                 state: .online, grants: adapter.grants, grantsRead: true, readsProfile: libraries.host.readsProfile,

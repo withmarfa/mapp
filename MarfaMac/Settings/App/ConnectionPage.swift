@@ -225,7 +225,6 @@ struct ConnectionPage: View {
         }
     }
 
-    // Connection keeps Disconnect until Account has its Sign Out action.
     private var disconnect: some View {
         SettingsSection("Disconnect") {
             SettingsRow(

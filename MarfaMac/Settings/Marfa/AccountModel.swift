@@ -358,7 +358,7 @@ nonisolated enum ProfileContactField: Hashable {
 
     func askToEnd(_ browser: BrowserSignIn) {
         question = Question(
-            action: .endBrowser(browser.id), title: String(localized: "Sign out “\(browser.name)”?"),
+            action: .endBrowser(browser.id), title: String(localized: "Sign Out “\(browser.name)”?"),
             message: String(localized: "It must sign in again with your password or a passkey. Apps and keys keep working."),
             confirm: String(localized: "Sign Out"))
     }
@@ -411,7 +411,7 @@ nonisolated enum ProfileContactField: Hashable {
 
     // MARK: Closing
 
-    /// The owner's name and the name typed for a passkey, which the app gives back when Settings closes. A password is
+    /// Unsaved profile and passkey edits are returned when Settings closes. A password is
     /// dropped and never handed over.
     func takeDrafts() -> [OwnerDraft] {
         var drafts: [OwnerDraft] = []

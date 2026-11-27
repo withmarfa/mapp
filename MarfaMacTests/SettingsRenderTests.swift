@@ -61,7 +61,7 @@ import Testing
         updates = UpdatesModel(context: context)
     }
 
-    /// Binds the Overview and the health reader to the host's own calls and grants, as the app does.
+    /// Binds the Account readings and the health reader to the host's own calls and grants, as the app does.
     func bindOverview() {
         health = ServerHealthModel(context: OwnerContext(host: self))
         overview = AccountOverview(context: OwnerContext(host: self))
@@ -566,7 +566,7 @@ struct RenderedWindow<Detail: View>: View {
                 ], orphanCount: 3, orphanBytes: 12_000_000, firstFound: .now, orphansComplete: true)
             $0.metrics.fileBytes = 3_400_000_000
         }
-        try await SettingsRender.png(windowed(.fileStorage, host: host), size: Self.size, named: "File Storage")
+        try await SettingsRender.png(windowed(.fileStorage, host: host), size: Self.size, named: "Storage")
     }
 
     @Test func trash() async throws {
@@ -614,7 +614,7 @@ struct RenderedWindow<Detail: View>: View {
             RenderedWindow(selection: .editor, search: "zzzz", detail: EditorPage()), size: Self.size, named: "Sidebar, search with no match")
     }
 
-    // MARK: The owner's pages (Account, Apps, Keys, Addresses)
+    // MARK: The owner's pages
 
     private static let days: (Int) -> Date = { Date.now.addingTimeInterval(-86_400 * Double($0)) }
 

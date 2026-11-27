@@ -59,7 +59,7 @@ struct AccountPage: View {
             if !model.canManageSignIns {
                 SettingsSection("Permissions") {
                     SettingsProblemRow(
-                        title: Text("This App Can’t Manage Sign-Ins"), line: Text("Your password, passkeys and browsers need this permission."),
+                        title: Text("This app can’t manage sign-ins"), line: Text("Your password, passkeys and browsers need this permission."),
                         symbol: "lock", actions: [SettingsProblemAction("Allow More") { Task { await model.allowSignIns() } }]
                     ).disabled(host.isAllowingMore)
                 }
@@ -67,7 +67,7 @@ struct AccountPage: View {
             if let profile = model.profile, model.failure == nil {
                 profileRows(profile)
             } else if let failure = model.failure {
-                OwnerProblem(title: "Couldn’t Read the Profile", failure: failure, page: .account, host: host) { Task { await model.load() } }
+                OwnerProblem(title: "Couldn’t read the profile", failure: failure, page: .account, host: host) { Task { await model.load() } }
             } else {
                 OwnerLoading()
             }
@@ -98,7 +98,7 @@ struct AccountPage: View {
         let overview = host.overview
         if host.grants.contains(.instanceRead) {
             if let failure = overview.failure {
-                OwnerProblem(title: "Couldn’t Check for Problems", failure: failure, page: .account, host: host) { Task { await overview.load() } }
+                OwnerProblem(title: "Couldn’t check for problems", failure: failure, page: .account, host: host) { Task { await overview.load() } }
             } else if !overview.concerns.isEmpty {
                 SettingsSection("Problems") {
                     ForEach(overview.concerns) { concern in
@@ -279,14 +279,14 @@ private struct PasswordSheet: View {
                 title: Text("Change Password"), line: Text("Every browser signs out. Apps and keys keep working.")
             ) {
                 VStack(alignment: .leading, spacing: SettingsTokens.Metric.sheetFieldGap) {
-                    SettingsSheetField(label: "Current Password", error: model.currentPasswordError) {
+                    SettingsSheetField(label: "Current password", error: model.currentPasswordError) {
                         SettingsField(
-                            title: "Current Password", text: $model.currentPassword, isError: model.currentPasswordError != nil,
+                            title: "Current password", text: $model.currentPassword, isError: model.currentPasswordError != nil,
                             isSecure: true, width: nil)
                     }
-                    SettingsSheetField(label: "New Password", error: model.newPasswordError ?? model.passwordLine) {
+                    SettingsSheetField(label: "New password", error: model.newPasswordError ?? model.passwordLine) {
                         SettingsField(
-                            title: "New Password", text: $model.newPassword, isError: model.newPasswordError != nil, isSecure: true,
+                            title: "New password", text: $model.newPassword, isError: model.newPasswordError != nil, isSecure: true,
                             width: nil, onSubmit: { Task { await model.changePassword() } })
                     }
                     SettingsSheetStatus(text: Text("At least 8 characters."), isMet: model.isNewPasswordLongEnough)

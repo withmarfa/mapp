@@ -2924,6 +2924,9 @@
     "Automatic checks are off." : {
 
     },
+    "Automatic checks are on." : {
+
+    },
     "Automatic uses words in lists and tables, such as “Yesterday”, and abbreviated dates elsewhere. Times follow your Mac’s 12 or 24 hour setting." : {
       "extractionState" : "manual"
     },
@@ -3523,9 +3526,6 @@
     "Check Again" : {
 
     },
-    "Check Automatically" : {
-
-    },
     "Check Document Now" : {
 
     },
@@ -3994,7 +3994,7 @@
     "Copy the Signing Secret Now" : {
 
     },
-    "Couldn’t Change Automatic Update Settings" : {
+    "Couldn’t change automatic update settings" : {
 
     },
     "Couldn’t Check" : {
@@ -4006,7 +4006,7 @@
     "Couldn’t Check Webhook Keys" : {
 
     },
-    "Couldn’t Check for Problems" : {
+    "Couldn’t check for problems" : {
 
     },
     "Couldn’t Check the Webhook’s Key" : {
@@ -4057,7 +4057,7 @@
     "Couldn’t Read %@" : {
 
     },
-    "Couldn’t Read Automatic Update Settings" : {
+    "Couldn’t read automatic update settings" : {
 
     },
     "Couldn’t Read Available Types" : {
@@ -4072,7 +4072,7 @@
     "Couldn’t Read Its Data" : {
 
     },
-    "Couldn’t Read Private Addresses" : {
+    "Couldn’t read private addresses" : {
 
     },
     "Couldn’t Read Start-Up Settings" : {
@@ -4096,13 +4096,13 @@
     "Couldn’t Read the Keys This App Made" : {
 
     },
-    "Couldn’t Read the Name" : {
+    "Couldn’t read the name" : {
 
     },
-    "Couldn’t Read the Profile" : {
+    "Couldn’t read the profile" : {
 
     },
-    "Couldn’t Read the Release" : {
+    "Couldn’t read the release" : {
 
     },
     "Couldn’t Read the Rules" : {
@@ -4138,7 +4138,7 @@
     "Couldn’t Sign In" : {
 
     },
-    "Couldn’t Update" : {
+    "Couldn’t update" : {
 
     },
     "Couldn’t be downloaded." : {
@@ -4249,7 +4249,7 @@
     "Current" : {
 
     },
-    "Current Password" : {
+    "Current password" : {
 
     },
     "Current Version" : {
@@ -5399,9 +5399,6 @@
 
     },
     "Heartbeat" : {
-
-    },
-    "Heartbeat Address" : {
 
     },
     "Help" : {
@@ -6997,7 +6994,7 @@
     "New Link Type…" : {
 
     },
-    "New Password" : {
+    "New password" : {
 
     },
     "New Section" : {
@@ -8138,9 +8135,6 @@
     "PostHog Host" : {
 
     },
-    "PostHog Project Token" : {
-
-    },
     "PostHog host" : {
 
     },
@@ -8198,7 +8192,7 @@
     "Privacy" : {
 
     },
-    "Private Addresses" : {
+    "Private addresses" : {
 
     },
     "Problems" : {
@@ -9063,13 +9057,13 @@
     "Set %@" : {
       "extractionState" : "manual"
     },
-    "Set %@ Again" : {
+    "Set the %@ again" : {
 
     },
     "Set %@ first." : {
 
     },
-    "Set a Secret Again" : {
+    "Set a secret again" : {
 
     },
     "Set on the machine %@ runs on." : {
@@ -9399,9 +9393,6 @@
     "Sign Out" : {
 
     },
-    "Sign Out…" : {
-
-    },
     "Sign in again" : {
 
     },
@@ -9414,7 +9405,7 @@
     "Sign in to this server again to see them." : {
       "extractionState" : "manual"
     },
-    "Sign out “%@”?" : {
+    "Sign Out “%@”?" : {
 
     },
     "Sign-In Address" : {
@@ -9850,12 +9841,6 @@
     "Telemetry" : {
 
     },
-    "Telemetry Address" : {
-
-    },
-    "Telemetry Headers" : {
-
-    },
     "Telemetry is sent without these headers." : {
 
     },
@@ -9961,7 +9946,7 @@
     "The PostHog host and the project token are removed together, and error reports stop." : {
 
     },
-    "The Server Hasn’t Come Back Yet" : {
+    "The server hasn’t come back yet" : {
 
     },
     "The Server Refused This Copy’s Sign-In" : {
@@ -10684,9 +10669,6 @@
     "The server is back on %@. Nothing was lost." : {
 
     },
-    "The server is up to date." : {
-
-    },
     "The server keeps every version for the first period, then one a day, then one a week. Each period must be at least as long as the one before. A type’s own policy wins. Empty uses the server’s defaults." : {
       "extractionState" : "manual"
     },
@@ -10984,7 +10966,7 @@
     "Thinned old versions" : {
 
     },
-    "This App Can’t Manage Sign-Ins" : {
+    "This app can’t manage sign-ins" : {
 
     },
     "This App Isn’t Connected" : {

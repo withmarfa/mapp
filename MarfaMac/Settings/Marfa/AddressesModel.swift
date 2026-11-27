@@ -2,7 +2,7 @@ import Foundation
 import Marfa
 import Observation
 
-/// The Addresses page: where the instance signs people in, the other addresses it answers on and the websites allowed to
+/// The Network page: where the instance signs people in, the other addresses it answers on and the websites allowed to
 /// call it. An address is added, removed or moved only after the server's own check says what it would do, and moving
 /// the sign-in address shows what changes and asks first. The instance read is named in every write, so another instance
 /// answering at the address is told, not written to.
@@ -350,7 +350,7 @@ import Observation
         defer { isWriting = false }
         switch await store.write([Self.key: .set(.bool(on))]) {
         case .saved: break
-        case .elsewhere: notice = StoredSettingWording.elsewhere([String(localized: "Private Addresses")])
+        case .elsewhere: notice = StoredSettingWording.elsewhere([String(localized: "Private addresses")])
         case .failed(let failure): line = StoredSettingWording.line(failure)
         }
     }

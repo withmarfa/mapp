@@ -239,7 +239,6 @@ nonisolated protocol OwnerCalls: Sendable {
     func browserSignIns() async throws(OwnerFailure) -> [BrowserSignIn]
     func endSignIn(_ id: String) async throws(OwnerFailure)
     func changePassword(from current: String, to new: String) async throws(OwnerFailure) -> PasswordOutcome
-    /// The parts of the profile the sign-in may change, as its scopes say; every part where it holds no scopes to read, as a
     /// Sends the owner's name alone, and answers the profile as the server then holds it.
     func setProfileName(_ name: String) async throws(OwnerFailure) -> OwnerProfile
     func setProfileContact(_ field: ProfileContactField, to value: String) async throws(OwnerFailure) -> OwnerProfile
