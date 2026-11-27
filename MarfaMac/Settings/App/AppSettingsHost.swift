@@ -206,7 +206,6 @@ enum LibraryDescription {
 
     func requestSignOut() {
         guard !libraries.marfaSettings.isWorking, host.configuredConnection != nil else { return }
-        showConnection()
         libraries.marfaSettings.requestDisconnect()
     }
 
