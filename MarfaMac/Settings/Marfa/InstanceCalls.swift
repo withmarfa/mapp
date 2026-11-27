@@ -144,8 +144,8 @@ nonisolated protocol InstanceCalls: Sendable {
     func change(_ changes: [String: StoredSettingChange], instanceID: String?) async throws(OwnerFailure)
 }
 
-/// `InstanceCalls` over the package's generated client. Item counts use the server as well: the generated client does
-/// not hold `GET /items/stats`.
+/// `InstanceCalls` over the package's generated client. Item counts go through `Server.itemStats`, which renews a
+/// refused token itself.
 nonisolated struct ClientInstanceCalls: InstanceCalls {
     let client: @Sendable () throws -> Client
     let server: @Sendable () throws -> Server
@@ -167,11 +167,6 @@ nonisolated struct ClientInstanceCalls: InstanceCalls {
     private static func date(_ text: String) -> Date? {
         (try? Date(text, strategy: .iso8601.year().month().day().time(includingFractionalSeconds: true).timeZone(separator: .omitted)))
             ?? (try? Date(text, strategy: .iso8601))
-    }
-
-    /// The same instant the audit log is read with, so a bound is the instant the page asked for.
-    private static func stamp(_ date: Date) -> String {
-        date.formatted(.iso8601.year().month().day().time(includingFractionalSeconds: true).timeZone(separator: .omitted))
     }
 
     private static func count(_ value: Double) -> Int? {
@@ -198,157 +193,29 @@ nonisolated struct ClientInstanceCalls: InstanceCalls {
     }
 
     func itemStats(_ query: UsageStatsQuery) async throws(OwnerFailure) -> [String: Int] {
+        let asked = Self.itemStatsRequest(query)
+        let server: Server
+        do { server = try self.server() } catch { throw ClientOwnerCalls.failure(error) }
         do {
-            return try await Self.itemCounts(query, server: server)
+            let groups = try await server.itemStats(by: asked.grouping, filters: asked.filters)
+            var counts: [String: Int] = [:]
+            for group in groups {
+                counts[group.key] = Int(exactly: group.count) ?? Int.max
+            }
+            return counts
         } catch {
             throw ClientOwnerCalls.failure(error)
         }
     }
 
-    /// The names and values `GET /items/stats` is asked with. `itemCountsBySource` cannot pass a grouping or a date.
-    static func statsQueryItems(_ query: UsageStatsQuery) -> [URLQueryItem] {
-        var items = [URLQueryItem(name: "by", value: query.grouping == .type ? "type" : "source")]
-        if let after = query.updatedAfter { items.append(URLQueryItem(name: "updated_after", value: stamp(after))) }
-        if let before = query.updatedBefore { items.append(URLQueryItem(name: "updated_before", value: stamp(before))) }
-        return items
-    }
-
-    /// One `GET /items/stats`. A refused token is renewed by the package's own stats call, then this request goes once more.
-    private static func itemCounts(
-        _ query: UsageStatsQuery, server make: @Sendable () throws -> Server, renewed: Bool = false
-    ) async throws(MarfaError) -> [String: Int] {
-        let server: Server
-        do {
-            server = try make()
-        } catch let error as MarfaError {
-            throw error
-        } catch {
-            throw .signedOut(origin: "", message: "the sign-in could not be read")
-        }
-        let (response, data) = try await exchange(statsRequest(query, server: server))
-        if response.statusCode == 401, !renewed {
-            _ = try await server.itemCountsBySource()
-            return try await itemCounts(query, server: make, renewed: true)
-        }
-        let origin = origin(of: server)
-        let status = UInt16(clamping: response.statusCode)
-        if (300..<400).contains(response.statusCode) {
-            throw .redirected(
-                origin: origin, status: status, location: response.value(forHTTPHeaderField: "Location"),
-                message: "\(origin) answered with a redirect, which was not followed", server: nil)
-        }
-        guard response.statusCode == 200 else { throw refusal(status: status, data: data, origin: origin) }
-        let contract = response.value(forHTTPHeaderField: "X-Marfa-Contract")
-        guard contract == String(marfaContractVersion) else {
-            throw .contractMismatch(
-                served: contract, expected: UInt64(marfaContractVersion), status: status, writeSent: false,
-                message: "\(origin) speaks a different contract", server: nil)
-        }
-        return try counts(from: data)
-    }
-
-    private static func statsRequest(_ query: UsageStatsQuery, server: Server) throws(MarfaError) -> URLRequest {
-        guard var components = URLComponents(url: server.url, resolvingAgainstBaseURL: false) else {
-            throw .invalid(message: "the server address could not be used")
-        }
-        var base = components.percentEncodedPath
-        while base.hasSuffix("/") { base.removeLast() }
-        components.percentEncodedPath = base + "/items/stats"
-        let items = statsQueryItems(query)
-        components.percentEncodedQuery = items.map { "\(queryPart($0.name))=\(queryPart($0.value ?? ""))" }.joined(separator: "&")
-        guard let url = components.url else { throw .invalid(message: "the item counts could not be asked for") }
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        let parts = Server.defaultTimeout.components
-        request.timeoutInterval = TimeInterval(parts.seconds) + TimeInterval(parts.attoseconds) / 1e18
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue(String(marfaContractVersion), forHTTPHeaderField: "X-Marfa-Contract")
-        request.setValue("Bearer \(server.key)", forHTTPHeaderField: "Authorization")
-        return request
-    }
-
-    private static func exchange(_ request: URLRequest) async throws(MarfaError) -> (HTTPURLResponse, Data) {
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.timeoutIntervalForRequest = request.timeoutInterval
-        configuration.timeoutIntervalForResource = request.timeoutInterval
-        configuration.httpShouldSetCookies = false
-        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-        let session = URLSession(configuration: configuration, delegate: StatsNoRedirect(), delegateQueue: nil)
-        defer { session.finishTasksAndInvalidate() }
-        let data: Data
-        let response: URLResponse
-        do {
-            (data, response) = try await session.data(for: request)
-        } catch is CancellationError {
-            throw .canceled(message: "the request was canceled")
-        } catch let error as URLError {
-            throw transport(error)
-        } catch {
-            throw .network(message: "the server could not be reached")
-        }
-        guard let http = response as? HTTPURLResponse else {
-            throw .network(message: "the server did not answer with http")
-        }
-        return (http, data)
-    }
-
-    private static func transport(_ error: URLError) -> MarfaError {
-        switch error.code {
-        case .cancelled: .canceled(message: "the request was canceled")
-        case .timedOut: .network(message: "the server did not answer in time")
-        case .notConnectedToInternet, .networkConnectionLost, .dataNotAllowed:
-            .noConnection(message: "the server could not be reached")
-        default: .network(message: "the server could not be reached")
-        }
-    }
-
-    private static func refusal(status: UInt16, data: Data, origin: String) -> MarfaError {
-        let told = refusalFields(data)
-        let code = told?.code ?? "error"
-        let message = told?.message ?? "\(origin) refused the item counts"
-        switch status {
-        case 401: return .unauthorized(code: code, message: message, server: nil)
-        case 403: return .forbidden(code: code, message: message, server: nil)
-        case 404: return .notFound(code: code, message: message, server: nil)
-        default: return .server(status: status, code: code, message: message, details: nil, server: nil)
-        }
-    }
-
-    private static func refusalFields(_ data: Data) -> (code: String, message: String)? {
-        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
-        let body = (object["error"] as? [String: Any]) ?? object
-        let code = body["code"] as? String
-        let message = body["message"] as? String
-        guard code != nil || message != nil else { return nil }
-        return (code ?? "error", message ?? "the server refused the item counts")
-    }
-
-    private static func counts(from data: Data) throws(MarfaError) -> [String: Int] {
-        let object: [String: Double]
-        do {
-            object = try JSONDecoder().decode([String: Double].self, from: data)
-        } catch {
-            throw .decoding(message: "the item counts could not be read")
-        }
-        var counts: [String: Int] = [:]
-        for (key, value) in object {
-            if let count = count(value) { counts[key] = count }
-        }
-        return counts
-    }
-
-    private static func origin(of server: Server) -> String {
-        guard let host = server.url.host, !host.isEmpty else { return server.url.absoluteString }
-        var text = "\(server.url.scheme ?? "https")://\(host)"
-        if let port = server.url.port { text += ":\(port)" }
-        return text
-    }
-
-    /// `+` is escaped too: a server reads a bare `+` in a query as a space.
-    private static func queryPart(_ value: String) -> String {
-        var allowed = CharacterSet.urlQueryAllowed
-        allowed.remove(charactersIn: "&=+")
-        return value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value
+    /// The grouping and the changed-time bounds `GET /items/stats` is asked with. An open count sends neither bound.
+    static func itemStatsRequest(_ query: UsageStatsQuery) -> (grouping: ItemStatsGrouping, filters: ItemStatsFilters) {
+        (
+            grouping: query.grouping == .type ? .type : .source,
+            filters: ItemStatsFilters(
+                updatedAfter: query.updatedAfter.map(ItemDate.instant),
+                updatedBefore: query.updatedBefore.map(ItemDate.instant))
+        )
     }
 
     func usageMetrics() async throws(OwnerFailure) -> UsageMetrics {
@@ -467,15 +334,5 @@ nonisolated struct ClientInstanceCalls: InstanceCalls {
         case "otel_exporter_otlp_headers": return text(\.otelExporterOtlpHeaders)
         default: return false
         }
-    }
-}
-
-/// Refuses a redirect, so the sign-in's token stays on the server that was asked.
-private nonisolated final class StatsNoRedirect: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
-    func urlSession(
-        _ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
-        newRequest request: URLRequest, completionHandler: @escaping @Sendable (URLRequest?) -> Void
-    ) {
-        completionHandler(nil)
     }
 }

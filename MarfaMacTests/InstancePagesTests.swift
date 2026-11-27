@@ -994,15 +994,15 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
     @Test func itemStatsAsksForTheGroupingAndTheDayBounds() {
         let start = Date(timeIntervalSince1970: 1_700_000_000)
         let end = start.addingTimeInterval(3_600)
-        let day = ClientInstanceCalls.statsQueryItems(
+        let day = ClientInstanceCalls.itemStatsRequest(
             UsageStatsQuery(grouping: .source, updatedAfter: start, updatedBefore: end))
-        #expect(day.map(\.name) == ["by", "updated_after", "updated_before"])
-        #expect(day[0].value == "source")
-        #expect(day[1].value?.isEmpty == false)
-        #expect(day[2].value?.isEmpty == false)
-        let open = ClientInstanceCalls.statsQueryItems(UsageStatsQuery(grouping: .type))
-        #expect(open.map(\.name) == ["by"])
-        #expect(open[0].value == "type")
+        #expect(day.grouping == .source)
+        #expect(day.filters.updatedAfter == ItemDate.instant(start))
+        #expect(day.filters.updatedBefore == ItemDate.instant(end))
+        let open = ClientInstanceCalls.itemStatsRequest(UsageStatsQuery(grouping: .type))
+        #expect(open.grouping == .type)
+        #expect(open.filters.updatedAfter == nil)
+        #expect(open.filters.updatedBefore == nil)
     }
 
     @Test func anEmptyMarfaIsZerosNotAFailure() async {
