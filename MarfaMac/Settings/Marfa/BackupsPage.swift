@@ -96,7 +96,7 @@ struct BackupsPage: View {
                 SettingsSection("Problems") {
                     if let failedRun {
                         SettingsRow(
-                            title: Text("The Last Backup Failed"), line: Text(verbatim: failedRun),
+                            title: Text("The last backup failed"), line: Text(verbatim: failedRun),
                             error: model.backUpError, lead: .tint("exclamationmark.triangle", .orange), lines: nil
                         ) {
                             backUpButton
@@ -172,9 +172,9 @@ struct BackupsPage: View {
                     }
                 }
                 if host.grants.contains(.configManage), let settings = model.settings {
-                    SettingsRow("Back Up Every", line: "Only when something changed.") {
+                    SettingsRow("Back up every", line: "Only when something changed.") {
                         SettingsPopUp(
-                            title: "Back Up Every",
+                            title: "Back up every",
                             selection: Binding { settings.intervalSeconds } set: { choice in
                                 if let choice { Task { await model.setInterval(choice) } }
                             }
@@ -187,7 +187,7 @@ struct BackupsPage: View {
                         .disabled(model.isChanging || model.settingsFailure != nil)
                     }
                 } else if !host.grants.contains(.configManage) {
-                    LockedInstanceRow(title: String(localized: "Back Up Every"), permission: .configManage, host: host)
+                    LockedInstanceRow(title: String(localized: "Back up every"), permission: .configManage, host: host)
                 }
                 lastBackup
             }
@@ -205,16 +205,16 @@ struct BackupsPage: View {
     @ViewBuilder private var keepIn: some View {
         if !host.grants.contains(.configManage) {
             SettingsLinkRow(
-                verbatim: String(localized: "Keep Backups In"), line: Self.destination(backupsHealth),
+                verbatim: String(localized: "Keep backups in"), line: Self.destination(backupsHealth),
                 lock: String(localized: "Not allowed")
             ) { host.askForMore(naming: InstancePermission.configManage.rawValue) }
             .disabled(host.isAllowingMore)
         } else if model.place == .objectStore {
-            SettingsRow("Keep Backups In", line: "Set on the machine that runs this Marfa.") { SettingsLockedValue(text: String(localized: "An Object Store")) }
+            SettingsRow("Keep backups in", line: "Set on the machine that runs this Marfa.") { SettingsLockedValue(text: String(localized: "An Object Store")) }
         } else if let place = model.place {
-            SettingsRow("Keep Backups In") {
+            SettingsRow("Keep backups in") {
                 SettingsPopUp(
-                    title: "Keep Backups In",
+                    title: "Keep backups in",
                     selection: Binding {
                         place
                     } set: { choice in
@@ -231,7 +231,7 @@ struct BackupsPage: View {
                 .disabled(model.isChanging || model.settingsFailure != nil)
             }
         } else {
-            SettingsRow("Keep Backups In") { SettingsValue(verbatim: Self.destination(backupsHealth)) }
+            SettingsRow("Keep backups in") { SettingsValue(verbatim: Self.destination(backupsHealth)) }
         }
     }
 
@@ -251,7 +251,7 @@ struct BackupsPage: View {
 
     private var lastBackup: some View {
         let hasFailedRun = backupsHealth.flatMap(Self.failedRun) != nil
-        return SettingsRow("Last Backup", error: hasFailedRun ? nil : model.backUpError) {
+        return SettingsRow("Last backup", error: hasFailedRun ? nil : model.backUpError) {
             HStack(spacing: SettingsTokens.Metric.buttonGap) {
                 SettingsValue(verbatim: model.lastBackupLine(health: backupsHealth))
                 if !hasFailedRun { backUpButton }
