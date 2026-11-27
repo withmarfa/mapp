@@ -341,6 +341,150 @@ import Testing
         #expect(model.failure == .notPermitted("instance.read"))
         #expect(bench.refreshed == 1)
     }
+
+    @Test func theUsageBarUsesTheServersReading() async {
+        let bench = OwnerBench(grants: [.instanceRead, .configManage])
+        bench.calls.state.withLock { $0.storageUsage = Self.board }
+        let model = FileStorageModel(context: bench.context)
+        await model.load()
+        #expect(model.usage?.parts.map(\.kind) == [.pictures, .pdfs, .audioAndVideo, .other, .database])
+        #expect(model.usage?.parts.map(\.bytes) == [2_100_000_000, 980_000_000, 180_000_000, 140_000_000, 214_000_000])
+        #expect(model.usage?.usedBytes == 3_614_000_000)
+        #expect(model.usage?.freeBytes == 6_400_000_000)
+        #expect(model.usage?.totalBytes == 10_000_000_000)
+        #expect(model.usageFailure == nil)
+    }
+
+    @Test func aNewMarfaShowsNothingUsed() async {
+        let bench = OwnerBench(grants: [.instanceRead])
+        let model = FileStorageModel(context: bench.context)
+        await model.load()
+        #expect(model.usage?.usedBytes == 0)
+        #expect(model.usage?.freeBytes == 0)
+        #expect(model.usage?.diskSizeBytes == 0)
+        #expect(model.usage?.parts.allSatisfy { $0.bytes == 0 } == true)
+        #expect(model.usageFailure == nil)
+    }
+
+    @Test func storageUsageIsNotAskedWithoutInstanceRead() async {
+        let bench = OwnerBench(grants: [.configManage])
+        let model = FileStorageModel(context: bench.context)
+        await model.load()
+        #expect(!bench.calls.calls.contains("storageUsage"))
+        #expect(model.usage == nil)
+        #expect(bench.calls.calls.contains("fileStores"))
+    }
+
+    @Test func aFailedUsageReadLeavesTheRestOfStorage() async {
+        let bench = OwnerBench(grants: [.instanceRead, .configManage])
+        bench.calls.state.withLock {
+            $0.fileStores = FileStores(
+                stores: [FileStoreRow(id: "a", kind: .disk, locator: "/var/lib/marfa/files", error: nil)],
+                orphanCount: 0, orphanBytes: 0, firstFound: nil, orphansComplete: true)
+        }
+        bench.calls.fail("storageUsage", with: .unreachable)
+        let model = FileStorageModel(context: bench.context)
+        await model.load()
+        #expect(model.stores?.stores.count == 1)
+        #expect(model.failure == nil)
+        #expect(model.usage == nil)
+        #expect(model.usageFailure == .unreachable)
+    }
+
+    @Test func aUsageAnswerThatArrivesAfterLeavingIsDropped() async {
+        let bench = OwnerBench(grants: [.instanceRead])
+        bench.calls.state.withLock {
+            $0.storageUsage.kinds = [.init(kind: .pictures, bytes: 9_000_000_000)]
+        }
+        let gate = bench.calls.hold("storageUsage")
+        let model = FileStorageModel(context: bench.context)
+        let task = Task { await model.load() }
+        #expect(await eventually(within: .seconds(3)) { bench.calls.state.withLock { $0.waiting["storageUsage", default: 0] >= 1 } })
+        task.cancel()
+        gate.open()
+        await task.value
+        #expect(model.usage == nil)
+    }
+
+    /// The board's disk: file kinds sum to 3.4 GB, the database and its log to 214 MB, on a 10 GB disk.
+    private static let board = StorageUsageReading(
+        kinds: [
+            .init(kind: .pictures, bytes: 2_100_000_000), .init(kind: .pdfs, bytes: 980_000_000),
+            .init(kind: .audioAndVideo, bytes: 180_000_000), .init(kind: .other, bytes: 140_000_000),
+        ],
+        databaseBytes: 200_000_000, writeAheadLogBytes: 14_000_000, freeBytes: 6_400_000_000, diskSizeBytes: 10_000_000_000)
+}
+
+@Suite(.hangLimit) struct StorageBarTests {
+    @Test func kindsStayInTheOrderTheyWereGivenAndTheDatabaseFollows() {
+        let reading = StorageBar.reading(from: StorageUsageReading(
+            kinds: [.init(kind: .other, bytes: 9), .init(kind: .pictures, bytes: 2)],
+            databaseBytes: 200_000_000, writeAheadLogBytes: nil, freeBytes: nil, diskSizeBytes: 10_000_000_000))
+        #expect(reading.parts.map(\.kind) == [.other, .pictures, .database])
+        #expect(reading.parts.map(\.bytes) == [9, 2, 200_000_000])
+        #expect(reading.freeBytes == nil)
+        #expect(reading.totalBytes == 10_000_000_000)
+        #expect(reading.usedBytes == 200_000_011)
+    }
+
+    @Test func aMissingFreeSpaceOrDiskSizeIsNotInvented() {
+        let missingFree = StorageBar.reading(from: StorageUsageReading(
+            kinds: [.init(kind: .pictures, bytes: 50)], databaseBytes: 10, writeAheadLogBytes: nil, freeBytes: nil, diskSizeBytes: 100))
+        #expect(missingFree.freeBytes == nil)
+        #expect(missingFree.totalBytes == 100)
+        #expect(missingFree.usedBytes == 60)
+
+        let missingDisk = StorageBar.reading(from: StorageUsageReading(
+            kinds: [.init(kind: .pictures, bytes: 50)], databaseBytes: nil, writeAheadLogBytes: nil, freeBytes: 40, diskSizeBytes: nil))
+        #expect(missingDisk.freeBytes == 40)
+        #expect(missingDisk.totalBytes == nil)
+        #expect(missingDisk.diskSizeBytes == nil)
+        #expect(missingDisk.parts.map(\.kind) == [.pictures])
+
+        let missingBoth = StorageBar.reading(from: StorageUsageReading(
+            kinds: [.init(kind: .pdfs, bytes: 8)], databaseBytes: nil, writeAheadLogBytes: nil, freeBytes: nil, diskSizeBytes: nil))
+        #expect(missingBoth.freeBytes == nil)
+        #expect(missingBoth.totalBytes == nil)
+        #expect(missingBoth.parts.map(\.kind) == [.pdfs])
+        #expect(missingBoth.usedBytes == 8)
+    }
+
+    @Test func anUnreadableDatabaseIsLeftOutAndALogAloneIsItsOwnPart() {
+        let neither = StorageBar.reading(from: StorageUsageReading(
+            kinds: StorageBar.Kind.files.map { .init(kind: $0, bytes: 1) },
+            databaseBytes: nil, writeAheadLogBytes: nil, freeBytes: nil, diskSizeBytes: nil))
+        #expect(neither.parts.map(\.kind) == StorageBar.Kind.files)
+        #expect(neither.usedBytes == 4)
+
+        let logOnly = StorageBar.reading(from: StorageUsageReading(
+            kinds: [], databaseBytes: nil, writeAheadLogBytes: 14, freeBytes: nil, diskSizeBytes: nil))
+        #expect(logOnly.parts.map(\.kind) == [.writeAheadLog])
+        #expect(logOnly.usedBytes == 14)
+    }
+
+    @Test func aNewMarfaKeepsTheZerosTheServerReported() {
+        let reading = StorageBar.reading(from: .empty)
+        #expect(reading.parts.map(\.kind) == [.pictures, .pdfs, .audioAndVideo, .other, .database])
+        #expect(reading.parts.allSatisfy { $0.bytes == 0 })
+        #expect(reading.freeBytes == 0)
+        #expect(reading.diskSizeBytes == 0)
+        #expect(reading.totalBytes == 0)
+        #expect(reading.usedBytes == 0)
+    }
+
+    @Test func aNegativeReadingIsShownAsNothingAndAFullDiskDoesNotOverflow() {
+        let negative = StorageBar.reading(from: StorageUsageReading(
+            kinds: [.init(kind: .pictures, bytes: -5)], databaseBytes: -1, writeAheadLogBytes: nil, freeBytes: -3, diskSizeBytes: -9))
+        #expect(negative.parts.map(\.bytes) == [0, 0])
+        #expect(negative.freeBytes == 0)
+        #expect(negative.diskSizeBytes == 0)
+        #expect(negative.usedBytes == 0)
+
+        let full = StorageBar.reading(from: StorageUsageReading(
+            kinds: [], databaseBytes: .max, writeAheadLogBytes: 1, freeBytes: nil, diskSizeBytes: nil))
+        #expect(full.parts.map(\.bytes) == [.max])
+        #expect(full.usedBytes == .max)
+    }
 }
 
 @MainActor

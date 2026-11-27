@@ -1,8 +1,8 @@
 import Marfa
 import SwiftUI
 
-/// The Storage page: where the server keeps files, how it reads, fetches and cleans them up. Switches and choices are sent
-/// at once, numbers when Return is pressed or the field is left.
+/// The Storage page: where the server keeps files, how full the disk is, and how it reads, fetches and cleans them up.
+/// Switches and choices are sent at once, numbers when Return is pressed or the field is left.
 struct FileStoragePage: View {
     let host: any MarfaSettingsHost
     @State private var storage: FileStorageModel
@@ -23,13 +23,14 @@ struct FileStoragePage: View {
                 content(nil)
             }
         }
-        .task(id: host.grants) { if host.grants.contains(.instanceRead) { await storage.load() } }
+        .task(id: host.grants) { if FileStorageModel.readsUsage(host.grants) { await storage.load() } }
         .accessibilityIdentifier("FileStoragePage")
     }
 
     private func content(_ catalog: LimitsModel?) -> some View {
         SettingsPageColumn {
             if let catalog, let notice = catalog.notice { OwnerNotice(title: "Changed Elsewhere", line: notice, close: { catalog.dismissNotice() }) }
+            usage
             files(catalog)
             SettingsSection("Versions", footer: "A type can keep its own.") {
                 ForEach(InstanceSetting.versionSettings, id: \.self) { setting in
@@ -81,6 +82,59 @@ struct FileStoragePage: View {
     @ViewBuilder private func field(_ limit: LimitSetting, _ catalog: LimitsModel?) -> some View {
         if let catalog { LimitField(model: catalog, limit: limit) }
         else { locked(limit.title) }
+    }
+
+    // MARK: How full the disk is
+
+    @ViewBuilder private var usage: some View {
+        if !FileStorageModel.readsUsage(host.grants) {
+            SettingsSection("Storage") {
+                LockedInstanceRow(title: String(localized: "Storage usage"), permission: .instanceRead, host: host)
+            }
+        } else if let failure = storage.usageFailure {
+            SettingsSection("Storage") {
+                OwnerProblemRow(
+                    title: "Couldn’t read storage usage", failure: failure, page: .fileStorage, host: host,
+                    retry: { Task { await storage.loadUsage() } })
+            }
+        } else if let reading = storage.usage {
+            SettingsSection(name: Text(verbatim: Self.used(reading))) {
+                SettingsStorageBar(
+                    parts: reading.parts.map { .init(name: $0.kind.title, tone: Self.tone($0.kind), bytes: $0.bytes) },
+                    freeBytes: reading.freeBytes, freeName: String(localized: "Free on disk"), label: Self.label(reading))
+            }
+        } else {
+            SettingsSection("Storage") {
+                SettingsRow("Reading storage usage…") { ProgressView().controlSize(.small) }
+            }
+        }
+    }
+
+    private static func used(_ reading: StorageBar.Reading) -> String {
+        String(format: String(localized: "%@ used"), size(reading.usedBytes))
+    }
+
+    /// Says "of" the disk size only when the server reported one.
+    private static func label(_ reading: StorageBar.Reading) -> LocalizedStringKey {
+        let amount = size(reading.usedBytes)
+        guard let disk = reading.diskSizeBytes else { return LocalizedStringKey(stringLiteral: String(format: String(localized: "%@ used"), amount)) }
+        let spoken = String(format: String(localized: "%1$@ used of %2$@"), amount, size(disk))
+        return LocalizedStringKey(stringLiteral: spoken)
+    }
+
+    private static func size(_ bytes: Int64) -> String {
+        bytes.formatted(.byteCount(style: .file))
+    }
+
+    private static func tone(_ kind: StorageBar.Kind) -> SettingsTokens.Tone {
+        switch kind {
+        case .pictures: .green
+        case .pdfs: .red
+        case .audioAndVideo: .pink
+        case .other: .gray
+        case .database: .blue
+        case .writeAheadLog: .indigo
+        }
     }
 
     // MARK: Where files are

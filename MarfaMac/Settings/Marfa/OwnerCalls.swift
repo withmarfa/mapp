@@ -280,6 +280,8 @@ nonisolated protocol OwnerCalls: Sendable {
     func instanceMetrics() async throws(OwnerFailure) -> InstanceMetricsReading
     /// Where files are kept and the files nothing uses (`instance.read`).
     func fileStores() async throws(OwnerFailure) -> FileStores
+    /// How much storage each kind of file uses, and the free space on their volume (`instance.read`).
+    func storageUsage() async throws(OwnerFailure) -> StorageUsageReading
     /// Every source the instance holds (`keys.manage`): those of its items, whatever a source filter hides, those named or
     /// marked, and those keys hold as their own or claim.
     func sources() async throws(OwnerFailure) -> [OwnerSource]
@@ -404,8 +406,8 @@ nonisolated struct AddressPlan: Hashable, Sendable {
 
 /// `OwnerCalls` over the package's generated client.
 nonisolated struct ClientOwnerCalls: OwnerCalls {
-    /// The package's server, for `Server.health()` and `Server.sources()`, which the generated client does not hold. Nil where
-    /// there is none.
+    /// The package's server, for `Server.health()`, `Server.sources()` and `Server.storageUsage()`, which the generated client
+    /// does not hold. Nil where there is none.
     var server: (@Sendable () throws -> Server)?
     let client: @Sendable () throws -> Client
 

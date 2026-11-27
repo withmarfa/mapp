@@ -4,6 +4,9 @@
     "" : {
 
     },
+    "%1$@ used of %2$@" : {
+
+    },
     "%@\n%@" : {
       "localizations" : {
         "en" : {
@@ -445,6 +448,9 @@
 
     },
     "%@ use it." : {
+
+    },
+    "%@ used" : {
 
     },
     "%@ uses it." : {
@@ -2991,6 +2997,9 @@
     "Attachments not yet offline" : {
 
     },
+    "Audio and video" : {
+
+    },
     "Audit Log" : {
 
     },
@@ -3019,9 +3028,6 @@
 
     },
     "Back 15 Seconds" : {
-
-    },
-    "Back up every" : {
 
     },
     "Back Up Now" : {
@@ -3055,6 +3061,9 @@
       "extractionState" : "manual"
     },
     "Back up" : {
+
+    },
+    "Back up every" : {
 
     },
     "Backing Up…" : {
@@ -3593,9 +3602,6 @@
     "Changed the settings" : {
 
     },
-    "Changes and sign-ins are recorded here." : {
-
-    },
     "Changes Are Waiting" : {
 
     },
@@ -3603,6 +3609,9 @@
       "extractionState" : "manual"
     },
     "Changes Still Waiting" : {
+
+    },
+    "Changes and sign-ins are recorded here." : {
 
     },
     "Changes not yet sent are kept." : {
@@ -4320,6 +4329,9 @@
 
     },
     "Couldn’t read start-up settings" : {
+
+    },
+    "Couldn’t read storage usage" : {
 
     },
     "Couldn’t read the name" : {
@@ -5355,6 +5367,9 @@
     "Free" : {
 
     },
+    "Free on disk" : {
+
+    },
     "From" : {
       "extractionState" : "manual"
     },
@@ -6294,9 +6309,6 @@
     "Keep All Downloads" : {
 
     },
-    "Keep backups in" : {
-
-    },
     "Keep Both Copies" : {
 
     },
@@ -6330,6 +6342,9 @@
           }
         }
       }
+    },
+    "Keep backups in" : {
+
     },
     "Keep every version for" : {
 
@@ -6458,9 +6473,6 @@
     "Last 7 Days" : {
 
     },
-    "Last backup" : {
-
-    },
     "Last Run" : {
 
     },
@@ -6471,6 +6483,9 @@
 
     },
     "Last answered %@. The app keeps trying." : {
+
+    },
+    "Last backup" : {
 
     },
     "Last heard from %@." : {
@@ -6550,9 +6565,6 @@
 
     },
     "Library" : {
-
-    },
-    "Limit sources" : {
 
     },
     "Library and Feed" : {
@@ -7356,12 +7368,6 @@
     "No Items" : {
       "extractionState" : "manual"
     },
-    "No items yet" : {
-
-    },
-    "No Jobs Yet" : {
-
-    },
     "No Jobs" : {
 
     },
@@ -7520,6 +7526,9 @@
 
     },
     "No items match this view." : {
+
+    },
+    "No items yet" : {
 
     },
     "No items." : {
@@ -8119,6 +8128,9 @@
     "Other Webhooks Aren’t Listed" : {
 
     },
+    "Other files" : {
+
+    },
     "Outline" : {
 
     },
@@ -8144,6 +8156,9 @@
 
     },
     "PDF, ^[%lld page](inflect: true)" : {
+
+    },
+    "PDFs" : {
 
     },
     "Page" : {
@@ -8575,6 +8590,9 @@
       "extractionState" : "manual"
     },
     "Reading earlier versions…" : {
+
+    },
+    "Reading storage usage…" : {
 
     },
     "Reading the plugins release…" : {
@@ -10021,6 +10039,9 @@
     "Storage Usage" : {
 
     },
+    "Storage usage" : {
+
+    },
     "Stored" : {
 
     },
@@ -10225,9 +10246,6 @@
     },
     "The Keychain wouldn’t keep or give the sign-in. Check that the app can use the Keychain, then try again." : {
       "extractionState" : "manual"
-    },
-    "The last backup failed" : {
-
     },
     "The Marfa server can’t be reached. The items are still in Recently Deleted." : {
       "extractionState" : "manual"
@@ -10779,6 +10797,9 @@
 
     },
     "The last backup didn’t finish" : {
+
+    },
+    "The last backup failed" : {
 
     },
     "The last backup run failed or lost files." : {
@@ -12413,9 +12434,6 @@
     "Waiting to download." : {
 
     },
-    "Webhook limit reached" : {
-
-    },
     "Waiting to start" : {
 
     },
@@ -12642,6 +12660,9 @@
 
     },
     "Wrap Code" : {
+
+    },
+    "Write-ahead log" : {
 
     },
     "Writes" : {
