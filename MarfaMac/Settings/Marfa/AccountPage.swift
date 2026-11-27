@@ -130,8 +130,10 @@ struct AccountPage: View {
 
     private func action(for concern: AttentionConcern) -> SettingsProblemAction {
         switch concern.repair {
-        case .command(let command):
-            SettingsProblemAction("Copy Command") { OwnerClipboard.copyText(command) }
+        case .command:
+            SettingsProblemAction("Copy Command") {
+                if let command = concern.repairCommand(serverAddress: host.serverAddress) { OwnerClipboard.copyText(command) }
+            }
         case .page(let page):
             SettingsProblemAction(verbatim: page == .keys ? String(localized: "Show Keys") : String(localized: "Show \(page.title)")) {
                 host.show(page)

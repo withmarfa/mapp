@@ -261,6 +261,7 @@ nonisolated enum ProfileContactField: Hashable {
         if !canManageSignIns {
             guard await allowSignIns() else { return }
             await load()
+            guard gateFailure == nil, canManageSignIns else { return }
         }
         clearPasswordInput()
         sheet = .password

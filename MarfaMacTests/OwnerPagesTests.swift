@@ -1014,6 +1014,17 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         #expect(bench.calls.calls.contains("passkeys"), "the lists are read once it is held")
     }
 
+    @Test func thePasswordSheetStaysClosedWhenTheReloadAfterApprovalIsSignedOut() async {
+        let bench = OwnerBench(grants: [])
+        let account = model(bench)
+        await account.load()
+        bench.calls.fail("profile", with: .signedOut)
+        await account.beginChangePassword()
+        #expect(bench.asked == [[.signInsManage]])
+        #expect(account.gateFailure == .signedOut)
+        #expect(account.sheet == nil)
+    }
+
     @Test func allowMoreCancelledOpensNothingAndChangesNothing() async {
         let bench = OwnerBench(grants: [])
         bench.allowing = .cancelled

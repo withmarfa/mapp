@@ -4000,7 +4000,7 @@
     "Copy the Signing Secret Now" : {
 
     },
-    "Couldn’t change automatic update settings" : {
+    "Copy the command, run it in Terminal, then enter the secret key when prompted." : {
 
     },
     "Couldn’t Check" : {
@@ -4010,9 +4010,6 @@
 
     },
     "Couldn’t Check Webhook Keys" : {
-
-    },
-    "Couldn’t check for problems" : {
 
     },
     "Couldn’t Check the Webhook’s Key" : {
@@ -4063,9 +4060,6 @@
     "Couldn’t Read %@" : {
 
     },
-    "Couldn’t read automatic update settings" : {
-
-    },
     "Couldn’t Read Available Types" : {
 
     },
@@ -4076,9 +4070,6 @@
 
     },
     "Couldn’t Read Its Data" : {
-
-    },
-    "Couldn’t read private addresses" : {
 
     },
     "Couldn’t Read Start-Up Settings" : {
@@ -4100,15 +4091,6 @@
 
     },
     "Couldn’t Read the Keys This App Made" : {
-
-    },
-    "Couldn’t read the name" : {
-
-    },
-    "Couldn’t read the profile" : {
-
-    },
-    "Couldn’t read the release" : {
 
     },
     "Couldn’t Read the Rules" : {
@@ -4144,10 +4126,10 @@
     "Couldn’t Sign In" : {
 
     },
-    "Couldn’t update" : {
+    "Couldn’t be downloaded." : {
 
     },
-    "Couldn’t be downloaded." : {
+    "Couldn’t change automatic update settings" : {
 
     },
     "Couldn’t change downloaded files. Check the current limit and try again." : {
@@ -4160,6 +4142,9 @@
 
     },
     "Couldn’t change this" : {
+
+    },
+    "Couldn’t check for problems" : {
 
     },
     "Couldn’t confirm the date" : {
@@ -4204,6 +4189,9 @@
     "Couldn’t read" : {
 
     },
+    "Couldn’t read automatic update settings" : {
+
+    },
     "Couldn’t read backup settings" : {
 
     },
@@ -4213,6 +4201,18 @@
     "Couldn’t read downloaded files. The app will try again." : {
       "extractionState" : "manual"
     },
+    "Couldn’t read private addresses" : {
+
+    },
+    "Couldn’t read the name" : {
+
+    },
+    "Couldn’t read the profile" : {
+
+    },
+    "Couldn’t read the release" : {
+
+    },
     "Couldn’t remove downloaded files. %@" : {
       "extractionState" : "manual"
     },
@@ -4220,6 +4220,9 @@
 
     },
     "Couldn’t tell whether this Marfa is set up." : {
+
+    },
+    "Couldn’t update" : {
 
     },
     "Count on the Card" : {
@@ -4258,10 +4261,10 @@
     "Current" : {
 
     },
-    "Current password" : {
+    "Current Version" : {
 
     },
-    "Current Version" : {
+    "Current password" : {
 
     },
     "Custom" : {
@@ -5616,9 +5619,6 @@
       "extractionState" : "manual"
     },
     "In Progress First" : {
-
-    },
-    "In Terminal, run %@ for this Marfa, then enter the secret key when prompted." : {
 
     },
     "In Two Weeks" : {
@@ -7012,9 +7012,6 @@
     "New Link Type…" : {
 
     },
-    "New password" : {
-
-    },
     "New Section" : {
 
     },
@@ -7059,6 +7056,9 @@
 
     },
     "New items are" : {
+
+    },
+    "New password" : {
 
     },
     "New windows open at these widths." : {
@@ -9081,9 +9081,6 @@
     "Set %@" : {
       "extractionState" : "manual"
     },
-    "Set the %@ again" : {
-
-    },
     "Set %@ first." : {
 
     },
@@ -9094,6 +9091,9 @@
 
     },
     "Set or Not Set" : {
+
+    },
+    "Set the %@ again" : {
 
     },
     "Set the PostHog host and the project token first." : {
@@ -9423,6 +9423,9 @@
     "Sign Out" : {
 
     },
+    "Sign Out “%@”?" : {
+
+    },
     "Sign in again" : {
 
     },
@@ -9436,9 +9439,6 @@
       "extractionState" : "manual"
     },
     "Sign in to your Marfa to open your library." : {
-
-    },
-    "Sign Out “%@”?" : {
 
     },
     "Sign-In Address" : {
@@ -9977,9 +9977,6 @@
 
     },
     "The PostHog host and the project token are removed together, and error reports stop." : {
-
-    },
-    "The server hasn’t come back yet" : {
 
     },
     "The Server Refused This Copy’s Sign-In" : {
@@ -10699,6 +10696,9 @@
     "The server has no history to show for this item. It may be new and not sent yet, deleted, or of a kind the app isn’t approved to read." : {
       "extractionState" : "manual"
     },
+    "The server hasn’t come back yet" : {
+
+    },
     "The server is back on %@. Nothing was lost." : {
 
     },
@@ -10999,12 +10999,6 @@
     "Thinned old versions" : {
 
     },
-    "This app can’t check for problems" : {
-
-    },
-    "This app can’t manage sign-ins" : {
-
-    },
     "This App Isn’t Connected" : {
 
     },
@@ -11132,6 +11126,12 @@
 
     },
     "This app can’t change it: another app or key made it, or this app isn’t allowed to. Change or remove it in Webhooks first." : {
+
+    },
+    "This app can’t check for problems" : {
+
+    },
+    "This app can’t manage sign-ins" : {
 
     },
     "This app isn’t allowed to change it. Allow more, or change it where it was made, first." : {

@@ -39,7 +39,10 @@ import Testing
     @Test func anUnreadableObjectStoreKeyGivesTheCommandInsteadOfOpeningStorage() {
         let concern = AttentionConcern(kind: .setting, reference: "object_store_secret_access_key", title: "")
         #expect(concern.repair == .command("marfa config set object_store_secret_access_key"))
-        #expect(concern.shownLine?.contains("marfa config set object_store_secret_access_key") == true)
+        #expect(concern.repairCommand(serverAddress: "https://castell.example/it's")
+            == "marfa config set object_store_secret_access_key --url 'https://castell.example/it'\\''s'")
+        #expect(concern.repairCommand(serverAddress: nil) == "marfa config set object_store_secret_access_key")
+        #expect(AttentionConcern(kind: .key, reference: "k", title: "").repairCommand(serverAddress: "https://a.example") == nil)
     }
 
     @Test func problemsUseTheirSettingsDestinationAndCount() async {
