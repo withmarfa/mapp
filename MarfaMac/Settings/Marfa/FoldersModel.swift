@@ -38,8 +38,6 @@ import Observation
 
     private let context: OwnerContext
     private let folderCalls: any FolderCalls
-    /// The sign-in this app is using, when the host knows it. Nil keeps every folder in one list.
-    let thisSignIn: String?
 
     private(set) var folders: [OwnerFolder] = []
     /// How many folders the server holds, which is more than `folders` where the overview cut its list.
@@ -77,32 +75,9 @@ import Observation
     /// The folder just stopped here, so its page goes back.
     private(set) var stopped: String?
 
-    init(context: OwnerContext, folderCalls: any FolderCalls, thisSignIn: String? = nil) {
+    init(context: OwnerContext, folderCalls: any FolderCalls) {
         self.context = context
         self.folderCalls = folderCalls
-        self.thisSignIn = thisSignIn
-    }
-
-    /// Whether the list can tell this Mac's copies from the others. It cannot until a sign-in id is known.
-    var splitsBySignIn: Bool { thisSignIn != nil }
-
-    /// Folders with a copy kept by this sign-in.
-    var onThisMac: [OwnerFolder] {
-        guard let thisSignIn else { return [] }
-        return folders.filter { reports[$0.id]?.copies.contains { $0.signInID == thisSignIn } == true }
-    }
-
-    /// Folders with no copy kept by this sign-in. Every folder, while this sign-in is unknown.
-    var otherFolders: [OwnerFolder] {
-        guard thisSignIn != nil else { return folders }
-        let here = Set(onThisMac.map(\.id))
-        return folders.filter { !here.contains($0.id) }
-    }
-
-    /// This sign-in's copy of a folder, when the list is split and one was reported.
-    func thisCopy(of folder: OwnerFolder) -> FolderCopy? {
-        guard let thisSignIn else { return nil }
-        return reports[folder.id]?.copies.first { $0.signInID == thisSignIn }
     }
 
     func folder(_ id: String) -> OwnerFolder? { folders.first { $0.id == id } }

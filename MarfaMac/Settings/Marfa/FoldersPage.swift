@@ -11,8 +11,7 @@ struct FoldersPage: View {
     init(host: any MarfaSettingsHost, subpage: SettingsSubpage?) {
         self.host = host
         self.subpage = subpage
-        _model = State(initialValue: FoldersModel(
-            context: OwnerContext(host: host), folderCalls: host.folderCalls, thisSignIn: host.folderSignInID))
+        _model = State(initialValue: FoldersModel(context: OwnerContext(host: host), folderCalls: host.folderCalls))
     }
 
     static func subpage(for folder: OwnerFolder) -> SettingsSubpage {
@@ -69,29 +68,6 @@ struct FoldersPage: View {
                     SettingsEmptyCard(
                         symbol: "folder", title: Text("No Folders"),
                         line: Text("Nothing is kept in step with a folder yet."))
-                }
-            } else if model.splitsBySignIn {
-                if !model.onThisMac.isEmpty {
-                    SettingsSection("On This Mac") {
-                        ForEach(model.onThisMac) { folder in
-                            let copy = model.thisCopy(of: folder)
-                            let condition = copy.map { FoldersModel.condition(of: $0) }
-                            SettingsLinkRow(
-                                verbatim: folder.title, line: line(folder, report: model.reports[folder.id]),
-                                lead: .tile("folder.fill", .blue), value: condition?.title, dot: condition.map(Self.dot)
-                            ) { navigation?.push(Self.subpage(for: folder)) }
-                        }
-                    }
-                }
-                if !model.otherFolders.isEmpty {
-                    SettingsSection("Other Folders") {
-                        ForEach(model.otherFolders) { folder in
-                            SettingsLinkRow(
-                                verbatim: folder.title, line: line(folder, report: model.reports[folder.id]),
-                                lead: .tile("folder.fill", .blue)
-                            ) { navigation?.push(Self.subpage(for: folder)) }
-                        }
-                    }
                 }
             } else {
                 SettingsSection(

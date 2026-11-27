@@ -48,8 +48,7 @@ struct SettingsWindowTests {
             launcher.show(results.first)
             #expect(launcher.navigation.page == .connection)
         }
-        // Folders names its own section On This Mac, so that phrase finds both pages.
-        #expect(SettingsPage.sidebarMatches("On This Mac") == [.connection, .folders])
+        #expect(SettingsPage.sidebarMatches("On This Mac") == [.connection])
         #expect(SettingsPage.sidebarMatches("Clear").contains(.connection))
     }
 

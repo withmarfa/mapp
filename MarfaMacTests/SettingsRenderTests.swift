@@ -27,8 +27,6 @@ import Testing
     var canDeletePermanently = true
     var openInApp: ((String) -> Void)?
     var ownAppVendor: String? { "app.marfa-mac" }
-    /// The sign-in whose folder copies count as On This Mac. Nil leaves Folders as one list.
-    var folderSignInID: String?
 
     var webSignInReturn: String { "com.withmarfa.marfa.test:/signed-in" }
     /// What the web sign-in sheet answers, and the addresses it was shown.
@@ -1230,8 +1228,8 @@ struct RenderedWindow<Detail: View>: View {
     }
 
     @Test(arguments: [ColorScheme.light, .dark])
-    func foldersOnThisMac(appearance: ColorScheme) async throws {
-        try await page(.folders, foldersSplitBySignIn(), named: appearanceName("Folders, on this Mac", appearance), appearance: appearance)
+    func foldersListed(appearance: ColorScheme) async throws {
+        try await page(.folders, listedFolders(), named: appearanceName("Folders, listed", appearance), appearance: appearance)
     }
 
     @Test func foldersWithNone() async throws {
@@ -1460,10 +1458,9 @@ struct RenderedWindow<Detail: View>: View {
         return copy
     }
 
-    /// The board's two sections. This app has no folder path and does not sync folders, so the rows carry no path.
-    private func foldersSplitBySignIn() -> StubMarfaHost {
+    /// A populated folder list. This app has no folder path and does not sync folders, so the rows carry no path.
+    private func listedFolders() -> StubMarfaHost {
         let host = owner()
-        host.folderSignInID = "this"
         host.typePlurals = ["core.note": "Notes", "core.file": "Files", "core.person": "People"]
         let folders = [
             OwnerFolder(id: "f1", title: "Studio Notes"), OwnerFolder(id: "f2", title: "Client Drawings"),
