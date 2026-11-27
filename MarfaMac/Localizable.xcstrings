@@ -12694,7 +12694,7 @@
     "deliveries" : {
 
     },
-    "events" : {
+    "events and records the server uses to recognize repeated writes" : {
 
     },
     "files" : {
@@ -12914,6 +12914,9 @@
     "read the server’s health and status" : {
       "extractionState" : "manual"
     },
+    "records used to undo table changes" : {
+
+    },
     "requests" : {
 
     },
@@ -12933,9 +12936,6 @@
 
     },
     "starts with" : {
-
-    },
-    "table changes" : {
 
     },
     "telemetry address" : {
@@ -13040,11 +13040,11 @@
     "“%@” can no longer do this. This can’t be undone: a permission can’t be given back to a key." : {
 
     },
-    "“%@” changes to %@. Anything older than that, in %@, will be permanently deleted the next time the server tidies up. It can’t be recovered." : {
-
-    },
     "“%@” changes to %@. Older versions of items may be permanently deleted the next time the server tidies up, so Version History will show fewer." : {
       "extractionState" : "manual"
+    },
+    "“%@” changes to %@. The next cleanup can permanently delete older data, including %@." : {
+
     },
     "“%@” could not be read. No layouts were changed." : {
 

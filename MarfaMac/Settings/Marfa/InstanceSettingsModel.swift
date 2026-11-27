@@ -442,7 +442,7 @@ nonisolated enum InstanceWording {
         case .versionRecentDays, .versionDailyDays, .versionWeeklyDays:
             String(localized: "“\(setting.title)” changes to \(days(limit)). Older versions of items may be permanently deleted the next time the server tidies up, so Version History will show fewer.")
         default:
-            String(localized: "“\(setting.title)” changes to \(days(limit)). Anything older than that, in \(setting.removes), will be permanently deleted the next time the server tidies up. It can’t be recovered.")
+            String(localized: "“\(setting.title)” changes to \(days(limit)). The next cleanup can permanently delete older data, including \(setting.removes).")
         }
     }
 }
@@ -455,8 +455,8 @@ nonisolated extension InstanceSetting {
         case .trashRetentionDays: String(localized: "deleted items")
         case .versionRecentDays, .versionDailyDays, .versionWeeklyDays, .versionMaxVersions: String(localized: "versions")
         case .auditRetentionDays: String(localized: "activity and webhook deliveries")
-        case .eventLogRetentionDays: String(localized: "events")
-        case .rowLogRetentionDays: String(localized: "table changes")
+        case .eventLogRetentionDays: String(localized: "events and records the server uses to recognize repeated writes")
+        case .rowLogRetentionDays: String(localized: "records used to undo table changes")
         case .inboundHandledRetentionDays, .inboundPendingRetentionDays: String(localized: "connector deliveries")
         default: String(localized: "things")
         }

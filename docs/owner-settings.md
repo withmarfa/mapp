@@ -67,7 +67,7 @@ The page gate checks the connection and the sign-in’s permissions. A configure
 
 ## What a person typed
 
-- **A refusal keeps what was typed**, marks the field and says why under it. Clearing it loses work the person cannot see again.
+- **A refusal preserves what the person typed.** A refused limit or free disk reserve returns to its last reported value. When the app shows the recovery notice, it copies the original input to the clipboard. Other fields keep the input and show the reason for the refusal.
 - **A draft is handed back** at the end of the window or the app (`OwnerDrafts`, `Notices.notKept`). Where a call is in flight, its failure hands it back.
 - **A pop-up or switch sends at once; a field sends on Return or when left.** Emptied, it removes the stored value.
 - **A number out of range is never sent.** A separator the Mac's region does not use is refused, not guessed at.
