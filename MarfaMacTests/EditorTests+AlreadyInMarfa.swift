@@ -236,6 +236,23 @@ extension EditorTests {
         #expect(await eventually { staged.allSatisfy { !FileManager.default.fileExists(atPath: $0.path) } })
     }
 
+    @Test func aFailedPasteKeepsItsCopyWhenAnEarlierFileDisappearsDuringAttachment() async throws {
+        let disk = TestFiles()
+        let chosen = disk.url("chosen.png", "chosen")
+        let library = FakeItemLibrary(items: [FakeItemLibrary.note("Plan", modified: .now)])
+        library.attaching = {
+            try? FileManager.default.removeItem(at: chosen)
+            return AttachReport(failed: [AttachmentFailure(index: 1, name: "Photo.png", reason: "Disk full")])
+        }
+        let editor = try await attachingEditor(library)
+        #expect(editor.insertImages([.file(chosen)] + Self.pasted))
+        try #require(await eventually { library.notices.waiting.last != nil })
+        #expect(library.attachedBatches.map(\.names) == [["chosen.png", "Photo.png"]])
+        let copy = try #require(library.askedSameBytes.last?.last?.resolvingSymlinksInPath())
+        #expect(FileManager.default.isReadableFile(atPath: copy.path))
+        #expect(library.notices.waiting.last?.action == .showInFinder([copy]))
+    }
+
     @Test func aSymbolicLinkIsHashedAndAttachedAsTheFileItNames() async throws {
         let library = FakeItemLibrary(items: [FakeItemLibrary.note("Plan", modified: .now)])
         library.sameBytes = { _ in .noAnswer }

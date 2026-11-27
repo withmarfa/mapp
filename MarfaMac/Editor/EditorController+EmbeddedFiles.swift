@@ -43,7 +43,7 @@ extension EditorController {
             }
             let (files, unread) = await PastedImages.read(chosen.map(\.source))
             // The page may have moved on. The files still belong to the item that was open, and a refusal saves them.
-            let report = files.isEmpty ? AttachReport() : await asked.attach(files, to: pageItemID)
+            let report = files.isEmpty ? AttachReport() : await asked.attach(files.map(\.file), to: pageItemID)
             let placed = self.pageItemID == pageItemID && isEditable && acceptsInsertion
             let embeds = report.embeds
             var notPlaced: [String] = []
@@ -51,7 +51,7 @@ extension EditorController {
                 await !place(embeds.map { ["src": $0.link, "alt": $0.name] }, at: point, height: height, in: pageItemID) {
                 notPlaced = embeds.map(\.name)
             }
-            let (failed, keptCopies) = Self.pasteFailures(report.failed, of: Self.readable(chosen))
+            let (failed, keptCopies) = Self.pasteFailures(report.failed, of: files.map { chosen[$0.index] })
             Self.reportUnplaced(
                 skipped: unread, failed: failed, kept: report.kept, attached: embeds.count,
                 unplaced: placed ? [] : embeds.map(\.name), refused: notPlaced,
@@ -83,16 +83,6 @@ extension EditorController {
                 reason: String(localized: "It couldn’t be saved to Downloads. The copy is still at \(copy.path).")))
         }
         return (told, copies)
-    }
-
-    /// The sources `PastedImages.read` would hand to attach, in that order, so a failure's index finds its copy.
-    private static func readable(_ entries: [ImageCheckBatch.Entry]) -> [ImageCheckBatch.Entry] {
-        entries.filter { entry in
-            switch entry.source {
-            case .data: true
-            case .file(let url): PastedImages.readImage(url) != nil
-            }
-        }
     }
 
     /// Where images were left out because they are already in Marfa. Show opens the matches and attaches nothing more.
