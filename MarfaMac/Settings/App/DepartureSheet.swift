@@ -73,11 +73,10 @@ struct DepartureSheet: View {
                 if isDisconnecting, model.offersSettingsRemoval {
                     VStack(alignment: .leading, spacing: SettingsTokens.Metric.sheetFieldGap) {
                         SettingsCheckRow(
-                            verbatim: words.signOutChoice, line: words.sendsWaitingChanges,
-                            isOn: Bindable(model).alsoRemovesSettings
+                            verbatim: words.signOutChoice, isOn: Bindable(model).alsoRemovesSettings
                         )
                         .accessibilityIdentifier("DepartureRemoveSettings")
-                        Text(verbatim: ConnectionSettings.removalRisk)
+                        Text(verbatim: "\(words.sendsWaitingChanges)\n\(ConnectionSettings.removalRisk)")
                             .settingsFont(.small)
                             .foregroundStyle(SettingsTokens.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)
