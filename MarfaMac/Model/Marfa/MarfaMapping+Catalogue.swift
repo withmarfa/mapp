@@ -13,7 +13,7 @@ nonisolated extension MarfaMapping {
             fields: type.fields.map { field($0, statusWords: $0.name == type.statusField ? type.statusWords : []) },
             titleField: type.titleField, bodyField: type.bodyField, parent: type.parent.map { TypeID($0) }, icon: type.icon,
             description: type.description, version: type.version, roles: type.roles, linkField: type.linkField,
-            feedDays: type.feedDays)
+            feedDays: type.feedDays, origin: type.origin)
     }
 
     private static func field(_ field: Marfa.TypeField, statusWords: [Marfa.StatusWord] = []) -> ItemTypeInfo.Field {

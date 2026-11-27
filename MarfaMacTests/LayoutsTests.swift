@@ -61,6 +61,41 @@ struct LayoutsTests {
 
     // MARK: The page
 
+    @Test func aLayoutWriteKeepsUnreadablePlacementsUnderTheirKey() throws {
+        let defaults = ThrowawayDefaults.make("LayoutsTests.setAside")
+        let mixed = #"{"core.note":{"pins":["author"]},"missing.type":{"pins":42},"core.task":{"pins":["priority"]}}"#
+        defaults.set(mixed, forKey: PagePlacements.key)
+        let page = layoutPage(note, defaults: defaults)
+        #expect(page.hasChanges)
+        #expect(defaults.object(forKey: PagePlacements.setAsideKey) == nil, "reading alone leaves the stored document untouched")
+        page.restore()
+        let saved = try #require(defaults.stringArray(forKey: PagePlacements.setAsideKey)?.last)
+        #expect(saved == mixed)
+        let entries = try #require(JSONSerialization.jsonObject(with: Data(saved.utf8)) as? [String: Any])
+        #expect(entries["missing.type"] as? [String: Int] == ["pins": 42])
+        let remaining = PagePlacements.stored(in: defaults)
+        #expect(!remaining.hasChoice(for: note))
+        #expect(remaining.pins(of: task, in: catalogue) == ["priority"])
+    }
+
+    @Test func pinsAndLinkedFromAreReadBackFromThePlacementsStore() {
+        let defaults = ThrowawayDefaults.make("LayoutsTests.pinsAndLinks")
+        let page = layoutPage(task, defaults: defaults)
+        PagePlacements.update(in: defaults) { $0.setPins([], of: task) }
+        page.pin("priority")
+        page.setLinkedFrom(.page)
+        let saved = PagePlacements.stored(in: defaults)
+        #expect(saved.pins(of: task, in: catalogue) == ["priority"])
+        #expect(saved.placement(of: task, in: catalogue).linkedFromPlace == .page)
+    }
+
+    private func layoutPage(_ type: TypeID, defaults: UserDefaults) -> LayoutTypePage {
+        let library = FakeItemLibrary()
+        library.catalogue = catalogue
+        return LayoutTypePage(type: type, placements: PagePlacements.stored(in: defaults), defaults: defaults,
+                              typeLooks: TypeLooks(defaults: defaults), key: server, library: library)
+    }
+
     @Test func aPageHoldsNoMoreThanFourPins() {
         var placements = PagePlacements()
         placements.setPins(["status", "due_at", "priority", "assignees"], of: task)

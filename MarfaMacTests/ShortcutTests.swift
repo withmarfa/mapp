@@ -74,10 +74,10 @@ struct ShortcutTests {
 
     @Test func aNewDefaultNeverTakesAKeyThePersonGaveAnotherCommand() {
         let store = defaults()
-        let bindings = ShortcutBindings(defaults: store)
         let option: ShortcutModifiers = [.command, .option]
-        #expect(bindings.shortcut(for: .copyFilePath) == key("c", option))
-        bindings.set(key("c", option), for: .refresh)
+        let earlier = ShortcutBindings(defaults: store, commands: ShortcutCommand.all.filter { $0 != .copyFilePath })
+        earlier.set(key("c", option), for: .refresh)
+        let bindings = ShortcutBindings(defaults: store)
         #expect(bindings.shortcut(for: .refresh) == key("c", option))
         #expect(bindings.shortcut(for: .copyFilePath) == nil, "the person's binding wins and the new command starts with none")
         #expect(bindings.holder(of: key("c", option), besides: .copyFilePath) == .command(.refresh))
@@ -416,12 +416,34 @@ struct ShortcutTests {
         let hotKeys = FakeHotKeys()
         hotKeys.heldByAnotherApp = [key("j", [.command, .control])]
         let (_, _, anyApp) = page(defaults(), hotKeys: hotKeys)
+        let previous = key("p", [.command, .option], code: 35)
+        #expect(anyApp.set(previous, for: .newItem) == nil)
         let result = anyApp.apply([
-            "newItem": key("j", [.command, .control], code: 38), "searchItems": key("s", [.command, .control], code: 1),
+            AnyAppCommand.newItem.rawValue: key("j", [.command, .control], code: 38), "searchItems": key("s", [.command, .control], code: 1),
             "gone": key("g", [.command, .control], code: 5),
         ])
         #expect(result.applied == 1 && result.skipped == 2)
-        #expect(anyApp.shortcut(for: .newItem) == nil)
+        #expect(anyApp.shortcut(for: .newItem) == previous)
+    }
+
+    @Test func importPreservesAChosenKeyEvenWhenTheFileNamesItsHolderLater() {
+        let chosen = key("y", [.command, .option])
+        let bindings = ShortcutBindings(defaults: defaults(), commands: [.addTag, .refresh])
+        bindings.set(chosen, for: .refresh)
+        for requested in [chosen, key("q")] {
+            let result = bindings.apply(["addTag": chosen, "refresh": requested])
+            #expect(result.skipped == (requested == chosen ? 1 : 2))
+            #expect(bindings.shortcut(for: .refresh) == chosen)
+            #expect(bindings.shortcut(for: .addTag) == nil)
+        }
+    }
+
+    @Test func importingASwapMovesBothCommandsTogether() {
+        let bindings = ShortcutBindings(defaults: defaults())
+        let result = bindings.apply(["newItem": key("r"), "refresh": key("n")])
+        #expect(result == .init(applied: 2, skipped: 0))
+        #expect(bindings.shortcut(for: .refresh) == key("n"))
+        #expect(bindings.shortcut(for: .newItem) == key("r"))
     }
 
 }

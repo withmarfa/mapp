@@ -38,7 +38,7 @@ import Testing
         _ leaveOut: SearchLeaveOut, catalogue: Catalogue = F.catalogue, sources: SourceDirectory = SourceDirectory(), offered: [TypeID] = []
     ) -> [SearchLeaveOutList.Entry] {
         let labels = SearchLeaveOutList.labels(offered: offered, leaveOut: leaveOut, catalogue: catalogue)
-        return SearchLeaveOutList.entries(for: leaveOut, catalogue: catalogue, sources: sources, labels: labels)
+        return SearchLeaveOutList.entries(for: leaveOut, catalogue: catalogue, typesLoaded: true, sources: sources, labels: labels)
     }
 
     @Test func aSourceTheCopyNoLongerHasIsKeptAndShownAsUnknown() {
@@ -59,5 +59,23 @@ import Testing
         store.update("marfa:a") { $0.sources = ["gone", "github"]; $0.types = [F.ticket] }
         store.update("marfa:a") { $0.sources.remove("gone") }
         #expect(store.leaveOut(for: "marfa:a") == SearchLeaveOut(types: [F.ticket], sources: ["github"]))
+    }
+
+    @MainActor @Test func missingExclusionsKeepTheirNamesAfterReopeningTheStore() {
+        let defaults = ThrowawayDefaults.make("SearchLeaveOutList.names")
+        let type = TypeID("plugin.gone")
+        SearchLeaveOuts(defaults: defaults).update("one") {
+            $0.exclude(.type(type), named: "Press Cuttings")
+            $0.exclude(.source("old"), named: "Studio Archive")
+        }
+        let reopened = SearchLeaveOuts(defaults: defaults)
+        let saved = reopened.leaveOut(for: "one")
+        var directory = SourceDirectory()
+        directory.counts = [:]
+        let rows = entries(saved, catalogue: Catalogue(), sources: directory)
+        #expect(rows.map(\.title) == ["Press Cuttings", "Studio Archive"])
+        #expect(rows.allSatisfy { !$0.isKnown })
+        reopened.update("one") { $0.remove(.type(type)) }
+        #expect(reopened.leaveOut(for: "one").names == ["source:old": "Studio Archive"])
     }
 }

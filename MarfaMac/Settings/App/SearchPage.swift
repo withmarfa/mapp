@@ -10,6 +10,7 @@ struct SearchPage: View {
     @AppStorage(SearchOptions.includesFeedKey) private var includesFeed = SearchOptions.includesFeedStandard
     @AppStorage(SearchOptions.orderKey) private var order = SearchOptions.Order.standard
     @AppStorage(SearchOptions.showsSnippetsKey) private var showsSnippets = SearchOptions.showsSnippetsStandard
+    @State private var adding = false
 
     var body: some View {
         SettingsPageColumn {
@@ -17,6 +18,12 @@ struct SearchPage: View {
             include
             results
         }
+        .settingsSheet(presenting: adding, dismiss: { adding = false }) {
+            if let library {
+                ExclusionSheet(library: library, libraries: libraries, libraryKey: libraries.libraryKey) { adding = false }
+            }
+        }
+        .onChange(of: libraries.libraryKey) { adding = false }
         .accessibilityIdentifier("SearchPage")
     }
 
@@ -28,8 +35,8 @@ struct SearchPage: View {
         libraries.searchLeaveOuts.update(libraries.libraryKey, change)
     }
 
-    /// What the add menu offers, with the names the list uses.
-    private struct Offer {
+    /// What the Add sheet offers, with the names the list uses.
+    fileprivate struct Offer {
         let types: [SearchLeaveOutList.TypeChoice]
         let sources: [SourceCount]
         let labels: [TypeID: String]
@@ -38,29 +45,29 @@ struct SearchPage: View {
         let atLimit: Bool
     }
 
-    private func offer(in library: any ItemLibrary) -> Offer {
+    fileprivate static func offer(in library: any ItemLibrary, leaveOut: SearchLeaveOut) -> Offer {
         let catalogue = library.catalogue
         let counts = library.itemTypeCounts
         let labels = SearchLeaveOutList.labels(offered: counts.map(\.id), leaveOut: leaveOut, catalogue: catalogue)
         let types = SearchLeaveOutList.typesToAdd(counts, leaveOut: leaveOut, catalogue: catalogue, labels: labels)
         let sources = SearchLeaveOutList.sourcesToAdd(library.sourceCounts, leaveOut: leaveOut)
-        let leaveOut = leaveOut
         let isDimmed = { (addition: SearchLeaveOutList.Addition) in !SearchLeaveOutList.fits(addition, in: leaveOut, catalogue: catalogue) }
         let atLimit = types.contains { isDimmed(.type($0.id)) } || sources.contains { isDimmed(.source($0.code)) }
         return Offer(types: types, sources: sources, labels: labels, isDimmed: isDimmed, atLimit: atLimit)
     }
 
     private var leftOut: some View {
-        let offer = library.map(offer(in:))
-        return SettingsSection(
-            "Left Out of Search", line: "They still show in their own place, in views and in Favorites.",
-            footer: offer?.atLimit == true ? "Some can’t be left out as well: a search can skip only so much. Stop leaving one out to make room." : nil
-        ) {
+        let offer = library.map { Self.offer(in: $0, leaveOut: leaveOut) }
+        return SettingsSection("Excluded", footer: "They still show in their own place.") {
+            SettingsButton("Add…", small: true) { adding = true }
+                .disabled(offer.map { $0.types.isEmpty && $0.sources.isEmpty } ?? true)
+                .accessibilityIdentifier("LeaveOutAdd")
+        } content: {
             if let library, let offer {
-                ForEach(SearchLeaveOutList.entries(for: leaveOut, catalogue: library.catalogue, sources: library.sources, labels: offer.labels)) { entry in
+                ForEach(SearchLeaveOutList.entries(for: leaveOut, catalogue: library.catalogue, typesLoaded: library.isLoaded,
+                                                   sources: library.sources, labels: offer.labels)) { entry in
                     row(for: entry, library: library, labels: offer.labels)
                 }
-                addMenu(offer)
             }
         }
         .accessibilityIdentifier("SearchLeftOut")
@@ -70,10 +77,13 @@ struct SearchPage: View {
         switch entry.kind {
         case .type(let type):
             SettingsRow(
-                verbatim: entry.title, line: entry.isKnown ? typeLine(type, in: library.catalogue) : String(localized: "Unknown type, kept until you remove it."),
-                lead: .mark(Image(typeGlyph: entry.icon))
+                verbatim: entry.isKnown ? entry.title : MissingChoice.label(entry.title),
+                line: typeLine(type, in: library), lead: .custom(AnyView(TypeTile(icon: entry.icon))), lines: nil
             ) {
-                SettingsMoreMenu { removal { change { $0.types.remove(type) } } }
+                removeMenu(.type(type))
+            }
+            .onChange(of: library.catalogue.itemTypes[type].map { _ in entry.title }, initial: true) { _, title in
+                if let title, leaveOut.types.contains(type) { change { $0.names[entry.id] = title } }
             }
         case .subtype(_, let parent):
             SettingsRow(verbatim: entry.title, lead: .mark(Image(typeGlyph: entry.icon)), size: .compact) {
@@ -81,60 +91,45 @@ struct SearchPage: View {
             }
         case .source(let code):
             SettingsRow(
-                verbatim: entry.title, line: sourceLine(entry),
-                lead: .mark(entry.icon.map { Image(typeGlyph: $0) } ?? Image(systemName: SourceTile.fallbackSymbol))
+                verbatim: entry.isKnown ? entry.title : MissingChoice.label(entry.title), line: sourceLine(entry),
+                lead: .mark(entry.icon.map { Image(typeGlyph: $0) } ?? Image(systemName: SourceTile.fallbackSymbol)), lines: nil
             ) {
-                SettingsMoreMenu { removal { change { $0.sources.remove(code) } } }
+                removeMenu(.source(code))
+            }
+            .onChange(of: library.sources.infos[code]?.name, initial: true) { _, name in
+                if let name, leaveOut.sources.contains(code) { change { $0.names[entry.id] = name } }
             }
         }
     }
 
-    private func removal(_ action: @escaping () -> Void) -> some View {
-        Button("Stop Leaving Out", action: action)
+    private func removeMenu(_ addition: SearchLeaveOutList.Addition) -> some View {
+        SettingsMoreMenu { Button("Remove") { change { $0.remove(addition) } } }
     }
 
-    private func typeLine(_ type: TypeID, in catalogue: Catalogue) -> String {
-        catalogue.descendants(of: type).isEmpty ? String(localized: "A type.") : String(localized: "A type, with those under it.")
+    private func typeLine(_ type: TypeID, in library: any ItemLibrary) -> String {
+        if !library.catalogue.descendants(of: type).isEmpty { return String(localized: "A type, with those under it.") }
+        if let count = library.itemTypeCounts.first(where: { $0.id == type })?.count {
+            if count == 1 { return String(localized: "A type. 1 item.") }
+            return String(localized: "A type. \(count.formatted()) items.")
+        }
+        return String(localized: "A type.")
     }
 
     private func sourceLine(_ entry: SearchLeaveOutList.Entry) -> String {
-        guard entry.isKnown else { return String(localized: "Unknown source, kept until you remove it.") }
         guard let count = entry.count else { return String(localized: "A source.") }
+        if count == 1 { return String(localized: "A source. 1 item.") }
         return String(localized: "A source. \(count.formatted()) items.")
-    }
-
-    private func addMenu(_ offer: Offer) -> some View {
-        SettingsAddMenu("Leave Out a Type or Source…") {
-            if !offer.types.isEmpty {
-                Section("Types") {
-                    ForEach(offer.types) { type in
-                        Button { change { $0.types.insert(type.id) } } label: { Text(verbatim: type.title) }
-                            .disabled(offer.isDimmed(.type(type.id)))
-                    }
-                }
-            }
-            if !offer.sources.isEmpty {
-                Section("Sources") {
-                    ForEach(offer.sources) { source in
-                        Button { change { $0.sources.insert(source.code) } } label: { Text(verbatim: source.name) }
-                            .disabled(offer.isDimmed(.source(source.code)))
-                    }
-                }
-            }
-        }
-        .disabled(offer.types.isEmpty && offer.sources.isEmpty)
-        .accessibilityIdentifier("LeaveOutAdd")
     }
 
     // MARK: Include
 
     private var include: some View {
-        SettingsSection("Include") {
-            SettingsRow("Archived Items") {
-                SettingsToggle(title: "Archived Items", isOn: $includesArchived).accessibilityIdentifier("SearchArchived")
+        SettingsSection("Included") {
+            SettingsRow("Archived items") {
+                SettingsToggle(title: "Archived items", isOn: $includesArchived).accessibilityIdentifier("SearchArchived")
             }
-            SettingsRow("Feed Items", line: "What your apps send.") {
-                SettingsToggle(title: "Feed Items", isOn: $includesFeed).accessibilityIdentifier("SearchFeed")
+            SettingsRow("Feed items", line: "What your apps send.") {
+                SettingsToggle(title: "Feed items", isOn: $includesFeed).accessibilityIdentifier("SearchFeed")
             }
         }
     }
@@ -149,9 +144,65 @@ struct SearchPage: View {
                 }
                 .accessibilityIdentifier("SearchOrder")
             }
-            SettingsRow("Show Snippets", line: "The words that matched, under each result.") {
-                SettingsToggle(title: "Show Snippets", isOn: $showsSnippets).accessibilityIdentifier("SearchSnippets")
+            SettingsRow("Show snippets", line: "The words that matched, under each result.", lines: nil) {
+                SettingsToggle(title: "Show snippets", isOn: $showsSnippets).accessibilityIdentifier("SearchSnippets")
             }
+        }
+    }
+}
+
+private struct ExclusionSheet: View {
+    typealias Addition = SearchLeaveOutList.Addition
+
+    let library: any ItemLibrary
+    let libraries: Libraries
+    let libraryKey: String
+    let dismiss: () -> Void
+    @State private var selection: Addition?
+
+    var body: some View {
+        let offer = SearchPage.offer(in: library, leaveOut: libraries.searchLeaveOuts.leaveOut(for: libraryKey))
+        let name = selectedName(in: offer)
+        return SettingsSheet(title: Text("Exclude from Search")) {
+            VStack(alignment: .leading, spacing: SettingsTokens.Metric.sectionGap) {
+                SettingsRow("Type or source") {
+                    SettingsPopUp(title: "Type or source", selection: $selection) {
+                        Text("Choose…").tag(nil as Addition?)
+                        Section("Types") {
+                            ForEach(offer.types) { type in
+                                Text(verbatim: type.title).tag(Addition.type(type.id)).disabled(offer.isDimmed(.type(type.id)))
+                            }
+                        }
+                        Section("Sources") {
+                            ForEach(offer.sources) { source in
+                                Text(verbatim: source.name).tag(Addition.source(source.code)).disabled(offer.isDimmed(.source(source.code)))
+                            }
+                        }
+                    }
+                }
+                if offer.atLimit {
+                    SettingsNote("A search can have up to ten conditions. Remove an exclusion to make room.")
+                }
+            }
+        } buttons: {
+            SettingsButton("Cancel", action: dismiss)
+            SettingsButton("Add", role: .confirm) {
+                guard let selection, libraryKey == libraries.libraryKey,
+                      let name = selectedName(in: SearchPage.offer(in: library, leaveOut: libraries.searchLeaveOut)) else { return }
+                libraries.searchLeaveOuts.update(libraryKey) { exclusions in
+                    exclusions.exclude(selection, named: name)
+                }
+                dismiss()
+            }
+            .disabled(name == nil)
+        }
+    }
+
+    private func selectedName(in offer: SearchPage.Offer) -> String? {
+        guard let selection, !offer.isDimmed(selection) else { return nil }
+        switch selection {
+        case .type(let type): return offer.types.first { $0.id == type }?.label
+        case .source(let code): return offer.sources.first { $0.code == code }?.name
         }
     }
 }

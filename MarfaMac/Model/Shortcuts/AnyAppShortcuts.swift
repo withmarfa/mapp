@@ -16,15 +16,6 @@ nonisolated enum AnyAppCommand: String, CaseIterable, Sendable {
         case .newItem: String(localized: "New Item")
         }
     }
-
-    /// The line under the title.
-    var line: String? {
-        switch self {
-        case .commandPalette: String(localized: "Over whatever you’re doing.")
-        case .searchItems: nil
-        case .newItem: String(localized: "One line, over any app.")
-        }
-    }
 }
 
 /// Registers and unregisters a hot key with the system. A test gives its own.

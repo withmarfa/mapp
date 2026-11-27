@@ -156,23 +156,33 @@ final class ShortcutBindings {
         var result = Applied()
         let known = Set(commands.map(\.id))
         result.skipped += shortcuts.keys.filter { !known.contains($0) }.count
-        var taken: [Shortcut: String] = [:]
-        for command in commands where shortcuts[command.id] == nil {
-            if let shortcut = shortcut(for: command) { taken[shortcut] = command.id }
-        }
-        var next = chosen
-        for command in commands {
-            guard let entry = shortcuts[command.id] else { continue }
-            if let shortcut = entry, taken[shortcut] != nil || SystemShortcuts.owner(of: shortcut) != nil || shortcut.menuProblem != nil {
+        let before = current
+        var accepted = shortcuts.filter { known.contains($0.key) }
+        for (id, entry) in accepted {
+            if let entry, SystemShortcuts.owner(of: entry) != nil || entry.menuProblem != nil {
+                accepted.removeValue(forKey: id)
                 result.skipped += 1
-                if let kept = self.shortcut(for: command), taken[kept] == nil { taken[kept] = command.id }
-                continue
             }
-            result.applied += 1
-            if let entry { taken[entry] = command.id }
-            if entry != command.defaultShortcut { next[command.id] = .some(entry) } else { next.removeValue(forKey: command.id) }
         }
-        chosen = next
+        // An unchanged or refused command keeps its keys. Refusing one move can block another,
+        // while a pair of commands that genuinely swap keys can move together.
+        var refused: [String]
+        repeat {
+            var taken: Set<Shortcut> = []
+            for command in commands where accepted[command.id] == nil || accepted[command.id] == before[command.id] {
+                if let kept = before[command.id] ?? nil { taken.insert(kept) }
+            }
+            refused = commands.compactMap { command in
+                guard let entry = accepted[command.id], let key = entry, entry != (before[command.id] ?? nil) else { return nil }
+                return taken.insert(key).inserted ? nil : command.id
+            }
+            for id in refused { accepted.removeValue(forKey: id) }
+            result.skipped += refused.count
+        } while !refused.isEmpty
+        for command in commands {
+            if let entry = accepted[command.id] { setWithoutSaving(entry, for: command) }
+        }
+        result.applied = accepted.count
         save()
         return result
     }

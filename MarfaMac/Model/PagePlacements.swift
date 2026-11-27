@@ -238,8 +238,18 @@ nonisolated extension PagePlacements: RawRepresentable {
 }
 
 nonisolated extension PagePlacements {
+    private struct ReadableChoice: Decodable {
+        let value: Choice?
+
+        init(from decoder: any Decoder) {
+            value = try? Choice(from: decoder)
+        }
+    }
+
     static func stored(in defaults: UserDefaults = .standard) -> PagePlacements {
-        defaults.string(forKey: key).flatMap(PagePlacements.init(rawValue:)) ?? PagePlacements()
+        guard let text = defaults.string(forKey: key),
+              let entries = try? JSONDecoder().decode([String: ReadableChoice].self, from: Data(text.utf8)) else { return PagePlacements() }
+        return PagePlacements(entries.compactMapValues(\.value))
     }
 
     static func update(in defaults: UserDefaults = .standard, _ change: (inout PagePlacements) -> Void) {

@@ -5,6 +5,8 @@ import Marfa
 nonisolated struct SearchLeaveOut: Codable, Hashable, Sendable {
     var types: Set<TypeID> = []
     var sources: Set<String> = []
+    /// Last known display names, for exclusions whose type or source later disappears.
+    var names: [String: String] = [:]
 
     var isEmpty: Bool { types.isEmpty && sources.isEmpty }
 
@@ -13,12 +15,38 @@ nonisolated struct SearchLeaveOut: Codable, Hashable, Sendable {
         self.sources = sources
     }
 
+    mutating func exclude(_ addition: SearchLeaveOutList.Addition, named name: String) {
+        switch addition {
+        case .type(let type): types.insert(type)
+        case .source(let code): sources.insert(code)
+        }
+        names[addition.id] = name
+    }
+
+    mutating func remove(_ addition: SearchLeaveOutList.Addition) {
+        switch addition {
+        case .type(let type): types.remove(type)
+        case .source(let code): sources.remove(code)
+        }
+        names[addition.id] = nil
+    }
+
     /// A value stored before a field existed still reads.
     init(from decoder: any Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         types = try values.decodeIfPresent(Set<TypeID>.self, forKey: .types) ?? []
         sources = try values.decodeIfPresent(Set<String>.self, forKey: .sources) ?? []
+        names = try values.decodeIfPresent([String: String].self, forKey: .names) ?? [:]
     }
+
+    func encode(to encoder: any Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(types, forKey: .types)
+        try values.encode(sources, forKey: .sources)
+        if !names.isEmpty { try values.encode(names, forKey: .names) }
+    }
+
+    private enum CodingKeys: String, CodingKey { case types, sources, names }
 }
 
 /// What a search over every item keeps and leaves out, applied by the copy inside the one search call, so the most it
