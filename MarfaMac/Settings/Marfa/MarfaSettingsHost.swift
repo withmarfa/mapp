@@ -264,7 +264,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .account: .indigo
         case .apps: .purple
         case .keys: .amber
-        case .network: .blue
+        case .network: .teal
         case .types: .orange
         case .plugins: .purple
         case .sources: .green
@@ -278,7 +278,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .activity: .teal
         case .monitoring: .red
         case .limits: .gray
-        case .links: .indigo
+        case .links: .gray
         }
     }
 

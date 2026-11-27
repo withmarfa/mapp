@@ -142,28 +142,30 @@ struct AccountPage: View {
     }
 
     private func profileRows(_ profile: OwnerProfile) -> some View {
-        SettingsSection("Profile") {
+        let nameEditable = profile.name != nil && model.changeable.contains(.name)
+        return SettingsSection("Profile") {
             SettingsRow("Picture", error: model.pictureError) {
-                if profile.pictureIsReadable {
-                    ProfilePictureMark(picture: model.picture, name: profile.name ?? profile.username)
-                }
                 if profile.pictureIsReadable && model.changeable.contains(.avatar) {
-                    SettingsButton("Change…") { choosesPicture = true }
-                        .disabled(model.isSendingPicture)
-                        .accessibilityIdentifier("AccountChangePicture")
+                    HStack(spacing: SettingsTokens.Metric.buttonGap) {
+                        ProfilePictureMark(picture: model.picture, name: profile.name ?? profile.username)
+                        SettingsButton("Change…") { choosesPicture = true }
+                            .disabled(model.isSendingPicture)
+                            .accessibilityIdentifier("AccountChangePicture")
+                    }
+                } else if profile.pictureIsReadable {
+                    lockedPicture(profile)
                 } else {
                     profileLock
                 }
             }
-            SettingsRow("Name", error: model.nameError) {
-                if profile.name != nil && model.changeable.contains(.name) {
+            SettingsRow(title: Text("Name"), line: nameEditable ? nil : profile.name.map { Text(verbatim: $0) }, error: model.nameError) {
+                if nameEditable {
                     SettingsField(
                         title: "Name", text: $model.nameDraft, isError: model.nameError != nil,
                         onSubmit: { Task { await model.saveName() } }, onEndEditing: { Task { await model.saveName() } }
                     )
                     .disabled(model.isSavingName).accessibilityIdentifier("AccountName")
                 } else {
-                    if let name = profile.name { SettingsValue(verbatim: name) }
                     profileLock
                 }
             }
@@ -176,13 +178,30 @@ struct AccountPage: View {
         Button {
             Task { await model.allowProfileChanges() }
         } label: {
-            Label("Not Allowed", systemImage: "lock").labelStyle(.iconOnly)
+            Label("Not allowed", systemImage: "lock").labelStyle(.iconOnly)
         }.buttonStyle(.plain).disabled(host.isAllowingMore)
     }
 
+    /// The picture and the lock are one control, so a read-only picture is not a second trailing value.
+    private func lockedPicture(_ profile: OwnerProfile) -> some View {
+        Button {
+            Task { await model.allowProfileChanges() }
+        } label: {
+            HStack(spacing: SettingsTokens.Metric.buttonGap) {
+                ProfilePictureMark(picture: model.picture, name: profile.name ?? profile.username)
+                Image(systemName: "lock").accessibilityHidden(true)
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(host.isAllowingMore)
+        .accessibilityLabel(Text("Not allowed"))
+    }
+
     private func profileField(_ field: ProfileContactField, readable: Bool, value: String?) -> some View {
-        SettingsRow(verbatim: field.title, error: model.contactErrors[field]) {
-            if readable && model.changeable.contains(field.scope) {
+        let editable = readable && model.changeable.contains(field.scope)
+        let shown = readable ? (value ?? String(localized: "Not set")) : nil
+        return SettingsRow(verbatim: field.title, line: editable ? nil : shown, error: model.contactErrors[field]) {
+            if editable {
                 SettingsField(
                     title: LocalizedStringKey(field.title),
                     text: Binding {
@@ -195,7 +214,6 @@ struct AccountPage: View {
                 )
                 .disabled(model.savingContacts.contains(field))
             } else {
-                if readable { SettingsValue(verbatim: value ?? String(localized: "Not Set")) }
                 profileLock
             }
         }
@@ -252,6 +270,8 @@ struct AccountHeader: View {
 private struct ProfilePictureMark: View {
     let picture: Data?
     let name: String?
+    /// The account board draws the picture at 28 points. Other tiles stay at the shared 24.
+    private static let side: CGFloat = 28
 
     private var initials: String {
         String((name ?? "").uppercased().split(separator: " ").prefix(2).compactMap(\.first))
@@ -264,7 +284,7 @@ private struct ProfilePictureMark: View {
             } else {
                 Circle().fill(SettingsTokens.Tone.purple.color).overlay {
                     if initials.isEmpty {
-                        SettingsTileGlyph(symbol: "person.fill", tileSize: SettingsTokens.Metric.tile)
+                        SettingsTileGlyph(symbol: "person.fill", tileSize: Self.side)
                     } else {
                         Text(verbatim: initials)
                             .settingsFont(.small)
@@ -275,7 +295,7 @@ private struct ProfilePictureMark: View {
                 .foregroundStyle(SettingsTokens.tileForeground)
             }
         }
-        .frame(width: SettingsTokens.Metric.tile, height: SettingsTokens.Metric.tile)
+        .frame(width: Self.side, height: Self.side)
         .clipShape(Circle())
         .accessibilityHidden(true)
     }
