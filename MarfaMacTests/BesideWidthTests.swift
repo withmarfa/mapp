@@ -43,6 +43,30 @@ struct BesideWidthTests {
         #expect(BesideColumn.pageWidth(in: 0, chosen: 500) == 500)
         #expect(BesideColumn.pageWidth(in: 0, chosen: 10) == BesideWidth.narrowest)
     }
+
+    @Test func aNarrowWindowLimitsWhatShowsAndNotWhatThePersonChose() {
+        let defaults = ThrowawayDefaults.make("BesideWidthTests.narrow")
+        BesideWidth.store(560, in: defaults)
+        let chosen = BesideWidth.stored(in: defaults)
+        #expect(chosen == 560)
+        // In a window of 1000 the page shows at 400, but a drag of one point moves the choice from 560, not from 400.
+        #expect(BesideColumn.pageWidth(in: 1000, chosen: chosen) == 400)
+        let dragged = BesideWidth.clamped(BesideWidth.dragged(from: chosen, by: 1))
+        #expect(dragged == 559)
+        BesideWidth.store(dragged, in: defaults)
+        #expect(BesideWidth.stored(in: defaults) == 559)
+        #expect(BesideColumn.pageWidth(in: 1600, chosen: BesideWidth.stored(in: defaults)) == 559)
+        // A double-click stores the standard width, whatever room the window has.
+        BesideWidth.store(BesideWidth.clamped(BesideWidth.standard), in: defaults)
+        #expect(BesideWidth.stored(in: defaults) == 440)
+    }
+
+    @Test func theWidthIsAMacOnlySettingTheAppKnows() {
+        #expect(BesideWidth.key == InterfaceKey.besideWidth)
+        #expect(InterfaceKey.all.contains(InterfaceKey.besideWidth))
+        #expect(PreferencesMap.staysOnMac.contains(InterfaceKey.besideWidth))
+        #expect(MacSettings.keys.contains(InterfaceKey.besideWidth))
+    }
 }
 
 struct RowLinkLimitTests {

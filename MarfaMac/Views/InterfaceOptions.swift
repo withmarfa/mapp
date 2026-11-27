@@ -5,6 +5,8 @@ enum InterfaceKey {
     static let textSize = "interfaceTextSize"
     /// The width the person last gave the right sidebar, kept across layouts and launches.
     static let inspectorWidth = "inspectorWidth"
+    /// The width the person last gave an item's page beside a layout, kept across launches.
+    static let besideWidth = "besideWidth"
     /// Whether the window's toolbar shows an item's title once the page's header has scrolled away.
     static let showsScrolledTitle = "showsScrolledTitle"
     /// Whether Back and Forward stand over the sidebar.
@@ -15,7 +17,7 @@ enum InterfaceKey {
     static let valuePanelStyle = "valuePanelStyle"
     /// What the command palette, Search Items and the new item stand on.
     static let paletteMaterial = "paletteMaterial"
-    static let all = [valuePanelStyle, paletteMaterial, textSize, inspectorWidth, showsScrolledTitle, showsSidebarHistory, showsPageToolbarBackground] + ColumnWidth.allCases.map(\.key)
+    static let all = [valuePanelStyle, paletteMaterial, textSize, inspectorWidth, besideWidth, showsScrolledTitle, showsSidebarHistory, showsPageToolbarBackground] + ColumnWidth.allCases.map(\.key)
 }
 
 /// What a value panel is made of. Glass lets the page show through; Solid is the window's own color.

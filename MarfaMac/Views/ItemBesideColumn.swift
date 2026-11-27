@@ -21,8 +21,9 @@ struct BesideColumn: ViewModifier {
     @State private var shared: CGFloat = 0
     /// The width the person gave the page, as kept on this Mac. What shows is `pageWidth(in:chosen:)` of it.
     @State private var chosen = BesideWidth.stored()
-    /// What the page measured when the person took hold of its divider, which the drag moves from.
-    @State private var dragStart: CGFloat?
+    /// The width chosen when the person took hold of the divider, which the drag moves from. A drag that is cancelled
+    /// resets it.
+    @GestureState private var dragStart: CGFloat?
 
     /// What the layout keeps before the page gives way: a table's Name column and its next three at their least.
     static let layoutKeeps: CGFloat = 600
@@ -39,9 +40,10 @@ struct BesideColumn: ViewModifier {
         return min(wanted, max(shared - layoutKeeps, min(narrowest, shared / 2)))
     }
 
-    /// Moves the page to `width` as far as the layout's room allows.
+    /// Keeps `width`, inside the page's range, as the person's choice. The room limits only what shows
+    /// (`pageWidth(in:chosen:)`), so a narrow window does not lower the choice.
     private func resize(to width: CGFloat) {
-        chosen = Self.pageWidth(in: shared, chosen: width)
+        chosen = BesideWidth.clamped(width)
     }
 
     func body(content: Content) -> some View {
@@ -102,13 +104,13 @@ extension BesideColumn {
             .pointerStyle(.columnResize)
             .gesture(
                 DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                    .updating($dragStart) { _, start, _ in
+                        if start == nil { start = chosen }
+                    }
                     .onChanged { drag in
-                        let start = dragStart ?? pageWidth
-                        dragStart = start
-                        resize(to: BesideWidth.dragged(from: start, by: drag.translation.width))
+                        resize(to: BesideWidth.dragged(from: dragStart ?? chosen, by: drag.translation.width))
                     }
                     .onEnded { _ in
-                        dragStart = nil
                         BesideWidth.store(chosen)
                     }
             )
@@ -121,8 +123,8 @@ extension BesideColumn {
             .accessibilityValue(Text(verbatim: "\(Int(pageWidth))"))
             .accessibilityAdjustableAction { direction in
                 switch direction {
-                case .increment: resize(to: pageWidth + BesideWidth.step)
-                case .decrement: resize(to: pageWidth - BesideWidth.step)
+                case .increment: resize(to: chosen + BesideWidth.step)
+                case .decrement: resize(to: chosen - BesideWidth.step)
                 @unknown default: return
                 }
                 BesideWidth.store(chosen)
@@ -134,7 +136,7 @@ extension BesideColumn {
 /// The width of the page beside a layout. The person drags it, and the width is kept on this Mac across launches in the
 /// defaults, as the right panel's is (`InterfaceKey.inspectorWidth`), and outside the settings the Marfa syncs.
 enum BesideWidth {
-    static let key = "besideWidth"
+    static let key = InterfaceKey.besideWidth
     /// Where the page starts, before the person drags it.
     static let standard: CGFloat = 440
     static let narrowest: CGFloat = 300
