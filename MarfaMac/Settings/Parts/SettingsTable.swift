@@ -81,6 +81,12 @@ struct SettingsHeaderPopUp<Value: Hashable, Choices: View>: View {
     }
 }
 
+/// Which column a log is ordered by, and which way. The column is its index in the table.
+struct SettingsColumnSort: Equatable {
+    var column: Int
+    var ascending: Bool
+}
+
 /// A bar above a list, with a count or tabs leading and search or choices trailing.
 struct SettingsListHeader<Leading: View, Trailing: View>: View {
     @ViewBuilder let leading: Leading
@@ -101,23 +107,45 @@ private struct TableHeader<Row>: View {
     var inset = SettingsTokens.Metric.sectionTableInset
     var height = SettingsTokens.Metric.tableHeader
     var hasCheck = false
+    /// Set together: a log's headings then order the rows, and say which way.
+    var sort: SettingsColumnSort?
+    var onColumnSort: ((Int) -> Void)?
 
     var body: some View {
         HStack(spacing: SettingsTokens.Metric.sectionTableColumnGap) {
             if hasCheck { Color.clear.frame(width: CheckWidth.value) }
             ForEach(columns.indices, id: \.self) { index in
-                let column = columns[index]
-                Text(column.title)
-                    .settingsFont(.tableHeader)
-                    .foregroundStyle(SettingsTokens.secondaryText)
-                    .frame(width: column.width, alignment: column.alignment)
-                    .frame(maxWidth: column.width == nil ? .infinity : nil, alignment: column.alignment)
+                heading(columns[index], index: index)
             }
             if hasAction { Color.clear.frame(width: ActionWidth.value) }
         }
         .padding(.horizontal, inset)
         .frame(minHeight: height)
-        .accessibilityHidden(true)
+        .accessibilityHidden(onColumnSort == nil)
+    }
+
+    /// A heading is a label, or a button where the table orders by it. The mark is only on the column in force.
+    private func heading(_ column: SettingsTableColumn<Row>, index: Int) -> some View {
+        let title = HStack(spacing: SettingsTokens.Metric.dotGap) {
+            Text(column.title)
+            if sort?.column == index {
+                Image(systemName: sort?.ascending == true ? "chevron.up" : "chevron.down")
+                    .accessibilityHidden(true)
+            }
+        }
+        .settingsFont(.tableHeader)
+        .foregroundStyle(SettingsTokens.secondaryText)
+        .frame(width: column.width, alignment: column.alignment)
+        .frame(maxWidth: column.width == nil ? .infinity : nil, alignment: column.alignment)
+        return Group {
+            if let onColumnSort {
+                Button { onColumnSort(index) } label: { title }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(sort?.column == index ? .isSelected : [])
+            } else {
+                title
+            }
+        }
     }
 }
 
@@ -297,6 +325,9 @@ struct SettingsLogTable<Row: Identifiable, Filter: View, Foot: View, Empty: View
     @ViewBuilder let filter: Filter
     @ViewBuilder let foot: Foot
     @ViewBuilder let empty: Empty
+    /// Where the headings order the rows. Nil leaves them as labels, as every table but a log does.
+    var sort: SettingsColumnSort?
+    var onColumnSort: ((Int) -> Void)?
 
     private var inset: CGFloat { SettingsTokens.Metric.pageTableInset }
 
@@ -310,7 +341,7 @@ struct SettingsLogTable<Row: Identifiable, Filter: View, Foot: View, Empty: View
             .padding(.horizontal, inset)
             .frame(minHeight: SettingsTokens.Metric.logTableBar)
             Rectangle().fill(SettingsTokens.rule).frame(height: 1)
-            TableHeader(columns: columns, hasAction: false, inset: inset)
+            TableHeader(columns: columns, hasAction: false, inset: inset, sort: sort, onColumnSort: onColumnSort)
             Rectangle().fill(SettingsTokens.rule).frame(height: 1)
             if rows.isEmpty {
                 empty.frame(maxWidth: .infinity, maxHeight: .infinity)
