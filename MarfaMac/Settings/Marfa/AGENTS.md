@@ -22,7 +22,7 @@ These pages stand alone, so another app can take them. They import nothing of th
 - **Each page names its permission and the one line that says what the app may not do** (`MarfaSettingsPage.permission`, `permissionLine`). No two pages share a line.
 - **`MarfaPageGate` shows the page or a centered state.** A page never falls back to a library of its own.
 - **A setting that needs no Marfa stands above the state** (`MarfaPageGate(above:)`, `SettingsStandingState`). `OpenLinksSection` sets the system's default for `marfa://` and stays reachable through Apps.
-- **Every Allow More… goes through `allowMore(_:)`,** whose argument names the permissions that the caller needs.
+- **Every permission request goes through `allowMore(_:)`,** whose argument names the permissions that the caller needs.
 - **Account has no page permission.** Change Password asks for access where the sign-in lacks `sign_ins.manage`.
 
 ## Code Review Rules

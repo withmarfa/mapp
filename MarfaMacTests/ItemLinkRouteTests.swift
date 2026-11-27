@@ -38,9 +38,9 @@ struct ItemLinkRouteTests {
     @Test func anItemInRecentlyDeletedIsRefusedAndOnlyOffersRecentlyDeleted() {
         #expect(
             ItemLinkRoute.decide(link(), mode: .marfa, isLoaded: true, instanceID: Self.instance, held: .trashed)
-                == .refuse(.inRecentlyDeleted))
-        #expect(ItemLinkRefusal.inRecentlyDeleted.message == "This item is in Recently Deleted.")
-        #expect(ItemLinkRefusal.inRecentlyDeleted.action == .openSettings(.trash))
+                == .refuse(.inTrash))
+        #expect(ItemLinkRefusal.inTrash.message == "This item is in Trash.")
+        #expect(ItemLinkRefusal.inTrash.action == .openSettings(.trash))
     }
 
     @Test func aCopyThatDoesNotKnowItsMarfaSaysSoAndNotNotFound() {
@@ -425,7 +425,7 @@ struct ItemLinkRouteTests {
         opener.register(browser, window: FakeWindow())
         opener.receive([link().url])
         #expect(await eventually { notices.told == 1 })
-        #expect(notices.waiting.map(\.message) == [ItemLinkRefusal.inRecentlyDeleted.message])
+        #expect(notices.waiting.map(\.message) == [ItemLinkRefusal.inTrash.message])
         #expect(notices.waiting.first?.action == .openSettings(.trash))
         #expect(opener.request == nil)
         #expect(browser.selection.isEmpty && !browser.isModalPresented)
@@ -443,7 +443,7 @@ struct ItemLinkRouteTests {
         library.items[index].state = .trashed
         #expect(await opener.take(for: browser, in: library) == nil)
         #expect(opener.request == nil)
-        #expect(notices.waiting.map(\.message) == [ItemLinkRefusal.inRecentlyDeleted.message])
+        #expect(notices.waiting.map(\.message) == [ItemLinkRefusal.inTrash.message])
     }
 
     @MainActor @Test func aCopyWithNoInstanceIDSaysItCantCheckYet() async {

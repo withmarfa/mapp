@@ -1,8 +1,7 @@
 import Marfa
 import SwiftUI
 
-/// The Trash page: what the server holds in its bin, with Restore on every row, Permanently Delete and Empty Trash.
-/// A section shows the latest page of it, and Show All opens the whole list as a page of its own.
+/// Trash opens the selection page through Select Items or Show All so individual items can be permanently deleted.
 struct TrashPage: View {
     static let allDeleted = SettingsSubpage(id: "all-deleted", title: String(localized: "All Deleted Items"))
 

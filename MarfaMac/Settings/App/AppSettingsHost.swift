@@ -313,7 +313,7 @@ enum LibraryDescription {
         return await WebSignInSheet.show(address, endingOn: scheme, over: window)
     }
 
-    // MARK: Recently Deleted
+    // MARK: Trash
 
     var deletedItems: [MarfaDeletedItem] {
         guard let library = libraries.current else { return [] }

@@ -25,7 +25,7 @@ A page opens with the permission here (`MarfaSettingsPage.permission`). A part t
 | Types | `schema.write` | Types, fields, status words, and rules |
 | Links | `schema.write` | Link types. Opens from Types |
 | Sources | `keys.manage` | Names and marks of sources. Both source rules need `config.manage` |
-| Trash | `items.purge` | The server's bin. How long items wait needs `config.manage` |
+| Trash | `items.purge` | Restore items or empty Trash. Choose Select Items or Show All to permanently delete selected items. Changing how long items wait needs `config.manage` |
 | History | `config.manage` | How long and how many versions, and how long logs, are kept |
 | File Storage | `config.manage` | Where files are kept, copies, reading text, removing unused files |
 | Connectors | `connectors.manage` | Each connector's health, machine, sign-in, settings and mapping |

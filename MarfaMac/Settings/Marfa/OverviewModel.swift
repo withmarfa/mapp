@@ -3,9 +3,7 @@ import Marfa
 import MarfaAPI
 import Observation
 
-/// What the Overview reads of the server: what needs the owner's attention, and how the server stands. The app keeps one, so
-/// the sidebar's badge is its count whichever page is shown. A server refusal for want of a permission shows the page's
-/// Needs a Permission state and has the grants read again.
+/// Reads server health, problems and release information for Overview and the Account badge.
 @Observable @MainActor final class OverviewModel {
     private let context: OwnerContext
     private let healthReader: ServerHealthModel
@@ -38,7 +36,6 @@ import Observation
         healthReader = health ?? ServerHealthModel(context: context)
     }
 
-    /// What the sidebar's badge counts: the server's concerns, not the app's own missing permissions.
     var attentionCount: Int { concerns.count }
 
     /// The release the server runs, left out for a development build: it carries version 0.0.0, which is no version.

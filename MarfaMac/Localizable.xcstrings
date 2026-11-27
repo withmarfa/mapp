@@ -11325,11 +11325,11 @@
     "This item is in Recently Deleted, where its history can’t be read. Recover it to see its versions." : {
       "extractionState" : "manual"
     },
-    "This item is in Recently Deleted." : {
-
-    },
     "This item is in Recently Deleted. Recover it to restore a version." : {
       "extractionState" : "manual"
+    },
+    "This item is in Trash." : {
+
     },
     "This item is no longer available." : {
 
