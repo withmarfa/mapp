@@ -408,12 +408,14 @@ struct RenderedWindow<Detail: View>: View {
         let library = FakeItemLibrary(items: [])
         library.downloadedFiles = FakeDownloads(
             state: DownloadedFileState(
-                budget: .automatic, limit: 12_000_000_000, bytes: 1_200_000_000,
-                attachments: .init(held: 53, heldBytes: 640_000_000, missing: 0, reasons: [])))
+                budget: .automatic, limit: 12_000_000_000, bytes: 1_200_000,
+                attachments: .init(held: 53, heldBytes: 640_000, missing: 0, reasons: [])))
         let (libraries, bench) = try await connected()
         let host = AppSettingsHost(libraries: libraries, launcher: SettingsLauncher())
         let defaults = ThrowawayDefaults.make("ConnectionRender")
-        _ = bench
+        let connection = try #require(libraries.host.configuredConnection)
+        let store = bench.location.store(for: connection)
+        try Data(repeating: 1, count: 2_000_000).write(to: store)
         try await SettingsRender.png(
             RenderedWindow(
                 selection: .connection, detail: ConnectionPage(settingsHost: host)

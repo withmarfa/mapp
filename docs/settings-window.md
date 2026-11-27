@@ -51,7 +51,7 @@ See `docs/owner-settings.md` for Marfa pages and `docs/settings-sync.md` for sto
 | Lists | The starting density, sort and group of a place, until a view or the place chooses its own |
 | Layouts | How each type looks, through the stores of `docs/type-looks.md`. Only what differs from the type's preset is kept, so a better preset still reaches it. Page pins properties and holds the one Linked From row, which reads and writes the type's stored choice (`PagePlacements.linkedFrom`) |
 | Search | What searches of the whole library leave out (`SearchLeaveOuts`). A search in one place leaves nothing out. A type or source that would pass a query's ten conditions is dimmed, with the reason |
-| Connection | Address status, Signed in as linking to Account, permission and queue counts, downloaded files, and exports. Other Marfas shows when other copies exist. Disconnect asks about unsent changes |
+| Connection | Address status, Account link, permission and queue counts, downloads, space used, and exports. Other Marfas shows when other copies exist. Disconnect asks about unsent changes |
 
 - **A choice whose thing is gone keeps its name, marked as missing** (`MissingChoice`), and the app uses the default meanwhile.
 - **Import, restore and reset save a restore point first.** If that fails, nothing changes.

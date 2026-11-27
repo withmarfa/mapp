@@ -17,14 +17,14 @@ import Testing
     @Test func withoutAPermissionTheySayTheyStayOnThisMacAndOfferAllowMore() {
         let needing = words(.off(.needsPermission))
         #expect(needing.title == "Kept on this Mac only")
-        #expect(needing.line == "The app isn’t allowed to keep them in this Marfa yet. Once it is, every Mac that connects uses them.")
+        #expect(needing.line == "The app isn’t allowed to keep them in Home yet. Once it is, every Mac that connects uses them.")
         #expect(needing.action == .allowMore && needing.actionTitle == "Allow More…")
     }
 
     @Test func removedSettingsStayOnThisMacUntilThePersonKeepsThemAgain() {
         let removed = words(.off(.removed))
         #expect(removed.title == "Kept on this Mac only")
-        #expect(removed.line == "They were removed from this Marfa. This Mac keeps its own.")
+        #expect(removed.line == "They were removed from Home. This Mac keeps its own.")
         #expect(removed.action == .keepAgain && removed.actionTitle == "Keep in Marfa Again")
     }
 
@@ -33,7 +33,8 @@ import Testing
         #expect(syncing.removeTitle == "Remove This App’s Settings from Home?")
         #expect(syncing.removeMessage == "Every Mac that connects to Home loses them. This Mac keeps its own, and your items stay.")
         #expect(syncing.title == "Kept in this Marfa")
-        #expect(syncing.actionTitle == "Remove")
+        #expect(syncing.line == "Every Mac that connects to it uses them.")
+        #expect(syncing.actionTitle == "Remove…")
     }
 
     /// The section's state is the sync's own, so Allow More… moving it on needs nothing else.
@@ -305,19 +306,26 @@ import Testing
         #expect(await copy.sends == 1 && sync.standing == .off(.removed))
     }
 
-    @Test func generalKeepsSettingsWhenTheServerRefusesRemoval() async throws {
+    @Test func generalQueuesRemovalAndStopsSyncingWhileOffline() async throws {
         let copy = FakePreferencesCopy()
-        let (sync, _) = try await syncing(copy)
+        let (sync, defaults) = try await syncing(copy)
+        let item = try #require(sync.item?.id)
         await copy.setDelivers(false)
-        await #expect(throws: MarfaError.self) { try await sync.removeFromMarfa() }
-        #expect(sync.syncs && sync.item != nil)
-        #expect(await copy.removed.isEmpty)
-        #expect(await copy.queuedRemovals.isEmpty)
 
-        await copy.setDelivers(true)
-        try await sync.removeFromMarfa()
-        #expect(sync.standing == .off(.removed))
-        #expect(await copy.removed.count == 1)
+        try await sync.remove()
+        #expect(sync.standing == .off(.removed) && sync.item == nil)
+        #expect(await Set(copy.queuedRemovals.values) == [item])
+        #expect(await copy.sends == 0)
+
+        defaults.set("dark", forKey: AppearanceKey.theme)
+        await sync.flush()
+        #expect(sync.standing == .off(.removed) && sync.item == nil)
+        #expect(await copy.writesToBinned == 0)
+
+        try await sync.startAgain()
+        #expect(sync.syncs && sync.item != nil && sync.item?.id != item)
+        #expect(defaults.string(forKey: AppearanceKey.theme) == "dark")
+        #expect(await copy.writesToBinned == 0)
     }
 
     @Test func aRemovalTheServerDidNotTakeThrowsSoDisconnectCanSayIt() async throws {

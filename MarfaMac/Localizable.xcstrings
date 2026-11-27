@@ -4199,9 +4199,6 @@
     "Couldn’t load that page of activity. %@" : {
 
     },
-    "Couldn’t reach this Marfa. Your settings are still kept there." : {
-
-    },
     "Couldn’t read" : {
 
     },
@@ -4825,6 +4822,9 @@
 
     },
     "Every Mac that connects to %@ loses them. This Mac keeps its own, and your items stay." : {
+
+    },
+    "Every Mac that connects to it uses them." : {
 
     },
     "Every Marfa has these. Base a type on one to add to it." : {
@@ -8490,9 +8490,6 @@
     "Remove Condition" : {
 
     },
-    "Remove Downloaded Files" : {
-      "extractionState" : "manual"
-    },
     "Remove Field" : {
 
     },
@@ -8531,6 +8528,9 @@
     },
     "Remove control and text-direction characters." : {
       "extractionState" : "manual"
+    },
+    "Remove downloaded files" : {
+
     },
     "Remove from Collection" : {
       "extractionState" : "manual"
@@ -9454,9 +9454,6 @@
     "Sign in again" : {
 
     },
-    "Sign in again in Connection. Your settings are still kept in this Marfa." : {
-
-    },
     "Sign in and switch" : {
 
     },
@@ -9665,6 +9662,9 @@
       "extractionState" : "manual"
     },
     "Sources show where items came from." : {
+
+    },
+    "Space used" : {
 
     },
     "Speed" : {
@@ -10238,7 +10238,7 @@
     "The app isn’t allowed to install, update or remove plugins." : {
 
     },
-    "The app isn’t allowed to keep them in this Marfa yet. Once it is, every Mac that connects uses them." : {
+    "The app isn’t allowed to keep them in %@ yet. Once it is, every Mac that connects uses them." : {
 
     },
     "The app isn’t allowed to list and end your sign-ins." : {
@@ -10328,7 +10328,7 @@
     "The app isn’t signed in to this server. Sign in below." : {
       "extractionState" : "manual"
     },
-    "The app keeps them in this Marfa once this Mac has finished downloading it." : {
+    "The app keeps them in %@ once this Mac has finished downloading it." : {
 
     },
     "The app keeps trying." : {
@@ -11039,7 +11039,7 @@
     "They still show in their own place, in views and in Favorites." : {
 
     },
-    "They were removed from this Marfa. This Mac keeps its own." : {
+    "They were removed from %@. This Mac keeps its own." : {
 
     },
     "They would go to Recently Deleted within the hour." : {

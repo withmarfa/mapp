@@ -46,9 +46,7 @@ struct GeneralPage: View {
         }
         .alert(Text(verbatim: keptSettings.removeTitle), isPresented: $isConfirmingRemoval) {
             Button("Cancel", role: .cancel) {}
-            Button("Remove", role: .destructive) {
-                removeKeptSettings()
-            }
+            Button("Remove", role: .destructive) { removeKeptSettings() }
         } message: {
             Text(keptSettings.removeMessage)
         }
@@ -255,7 +253,7 @@ struct GeneralPage: View {
 
     @ViewBuilder private var keptSettingsRow: some View {
         let words = keptSettings
-        if words.isShown {
+        if libraries.host.configuredConnection != nil, words.isShown {
             SettingsRow(verbatim: words.title, line: words.line, error: settingsProblem, lines: nil) {
                 if let title = words.actionTitle {
                     let buttonTitle = words.action == .allowMore && libraries.marfaSettings.isAllowingMore
@@ -263,7 +261,7 @@ struct GeneralPage: View {
                     SettingsButton(title: Text(verbatim: buttonTitle), role: words.action == .remove ? .destructive : .normal) {
                         act(on: words.action)
                     }
-                    .disabled(isChangingKeptSettings || libraries.marfaSettings.isAllowingMore || libraries.marfaSettings.isWorking)
+                    .disabled(isChangingKeptSettings || libraries.marfaSettings.isAllowingMore)
                     .accessibilityIdentifier(words.action == .remove ? "RemoveAppSettings" :
                         words.action == .keepAgain ? "KeepAppSettingsAgain" : "AllowMoreForAppSettings")
                 }
@@ -304,13 +302,7 @@ struct GeneralPage: View {
     }
 
     private func removeKeptSettings() {
-        guard libraries.host.state == .online else {
-            settingsProblem = libraries.host.state == .keyRefused
-                ? String(localized: "Sign in again in Connection. Your settings are still kept in this Marfa.")
-                : String(localized: "Couldn’t reach this Marfa. Your settings are still kept there.")
-            return
-        }
-        changeKeptSettings { try await libraries.preferences.removeFromMarfa() }
+        changeKeptSettings { try await libraries.preferences.remove() }
     }
 
     /// Where the settings sync, a reset reaches every Mac that connects to the Marfa. Either way a restore point is saved first.

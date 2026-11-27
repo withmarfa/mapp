@@ -29,11 +29,11 @@ nonisolated struct ConnectionSettings: Equatable, Sendable {
 
     var line: String? {
         switch standing {
-        case .syncing: nil
+        case .syncing: String(localized: "Every Mac that connects to it uses them.")
         case .off(.needsPermission):
-            String(localized: "The app isn’t allowed to keep them in this Marfa yet. Once it is, every Mac that connects uses them.")
-        case .off(.notFilled): String(localized: "The app keeps them in this Marfa once this Mac has finished downloading it.")
-        case .off(.removed): String(localized: "They were removed from this Marfa. This Mac keeps its own.")
+            String(localized: "The app isn’t allowed to keep them in \(name) yet. Once it is, every Mac that connects uses them.")
+        case .off(.notFilled): String(localized: "The app keeps them in \(name) once this Mac has finished downloading it.")
+        case .off(.removed): String(localized: "They were removed from \(name). This Mac keeps its own.")
         case .off(.noMarfa): nil
         }
     }
@@ -49,14 +49,14 @@ nonisolated struct ConnectionSettings: Equatable, Sendable {
 
     var actionTitle: String? {
         switch action {
-        case .remove: String(localized: "Remove")
+        case .remove: String(localized: "Remove…")
         case .allowMore: String(localized: "Allow More…")
         case .keepAgain: String(localized: "Keep in Marfa Again")
         case .none: nil
         }
     }
 
-    /// The question before Remove takes the settings out of the Marfa.
+    /// The question before Remove… takes the settings out of the Marfa.
     var removeTitle: String { String(localized: "Remove This App’s Settings from \(name)?") }
     var removeMessage: String {
         String(localized: "Every Mac that connects to \(name) loses them. This Mac keeps its own, and your items stay.")

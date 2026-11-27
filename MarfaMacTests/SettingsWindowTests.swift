@@ -38,13 +38,17 @@ struct SettingsWindowTests {
     }
 
     @Test func searchesForLocalCopySettingsOpenConnection() {
-        for word in ["On This Mac", "Keep opened files", "Export everything", "Download everything again"] {
+        for word in [
+            "On This Mac", "Keep opened files", "Space used", "Remove downloaded files",
+            "Export everything", "Download everything again",
+        ] {
             let launcher = SettingsLauncher()
             let results = SettingsPage.sidebarMatches(word)
             #expect(results == [.connection])
             launcher.show(results.first)
             #expect(launcher.navigation.page == .connection)
         }
+        #expect(SettingsPage.sidebarMatches("Clear").contains(.connection))
     }
 
     @Test func appearanceAndEditorRowsAppearInSidebarSearch() {

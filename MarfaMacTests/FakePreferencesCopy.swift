@@ -230,12 +230,6 @@ actor FakePreferencesCopy: PreferencesCopy {
         return write
     }
 
-    func removeFromMarfa(_ items: [String]) async throws {
-        guard delivers else { throw MarfaError.invalid(message: "the server did not take the removal") }
-        for item in items { held[item]?.trashed = true }
-        removed.append(contentsOf: items)
-    }
-
     func pendingRemovals() async throws -> Set<String> { Set(queuedRemovals.keys) }
 
     func holdsOtherChanges(besides items: Set<String>) async throws -> Bool { !libraryWrites.isEmpty }

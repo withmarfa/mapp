@@ -167,7 +167,8 @@ nonisolated enum SettingsPage: CaseIterable, Hashable, Sendable {
                 String(localized: "Marfa"), String(localized: "Address"), String(localized: "Sign In"), String(localized: "Signed in as"),
                 String(localized: "Permissions"), String(localized: "Unsent changes"), String(localized: "Use another Marfa"),
                 String(localized: "Downloaded Files"), String(localized: "Keep opened files"), String(localized: "Attachments"),
-                String(localized: "Opened files"), String(localized: "This Mac’s Copy"), String(localized: "On This Mac"),
+                String(localized: "Opened files"), String(localized: "Clear"), String(localized: "Remove downloaded files"),
+                String(localized: "This Mac’s Copy"), String(localized: "Space used"), String(localized: "On This Mac"),
                 String(localized: "Export everything"), String(localized: "Export automatically"), String(localized: "Export folder"),
                 String(localized: "Download everything again"), String(localized: "Disconnect"),
             ]

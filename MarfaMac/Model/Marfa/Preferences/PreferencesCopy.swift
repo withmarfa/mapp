@@ -23,7 +23,8 @@ nonisolated struct PreferencesReadiness: Equatable, Sendable {
     var instance: String?
 }
 
-/// The working copy operations used by settings sync. Ordinary sync writes are queued locally so they work offline.
+/// What the preferences sync asks of the working copy, apart from the copy so it can be tested without one. Every
+/// write is queued and shown at once, so it works offline.
 nonisolated protocol PreferencesCopy: Sendable {
     /// Names this opened copy, so a write queued under another, whose answer no sync here can take, is told apart.
     var run: String { get }
@@ -49,8 +50,6 @@ nonisolated protocol PreferencesCopy: Sendable {
     func write(_ operations: [RowOperation], to table: PreferencesTable, of item: String) async throws
     /// Moves an item to the bin, and answers the id of the queued write that does it.
     func remove(_ item: String) async throws -> String
-    /// Asks the server to trash the named settings items together.
-    func removeFromMarfa(_ items: [String]) async throws
     /// The queued writes that move a settings item to the bin and have no answer yet.
     func pendingRemovals() async throws -> Set<String>
     /// Whether the queue holds a write the server has not answered that is not one of these items' own, such as the
@@ -194,15 +193,6 @@ nonisolated struct WorkingCopyPreferences: PreferencesCopy {
         let queued = try await MarfaEngine.asking { try await copy.items.delete(item) }
         await sendSoon()
         return queued.id
-    }
-
-    func removeFromMarfa(_ items: [String]) async throws {
-        guard !items.isEmpty else { return }
-        let preview = try await MarfaEngine.asking { try await copy.items.previewTrash(ids: items) }
-        guard preview.count == items.count, preview.items.allSatisfy({ $0.count == 1 && !$0.truncated }) else {
-            throw PreferencesSync.RemovalError.takesOtherItems
-        }
-        _ = try await MarfaEngine.asking { try await copy.items.trash(preview) }
     }
 
     func pendingRemovals() async throws -> Set<String> {

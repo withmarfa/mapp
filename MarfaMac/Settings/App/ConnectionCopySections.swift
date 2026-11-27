@@ -6,6 +6,7 @@ struct ConnectionCopySections: View {
     @Environment(Libraries.self) private var libraries
     @Environment(\.library) private var library
     @State private var downloads: DownloadedFileState?
+    @State private var storeBytes: UInt64?
     @State private var isWorking = false
     @State private var readFailed = false
     @State private var actionFailure: String?
@@ -40,6 +41,9 @@ struct ConnectionCopySections: View {
                     Task { await read() }
                 }
             SettingsSection("This Mac’s Copy", footer: "An export is an archive that any Marfa can restore.") {
+                SettingsRow("Space used") {
+                    SettingsValue(verbatim: storeBytes.map(StoreSize.text) ?? String(localized: "Unavailable"))
+                }
                 exportRow(connection: connection)
                 automaticRows
                 downloadRow(library: library)
@@ -306,7 +310,10 @@ struct ConnectionCopySections: View {
     // MARK: Reading
 
     private func read() async {
-        guard let source = library?.downloadedFiles else { return }
+        guard let source = library?.downloadedFiles, let connection = host.configuredConnection else { return }
+        let bytes = await StoreSize.bytes(of: host.location.directory(for: connection))
+        guard !Task.isCancelled, connection == host.configuredConnection else { return }
+        storeBytes = bytes
         do {
             downloads = try await source.read()
             readFailed = false

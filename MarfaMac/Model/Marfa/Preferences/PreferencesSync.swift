@@ -61,7 +61,6 @@ final class PreferencesSync {
     @ObservationIgnored private(set) var library = ""
     /// Bumped on each attach and detach, so a step that awaited across one stops.
     @ObservationIgnored private var generation = 0
-    @ObservationIgnored private var isRemoving = false
     @ObservationIgnored private var listening: Task<Void, Never>?
     @ObservationIgnored private var pending: Task<Void, Never>?
     @ObservationIgnored private var running = false
@@ -160,7 +159,7 @@ final class PreferencesSync {
         await run()
     }
 
-    // MARK: Removing settings
+    // MARK: For Connection's section
 
     /// Why a removal did not go ahead or did not finish.
     nonisolated enum RemovalError: Error, Equatable {
@@ -168,20 +167,6 @@ final class PreferencesSync {
         case otherChangesWait
         /// The server did not take the removal; it stays queued and is sent when the copy next reaches the server.
         case notTaken
-        /// The preview shows a cascade or a different item count.
-        case takesOtherItems
-        case alreadyRemoving
-    }
-
-    /// Removes the server's settings together. A refusal leaves the copy and its settings sync as they were.
-    func removeFromMarfa() async throws {
-        try await withRemoval { copy, generation in
-            let instance = try await copy.readiness().instance
-            let ids = try await copy.items().map(\.id)
-            guard generation == self.generation else { return }
-            try await copy.removeFromMarfa(ids)
-            markRemoved(instance: instance, generation: generation)
-        }
     }
 
     /// Moves every settings item of this Marfa to the bin. The settings on this Mac stay as they are, and nothing is
@@ -192,24 +177,7 @@ final class PreferencesSync {
     /// (`sendsOtherChanges`), a queue that holds any is left alone and the removal is not made: changes the person
     /// chose to discard never reach the server this way.
     func remove(confirmed: Bool = false, sendsOtherChanges: Bool = true) async throws {
-        try await withRemoval { copy, generation in
-            let held = try await copy.items()
-            if confirmed, !sendsOtherChanges, try await copy.holdsOtherChanges(besides: Set(held.map(\.id))) {
-                throw RemovalError.otherChangesWait
-            }
-            var writes: Set<String> = []
-            for settings in held { writes.insert(try await copy.remove(settings.id)) }
-            markRemoved(instance: try await copy.readiness().instance, generation: generation)
-            if confirmed {
-                do { try await copy.send(writes) } catch { throw RemovalError.notTaken }
-            }
-        }
-    }
-
-    private func withRemoval(_ operation: (any PreferencesCopy, Int) async throws -> Void) async throws {
         guard let copy else { return }
-        guard !isRemoving else { throw RemovalError.alreadyRemoving }
-        isRemoving = true
         let generation = generation
         pending?.cancel()
         pending = nil
@@ -217,24 +185,26 @@ final class PreferencesSync {
         // or sets the standing over `removed`.
         holding += 1
         defer {
-            isRemoving = false
             holding -= 1
             if holding == 0 { schedule(after: .milliseconds(300)) }
         }
         await run()
         guard generation == self.generation else { return }
-        try await operation(copy, generation)
-    }
-
-    private func markRemoved(instance: String?, generation: Int) {
-        if generation == self.generation {
-            item = nil
-            standing = .off(.removed)
+        let held = try await copy.items()
+        if confirmed, !sendsOtherChanges, try await copy.holdsOtherChanges(besides: Set(held.map(\.id))) {
+            throw RemovalError.otherChangesWait
         }
-        if let instance {
+        var writes: Set<String> = []
+        for settings in held { writes.insert(try await copy.remove(settings.id)) }
+        item = nil
+        standing = .off(.removed)
+        if let instance = try await copy.readiness().instance {
             var record = Record.read(defaults)
             record.marfas[instance]?.removed = true
             record.save(defaults)
+        }
+        if confirmed {
+            do { try await copy.send(writes) } catch { throw RemovalError.notTaken }
         }
     }
 
