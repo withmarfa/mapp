@@ -45,6 +45,15 @@ struct SettingsWindowTests {
         }
     }
 
+    @Test func appearanceAndEditorRowsAppearInSidebarSearch() {
+        for word in ["App icon", "Dock", "Interface text size", "Sidebar color"] {
+            #expect(SettingsPage.sidebarMatches(word) == [.appearance])
+        }
+        for word in ["Font", "Code font", "PDF background", "Pinned properties", "Text size and width"] {
+            #expect(SettingsPage.sidebarMatches(word) == [.editor])
+        }
+    }
+
     @Test func backAndForwardKeepMovedPageRoutes() {
         let launcher = SettingsLauncher()
         launcher.show(.addresses)

@@ -122,10 +122,13 @@ nonisolated enum SettingsPage: CaseIterable, Hashable, Sendable {
             ]
         case .appearance:
             [
-                String(localized: "Theme"), String(localized: "Accent"), String(localized: "Highlights"), String(localized: "Type Chips"), String(localized: "Text Size"),
-                String(localized: "Text Font"), String(localized: "Code Font"), String(localized: "Value Panels"),
-                String(localized: "Palettes"), String(localized: "Title When Scrolling"), String(localized: "Toolbar Background When Scrolling"),
-                String(localized: "Symbols on Subtypes"), String(localized: "Window Layout"), String(localized: "Sidebar"), String(localized: "List"),
+                String(localized: "Theme"), String(localized: "Accent"), String(localized: "App icon"), String(localized: "Dock"),
+                String(localized: "Highlight color"), String(localized: "Type chip color"), String(localized: "Interface text size"),
+                String(localized: "Value panels"), String(localized: "Palettes"), String(localized: "Sidebar color"),
+                String(localized: "Back and forward over the sidebar"), String(localized: "Show item title when scrolling"),
+                String(localized: "Toolbar background when scrolling"), String(localized: "Symbols on subtypes in the sidebar"),
+                String(localized: "Window Layout"), String(localized: "Sidebar width"), String(localized: "List width"),
+                String(localized: "From the front window"), String(localized: "Default widths"),
             ]
         case .keyboard:
             [
@@ -142,12 +145,16 @@ nonisolated enum SettingsPage: CaseIterable, Hashable, Sendable {
             ] + ItemSort.allCases.map { String(localized: $0.title) }
         case .editor:
             [
-                String(localized: "Text Size"), String(localized: "Line Spacing"), String(localized: "Paragraph Spacing"),
-                String(localized: "Links to Items"), String(localized: "Page Width"), String(localized: "Standard Width"),
-                String(localized: "Title Length"), String(localized: "Edit Pages As"), String(localized: "Articles Open In"),
-                String(localized: "Check Spelling While Typing"), String(localized: "Smart Quotes and Dashes"),
-                String(localized: "Pair Brackets and Quotes"), String(localized: "Continue Lists on Return"), String(localized: "Indent With"),
-                String(localized: "Paste Formatted Text As"), String(localized: "Fold Headings"), String(localized: "Line Numbers in Code"),
+                String(localized: "Font"), String(localized: "Code font"), String(localized: "Text size"),
+                String(localized: "Line spacing"), String(localized: "Paragraph spacing"), String(localized: "Links to items"),
+                String(localized: "Page width"), String(localized: "Standard width"), String(localized: "Title length"),
+                String(localized: "Fold headings with a triangle"), String(localized: "Line numbers in code"),
+                String(localized: "Pinned properties"), String(localized: "PDF background"),
+                String(localized: "Formats"), String(localized: "Text size and width"), String(localized: "Focus"),
+                String(localized: "Edit pages as"), String(localized: "Articles open in"), String(localized: "Paste formatted text as"),
+                String(localized: "Check spelling"), String(localized: "Smart quotes and dashes in formatted text"),
+                String(localized: "Pair brackets and quotes"), String(localized: "Continue lists on Return"),
+                String(localized: "Indent Markdown Source with"),
             ]
         case .layouts:
             [

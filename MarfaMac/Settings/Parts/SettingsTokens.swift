@@ -221,6 +221,9 @@ enum SettingsTokens {
         static let swatch: CGFloat = 18
         static let swatchDot: CGFloat = 6
         static let swatchSpacing: CGFloat = 8
+        /// Compensates for the transparent margin built into the icon assets.
+        static let iconChoiceScale: CGFloat = 1.25
+        static let iconChoiceRingOutset: CGFloat = 3
         /// How much of the system's color well shows over a swatch that stands for it: none to the eye, all to the pointer.
         static let invisibleWell: Double = 0.02
         /// A choice tile's picture is wider than tall, as the board draws it: 186 by 104 in the column.

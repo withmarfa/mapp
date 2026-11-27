@@ -45,9 +45,9 @@ See `docs/owner-settings.md` for Marfa pages and `docs/settings-sync.md` for sto
 | Page | What to know before a change |
 | --- | --- |
 | General | Reopen Windows follows the Mac until the person changes it, and only then writes `NSQuitAlwaysKeepsWindows`. Send Error Reports and Updates show only in a build that carries a destination or a feed |
-| Appearance | A color is stored as a name or a hex value. Installed fonts are listed when the page appears, never before |
+| Appearance | App icon updates the Dock at launch and on change. Sky uses the bundle icon. Alternatives are Cobalt, Sea, Leaf, Marigold, and Adobe. Sidebar color applies to the main window |
 | Keyboard | Search by command or keys. Export and Restore Defaults include menu and global shortcuts. Import updates commands in the file (`docs/commands.md`) |
-| Editor | Each change reaches an open page. Inkkit's options go as one set (`EditorOptions`), because each of its calls replaces the whole set. Edit Pages As applies to items opened next, never to the page shown |
+| Editor | Fonts load when the page opens. PDF background shares the choice in View › PDF Background. Inkkit replaces `EditorOptions` as a set. Edit pages as applies to items opened next |
 | Lists | Density, From (All Items or Library), sort, and grouping. A view or place can override these defaults |
 | Layouts | Types are grouped by origin. Export and Import transfer the date, secondary line, and facts (`docs/type-looks.md`). `PagePlacements` stores pins and Linked From. Restore Defaults resets both stores for one type |
 | Search | Excluded types and sources keep their names if missing (`SearchLeaveOuts`). Add explains the ten-condition limit. Included controls archived and Feed items. Results controls order and snippets. Searches within a place omit nothing |

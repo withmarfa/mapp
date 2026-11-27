@@ -82,15 +82,6 @@ struct FileViewCommands: View {
     let shortcuts: ShortcutBindings
     @AppStorage(PDFBackground.key) private var background = PDFBackground.gray
 
-    /// Gray is the default, so it is stored as no choice.
-    private var storedBackground: Binding<PDFBackground> {
-        Binding {
-            background
-        } set: { choice in
-            if choice == .gray { UserDefaults.standard.removeObject(forKey: PDFBackground.key) } else { background = choice }
-        }
-    }
-
     var body: some View {
         let commands = FileViewCommand.offered(for: viewing.kind)
         ForEach(commands.filter { ![.nextPage, .previousPage].contains($0) }, id: \.self) { command in
@@ -101,7 +92,7 @@ struct FileViewCommands: View {
             button(.nextPage)
             button(.previousPage)
             Divider()
-            Picker("PDF Background", selection: storedBackground) {
+            Picker("PDF Background", selection: Binding { background } set: { $0.store() }) {
                 ForEach(PDFBackground.allCases) { Text($0.title).tag($0) }
             }
             .pickerStyle(.menu)

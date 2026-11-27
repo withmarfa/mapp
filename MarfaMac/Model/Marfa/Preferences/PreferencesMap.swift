@@ -61,7 +61,7 @@ enum PreferencesMap {
         keys.map { SyncedSetting(key: $0, place: .member(field)) }
     }
 
-    /// Each field holds the settings of one Settings page.
+    /// A setting keeps its field when its control moves to another page.
     private static let members: [SyncedSetting] =
         members(AppearanceKey.all + [
             InterfaceKey.textSize, InterfaceKey.valuePanelStyle, InterfaceKey.paletteMaterial, InterfaceKey.showsScrolledTitle,
