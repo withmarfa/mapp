@@ -491,7 +491,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         case .replacedMeanwhile:
             Notice(
                 title: String(localized: "The Sign-In Changed"),
-                message: String(localized: "Another copy of this app or another app signed in to this server while you were approving, so this approval wasn’t kept. Sign in again to replace that sign-in."))
+                message: String(localized: "Another copy of this app or another app signed in to this server while you were approving, so this approval wasn’t kept and that sign-in stays. To replace it, sign in again."))
         case .keychain:
             Notice(
                 title: String(localized: "Can’t Keep the Sign-In"),
