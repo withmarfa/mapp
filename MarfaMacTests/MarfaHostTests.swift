@@ -503,6 +503,7 @@ import Testing
         (.unavailable(message: "offline"), .couldNotFinish),
         (.unreadable(message: "locked"), .notMarfa),
         (.heldElsewhere, .inUse),
+        (.keptSignInChanged, .replacedMeanwhile),
     ])
     func aSignInThatDoesNotFinishLeavesTheOldOneAndTheCopyAlone(_ error: SignInError, _ outcome: SignInOutcome) async throws {
         let bench = HostBench()

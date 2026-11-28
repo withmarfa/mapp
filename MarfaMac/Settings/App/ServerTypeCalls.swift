@@ -47,7 +47,7 @@ nonisolated struct ServerTypeCalls: TypeCalls {
     }
 
     func delete(_ type: String, force: Bool) async throws(TypeFailure) {
-        try await run { client in try await client.delete(itemType: type, force: force) }
+        try await run { client in try await client.delete(itemType: type, force: force, revision: nil) }
     }
 
     func previewMove(of type: String, to target: String) async throws(TypeFailure) -> TypeMovePreview {

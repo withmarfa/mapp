@@ -481,7 +481,7 @@ import Observation
     /// The names, marks and counts the server last gave, kept while it cannot be reached. Before the first answer a
     /// source shows its code, and its count is the loaded items'. It is read again at start, on coming online, when
     /// the Sources page opens and whenever the items change while it is open; a turn counter stops a read that began
-    /// before a rename from undoing it. Counts come from `itemCountsBySource(state: "active", filter: "part eq false")`,
+    /// before a rename from undoing it. Counts come from `itemStats(by: .source)` of the active items without parts,
     /// both tiers, which leaves out parts (items that live with a host, such as attached files), as the server's own
     /// lists do; the app's lists hide only attached files, so another kind of part would count lower than the list shows.
     /// Once the server has answered, the Sources page and sidebar list its sources that hold items

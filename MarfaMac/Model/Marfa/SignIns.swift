@@ -105,6 +105,9 @@ nonisolated enum SignInOutcome: Hashable, Sendable {
     case inUse
     /// The Keychain would not keep or give the sign-in.
     case keychain
+    /// While the person approved, another copy of the app or another app signed in to the same server and the Keychain
+    /// kept that sign-in, so the approval was not kept.
+    case replacedMeanwhile
     /// the app had no window to show the server's page over.
     case noWindow
     /// Anything else that stopped the sign-in.
@@ -131,6 +134,7 @@ nonisolated enum SignInOutcome: Hashable, Sendable {
             case .unavailable: self = .couldNotFinish
             case .discoveryTransport(let reason): self = .discoveryTransport(reason)
             case .heldElsewhere: self = .inUse
+            case .keptSignInChanged: self = .replacedMeanwhile
             case .refused(let code, _): self = Self.isHTTPStatus(code) ? .notMarfa : .refused
             case .stateMismatch, .issuerMismatch: self = .notVerified
             case .notAServer, .unreadable: self = .notMarfa
