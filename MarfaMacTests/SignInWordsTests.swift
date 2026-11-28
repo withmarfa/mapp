@@ -17,7 +17,7 @@ import Testing
         .canceled, .denied, .expired, .stateMismatch, .issuerMismatch, .notSignedIn, .notAServer, .otherServer, .noRedirect,
         .refused(code: "invalid_client", message: "Unknown client, HTTP 401"),
         .unavailable(message: "The Internet connection appears to be offline. (NSURLErrorDomain -1009)"),
-        .heldElsewhere,
+        .heldElsewhere, .keptSignInChanged,
         .unreadable(message: "The server answered 401 with invalid_grant."),
     ]
 

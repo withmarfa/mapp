@@ -2751,6 +2751,9 @@
     "Another copy of this app or another app is using the sign-in on this Mac, so nothing changed. Wait a moment, then try again." : {
       "extractionState" : "manual"
     },
+    "Another copy of this app or another app signed in to this server while you were approving, so this approval wasn’t kept. Sign in again to replace that sign-in." : {
+      "extractionState" : "manual"
+    },
     "Another item opened before the app finished saving this one, so your most recent typing might not be saved. Try again." : {
 
     },
@@ -10313,6 +10316,9 @@
     },
     "The Server’s Steps" : {
 
+    },
+    "The Sign-In Changed" : {
+      "extractionState" : "manual"
     },
     "The Sign-In Is in Use" : {
       "extractionState" : "manual"

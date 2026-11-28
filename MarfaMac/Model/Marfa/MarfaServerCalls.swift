@@ -321,7 +321,10 @@ nonisolated struct MarfaServerCalls: ItemHistorySource, InstanceConfigSource, Ty
     /// (`system.*` and `app.*`, `items/hidden-types`) and the ones the key cannot read by itself.
     @concurrent func counts() async throws(SourceEditFailure) -> [String: Int] {
         do {
-            return try await server().itemCountsBySource(state: "active", filter: "part eq false", timeout: timeout)
+            let groups = try await server().itemStats(
+                by: .source, filters: .init(states: [.active], filter: "part eq false"), timeout: timeout)
+            // Codes that differ only in Unicode normalization are separate groups on the server but one key here.
+            return groups.reduce(into: [:]) { counts, group in counts[group.key, default: 0] += Int(clamping: group.count) }
         } catch let ending as Ending {
             throw Self.sourceFailure(ending)
         } catch {
